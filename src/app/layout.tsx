@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 export const metadata: Metadata = {
-  title: "Redovisningsbyrå - Specialister på Enskilda Firmor",
+  title: "Enkla bokslut - Specialister på Enskilda Firmor",
   description: "Professionell redovisning för enskilda firmor. NE-bilaga från 1499kr, Komplett tjänst från 3499kr.",
 };
 
@@ -16,11 +17,13 @@ export default function RootLayout({
   return (
     <html lang="sv">
       <body>
-        <Navigation />
-        <main className="min-h-screen">
-          {children}
-        </main>
-        <Footer />
+        <AuthProvider>
+          <Navigation />
+          <main className="min-h-screen">
+            {children}
+          </main>
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   );

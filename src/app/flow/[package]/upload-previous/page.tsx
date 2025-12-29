@@ -18,7 +18,7 @@ export default function UploadPreviousPage() {
   const [hasNoPrevious, setHasNoPrevious] = useState(false);
 
   const bank = banks.find((b) => b.id === bankId);
-  const totalSteps = 5;
+  const totalSteps = 6;
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -29,7 +29,7 @@ export default function UploadPreviousPage() {
   };
 
   const handleContinue = () => {
-    router.push(`/flow/${packageType}/confirmation?bank=${bankId}`);
+    router.push(`/flow/${packageType}/contact-info?bank=${bankId}`);
   };
 
   return (

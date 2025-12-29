@@ -1,21 +1,67 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import FlowContainer from '@/components/FlowContainer';
 import { banks } from '@/data/banks';
 import { packages } from '@/data/packages';
 import { Bank } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { createClient } from '@/lib/supabase';
 
 export default function ConfirmationPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const packageType = params.package as string;
   const bankId = searchParams.get('bank') as Bank;
+  const email = searchParams.get('email') || '';
+  const name = searchParams.get('name') || '';
+  const phone = searchParams.get('phone') || '';
+  const company = searchParams.get('company') || '';
+
+  const { user, refreshProfile } = useAuth();
+  const supabase = createClient();
 
   const bank = banks.find((b) => b.id === bankId);
   const packageInfo = packages.find((p) => p.id === packageType);
-  const totalSteps = 5;
+  const totalSteps = 6;
+  const [orderSaved, setOrderSaved] = useState(false);
+
+  // Save order to database on mount
+  useEffect(() => {
+    const saveOrder = async () => {
+      if (orderSaved) return; // Prevent duplicate saves
+
+      const orderData = {
+        user_id: user?.id || null,
+        guest_email: user ? null : email,
+        guest_name: user ? null : name,
+        guest_phone: user ? null : phone,
+        guest_company: user ? null : company,
+        package_type: packageType,
+        bank: bankId,
+        status: 'pending',
+      };
+
+      const { error } = await supabase.from('orders').insert(orderData);
+
+      if (!error) {
+        setOrderSaved(true);
+
+        // Increment order count for logged-in users
+        if (user) {
+          await supabase.rpc('increment_order_count', { user_id: user.id });
+          // Refresh profile to update order count in UI
+          await refreshProfile();
+        }
+      }
+    };
+
+    if (bankId && packageType && (user || email)) {
+      saveOrder();
+    }
+  }, [bankId, packageType, email, user, orderSaved, supabase, refreshProfile, name, phone, company]);
 
   return (
     <FlowContainer
@@ -66,6 +112,31 @@ export default function ConfirmationPage() {
             <span>Pris:</span>
             <span className="font-semibold text-gold-500">{packageInfo?.price} kr</span>
           </div>
+          {(name || email) && (
+            <>
+              <div className="border-t border-navy-600 my-3 pt-3"></div>
+              <div className="flex justify-between">
+                <span>Kontakt:</span>
+                <span className="font-semibold text-white text-right">{name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>E-post:</span>
+                <span className="font-semibold text-warm-400 text-right">{email}</span>
+              </div>
+              {phone && (
+                <div className="flex justify-between">
+                  <span>Telefon:</span>
+                  <span className="font-semibold text-warm-400 text-right">{phone}</span>
+                </div>
+              )}
+              {company && (
+                <div className="flex justify-between">
+                  <span>Företag:</span>
+                  <span className="font-semibold text-warm-400 text-right">{company}</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 

@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { packages } from '@/data/packages';
-import { Package } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Home() {
-  const [isReturningCustomer, setIsReturningCustomer] = useState(false);
+  const { user, profile, isReturningCustomer, loading } = useAuth();
 
   return (
     <div className="bg-navy-800">
@@ -41,35 +40,9 @@ export default function Home() {
               </span>
             </p>
 
-            {/* Customer Type Toggle */}
-            <div className="flex justify-center mb-16">
-              <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl p-1.5 inline-flex">
-                <button
-                  onClick={() => setIsReturningCustomer(false)}
-                  className={`px-8 py-3 rounded-lg font-semibold transition-all duration-200 ${
-                    !isReturningCustomer
-                      ? 'bg-gold-500 text-navy-900 shadow-lg shadow-gold-500/20'
-                      : 'text-warm-300 hover:text-white'
-                  }`}
-                >
-                  Ny kund
-                </button>
-                <button
-                  onClick={() => setIsReturningCustomer(true)}
-                  className={`px-8 py-3 rounded-lg font-semibold transition-all duration-200 ${
-                    isReturningCustomer
-                      ? 'bg-gold-500 text-navy-900 shadow-lg shadow-gold-500/20'
-                      : 'text-warm-300 hover:text-white'
-                  }`}
-                >
-                  Återkommande kund
-                </button>
-              </div>
-            </div>
-
-            {/* Welcome Message */}
+            {/* Welcome Message - Auto-detected based on auth */}
             <div className="mb-20">
-              {isReturningCustomer ? (
+              {!loading && user && isReturningCustomer ? (
                 <div className="bg-gradient-to-br from-gold-500/10 to-gold-600/5 border border-gold-500/20 rounded-2xl p-8 max-w-2xl mx-auto backdrop-blur-sm">
                   <div className="flex items-center justify-center mb-4">
                     <div className="w-12 h-12 bg-gold-500/20 rounded-full flex items-center justify-center">
@@ -79,11 +52,27 @@ export default function Home() {
                     </div>
                   </div>
                   <h2 className="text-2xl font-bold text-white mb-3">
-                    Välkommen tillbaka!
+                    Välkommen tillbaka, {profile?.full_name || 'tillbaka'}!
                   </h2>
                   <p className="text-warm-300 text-lg">
-                    Som återkommande kund känner du redan till processen.
+                    Du har gjort {profile?.order_count || 0} {profile?.order_count === 1 ? 'beställning' : 'beställningar'} hos oss tidigare.
                     Välj ditt paket nedan för att komma igång direkt.
+                  </p>
+                </div>
+              ) : !loading && user && !isReturningCustomer ? (
+                <div className="bg-gradient-to-br from-gold-500/10 to-gold-600/5 border border-gold-500/20 rounded-2xl p-8 max-w-2xl mx-auto backdrop-blur-sm">
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="w-12 h-12 bg-gold-500/20 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-3">
+                    Välkommen, {profile?.full_name}!
+                  </h2>
+                  <p className="text-warm-300 text-lg">
+                    Detta är din första beställning hos oss. Vi guidar dig genom hela processen steg för steg.
                   </p>
                 </div>
               ) : (
@@ -104,6 +93,27 @@ export default function Home() {
                       Färdig på 24 timmar
                     </span>
                   </div>
+                  {!user && (
+                    <div className="mt-6 pt-6 border-t border-navy-600">
+                      <p className="text-warm-400 text-sm mb-4">
+                        Har du ett konto? Logga in för snabbare checkout.
+                      </p>
+                      <div className="flex gap-3 justify-center">
+                        <Link
+                          href="/auth/login"
+                          className="px-6 py-2 bg-navy-800 hover:bg-navy-600 border border-gold-500/50 hover:border-gold-500 text-white rounded-lg font-semibold transition-all duration-200"
+                        >
+                          Logga in
+                        </Link>
+                        <Link
+                          href="/auth/signup"
+                          className="px-6 py-2 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-lg font-bold transition-all duration-200 shadow-lg shadow-gold-500/20"
+                        >
+                          Skapa konto
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

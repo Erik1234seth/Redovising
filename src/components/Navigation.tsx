@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Navigation() {
   const pathname = usePathname();
+  const { user, profile, signOut, loading } = useAuth();
 
   const isActive = (path: string) => pathname === path;
 
@@ -53,14 +55,47 @@ export default function Navigation() {
             </Link>
             <Link
               href="/kontakt"
-              className={`ml-2 px-6 py-2 text-sm font-bold rounded-lg transition-all duration-200 ${
+              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
                 isActive('/kontakt')
-                  ? 'bg-gradient-to-r from-gold-600 to-gold-700 text-navy-900 shadow-lg shadow-gold-500/20'
-                  : 'bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40'
+                  ? 'bg-gold-500/10 text-gold-500'
+                  : 'text-warm-300 hover:text-white hover:bg-navy-800'
               }`}
             >
               Kontakt
             </Link>
+
+            {!loading && (
+              <>
+                {user ? (
+                  <div className="flex items-center space-x-2 ml-4">
+                    <span className="text-sm text-warm-300 px-3 py-2">
+                      {profile?.full_name || user.email}
+                    </span>
+                    <button
+                      onClick={() => signOut()}
+                      className="px-4 py-2 text-sm font-semibold text-warm-300 hover:text-white hover:bg-navy-800 rounded-lg transition-all duration-200"
+                    >
+                      Logga ut
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2 ml-4">
+                    <Link
+                      href="/auth/login"
+                      className="px-4 py-2 text-sm font-semibold text-warm-300 hover:text-white hover:bg-navy-800 rounded-lg transition-all duration-200"
+                    >
+                      Logga in
+                    </Link>
+                    <Link
+                      href="/auth/signup"
+                      className="px-6 py-2 text-sm font-bold bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-lg shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 transition-all duration-200"
+                    >
+                      Skapa konto
+                    </Link>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
