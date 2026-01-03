@@ -37,29 +37,29 @@ export default function KontaktPage() {
   };
 
   return (
-    <div className="min-h-screen bg-navy-800 py-12">
+    <div className="min-h-screen bg-navy-800 py-8 sm:py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+        <div className="text-center mb-8 sm:mb-12">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-3 sm:mb-4">
             Kontakta oss
           </h1>
-          <p className="text-xl text-warm-300">
+          <p className="text-base sm:text-xl text-warm-300 px-4">
             Har du frågor? Vi hjälper dig gärna!
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 mb-12">
+        <div className="grid md:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-12">
           {/* Contact Info */}
-          <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-2xl shadow-xl p-8">
-            <h2 className="text-2xl font-bold text-white mb-6">
+          <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl shadow-xl p-6 sm:p-8">
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">
               Kontaktinformation
             </h2>
 
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="flex items-start">
-                <div className="w-12 h-12 bg-gold-500/20 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gold-500/20 rounded-lg sm:rounded-xl flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
                   <svg
-                    className="w-6 h-6 text-gold-500"
+                    className="w-5 h-5 sm:w-6 sm:h-6 text-gold-500"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -73,10 +73,10 @@ export default function KontaktPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white mb-1">E-post</h3>
+                  <h3 className="font-semibold text-white text-sm sm:text-base mb-1">E-post</h3>
                   <a
                     href="mailto:erik@enklabokslut.se"
-                    className="text-gold-500 hover:text-gold-400 transition-colors"
+                    className="text-gold-500 hover:text-gold-400 transition-colors text-sm sm:text-base"
                   >
                     erik@enklabokslut.se
                   </a>
@@ -84,9 +84,9 @@ export default function KontaktPage() {
               </div>
 
               <div className="flex items-start">
-                <div className="w-12 h-12 bg-gold-500/20 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gold-500/20 rounded-lg sm:rounded-xl flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
                   <svg
-                    className="w-6 h-6 text-gold-500"
+                    className="w-5 h-5 sm:w-6 sm:h-6 text-gold-500"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -100,23 +100,23 @@ export default function KontaktPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white mb-1">Telefon</h3>
+                  <h3 className="font-semibold text-white text-sm sm:text-base mb-1">Telefon</h3>
                   <a
                     href="tel:+46701234567"
-                    className="text-gold-500 hover:text-gold-400 transition-colors"
+                    className="text-gold-500 hover:text-gold-400 transition-colors text-sm sm:text-base"
                   >
                     070-123 45 67
                   </a>
-                  <p className="text-sm text-warm-400 mt-1">
+                  <p className="text-xs sm:text-sm text-warm-400 mt-1">
                     Vardagar 9:00-17:00
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start">
-                <div className="w-12 h-12 bg-gold-500/20 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gold-500/20 rounded-lg sm:rounded-xl flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
                   <svg
-                    className="w-6 h-6 text-gold-500"
+                    className="w-5 h-5 sm:w-6 sm:h-6 text-gold-500"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -130,30 +130,30 @@ export default function KontaktPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white mb-1">
+                  <h3 className="font-semibold text-white text-sm sm:text-base mb-1">
                     Svarstid
                   </h3>
-                  <p className="text-warm-300">
+                  <p className="text-warm-300 text-sm sm:text-base">
                     Vi strävar efter att svara inom 24 timmar
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="mt-8 pt-8 border-t border-navy-600">
-              <h3 className="font-semibold text-white mb-3">
+            <div className="mt-6 sm:mt-8 pt-6 sm:pt-8 border-t border-navy-600">
+              <h3 className="font-semibold text-white text-sm sm:text-base mb-2 sm:mb-3">
                 Vanliga frågor?
               </h3>
-              <p className="text-warm-300 mb-4">
+              <p className="text-warm-300 text-sm sm:text-base mb-3 sm:mb-4">
                 Kolla in vår guidesida för svar på vanliga frågor och
                 steg-för-steg instruktioner.
               </p>
               <a
                 href="/tutorial"
-                className="inline-flex items-center text-gold-500 hover:text-gold-400 font-semibold transition-colors"
+                className="inline-flex items-center text-gold-500 hover:text-gold-400 font-semibold transition-colors text-sm sm:text-base"
               >
                 Till guider
-                <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </a>
@@ -161,12 +161,12 @@ export default function KontaktPage() {
           </div>
 
           {/* Contact Form */}
-          <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-2xl shadow-xl p-8">
+          <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl shadow-xl p-6 sm:p-8">
             {isSubmitted ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-gold-500/20 border-2 border-gold-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="text-center py-8 sm:py-12">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gold-500/20 border-2 border-gold-500 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
                   <svg
-                    className="w-10 h-10 text-gold-500"
+                    className="w-8 h-8 sm:w-10 sm:h-10 text-gold-500"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -179,26 +179,26 @@ export default function KontaktPage() {
                     />
                   </svg>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-2">
+                <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
                   Tack för ditt meddelande!
                 </h3>
-                <p className="text-warm-300 mb-6">
+                <p className="text-warm-300 text-sm sm:text-base mb-4 sm:mb-6">
                   Vi återkommer till dig så snart som möjligt.
                 </p>
                 <button
                   onClick={() => setIsSubmitted(false)}
-                  className="text-gold-500 hover:text-gold-400 font-semibold transition-colors"
+                  className="text-gold-500 hover:text-gold-400 font-semibold transition-colors text-sm sm:text-base"
                 >
                   Skicka ett nytt meddelande
                 </button>
               </div>
             ) : (
               <>
-                <h2 className="text-2xl font-bold text-white mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">
                   Skicka ett meddelande
                 </h2>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
                   <div>
                     <label
                       htmlFor="name"
@@ -287,11 +287,11 @@ export default function KontaktPage() {
         </div>
 
         {/* Additional Info */}
-        <div className="bg-gold-500/10 border-l-4 border-gold-500 rounded-r-xl p-6">
-          <h3 className="font-semibold text-gold-500 mb-2">
+        <div className="bg-gold-500/10 border-l-4 border-gold-500 rounded-r-lg sm:rounded-r-xl p-4 sm:p-6">
+          <h3 className="font-semibold text-gold-500 text-sm sm:text-base mb-2">
             Personuppgifter och GDPR
           </h3>
-          <p className="text-sm text-warm-300">
+          <p className="text-xs sm:text-sm text-warm-300">
             Vi värnar om din integritet. De uppgifter du delar med oss hanteras enligt
             GDPR och används endast för att svara på din förfrågan. Läs mer om hur vi
             behandlar dina personuppgifter i vår integritetspolicy.
