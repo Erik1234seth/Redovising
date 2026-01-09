@@ -85,7 +85,7 @@ export default function ContactInfoPage() {
     <FlowContainer
       title="Kontaktuppgifter"
       description="Fyll i dina uppgifter så kan vi nå dig när din NE-bilaga är klar."
-      currentStep={5}
+      currentStep={6}
       totalSteps={6}
       packageType={packageType}
     >

@@ -89,7 +89,7 @@ export default function UploadPreviousPage() {
     <FlowContainer
       title="Ladda upp tidigare NE-bilaga (om tillämpligt)"
       description="Om du har fått en NE-bilaga tidigare år, ladda upp den här så vi kan använda samma struktur."
-      currentStep={4}
+      currentStep={5}
       totalSteps={totalSteps}
       packageType={packageType}
     >

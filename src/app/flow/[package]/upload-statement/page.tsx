@@ -21,7 +21,7 @@ export default function UploadStatementPage() {
   const [uploadError, setUploadError] = useState<string>('');
   const [orderId, setOrderId] = useState<string>('');
 
-  const totalSteps = packageType === 'ne-bilaga' ? 5 : 5;
+  const totalSteps = 6;
 
   // Generate or retrieve order ID
   useEffect(() => {

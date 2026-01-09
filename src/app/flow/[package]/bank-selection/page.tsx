@@ -12,7 +12,7 @@ export default function BankSelectionPage() {
   const packageType = params.package as string;
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
 
-  const totalSteps = packageType === 'ne-bilaga' ? 5 : 5;
+  const totalSteps = 6;
 
   const handleContinue = () => {
     if (selectedBank) {

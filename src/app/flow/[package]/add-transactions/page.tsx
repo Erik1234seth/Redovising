@@ -34,7 +34,7 @@ export default function AddTransactionsPage() {
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
   const [formError, setFormError] = useState('');
 
-  const totalSteps = packageType === 'ne-bilaga' ? 5 : 5;
+  const totalSteps = 6;
 
   // Get order ID from sessionStorage
   useEffect(() => {

@@ -97,7 +97,7 @@ export default function ConfirmationPage() {
     <FlowContainer
       title="Tack för din beställning!"
       description="Vi har tagit emot dina uppgifter och börjar arbeta med din redovisning."
-      currentStep={5}
+      currentStep={6}
       totalSteps={totalSteps}
       packageType={packageType}
     >
