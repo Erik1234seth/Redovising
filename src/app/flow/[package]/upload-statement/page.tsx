@@ -95,11 +95,7 @@ export default function UploadStatementPage() {
 
   const handleContinue = () => {
     if (selectedFile && !uploading) {
-      if (packageType === 'ne-bilaga') {
-        router.push(`/flow/${packageType}/upload-previous?bank=${bankId}`);
-      } else {
-        router.push(`/flow/${packageType}/delegation-guide?bank=${bankId}`);
-      }
+      router.push(`/flow/${packageType}/add-transactions?bank=${bankId}`);
     }
   };
 

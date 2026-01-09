@@ -3,7 +3,8 @@
     "allow": [
       "WebFetch(domain:developer.signicat.com)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
