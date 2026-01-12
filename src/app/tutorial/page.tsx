@@ -325,12 +325,20 @@ export default function TutorialPage() {
                   5
                 </div>
                 <h2 className="text-lg sm:text-2xl font-bold text-white">
-                  Ge oss behörighet via Skatteverket
+                  Registrera oss som ombud på Skatteverket
                 </h2>
               </div>
               <div className="ml-0 sm:ml-14 space-y-3 sm:space-y-4">
                 <p className="text-sm sm:text-base text-warm-300">
-                  För att vi ska kunna lämna in din deklaration åt dig behöver du ge oss behörighet på Skatteverkets webbplats. Följ stegen nedan:
+                  För att vi ska kunna lämna in din deklaration åt dig behöver du registrera oss som ombud på Skatteverkets webbplats. Detta ger oss behörighet att lämna in din inkomstdeklaration.
+                </p>
+                <div className="bg-gold-500/10 border-l-4 border-gold-500 rounded-r-lg p-3 sm:p-4 mb-4">
+                  <p className="text-xs sm:text-sm text-warm-200">
+                    <strong className="text-gold-500">Varför behövs detta?</strong> Genom att registrera oss som ombud kan vi lämna in din deklaration direkt till Skatteverket åt dig. Du behåller full kontroll och kan när som helst återkalla behörigheten.
+                  </p>
+                </div>
+                <p className="text-sm sm:text-base text-warm-300 font-semibold">
+                  Följ stegen nedan:
                 </p>
                 <div className="bg-navy-800/50 border border-navy-600 rounded-lg p-3 sm:p-4">
                   <ol className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-warm-300 list-decimal list-inside">
