@@ -18,19 +18,16 @@ export default function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20">
           <div className="flex items-center">
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0">
+            <Link href="/" className="flex items-center group">
+              <div className="relative w-12 h-12 sm:w-14 sm:h-14">
                 <Image
                   src="/logga.png"
-                  alt="Enkla bokslut logo"
+                  alt="Enkla bokslut"
                   fill
-                  className="object-contain"
+                  className="object-contain hover:scale-105 transition-transform duration-200"
                   priority
                 />
               </div>
-              <span className="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gold-400 to-gold-600 group-hover:from-gold-300 group-hover:to-gold-500 transition-all duration-300">
-                Enkla bokslut
-              </span>
             </Link>
           </div>
 
