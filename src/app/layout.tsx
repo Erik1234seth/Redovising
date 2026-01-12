@@ -7,6 +7,11 @@ import { AuthProvider } from "@/contexts/AuthContext";
 export const metadata: Metadata = {
   title: "Enkla bokslut - Specialister på Enskilda Firmor",
   description: "Professionell redovisning för enskilda firmor. NE-bilaga från 1499kr, Komplett tjänst från 3499kr.",
+  icons: {
+    icon: '/logga.png',
+    shortcut: '/logga.png',
+    apple: '/logga.png',
+  },
 };
 
 export default function RootLayout({
