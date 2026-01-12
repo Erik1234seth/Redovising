@@ -100,7 +100,7 @@ export default function UploadPreviousPage() {
         />
       </div>
 
-      <div className={`border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200 ${
+      <div className={`border-2 border-dashed rounded-xl p-6 sm:p-12 text-center transition-all duration-200 ${
         uploading
           ? 'border-gold-500 bg-gold-500/10 scale-[1.02]'
           : selectedFile

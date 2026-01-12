@@ -89,7 +89,7 @@ export default function ContactInfoPage() {
       totalSteps={7}
       packageType={packageType}
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {existingCustomer && (
           <div className="bg-gold-500/10 border border-gold-500/50 rounded-xl p-4 mb-6">
             <div className="flex items-start">

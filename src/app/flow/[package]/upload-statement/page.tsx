@@ -111,7 +111,7 @@ export default function UploadStatementPage() {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        className={`border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200 ${
+        className={`border-2 border-dashed rounded-xl p-6 sm:p-12 text-center transition-all duration-200 ${
           isDragging
             ? 'border-gold-500 bg-gold-500/10 scale-[1.02]'
             : selectedFile

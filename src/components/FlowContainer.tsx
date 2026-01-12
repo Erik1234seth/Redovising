@@ -27,8 +27,8 @@ export default function FlowContainer({
           packageType={packageType}
         />
 
-        <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-2xl shadow-2xl p-8 md:p-12">
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
+        <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-2xl shadow-2xl p-4 sm:p-8 md:p-12">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">
             {title}
           </h1>
           {description && (
