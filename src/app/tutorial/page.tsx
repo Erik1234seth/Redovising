@@ -192,7 +192,7 @@ export default function TutorialPage() {
               </p>
               <div className="ml-0 sm:ml-14 bg-gold-500/10 border border-gold-500/30 rounded-lg p-3 sm:p-4">
                 <p className="text-xs sm:text-sm text-warm-200">
-                  <strong className="text-gold-500">Inom 24 timmar</strong> får du din färdiga NE-bilaga via e-post.
+                  Du får din färdiga NE-bilaga via e-post <strong className="text-gold-500">så snart som möjligt</strong>.
                   Du lämnar sedan in den själv på Skatteverkets webbplats.
                 </p>
               </div>
@@ -401,7 +401,7 @@ export default function TutorialPage() {
                   <h4 className="font-semibold text-white text-sm sm:text-base mb-2 sm:mb-3">Så här går det till:</h4>
                   <ol className="space-y-2 text-xs sm:text-sm text-warm-300 list-decimal list-inside">
                     <li>Vi bearbetar dina kontoutdrag och upprättar NE-bilagan</li>
-                    <li>Du får en kopia via e-post för granskning (vanligtvis inom 24 timmar)</li>
+                    <li>Du får en kopia via e-post för granskning så snart som möjligt</li>
                     <li>Granska NE-bilagan noggrant och kontrollera att allt stämmer</li>
                     <li>Svara på e-postmeddelandet med ditt godkännande</li>
                     <li>Vi lämnar in deklarationen åt dig på Skatteverket</li>

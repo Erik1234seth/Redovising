@@ -186,7 +186,7 @@ export default function ConfirmationPage() {
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
                 2
               </span>
-              <span>Inom 24 timmar får du din färdiga NE-bilaga via e-post</span>
+              <span>Du får din färdiga NE-bilaga via e-post så snart som möjligt</span>
             </li>
             <li className="flex items-start">
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
