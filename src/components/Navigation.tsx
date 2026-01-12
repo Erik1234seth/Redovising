@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState } from 'react';
@@ -19,15 +18,9 @@ export default function Navigation() {
         <div className="flex justify-between h-20">
           <div className="flex items-center">
             <Link href="/" className="flex items-center group">
-              <div className="relative w-16 h-16 sm:w-20 sm:h-20">
-                <Image
-                  src="/logga.png"
-                  alt="Enkla bokslut"
-                  fill
-                  className="object-contain hover:scale-105 transition-transform duration-200"
-                  priority
-                />
-              </div>
+              <span className="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gold-400 to-gold-600 group-hover:from-gold-300 group-hover:to-gold-500 transition-all duration-300">
+                Enkla bokslut
+              </span>
             </Link>
           </div>
 
