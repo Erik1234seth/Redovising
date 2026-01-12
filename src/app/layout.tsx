@@ -8,9 +8,9 @@ export const metadata: Metadata = {
   title: "Enkla bokslut - Specialister på Enskilda Firmor",
   description: "Professionell redovisning för enskilda firmor. NE-bilaga från 1499kr, Komplett tjänst från 3499kr.",
   icons: {
-    icon: '/logga.png',
-    shortcut: '/logga.png',
-    apple: '/logga.png',
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/favicon.ico',
   },
 };
 
