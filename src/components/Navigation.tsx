@@ -19,7 +19,7 @@ export default function Navigation() {
         <div className="flex justify-between h-20">
           <div className="flex items-center">
             <Link href="/" className="flex items-center group">
-              <div className="relative w-12 h-12 sm:w-14 sm:h-14">
+              <div className="relative w-16 h-16 sm:w-20 sm:h-20">
                 <Image
                   src="/logga.png"
                   alt="Enkla bokslut"
