@@ -24,7 +24,7 @@ export default function UploadPreviousPage() {
   const [orderId, setOrderId] = useState<string>('');
 
   const bank = banks.find((b) => b.id === bankId);
-  const totalSteps = 6;
+  const totalSteps = 7;
 
   // Get order ID from sessionStorage
   useEffect(() => {

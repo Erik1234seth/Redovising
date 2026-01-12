@@ -12,7 +12,7 @@ export default function BankSelectionPage() {
   const packageType = params.package as string;
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
 
-  const totalSteps = 6;
+  const totalSteps = 7;
 
   const handleContinue = () => {
     if (selectedBank) {

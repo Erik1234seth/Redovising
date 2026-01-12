@@ -21,7 +21,7 @@ export default function UploadStatementPage() {
   const [uploadError, setUploadError] = useState<string>('');
   const [orderId, setOrderId] = useState<string>('');
 
-  const totalSteps = 6;
+  const totalSteps = 7;
 
   // Generate or retrieve order ID
   useEffect(() => {

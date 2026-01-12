@@ -34,7 +34,7 @@ export default function AddTransactionsPage() {
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
   const [formError, setFormError] = useState('');
 
-  const totalSteps = 6;
+  const totalSteps = 7;
 
   // Get order ID from sessionStorage
   useEffect(() => {

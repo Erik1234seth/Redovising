@@ -25,7 +25,7 @@ export default function ConfirmationPage() {
 
   const bank = banks.find((b) => b.id === bankId);
   const packageInfo = packages.find((p) => p.id === packageType);
-  const totalSteps = 6;
+  const totalSteps = 7;
   const [orderSaved, setOrderSaved] = useState(false);
 
   // Save order to database on mount
@@ -97,7 +97,7 @@ export default function ConfirmationPage() {
     <FlowContainer
       title="Tack för din beställning!"
       description="Vi har tagit emot dina uppgifter och börjar arbeta med din redovisning."
-      currentStep={6}
+      currentStep={7}
       totalSteps={totalSteps}
       packageType={packageType}
     >

@@ -5,7 +5,12 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(for file in src/app/flow/[package]/add-transactions/page.tsx src/app/flow/[package]/bank-selection/page.tsx src/app/flow/[package]/delegation-guide/page.tsx src/app/flow/[package]/download-guide/page.tsx src/app/flow/[package]/upload-previous/page.tsx src/app/flow/[package]/upload-statement/page.tsx)",
+      "Bash(do sed -i 's/const totalSteps = 6/const totalSteps = 7/g' \"$file\")",
+      "Bash(done)",
+      "Bash(grep:*)"
     ]
   }
 }

@@ -17,7 +17,7 @@ export default function DelegationGuidePage() {
   const [hasCompleted, setHasCompleted] = useState(false);
 
   const bank = banks.find((b) => b.id === bankId);
-  const totalSteps = 6;
+  const totalSteps = 7;
 
   const handleContinue = () => {
     if (hasCompleted) {

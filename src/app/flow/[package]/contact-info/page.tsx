@@ -78,7 +78,7 @@ export default function ContactInfoPage() {
       company: formData.company,
     });
 
-    router.push(`/flow/${packageType}/confirmation?${params.toString()}`);
+    router.push(`/flow/${packageType}/review-and-accept?${params.toString()}`);
   };
 
   return (
@@ -86,7 +86,7 @@ export default function ContactInfoPage() {
       title="Kontaktuppgifter"
       description="Fyll i dina uppgifter så kan vi nå dig när din NE-bilaga är klar."
       currentStep={6}
-      totalSteps={6}
+      totalSteps={7}
       packageType={packageType}
     >
       <form onSubmit={handleSubmit} className="space-y-6">
