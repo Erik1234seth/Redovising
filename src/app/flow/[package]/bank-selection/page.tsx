@@ -1,18 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import FlowContainer from '@/components/FlowContainer';
 import { banks } from '@/data/banks';
 import { Bank } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function BankSelectionPage() {
   const params = useParams();
   const router = useRouter();
+  const { user, loading } = useAuth();
   const packageType = params.package as string;
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
 
   const totalSteps = 7;
+
+  // Protect route - require authentication
+  useEffect(() => {
+    if (!loading && !user) {
+      // Redirect to login with return URL
+      router.push(`/auth/login?redirect=/flow/${packageType}/bank-selection`);
+    }
+  }, [user, loading, router, packageType]);
 
   const handleContinue = () => {
     if (selectedBank) {

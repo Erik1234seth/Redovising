@@ -119,6 +119,23 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Login Required Notice for Guests */}
+          {!loading && !user && (
+            <div className="bg-gold-500/10 border-l-4 border-gold-500 rounded-r-xl p-4 sm:p-6 mb-8 max-w-5xl mx-auto">
+              <div className="flex items-start">
+                <svg className="w-6 h-6 text-gold-500 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h3 className="text-gold-500 font-bold mb-1 text-sm sm:text-base">Inloggning krävs</h3>
+                  <p className="text-warm-200 text-sm sm:text-base">
+                    Du måste vara inloggad för att göra en beställning. Skapa ett gratis konto eller logga in för att komma igång.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Packages Section */}
           <div id="packages" className="grid md:grid-cols-2 gap-6 sm:gap-8 max-w-5xl mx-auto">
             {packages.map((pkg, index) => (
@@ -175,12 +192,21 @@ export default function Home() {
                     ))}
                   </ul>
 
-                  <Link
-                    href={`/flow/${pkg.id}/bank-selection`}
-                    className="block w-full bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 text-center font-bold py-3 sm:py-4 px-6 rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-[1.02] text-sm sm:text-base"
-                  >
-                    Välj {pkg.name} →
-                  </Link>
+                  {user ? (
+                    <Link
+                      href={`/flow/${pkg.id}/bank-selection`}
+                      className="block w-full bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 text-center font-bold py-3 sm:py-4 px-6 rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-[1.02] text-sm sm:text-base"
+                    >
+                      Välj {pkg.name} →
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/auth/login?redirect=/flow/${pkg.id}/bank-selection`}
+                      className="block w-full bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 text-center font-bold py-3 sm:py-4 px-6 rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-[1.02] text-sm sm:text-base"
+                    >
+                      Logga in för att välja {pkg.name} →
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}
