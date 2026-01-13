@@ -70,6 +70,19 @@ export default function ConfirmationPage() {
             .in('id', fileIds);
         }
 
+        // Link manual transactions to the order
+        const tempOrderId = sessionStorage.getItem('tempOrderId');
+        if (tempOrderId) {
+          await supabase
+            .from('manual_transactions')
+            .update({
+              order_id: newOrder.id,
+              guest_email: user ? null : email,
+              guest_name: user ? null : name,
+            })
+            .eq('order_id', tempOrderId);
+        }
+
         // Clean up sessionStorage
         sessionStorage.removeItem('statementFileUrl');
         sessionStorage.removeItem('statementFilePath');
