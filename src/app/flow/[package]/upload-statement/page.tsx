@@ -21,7 +21,7 @@ export default function UploadStatementPage() {
   const [uploadError, setUploadError] = useState<string>('');
   const [orderId, setOrderId] = useState<string>('');
 
-  const totalSteps = 7;
+  const totalSteps = 8;
 
   // Generate or retrieve order ID
   useEffect(() => {
@@ -95,7 +95,7 @@ export default function UploadStatementPage() {
 
   const handleContinue = () => {
     if (selectedFile && !uploading) {
-      router.push(`/flow/${packageType}/add-transactions?bank=${bankId}`);
+      router.push(`/flow/${packageType}/review-transactions?bank=${bankId}`);
     }
   };
 

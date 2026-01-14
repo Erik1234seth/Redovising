@@ -85,8 +85,8 @@ export default function ContactInfoPage() {
     <FlowContainer
       title="Kontaktuppgifter"
       description="Fyll i dina uppgifter så kan vi nå dig när din NE-bilaga är klar."
-      currentStep={6}
-      totalSteps={7}
+      currentStep={7}
+      totalSteps={8}
       packageType={packageType}
     >
       <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">

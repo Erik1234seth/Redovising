@@ -17,7 +17,7 @@ export default function DelegationGuidePage() {
   const [hasCompleted, setHasCompleted] = useState(false);
 
   const bank = banks.find((b) => b.id === bankId);
-  const totalSteps = 7;
+  const totalSteps = 8;
 
   const handleContinue = () => {
     if (hasCompleted) {
@@ -29,7 +29,7 @@ export default function DelegationGuidePage() {
     <FlowContainer
       title="Registrera oss som ombud på Skatteverket"
       description="För att vi ska kunna lämna in din deklaration åt dig behöver du registrera oss som ombud på Skatteverket."
-      currentStep={5}
+      currentStep={6}
       totalSteps={totalSteps}
       packageType={packageType}
     >

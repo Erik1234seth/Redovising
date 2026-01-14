@@ -14,7 +14,7 @@ export default function BankSelectionPage() {
   const packageType = params.package as string;
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
 
-  const totalSteps = 7;
+  const totalSteps = 8;
 
   // Protect route - require authentication
   useEffect(() => {

@@ -14,7 +14,7 @@ export default function DownloadGuidePage() {
   const bankId = searchParams.get('bank') as Bank;
 
   const bank = banks.find((b) => b.id === bankId);
-  const totalSteps = 7;
+  const totalSteps = 8;
 
   if (!bank) {
     return <div>Bank hittades inte</div>;

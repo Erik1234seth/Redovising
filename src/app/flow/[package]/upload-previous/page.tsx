@@ -24,7 +24,7 @@ export default function UploadPreviousPage() {
   const [orderId, setOrderId] = useState<string>('');
 
   const bank = banks.find((b) => b.id === bankId);
-  const totalSteps = 7;
+  const totalSteps = 8;
 
   // Get order ID from sessionStorage
   useEffect(() => {
@@ -89,7 +89,7 @@ export default function UploadPreviousPage() {
     <FlowContainer
       title="Ladda upp tidigare NE-bilaga (om tillämpligt)"
       description="Om du har fått en NE-bilaga tidigare år, ladda upp den här så vi kan använda samma struktur."
-      currentStep={5}
+      currentStep={6}
       totalSteps={totalSteps}
       packageType={packageType}
     >

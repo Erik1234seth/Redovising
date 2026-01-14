@@ -20,7 +20,7 @@ export default function ReviewAndAcceptPage() {
   const [invoiceAccepted, setInvoiceAccepted] = useState(false);
 
   const packageInfo = packages.find((p) => p.id === packageType);
-  const totalSteps = 7;
+  const totalSteps = 8;
 
   const handleContinue = () => {
     if (termsAccepted && invoiceAccepted) {
@@ -39,7 +39,7 @@ export default function ReviewAndAcceptPage() {
     <FlowContainer
       title="Granska och godkänn"
       description="Granska din beställning och godkänn villkoren innan vi går vidare."
-      currentStep={7}
+      currentStep={8}
       totalSteps={totalSteps}
       packageType={packageType}
     >

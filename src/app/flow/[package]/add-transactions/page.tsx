@@ -34,7 +34,7 @@ export default function AddTransactionsPage() {
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
   const [formError, setFormError] = useState('');
 
-  const totalSteps = 7;
+  const totalSteps = 8;
 
   // Get order ID from sessionStorage
   useEffect(() => {
@@ -159,7 +159,7 @@ export default function AddTransactionsPage() {
     <FlowContainer
       title="Lägg till utgifter och inkomster"
       description="Lägg till manuella transaktioner som inte syns i ditt kontoutdrag (valfritt)."
-      currentStep={4}
+      currentStep={5}
       totalSteps={totalSteps}
       packageType={packageType}
     >
