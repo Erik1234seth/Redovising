@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -34,6 +34,67 @@ export default function LoginPage() {
   };
 
   return (
+    <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-2xl shadow-xl p-8">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-xl">
+            {error}
+          </div>
+        )}
+
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-warm-300 mb-2">
+            E-postadress
+          </label>
+          <input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition placeholder-warm-500"
+            placeholder="din@epost.se"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium text-warm-300 mb-2">
+            Lösenord
+          </label>
+          <input
+            id="password"
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition placeholder-warm-500"
+            placeholder="••••••••"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 disabled:from-gold-600 disabled:to-gold-600 disabled:opacity-50 text-navy-900 font-bold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-[1.02]"
+        >
+          {loading ? 'Loggar in...' : 'Logga in'}
+        </button>
+      </form>
+
+      <div className="mt-6 text-center">
+        <p className="text-warm-400 text-sm">
+          Har du inget konto?{' '}
+          <Link href="/auth/signup" className="text-gold-500 hover:text-gold-400 font-semibold">
+            Skapa konto
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
     <div className="min-h-screen bg-navy-800 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto">
         <div className="text-center mb-8">
@@ -41,62 +102,17 @@ export default function LoginPage() {
           <p className="text-warm-300">Välkommen tillbaka till Enkla bokslut</p>
         </div>
 
-        <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-xl">
-                {error}
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-warm-300 mb-2">
-                E-postadress
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition placeholder-warm-500"
-                placeholder="din@epost.se"
-              />
+        <Suspense fallback={
+          <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-2xl shadow-xl p-8">
+            <div className="animate-pulse space-y-6">
+              <div className="h-12 bg-navy-600 rounded-xl"></div>
+              <div className="h-12 bg-navy-600 rounded-xl"></div>
+              <div className="h-12 bg-navy-600 rounded-xl"></div>
             </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-warm-300 mb-2">
-                Lösenord
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition placeholder-warm-500"
-                placeholder="••••••••"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 disabled:from-gold-600 disabled:to-gold-600 disabled:opacity-50 text-navy-900 font-bold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-[1.02]"
-            >
-              {loading ? 'Loggar in...' : 'Logga in'}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-warm-400 text-sm">
-              Har du inget konto?{' '}
-              <Link href="/auth/signup" className="text-gold-500 hover:text-gold-400 font-semibold">
-                Skapa konto
-              </Link>
-            </p>
           </div>
-        </div>
+        }>
+          <LoginForm />
+        </Suspense>
 
         <div className="mt-6 text-center">
           <Link href="/" className="text-warm-400 hover:text-white text-sm inline-flex items-center">

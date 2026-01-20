@@ -56,6 +56,7 @@ export async function GET(
       totalExpenses: transactions
         ?.filter(t => t.transaction_type === 'expense')
         .reduce((sum, t) => sum + parseFloat(t.amount.toString()), 0) || 0,
+      netAmount: 0,
     };
 
     transactionSummary.netAmount = transactionSummary.totalIncome - transactionSummary.totalExpenses;
