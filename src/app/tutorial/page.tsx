@@ -93,6 +93,19 @@ export default function TutorialPage() {
               <p className="text-sm sm:text-base text-warm-300 ml-11 sm:ml-14">
                 Använd ditt BankID för att logga in på {bank?.name}s webbplats.
               </p>
+              {bank?.websiteUrl && (
+                <a
+                  href={bank.websiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-gold-500 hover:text-gold-400 font-semibold transition-colors ml-11 sm:ml-14 mt-2"
+                >
+                  Gå till {bank.name}
+                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              )}
             </div>
 
             <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl p-6 sm:p-8">
@@ -141,7 +154,7 @@ export default function TutorialPage() {
                   4
                 </div>
                 <h2 className="text-lg sm:text-2xl font-bold text-white">
-                  Lägg till manuella transaktioner (valfritt)
+                  Lägg till transaktioner (valfritt)
                 </h2>
               </div>
               <p className="text-sm sm:text-base text-warm-300 mb-3 sm:mb-4 ml-11 sm:ml-14">
@@ -158,7 +171,7 @@ export default function TutorialPage() {
                   <li>Typ: Inkomst eller Utgift</li>
                 </ul>
                 <p className="text-xs sm:text-sm text-warm-400 mt-3">
-                  Detta steg är helt valfritt och kan hoppas över om du inte har några manuella transaktioner att lägga till.
+                  Detta steg är helt valfritt och kan hoppas över om du inte har några transaktioner att lägga till.
                 </p>
               </div>
             </div>
@@ -169,12 +182,12 @@ export default function TutorialPage() {
                   5
                 </div>
                 <h2 className="text-lg sm:text-2xl font-bold text-white">
-                  Ladda upp tidigare NE-bilaga (valfritt)
+                  Ladda upp tidigare NE-bilaga (ej första året)
                 </h2>
               </div>
               <p className="text-sm sm:text-base text-warm-300 ml-11 sm:ml-14">
-                Om du har fått en NE-bilaga tidigare år kan du ladda upp den så vi kan
-                använda samma struktur. Detta steg är valfritt men rekommenderas.
+                Om du har drivit din firma tidigare år, ladda upp din senaste NE-bilaga så vi kan
+                använda samma struktur. Hoppa över detta steg om det är ditt första år.
               </p>
             </div>
 
@@ -295,7 +308,7 @@ export default function TutorialPage() {
                   4
                 </div>
                 <h2 className="text-lg sm:text-2xl font-bold text-white">
-                  Lägg till manuella transaktioner (valfritt)
+                  Lägg till transaktioner (valfritt)
                 </h2>
               </div>
               <div className="ml-0 sm:ml-14 space-y-3">
@@ -313,7 +326,7 @@ export default function TutorialPage() {
                     <li>Typ: Inkomst eller Utgift</li>
                   </ul>
                   <p className="text-xs sm:text-sm text-warm-400 mt-3">
-                    Detta steg är helt valfritt och kan hoppas över om du inte har några manuella transaktioner att lägga till.
+                    Detta steg är helt valfritt och kan hoppas över om du inte har några transaktioner att lägga till.
                   </p>
                 </div>
               </div>
@@ -325,12 +338,27 @@ export default function TutorialPage() {
                   5
                 </div>
                 <h2 className="text-lg sm:text-2xl font-bold text-white">
-                  Registrera oss som ombud på Skatteverket
+                  Ladda upp tidigare NE-bilaga (ej första året)
+                </h2>
+              </div>
+              <p className="text-sm sm:text-base text-warm-300 ml-11 sm:ml-14">
+                Om du har drivit din firma tidigare år, ladda upp din senaste NE-bilaga så vi kan
+                använda samma struktur. Hoppa över detta steg om det är ditt första år.
+              </p>
+            </div>
+
+            <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl p-6 sm:p-8">
+              <div className="flex items-center mb-3 sm:mb-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold mr-3 sm:mr-4 text-sm sm:text-base flex-shrink-0">
+                  6
+                </div>
+                <h2 className="text-lg sm:text-2xl font-bold text-white">
+                  Registrera oss som ombud hos Skatteverket
                 </h2>
               </div>
               <div className="ml-0 sm:ml-14 space-y-3 sm:space-y-4">
                 <p className="text-sm sm:text-base text-warm-300">
-                  För att vi ska kunna lämna in din deklaration åt dig behöver du registrera oss som ombud på Skatteverkets webbplats. Detta ger oss behörighet att lämna in din inkomstdeklaration.
+                  För att vi ska kunna lämna in din deklaration åt dig behöver du registrera oss som ombud hos Skatteverkets webbplats. Detta ger oss behörighet att lämna in din inkomstdeklaration.
                 </p>
                 <div className="bg-gold-500/10 border-l-4 border-gold-500 rounded-r-lg p-3 sm:p-4 mb-4">
                   <p className="text-xs sm:text-sm text-warm-200">
@@ -387,7 +415,7 @@ export default function TutorialPage() {
             <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl p-6 sm:p-8">
               <div className="flex items-center mb-3 sm:mb-4">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold mr-3 sm:mr-4 text-sm sm:text-base flex-shrink-0">
-                  6
+                  7
                 </div>
                 <h2 className="text-lg sm:text-2xl font-bold text-white">
                   Granska och godkänn
@@ -404,7 +432,7 @@ export default function TutorialPage() {
                     <li>Du får en kopia via e-post för granskning så snart som möjligt</li>
                     <li>Granska NE-bilagan noggrant och kontrollera att allt stämmer</li>
                     <li>Svara på e-postmeddelandet med ditt godkännande</li>
-                    <li>Vi lämnar in deklarationen åt dig på Skatteverket</li>
+                    <li>Vi lämnar in deklarationen åt dig hos Skatteverket</li>
                     <li>Du får en slutgiltig bekräftelse när allt är klart</li>
                   </ol>
                 </div>
@@ -420,6 +448,33 @@ export default function TutorialPage() {
             </div>
           </div>
         )}
+
+        {/* Important Notice */}
+        <div className="mt-8 sm:mt-12 bg-amber-500/10 border border-amber-500/30 rounded-xl sm:rounded-2xl p-6 sm:p-8">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-amber-500/20 rounded-full flex items-center justify-center">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-amber-500 mb-3 sm:mb-4">
+                Viktigt att tänka på
+              </h2>
+              <div className="space-y-3 text-sm sm:text-base text-warm-300">
+                <p>
+                  <strong className="text-white">Du ansvarar för dina underlag.</strong> Vi utgår från dina kontoutdrag när vi gör din bokföring, men du är ansvarig för att ha underlag för alla transaktioner som ingår i verksamheten.
+                </p>
+                <p>
+                  Se till att spara kvitton och fakturor för alla inköp och utgifter. Vid en eventuell granskning från Skatteverket kan du behöva visa upp dessa.
+                </p>
+                <p>
+                  <strong className="text-white">Vi hör av oss om något är oklart.</strong> Om vi har frågor om specifika transaktioner kontaktar vi dig via e-post.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Bottom Info */}
         <div className="mt-8 sm:mt-12 bg-navy-900 border border-navy-700 rounded-xl sm:rounded-2xl p-6 sm:p-8">

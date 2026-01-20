@@ -107,7 +107,7 @@ export default function OmOssPage() {
               Snabb leverans
             </h3>
             <p className="text-sm sm:text-base text-warm-300 leading-relaxed">
-              Din NE-bilaga är klar inom 24 timmar. Ingen väntan, ingen stress.
+              Din NE-bilaga levereras snabbt. Ingen väntan, ingen stress.
               Vi vet att din tid är värdefull.
             </p>
           </div>
@@ -196,7 +196,23 @@ export default function OmOssPage() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <span>Streamlinead process för NE-bilagor</span>
+                <span>Streamlinead process</span>
+              </li>
+              <li className="flex items-start">
+                <svg
+                  className="w-6 h-6 text-gold-500 mr-2 flex-shrink-0 mt-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <span>Inget krav på auktoriserad revisor</span>
               </li>
               <li className="flex items-start">
                 <svg
@@ -229,7 +245,7 @@ export default function OmOssPage() {
             Redo att komma igång?
           </h2>
           <p className="text-base sm:text-lg text-warm-300 mb-6 sm:mb-8 max-w-2xl mx-auto px-4">
-            Välj ditt paket och få din NE-bilaga klar inom 24 timmar.
+            Välj ditt paket och kom igång med din NE-bilaga.
             Enkel process, fast pris, professionellt resultat.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

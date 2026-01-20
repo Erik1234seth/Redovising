@@ -11,7 +11,7 @@ export default function UploadStatementPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const packageType = params.package as string;
   const bankId = searchParams.get('bank') as Bank;
 
@@ -22,6 +22,13 @@ export default function UploadStatementPage() {
   const [orderId, setOrderId] = useState<string>('');
 
   const totalSteps = 8;
+
+  // Protect route - require authentication
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push(`/auth/login?redirect=/flow/${packageType}/upload-statement?bank=${bankId}`);
+    }
+  }, [user, loading, router, packageType, bankId]);
 
   // Generate or retrieve order ID
   useEffect(() => {

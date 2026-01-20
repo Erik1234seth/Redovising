@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 // GET - Fetch all parsed transactions for an order
 export async function GET(request: Request) {
@@ -7,11 +7,16 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const orderId = searchParams.get('orderId');
 
+    console.log('📋 Fetching parsed transactions for order:', orderId);
+
     if (!orderId) {
       return NextResponse.json({ error: 'Order ID required' }, { status: 400 });
     }
 
-    const supabase = createClient();
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
     const { data: transactions, error } = await supabase
       .from('parsed_transactions')

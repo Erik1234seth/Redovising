@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import FlowContainer from '@/components/FlowContainer';
 import { banks } from '@/data/banks';
@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase';
 export default function ConfirmationPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const packageType = params.package as string;
   const bankId = searchParams.get('bank') as Bank;
   const email = searchParams.get('email') || '';
@@ -20,7 +21,14 @@ export default function ConfirmationPage() {
   const phone = searchParams.get('phone') || '';
   const company = searchParams.get('company') || '';
 
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, loading } = useAuth();
+
+  // Protect route - require authentication
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push(`/auth/login?redirect=/flow/${packageType}/confirmation?bank=${bankId}`);
+    }
+  }, [user, loading, router, packageType, bankId]);
   const supabase = createClient();
 
   const bank = banks.find((b) => b.id === bankId);
@@ -205,7 +213,7 @@ export default function ConfirmationPage() {
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
                 3
               </span>
-              <span>Du loggar in på Skatteverket och lämnar in NE-bilagan själv</span>
+              <span>Du loggar in hos Skatteverket och lämnar in NE-bilagan själv</span>
             </li>
             <li className="flex items-start">
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
@@ -242,6 +250,28 @@ export default function ConfirmationPage() {
             </li>
           </ol>
         )}
+      </div>
+
+      {/* Important Notice */}
+      <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-6 mb-8">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0 w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="font-semibold text-amber-500 mb-2">
+              Viktigt att tänka på
+            </h3>
+            <p className="text-sm text-warm-300 mb-2">
+              <strong className="text-white">Du ansvarar för dina underlag.</strong> Vi utgår från dina kontoutdrag, men du behöver ha kvitton och fakturor för alla transaktioner som ingår i verksamheten.
+            </p>
+            <p className="text-sm text-warm-300">
+              Vid en eventuell granskning från Skatteverket kan du behöva visa upp dessa. Vi hör av oss om vi har frågor om specifika transaktioner.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-6 mb-8">

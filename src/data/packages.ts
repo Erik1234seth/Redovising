@@ -9,7 +9,7 @@ export const packages: PackageInfo[] = [
     features: [
       'Vi upprättar din NE-bilaga',
       'Baserat på dina kontoutdrag',
-      'Färdigt inom 24 timmar',
+      'Snabb leverans',
       'Du lämnar in själv till Skatteverket',
       'Support vid frågor'
     ]
@@ -24,7 +24,7 @@ export const packages: PackageInfo[] = [
       'Vi lämnar in till Skatteverket åt dig',
       'Baserat på dina kontoutdrag',
       'Komplett hantering',
-      'Färdigt inom 24 timmar',
+      'Snabb leverans',
       'Full support'
     ]
   }

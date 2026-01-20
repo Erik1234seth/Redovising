@@ -90,7 +90,7 @@ export default function Home() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     <span className="text-gold-500 text-sm sm:text-base font-semibold">
-                      Färdig på 24 timmar
+                      Snabb leverans
                     </span>
                   </div>
                   {!user && (
@@ -253,7 +253,7 @@ export default function Home() {
                   />
                 ),
                 title: 'Snabbt och enkelt',
-                description: 'Färdig NE-bilaga inom 24 timmar. Enkla steg-för-steg instruktioner.'
+                description: 'Snabb leverans av din NE-bilaga. Enkla steg-för-steg instruktioner.'
               },
               {
                 icon: (
@@ -305,7 +305,7 @@ export default function Home() {
             Redo att komma igång?
           </h2>
           <p className="text-base sm:text-xl text-warm-300 mb-6 sm:mb-8 px-4">
-            Välj ditt paket och få din NE-bilaga inom 24 timmar
+            Välj ditt paket och kom igång direkt
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
             <a

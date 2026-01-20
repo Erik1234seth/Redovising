@@ -1,5 +1,12 @@
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+
+function getSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
 
 // GET - Fetch all transactions for a specific order
 export async function GET(request: Request) {
@@ -14,7 +21,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = getSupabaseClient();
 
     const { data, error } = await supabase
       .from('manual_transactions')
@@ -79,7 +86,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = getSupabaseClient();
 
     const transactionData = {
       order_id: orderId,

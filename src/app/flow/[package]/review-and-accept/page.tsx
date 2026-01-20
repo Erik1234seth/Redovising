@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import FlowContainer from '@/components/FlowContainer';
 import { packages } from '@/data/packages';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function ReviewAndAcceptPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, loading } = useAuth();
   const packageType = params.package as string;
   const bank = searchParams.get('bank') || '';
   const email = searchParams.get('email') || '';
@@ -21,6 +23,13 @@ export default function ReviewAndAcceptPage() {
 
   const packageInfo = packages.find((p) => p.id === packageType);
   const totalSteps = 8;
+
+  // Protect route - require authentication
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push(`/auth/login?redirect=/flow/${packageType}/review-and-accept?bank=${bank}`);
+    }
+  }, [user, loading, router, packageType, bank]);
 
   const handleContinue = () => {
     if (termsAccepted && invoiceAccepted) {
@@ -93,7 +102,7 @@ export default function ReviewAndAcceptPage() {
                   Jag bekräftar att all information jag har lämnat är korrekt
                 </span>
                 <span className="text-sm text-warm-400 mt-1 block">
-                  Kontoutdrag, kontaktuppgifter och eventuella manuella transaktioner är korrekta.
+                  Kontoutdrag, kontaktuppgifter och eventuella extra transaktioner är korrekta.
                 </span>
               </div>
             </label>

@@ -1,16 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import FlowContainer from '@/components/FlowContainer';
 import VideoPlayer from '@/components/VideoPlayer';
 import { banks } from '@/data/banks';
 import { Bank } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function DelegationGuidePage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, loading } = useAuth();
   const packageType = params.package as string;
   const bankId = searchParams.get('bank') as Bank;
 
@@ -18,6 +20,13 @@ export default function DelegationGuidePage() {
 
   const bank = banks.find((b) => b.id === bankId);
   const totalSteps = 8;
+
+  // Protect route - require authentication
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push(`/auth/login?redirect=/flow/${packageType}/delegation-guide?bank=${bankId}`);
+    }
+  }, [user, loading, router, packageType, bankId]);
 
   const handleContinue = () => {
     if (hasCompleted) {
@@ -27,16 +36,16 @@ export default function DelegationGuidePage() {
 
   return (
     <FlowContainer
-      title="Registrera oss som ombud på Skatteverket"
-      description="För att vi ska kunna lämna in din deklaration åt dig behöver du registrera oss som ombud på Skatteverket."
-      currentStep={6}
+      title="Registrera oss som ombud hos Skatteverket"
+      description="För att vi ska kunna lämna in din deklaration åt dig behöver du registrera oss som ombud hos Skatteverket."
+      currentStep={7}
       totalSteps={totalSteps}
       packageType={packageType}
     >
       <div className="mb-8">
         <VideoPlayer
           videoUrl={bank?.accessDelegationVideoUrl || ''}
-          title="Så här registrerar du oss som ombud på Skatteverket"
+          title="Så här registrerar du oss som ombud hos Skatteverket"
         />
       </div>
 
@@ -60,7 +69,7 @@ export default function DelegationGuidePage() {
               1
             </span>
             <div>
-              <strong className="text-white block mb-1">Gå till Skatteverkets webbplats</strong>
+              <strong className="text-white block mb-1">Gå till Skatteverkets hemsida</strong>
               <span className="text-sm text-warm-300">Besök skatteverket.se</span>
             </div>
           </li>
@@ -69,8 +78,8 @@ export default function DelegationGuidePage() {
               2
             </span>
             <div>
-              <strong className="text-white block mb-1">Logga in med BankID</strong>
-              <span className="text-sm text-warm-300">Klicka på "Logga in" och använd ditt BankID</span>
+              <strong className="text-white block mb-1">Sök efter "ombud"</strong>
+              <span className="text-sm text-warm-300">Skriv "ombud" i sökfältet på hemsidan</span>
             </div>
           </li>
           <li className="flex items-start">
@@ -78,8 +87,8 @@ export default function DelegationGuidePage() {
               3
             </span>
             <div>
-              <strong className="text-white block mb-1">Gå till "Mina ombud och fullmakter"</strong>
-              <span className="text-sm text-warm-300">Hittar du under "Mina sidor"</span>
+              <strong className="text-white block mb-1">Välj "Ombud för en privatperson"</strong>
+              <span className="text-sm text-warm-300">Klicka på länken i sökresultatet</span>
             </div>
           </li>
           <li className="flex items-start">
@@ -87,8 +96,8 @@ export default function DelegationGuidePage() {
               4
             </span>
             <div>
-              <strong className="text-white block mb-1">Klicka på "Lägg till ombud"</strong>
-              <span className="text-sm text-warm-300">Eller "Registrera fullmakt"</span>
+              <strong className="text-white block mb-1">Logga in med e-legitimation</strong>
+              <span className="text-sm text-warm-300">Använd BankID eller annan e-legitimation för att logga in</span>
             </div>
           </li>
           <li className="flex items-start">
@@ -96,10 +105,8 @@ export default function DelegationGuidePage() {
               5
             </span>
             <div>
-              <strong className="text-white block mb-1">Ange vårt organisationsnummer</strong>
-              <span className="text-sm text-warm-300 bg-navy-800 px-3 py-1 rounded inline-block mt-1">
-                Organisationsnummer: <strong className="text-gold-500">XX-XXXXXX-XXXX</strong>
-              </span>
+              <strong className="text-white block mb-1">Välj "Utse person som ombud"</strong>
+              <span className="text-sm text-warm-300">Klicka på alternativet för att utse ett nytt ombud</span>
             </div>
           </li>
           <li className="flex items-start">
@@ -107,8 +114,8 @@ export default function DelegationGuidePage() {
               6
             </span>
             <div>
-              <strong className="text-white block mb-1">Välj behörighet</strong>
-              <span className="text-sm text-warm-300">Markera "Inkomstdeklaration" i listan över behörigheter</span>
+              <strong className="text-white block mb-1">Välj din enskilda firma</strong>
+              <span className="text-sm text-warm-300">Välj den firma du vill ge oss behörighet för</span>
             </div>
           </li>
           <li className="flex items-start">
@@ -116,8 +123,53 @@ export default function DelegationGuidePage() {
               7
             </span>
             <div>
-              <strong className="text-white block mb-1">Bekräfta med BankID</strong>
-              <span className="text-sm text-warm-300">Signera fullmakten med ditt BankID</span>
+              <strong className="text-white block mb-1">Ange personnumret vi skickar till dig</strong>
+              <span className="text-sm text-warm-300">Du får ett personnummer via e-post som du skriver in i rutan</span>
+            </div>
+          </li>
+          <li className="flex items-start">
+            <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-4">
+              8
+            </span>
+            <div>
+              <strong className="text-white block mb-1">Välj behörighet "Deklarationsombud"</strong>
+              <span className="text-sm text-warm-300">Markera deklarationsombud i listan över behörigheter</span>
+            </div>
+          </li>
+          <li className="flex items-start">
+            <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-4">
+              9
+            </span>
+            <div>
+              <strong className="text-white block mb-1">Valfritt: Sätt ett slutdatum</strong>
+              <span className="text-sm text-warm-300">Om du vill kan du ange ett "till och med"-datum. Se till att det är efter deklarationens deadline.</span>
+            </div>
+          </li>
+          <li className="flex items-start">
+            <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-4">
+              10
+            </span>
+            <div>
+              <strong className="text-white block mb-1">Granska och godkänn</strong>
+              <span className="text-sm text-warm-300">Kontrollera att uppgifterna stämmer och klicka i bekräftelserutan</span>
+            </div>
+          </li>
+          <li className="flex items-start">
+            <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-4">
+              11
+            </span>
+            <div>
+              <strong className="text-white block mb-1">Skriv under och skicka in</strong>
+              <span className="text-sm text-warm-300">Klicka på "Skriv under och skicka in"</span>
+            </div>
+          </li>
+          <li className="flex items-start">
+            <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-4">
+              12
+            </span>
+            <div>
+              <strong className="text-white block mb-1">Godkänn med BankID</strong>
+              <span className="text-sm text-warm-300">Signera med BankID. När det är klart ser du en bekräftelse på att allt är registrerat.</span>
             </div>
           </li>
         </ol>
@@ -217,7 +269,7 @@ export default function DelegationGuidePage() {
             className="mt-1 w-5 h-5 text-gold-500 bg-navy-700 border-navy-600 rounded focus:ring-gold-500 focus:ring-offset-navy-800"
           />
           <span className="text-warm-200 group-hover:text-white font-medium">
-            Jag bekräftar att jag har registrerat er som ombud på Skatteverket och gett behörighet att lämna in min inkomstdeklaration
+            Jag bekräftar att jag har registrerat er som ombud hos Skatteverket och givit behörighet att lämna in min inkomstdeklaration
           </span>
         </label>
       </div>

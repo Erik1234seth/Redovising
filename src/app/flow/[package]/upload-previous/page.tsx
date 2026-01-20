@@ -13,7 +13,7 @@ export default function UploadPreviousPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const packageType = params.package as string;
   const bankId = searchParams.get('bank') as Bank;
 
@@ -25,6 +25,13 @@ export default function UploadPreviousPage() {
 
   const bank = banks.find((b) => b.id === bankId);
   const totalSteps = 8;
+
+  // Protect route - require authentication
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push(`/auth/login?redirect=/flow/${packageType}/upload-previous?bank=${bankId}`);
+    }
+  }, [user, loading, router, packageType, bankId]);
 
   // Get order ID from sessionStorage
   useEffect(() => {
@@ -82,13 +89,17 @@ export default function UploadPreviousPage() {
       sessionStorage.removeItem('previousFileUrl');
       sessionStorage.removeItem('previousFilePath');
     }
-    router.push(`/flow/${packageType}/contact-info?bank=${bankId}`);
+    if (packageType === 'komplett') {
+      router.push(`/flow/${packageType}/delegation-guide?bank=${bankId}`);
+    } else {
+      router.push(`/flow/${packageType}/contact-info?bank=${bankId}`);
+    }
   };
 
   return (
     <FlowContainer
-      title="Ladda upp tidigare NE-bilaga (om tillämpligt)"
-      description="Om du har fått en NE-bilaga tidigare år, ladda upp den här så vi kan använda samma struktur."
+      title="Ladda upp tidigare NE-bilaga (ej första året)"
+      description="Om du har drivit din firma tidigare år, ladda upp din senaste NE-bilaga. Hoppa över om det är ditt första år."
       currentStep={6}
       totalSteps={totalSteps}
       packageType={packageType}

@@ -8,6 +8,7 @@ export interface BankInfo {
   logo?: string;
   downloadVideoUrl?: string;
   accessDelegationVideoUrl?: string;
+  websiteUrl?: string;
 }
 
 export interface PackageInfo {

@@ -61,38 +61,55 @@ export default function ReviewTransactionsPage() {
 
   // Get order ID and parse the uploaded file
   useEffect(() => {
-    const id = sessionStorage.getItem('tempOrderId');
-    const fileUrl = sessionStorage.getItem('statementFileUrl');
+    const initializeTransactions = async () => {
+      const id = sessionStorage.getItem('tempOrderId');
+      const fileUrl = sessionStorage.getItem('statementFileUrl');
 
-    if (id) {
-      setOrderId(id);
-      // First try to fetch existing parsed transactions
-      fetchTransactions(id).then(hasData => {
+      console.log('🔍 Review Transactions: Order ID:', id);
+      console.log('🔍 Review Transactions: File URL:', fileUrl);
+
+      if (id) {
+        setOrderId(id);
+        // First try to fetch existing parsed transactions
+        const hasData = await fetchTransactions(id);
+        console.log('🔍 Review Transactions: Has existing data:', hasData);
+
         if (!hasData && fileUrl) {
           // If no existing data, parse the file
+          console.log('🔍 Review Transactions: Parsing file...');
           parseUploadedFile(id);
+        } else if (!hasData && !fileUrl) {
+          console.log('🔍 Review Transactions: No file URL found');
+          setError('Ingen fil hittades. Gå tillbaka och ladda upp ditt kontoutdrag först.');
+          setLoading(false);
         }
-      });
-    } else {
-      setError('Ingen order hittades. Gå tillbaka och ladda upp ditt kontoutdrag först.');
-      setLoading(false);
-    }
+      } else {
+        setError('Ingen order hittades. Gå tillbaka och ladda upp ditt kontoutdrag först.');
+        setLoading(false);
+      }
+    };
+
+    initializeTransactions();
   }, []);
 
   const fetchTransactions = async (orderId: string): Promise<boolean> => {
     try {
+      console.log('🔍 Fetching transactions for order:', orderId);
       const response = await fetch(`/api/parsed-transactions?orderId=${orderId}`);
       const data = await response.json();
+      console.log('🔍 Fetch response:', response.status, data);
 
       if (response.ok && data.transactions && data.transactions.length > 0) {
+        console.log('🔍 Found', data.transactions.length, 'transactions');
         setTransactions(data.transactions);
         setSummary(data.summary);
         setLoading(false);
         return true;
       }
+      console.log('🔍 No transactions found');
       return false;
     } catch (err) {
-      console.error('Error fetching transactions:', err);
+      console.error('🔍 Error fetching transactions:', err);
       return false;
     }
   };
@@ -104,6 +121,7 @@ export default function ReviewTransactionsPage() {
     try {
       // Get the file URL from sessionStorage
       const fileUrl = sessionStorage.getItem('statementFileUrl');
+      console.log('📄 Parsing file from URL:', fileUrl);
 
       if (!fileUrl) {
         setError('Ingen fil hittades. Gå tillbaka och ladda upp ditt kontoutdrag först.');
@@ -113,12 +131,15 @@ export default function ReviewTransactionsPage() {
       }
 
       // Fetch the file from Supabase Storage
+      console.log('📄 Fetching file from Supabase...');
       const fileResponse = await fetch(fileUrl);
+      console.log('📄 File fetch response:', fileResponse.status);
       if (!fileResponse.ok) {
         throw new Error('Could not fetch uploaded file');
       }
 
       const fileBlob = await fileResponse.blob();
+      console.log('📄 File blob size:', fileBlob.size);
 
       // Create FormData with the file
       const formData = new FormData();
@@ -129,22 +150,26 @@ export default function ReviewTransactionsPage() {
       }
 
       // Parse the file
+      console.log('📄 Sending to parse-statement API...');
       const parseResponse = await fetch('/api/parse-statement', {
         method: 'POST',
         body: formData,
       });
 
       const parseData = await parseResponse.json();
+      console.log('📄 Parse response:', parseResponse.status, parseData);
 
       if (!parseResponse.ok) {
         throw new Error(parseData.error || 'Failed to parse file');
       }
 
+      console.log('📄 Parse successful! Transaction count:', parseData.transactionCount);
+
       // Fetch the saved transactions
       await fetchTransactions(orderId);
 
     } catch (err) {
-      console.error('Error parsing file:', err);
+      console.error('📄 Error parsing file:', err);
       setError('Kunde inte läsa kontoutdraget. Kontrollera att filen är i rätt format (Excel/CSV).');
     } finally {
       setLoading(false);
@@ -300,8 +325,8 @@ export default function ReviewTransactionsPage() {
                           {transaction.description || transaction.reference || 'Ingen beskrivning'}
                         </p>
                         {transaction.note && (
-                          <p className="text-gold-500 text-xs sm:text-sm mt-1 italic">
-                            📝 {transaction.note}
+                          <p className="text-gold-500/80 text-xs sm:text-sm mt-1 italic border-l-2 border-gold-500/30 pl-2">
+                            {transaction.note}
                           </p>
                         )}
                       </div>
@@ -318,40 +343,60 @@ export default function ReviewTransactionsPage() {
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex flex-wrap gap-2 mt-3">
+                    <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-navy-700/50">
+                      {/* Note button - text style */}
                       <button
                         onClick={() => {
                           setEditingId(transaction.id);
                           setNoteText(transaction.note || '');
                         }}
-                        className="px-3 py-1.5 text-xs sm:text-sm bg-navy-700 hover:bg-navy-600 text-warm-300 rounded-lg transition-colors"
+                        className="text-xs sm:text-sm text-warm-400 hover:text-gold-500 transition-colors flex items-center gap-1.5"
                       >
-                        {transaction.note ? '✏️ Redigera' : '📝 Anteckning'}
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        {transaction.note ? 'Redigera anteckning' : 'Lägg till anteckning'}
                       </button>
-                      <button
-                        onClick={() => updateTransaction(transaction.id, {
-                          is_eu_transaction: !transaction.is_eu_transaction
-                        })}
-                        className={`px-3 py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${
-                          transaction.is_eu_transaction
-                            ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
-                            : 'bg-navy-700 hover:bg-navy-600 text-warm-300'
-                        }`}
-                      >
-                        🇪🇺 EU-transaktion
-                      </button>
-                      <button
-                        onClick={() => updateTransaction(transaction.id, {
-                          is_private: !transaction.is_private
-                        })}
-                        className={`px-3 py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${
-                          transaction.is_private
-                            ? 'bg-warm-500/20 text-warm-400 hover:bg-warm-500/30'
-                            : 'bg-navy-700 hover:bg-navy-600 text-warm-300'
-                        }`}
-                      >
-                        🏠 Privat
-                      </button>
+
+                      <span className="text-navy-600">|</span>
+
+                      {/* Toggle buttons */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => updateTransaction(transaction.id, {
+                            is_eu_transaction: !transaction.is_eu_transaction
+                          })}
+                          className={`px-3 py-1 text-xs font-medium rounded border transition-all ${
+                            transaction.is_eu_transaction
+                              ? 'bg-blue-500/10 border-blue-500/50 text-blue-400'
+                              : 'bg-transparent border-navy-600 text-warm-500 hover:border-warm-500 hover:text-warm-400'
+                          }`}
+                        >
+                          {transaction.is_eu_transaction && (
+                            <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                          EU-transaktion
+                        </button>
+                        <button
+                          onClick={() => updateTransaction(transaction.id, {
+                            is_private: !transaction.is_private
+                          })}
+                          className={`px-3 py-1 text-xs font-medium rounded border transition-all ${
+                            transaction.is_private
+                              ? 'bg-purple-500/10 border-purple-500/50 text-purple-400'
+                              : 'bg-transparent border-navy-600 text-warm-500 hover:border-warm-500 hover:text-warm-400'
+                          }`}
+                        >
+                          {transaction.is_private && (
+                            <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                          Privat
+                        </button>
+                      </div>
                     </div>
 
                     {/* Note input */}
@@ -395,13 +440,22 @@ export default function ReviewTransactionsPage() {
           </div>
 
           {/* Info box */}
-          <div className="bg-gold-500/10 border-l-4 border-gold-500 rounded-r-xl p-4 sm:p-6 mb-6">
-            <h3 className="text-gold-500 font-bold mb-2">Tips för granskning</h3>
-            <ul className="text-warm-200 text-sm space-y-1">
-              <li>• Markera privata transaktioner som inte ska tas med i bokföringen</li>
-              <li>• Lägg till anteckningar för att förtydliga oklara transaktioner</li>
-              <li>• Markera EU-transaktioner för korrekt momshantering</li>
-            </ul>
+          <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-4 sm:p-6 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 bg-gold-500/10 rounded-lg flex items-center justify-center">
+                <svg className="w-4 h-4 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-white font-semibold mb-2">Tips för granskning</h3>
+                <div className="text-warm-300 text-sm space-y-1.5">
+                  <p><span className="text-purple-400 font-medium">Privat</span> – Markera transaktioner som inte ska ingå i bokföringen</p>
+                  <p><span className="text-blue-400 font-medium">EU-transaktion</span> – Markera köp från andra EU-länder för korrekt momshantering</p>
+                  <p><span className="text-gold-500 font-medium">Anteckningar</span> – Lägg till förklaringar för oklara transaktioner</p>
+                </div>
+              </div>
+            </div>
           </div>
         </>
       )}

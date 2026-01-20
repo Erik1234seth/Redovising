@@ -1,20 +1,30 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import FlowContainer from '@/components/FlowContainer';
 import VideoPlayer from '@/components/VideoPlayer';
 import { banks } from '@/data/banks';
 import { Bank } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function DownloadGuidePage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, loading } = useAuth();
   const packageType = params.package as string;
   const bankId = searchParams.get('bank') as Bank;
 
   const bank = banks.find((b) => b.id === bankId);
   const totalSteps = 8;
+
+  // Protect route - require authentication
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push(`/auth/login?redirect=/flow/${packageType}/download-guide?bank=${bankId}`);
+    }
+  }, [user, loading, router, packageType, bankId]);
 
   if (!bank) {
     return <div>Bank hittades inte</div>;
@@ -32,6 +42,20 @@ export default function DownloadGuidePage() {
       totalSteps={totalSteps}
       packageType={packageType}
     >
+      <div className="mb-6">
+        <a
+          href={bank.websiteUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center text-gold-500 hover:text-gold-400 font-semibold transition-colors"
+        >
+          Gå till {bank.name}
+          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </a>
+      </div>
+
       <div className="mb-8">
         <VideoPlayer
           videoUrl={bank.downloadVideoUrl || ''}
@@ -103,8 +127,7 @@ export default function DownloadGuidePage() {
           onClick={handleContinue}
           className="px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-xl font-bold transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105 text-sm sm:text-base w-full sm:w-auto"
         >
-          <span className="sm:hidden">Fortsätt →</span>
-          <span className="hidden sm:inline">Jag har laddat ner mina kontoutdrag →</span>
+          Fortsätt →
         </button>
       </div>
     </FlowContainer>

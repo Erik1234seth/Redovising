@@ -18,13 +18,13 @@ export default function AddTransactionsPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const packageType = params.package as string;
   const bankId = searchParams.get('bank') as Bank;
 
   const [orderId, setOrderId] = useState<string>('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Form state
@@ -36,6 +36,13 @@ export default function AddTransactionsPage() {
 
   const totalSteps = 8;
 
+  // Protect route - require authentication
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push(`/auth/login?redirect=/flow/${packageType}/add-transactions?bank=${bankId}`);
+    }
+  }, [user, loading, router, packageType, bankId]);
+
   // Get order ID from sessionStorage
   useEffect(() => {
     const id = sessionStorage.getItem('tempOrderId');
@@ -46,7 +53,7 @@ export default function AddTransactionsPage() {
   }, []);
 
   const fetchTransactions = async (orderId: string) => {
-    setLoading(true);
+    setFetching(true);
     try {
       const response = await fetch(`/api/transactions?orderId=${orderId}`);
       const data = await response.json();
@@ -56,7 +63,7 @@ export default function AddTransactionsPage() {
     } catch (error) {
       console.error('Error fetching transactions:', error);
     } finally {
-      setLoading(false);
+      setFetching(false);
     }
   };
 
@@ -136,11 +143,7 @@ export default function AddTransactionsPage() {
   };
 
   const handleContinue = () => {
-    if (packageType === 'ne-bilaga') {
-      router.push(`/flow/${packageType}/upload-previous?bank=${bankId}`);
-    } else {
-      router.push(`/flow/${packageType}/delegation-guide?bank=${bankId}`);
-    }
+    router.push(`/flow/${packageType}/upload-previous?bank=${bankId}`);
   };
 
   const handleSkip = () => {
@@ -158,7 +161,7 @@ export default function AddTransactionsPage() {
   return (
     <FlowContainer
       title="Lägg till utgifter och inkomster"
-      description="Lägg till manuella transaktioner som inte syns i ditt kontoutdrag (valfritt)."
+      description="Lägg till transaktioner som inte syns i ditt kontoutdrag (valfritt)."
       currentStep={5}
       totalSteps={totalSteps}
       packageType={packageType}
@@ -204,7 +207,7 @@ export default function AddTransactionsPage() {
           {/* Amount */}
           <div>
             <label htmlFor="amount" className="block text-sm font-semibold text-warm-300 mb-2">
-              Belopp (kr)
+              Belopp (kr, inklusive moms)
             </label>
             <input
               type="number"
@@ -256,7 +259,7 @@ export default function AddTransactionsPage() {
       </div>
 
       {/* Transactions List */}
-      {loading ? (
+      {fetching ? (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold-500 mx-auto mb-4"></div>
           <p className="text-warm-300">Laddar transaktioner...</p>
@@ -380,11 +383,10 @@ export default function AddTransactionsPage() {
             </svg>
           </div>
           <div>
-            <h3 className="font-bold text-white mb-2">Om manuella transaktioner</h3>
+            <h3 className="font-bold text-white mb-2">Om transaktioner</h3>
             <p className="text-sm text-warm-300">
               Här kan du lägga till transaktioner som inte syns i ditt kontoutdrag, till exempel
-              kontantbetalningar, fakturor som inte betalats än, eller andra transaktioner som behöver
-              rapporteras. Detta är helt valfritt och kan hoppas över om du inte har några sådana
+              kontantbetalningar eller andra transaktioner som behöver rapporteras. Detta är helt valfritt och kan hoppas över om du inte har några sådana
               transaktioner.
             </p>
           </div>

@@ -14,7 +14,14 @@ export default function ContactInfoPage() {
   const packageType = params.package as string;
   const bank = searchParams.get('bank') || '';
 
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
+
+  // Protect route - require authentication
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push(`/auth/login?redirect=/flow/${packageType}/contact-info?bank=${bank}`);
+    }
+  }, [user, authLoading, router, packageType, bank]);
   const supabase = createClient();
 
   const [formData, setFormData] = useState({

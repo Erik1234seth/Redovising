@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 
 interface ParsedTransaction {
@@ -22,29 +22,61 @@ interface AccountInfo {
 }
 
 export async function POST(request: Request) {
+  console.log('📊 Parse Statement API: Request received');
+
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const orderId = formData.get('orderId') as string;
     const userId = formData.get('userId') as string | null;
 
+    console.log('📊 Parse Statement API: File:', file?.name, 'Size:', file?.size);
+    console.log('📊 Parse Statement API: Order ID:', orderId);
+    console.log('📊 Parse Statement API: User ID:', userId);
+
     if (!file) {
+      console.error('📊 Parse Statement API: No file provided');
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
     if (!orderId) {
+      console.error('📊 Parse Statement API: No order ID provided');
       return NextResponse.json({ error: 'No order ID provided' }, { status: 400 });
     }
 
     // Read file as ArrayBuffer
+    console.log('📊 Parse Statement API: Reading file...');
     const arrayBuffer = await file.arrayBuffer();
     const data = new Uint8Array(arrayBuffer);
+    console.log('📊 Parse Statement API: File read, size:', data.length);
 
     // Parse Excel file
-    const workbook = XLSX.read(data, { type: 'array' });
+    console.log('📊 Parse Statement API: Parsing Excel...');
+    const workbook = XLSX.read(data, {
+      type: 'array',
+      sheetRows: 0,  // Read all rows, ignore dimension
+      cellDates: true,
+    });
     const sheetName = workbook.SheetNames[0];
+    console.log('📊 Parse Statement API: Sheet name:', sheetName);
     const sheet = workbook.Sheets[sheetName];
-    const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    // Fix: Some Excel files have wrong dimension, recalculate it
+    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+    // Find actual last row by checking for data
+    let maxRow = range.e.r;
+    for (const cellRef in sheet) {
+      if (cellRef[0] === '!') continue;
+      const cellRow = XLSX.utils.decode_cell(cellRef).r;
+      if (cellRow > maxRow) maxRow = cellRow;
+    }
+    // Update the range to include all rows
+    range.e.r = maxRow;
+    sheet['!ref'] = XLSX.utils.encode_range(range);
+    console.log('📊 Parse Statement API: Fixed range:', sheet['!ref']);
+
+    const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    console.log('📊 Parse Statement API: Total rows:', rows.length);
 
     // Extract account info from metadata rows
     const accountInfo: AccountInfo = {
@@ -56,17 +88,20 @@ export async function POST(request: Request) {
     };
 
     // Find header row (usually row 7, index 7)
+    console.log('📊 Parse Statement API: Looking for header row...');
     let headerRowIndex = 7;
     for (let i = 0; i < Math.min(15, rows.length); i++) {
       const row = rows[i];
       if (row && Array.isArray(row) &&
           (row.includes('Bokföringsdag') || row.includes('Transaktionsdag') || row.includes('Belopp'))) {
         headerRowIndex = i;
+        console.log('📊 Parse Statement API: Found header at row:', i);
         break;
       }
     }
 
     const headers = rows[headerRowIndex] as string[];
+    console.log('📊 Parse Statement API: Headers:', headers);
 
     // Map column indices
     const columnMap = {
@@ -79,6 +114,7 @@ export async function POST(request: Request) {
       amount: findColumnIndex(headers, ['Belopp', 'Summa']),
       balance: findColumnIndex(headers, ['Bokfört saldo', 'Saldo', 'Balans']),
     };
+    console.log('📊 Parse Statement API: Column map:', columnMap);
 
     // Parse transactions
     const transactions: ParsedTransaction[] = [];
@@ -102,17 +138,32 @@ export async function POST(request: Request) {
       });
     }
 
+    console.log('📊 Parse Statement API: Parsed', transactions.length, 'transactions');
+    if (transactions.length > 0) {
+      console.log('📊 Parse Statement API: First transaction:', transactions[0]);
+    }
+
     // Save transactions to database
-    const supabase = createClient();
+    console.log('📊 Parse Statement API: Connecting to Supabase...');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
     // First, delete any existing parsed transactions for this order
-    await supabase
+    console.log('📊 Parse Statement API: Deleting existing transactions for order:', orderId);
+    const { error: deleteError } = await supabase
       .from('parsed_transactions')
       .delete()
       .eq('order_id', orderId);
 
+    if (deleteError) {
+      console.error('📊 Parse Statement API: Delete error:', deleteError);
+    }
+
     // Insert new transactions
     if (transactions.length > 0) {
+      console.log('📊 Parse Statement API: Inserting', transactions.length, 'transactions...');
       const transactionsToInsert = transactions.map(t => ({
         order_id: orderId,
         user_id: userId || null,
@@ -134,9 +185,13 @@ export async function POST(request: Request) {
         .insert(transactionsToInsert);
 
       if (insertError) {
-        console.error('Error inserting transactions:', insertError);
+        console.error('📊 Parse Statement API: Insert error:', insertError);
         // Continue anyway, return parsed data
+      } else {
+        console.log('📊 Parse Statement API: Successfully inserted transactions');
       }
+    } else {
+      console.log('📊 Parse Statement API: No transactions to insert');
     }
 
     return NextResponse.json({

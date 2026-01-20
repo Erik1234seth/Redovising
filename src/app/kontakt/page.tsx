@@ -102,10 +102,10 @@ export default function KontaktPage() {
                 <div>
                   <h3 className="font-semibold text-white text-sm sm:text-base mb-1">Telefon</h3>
                   <a
-                    href="tel:+46701234567"
+                    href="tel:+46725191616"
                     className="text-gold-500 hover:text-gold-400 transition-colors text-sm sm:text-base"
                   >
-                    070-123 45 67
+                    072-519-16-16
                   </a>
                   <p className="text-xs sm:text-sm text-warm-400 mt-1">
                     Vardagar 9:00-17:00
@@ -134,7 +134,7 @@ export default function KontaktPage() {
                     Svarstid
                   </h3>
                   <p className="text-warm-300 text-sm sm:text-base">
-                    Vi strävar efter att svara inom 24 timmar
+                    Vi strävar efter att svara så snart som möjligt
                   </p>
                 </div>
               </div>
