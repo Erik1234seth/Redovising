@@ -44,7 +44,7 @@ export default function DelegationGuidePage() {
     >
       <div className="mb-8">
         <VideoPlayer
-          videoUrl={bank?.accessDelegationVideoUrl || ''}
+          videoUrl="/videos/ombudny.mp4"
           title="Så här registrerar du oss som ombud hos Skatteverket"
         />
       </div>
