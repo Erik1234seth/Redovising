@@ -1,71 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { createClient } from '@/lib/supabase';
 
 export default function AccountPage() {
-  const { user, profile, refreshProfile, signOut, loading } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
   const router = useRouter();
-  const supabase = createClient();
-
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-  const [formData, setFormData] = useState({
-    full_name: '',
-    phone: '',
-    company_name: '',
-  });
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/auth/login');
     }
   }, [user, loading, router]);
-
-  useEffect(() => {
-    if (profile) {
-      setFormData({
-        full_name: profile.full_name || '',
-        phone: profile.phone || '',
-        company_name: profile.company_name || '',
-      });
-    }
-  }, [profile]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setMessage('');
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        full_name: formData.full_name,
-        phone: formData.phone,
-        company_name: formData.company_name,
-      })
-      .eq('id', user?.id);
-
-    if (error) {
-      setMessage('Ett fel uppstod. Försök igen.');
-    } else {
-      await refreshProfile();
-      setMessage('Profilen har uppdaterats!');
-      setEditing(false);
-    }
-
-    setSaving(false);
-  };
 
   const handleLogout = async () => {
     await signOut();
@@ -84,127 +32,32 @@ export default function AccountPage() {
     <div className="min-h-screen bg-navy-900 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Min profil</h1>
-          <p className="text-sm sm:text-base text-warm-300">Hantera dina uppgifter och se din orderhistorik</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Mitt konto</h1>
+          <p className="text-sm sm:text-base text-warm-300">Inloggad som {user.email}</p>
         </div>
 
-        {message && (
-          <div className="mb-4 sm:mb-6 bg-gold-500/10 border border-gold-500/50 text-gold-500 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl text-sm sm:text-base">
-            {message}
+        {/* My Accounting */}
+        <Link
+          href="/account/redovisning"
+          className="block bg-gradient-to-r from-gold-500/10 to-gold-600/10 hover:from-gold-500/20 hover:to-gold-600/20 border border-gold-500/30 hover:border-gold-500/50 rounded-xl sm:rounded-2xl shadow-xl p-6 sm:p-8 mb-4 sm:mb-6 transition-all duration-200 group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gold-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 sm:w-7 sm:h-7 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">Min redovisning</h2>
+                <p className="text-sm sm:text-base text-warm-300">Se dina färdiga bokslut och NE-bilagor</p>
+              </div>
+            </div>
+            <svg className="w-6 h-6 text-gold-500 group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </div>
-        )}
-
-        {/* Profile Information */}
-        <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl shadow-xl p-6 sm:p-8 mb-4 sm:mb-6">
-          <div className="flex justify-between items-center mb-4 sm:mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-white">Kontaktuppgifter</h2>
-            {!editing && (
-              <button
-                onClick={() => setEditing(true)}
-                className="px-4 py-2 bg-navy-600 hover:bg-navy-500 border border-gold-500/50 hover:border-gold-500 text-white rounded-xl font-semibold transition-all duration-200"
-              >
-                Redigera
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-warm-300 mb-2">
-                E-postadress
-              </label>
-              <input
-                type="email"
-                value={user.email || ''}
-                disabled
-                className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-warm-500 rounded-xl cursor-not-allowed"
-              />
-              <p className="mt-1 text-xs text-warm-500">E-postadressen kan inte ändras</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-warm-300 mb-2">
-                Namn
-              </label>
-              <input
-                type="text"
-                name="full_name"
-                value={formData.full_name}
-                onChange={handleChange}
-                disabled={!editing}
-                className={`w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl outline-none transition placeholder-warm-500 ${
-                  editing
-                    ? 'focus:ring-2 focus:ring-gold-500 focus:border-gold-500'
-                    : 'cursor-not-allowed opacity-75'
-                }`}
-                placeholder="Ditt namn"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-warm-300 mb-2">
-                Telefonnummer
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                disabled={!editing}
-                className={`w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl outline-none transition placeholder-warm-500 ${
-                  editing
-                    ? 'focus:ring-2 focus:ring-gold-500 focus:border-gold-500'
-                    : 'cursor-not-allowed opacity-75'
-                }`}
-                placeholder="070-123 45 67"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-warm-300 mb-2">
-                Företagsnamn
-              </label>
-              <input
-                type="text"
-                name="company_name"
-                value={formData.company_name}
-                onChange={handleChange}
-                disabled={!editing}
-                className={`w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl outline-none transition placeholder-warm-500 ${
-                  editing
-                    ? 'focus:ring-2 focus:ring-gold-500 focus:border-gold-500'
-                    : 'cursor-not-allowed opacity-75'
-                }`}
-                placeholder="Namnet på din enskilda firma"
-              />
-            </div>
-          </div>
-
-          {editing && (
-            <div className="flex gap-4 mt-6">
-              <button
-                onClick={() => {
-                  setEditing(false);
-                  setFormData({
-                    full_name: profile.full_name || '',
-                    phone: profile.phone || '',
-                    company_name: profile.company_name || '',
-                  });
-                }}
-                className="flex-1 px-6 py-3 bg-navy-600 hover:bg-navy-500 border border-navy-500 text-white rounded-xl font-semibold transition-all duration-200"
-              >
-                Avbryt
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 disabled:from-gold-600 disabled:to-gold-600 disabled:opacity-50 text-navy-900 rounded-xl font-bold transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40"
-              >
-                {saving ? 'Sparar...' : 'Spara ändringar'}
-              </button>
-            </div>
-          )}
-        </div>
+        </Link>
 
         {/* Order Statistics */}
         <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl shadow-xl p-6 sm:p-8 mb-4 sm:mb-6">
@@ -244,29 +97,6 @@ export default function AccountPage() {
             </div>
           </div>
         </div>
-
-        {/* My Accounting */}
-        <Link
-          href="/account/redovisning"
-          className="block bg-gradient-to-r from-gold-500/10 to-gold-600/10 hover:from-gold-500/20 hover:to-gold-600/20 border border-gold-500/30 hover:border-gold-500/50 rounded-xl sm:rounded-2xl shadow-xl p-6 sm:p-8 mb-4 sm:mb-6 transition-all duration-200 group"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gold-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                <svg className="w-6 h-6 sm:w-7 sm:h-7 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">Min redovisning</h2>
-                <p className="text-sm sm:text-base text-warm-300">Se dina färdiga bokslut och NE-bilagor</p>
-              </div>
-            </div>
-            <svg className="w-6 h-6 text-gold-500 group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </div>
-        </Link>
 
         {/* Actions */}
         <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl shadow-xl p-6 sm:p-8">
