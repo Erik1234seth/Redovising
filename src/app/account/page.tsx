@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
 
@@ -243,6 +244,29 @@ export default function AccountPage() {
             </div>
           </div>
         </div>
+
+        {/* My Accounting */}
+        <Link
+          href="/account/redovisning"
+          className="block bg-gradient-to-r from-gold-500/10 to-gold-600/10 hover:from-gold-500/20 hover:to-gold-600/20 border border-gold-500/30 hover:border-gold-500/50 rounded-xl sm:rounded-2xl shadow-xl p-6 sm:p-8 mb-4 sm:mb-6 transition-all duration-200 group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gold-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 sm:w-7 sm:h-7 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">Min redovisning</h2>
+                <p className="text-sm sm:text-base text-warm-300">Se dina färdiga bokslut och NE-bilagor</p>
+              </div>
+            </div>
+            <svg className="w-6 h-6 text-gold-500 group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        </Link>
 
         {/* Actions */}
         <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl shadow-xl p-6 sm:p-8">
