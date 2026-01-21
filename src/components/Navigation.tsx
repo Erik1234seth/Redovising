@@ -71,13 +71,13 @@ export default function Navigation() {
                 {user ? (
                   <Link
                     href="/account"
-                    className={`ml-4 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
                       isActive('/account')
                         ? 'bg-gold-500/10 text-gold-500'
                         : 'text-warm-300 hover:text-white hover:bg-navy-800'
                     }`}
                   >
-                    Min profil
+                    Konto
                   </Link>
                 ) : (
                   <div className="flex items-center space-x-2 ml-4">
@@ -194,7 +194,7 @@ export default function Navigation() {
                         : 'text-warm-300 hover:text-white hover:bg-navy-800'
                     }`}
                   >
-                    Min profil
+                    Konto
                   </Link>
                 ) : (
                   <div className="space-y-2 pt-2">
