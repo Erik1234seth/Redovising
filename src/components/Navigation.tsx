@@ -66,36 +66,36 @@ export default function Navigation() {
             >
               Kontakt
             </Link>
-            {!loading && (
-              <>
-                {user ? (
-                  <Link
-                    href="/account"
-                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                      isActive('/account')
-                        ? 'bg-gold-500/10 text-gold-500'
-                        : 'text-warm-300 hover:text-white hover:bg-navy-800'
-                    }`}
-                  >
-                    Konto
-                  </Link>
-                ) : (
-                  <div className="flex items-center space-x-2 ml-4">
-                    <Link
-                      href="/auth/login"
-                      className="px-4 py-2 text-sm font-semibold text-warm-300 hover:text-white hover:bg-navy-800 rounded-lg transition-all duration-200"
-                    >
-                      Logga in
-                    </Link>
-                    <Link
-                      href="/auth/signup"
-                      className="px-6 py-2 text-sm font-bold bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-lg shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 transition-all duration-200"
-                    >
-                      Skapa konto
-                    </Link>
-                  </div>
-                )}
-              </>
+            {loading ? (
+              <div className="px-4 py-2">
+                <div className="w-5 h-5 border-2 border-warm-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : user ? (
+              <Link
+                href="/account"
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                  isActive('/account')
+                    ? 'bg-gold-500/10 text-gold-500'
+                    : 'text-warm-300 hover:text-white hover:bg-navy-800'
+                }`}
+              >
+                Konto
+              </Link>
+            ) : (
+              <div className="flex items-center space-x-2 ml-4">
+                <Link
+                  href="/auth/login"
+                  className="px-4 py-2 text-sm font-semibold text-warm-300 hover:text-white hover:bg-navy-800 rounded-lg transition-all duration-200"
+                >
+                  Logga in
+                </Link>
+                <Link
+                  href="/auth/signup"
+                  className="px-6 py-2 text-sm font-bold bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-lg shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 transition-all duration-200"
+                >
+                  Skapa konto
+                </Link>
+              </div>
             )}
           </div>
 
@@ -182,39 +182,39 @@ export default function Navigation() {
             >
               Kontakt
             </Link>
-            {!loading && (
-              <>
-                {user ? (
-                  <Link
-                    href="/account"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`block px-4 py-3 text-base font-semibold rounded-lg transition-all duration-200 ${
-                      isActive('/account')
-                        ? 'bg-gold-500/10 text-gold-500'
-                        : 'text-warm-300 hover:text-white hover:bg-navy-800'
-                    }`}
-                  >
-                    Konto
-                  </Link>
-                ) : (
-                  <div className="space-y-2 pt-2">
-                    <Link
-                      href="/auth/login"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 text-base font-semibold text-warm-300 hover:text-white hover:bg-navy-800 rounded-lg transition-all duration-200"
-                    >
-                      Logga in
-                    </Link>
-                    <Link
-                      href="/auth/signup"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-4 py-3 text-base font-bold bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-lg shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 transition-all duration-200 text-center"
-                    >
-                      Skapa konto
-                    </Link>
-                  </div>
-                )}
-              </>
+            {loading ? (
+              <div className="px-4 py-3 flex justify-center">
+                <div className="w-5 h-5 border-2 border-warm-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : user ? (
+              <Link
+                href="/account"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`block px-4 py-3 text-base font-semibold rounded-lg transition-all duration-200 ${
+                  isActive('/account')
+                    ? 'bg-gold-500/10 text-gold-500'
+                    : 'text-warm-300 hover:text-white hover:bg-navy-800'
+                }`}
+              >
+                Konto
+              </Link>
+            ) : (
+              <div className="space-y-2 pt-2">
+                <Link
+                  href="/auth/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-3 text-base font-semibold text-warm-300 hover:text-white hover:bg-navy-800 rounded-lg transition-all duration-200"
+                >
+                  Logga in
+                </Link>
+                <Link
+                  href="/auth/signup"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-3 text-base font-bold bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-lg shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 transition-all duration-200 text-center"
+                >
+                  Skapa konto
+                </Link>
+              </div>
             )}
           </div>
         </div>
