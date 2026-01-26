@@ -193,7 +193,7 @@ export default function ConfirmationPage() {
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
                 1
               </span>
-              <span>Vi granskar dina kontoutdrag och börjar arbeta med din NE-bilaga</span>
+              <span>Vi granskar dina kontoutdrag och börjar arbeta med dina uppgifter</span>
             </li>
             <li className="flex items-start">
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
@@ -220,7 +220,7 @@ export default function ConfirmationPage() {
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
                 1
               </span>
-              <span>Vi granskar dina kontoutdrag och börjar arbeta med din NE-bilaga</span>
+              <span>Vi granskar dina kontoutdrag och börjar arbeta med dina uppgifter</span>
             </li>
             <li className="flex items-start">
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">

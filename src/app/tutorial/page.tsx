@@ -36,7 +36,7 @@ export default function TutorialPage() {
                   : 'text-warm-300 hover:text-white'
               }`}
             >
-              NE-Bilaga (1499 kr)
+              NE-Bilaga (2499 kr)
             </button>
             <button
               onClick={() => setActiveTab('komplett')}

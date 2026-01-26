@@ -202,7 +202,7 @@ export default function ContactInfoPage() {
 
         <div className="flex gap-4 pt-4">
           <Link
-            href={`/flow/${packageType}/upload-previous?bank=${bank}`}
+            href={packageType === 'komplett' ? `/flow/${packageType}/delegation-guide?bank=${bank}` : `/flow/${packageType}/upload-previous?bank=${bank}`}
             className="flex-1 px-6 py-3 bg-navy-800 hover:bg-navy-600 border border-navy-600 hover:border-gold-500/50 text-white rounded-xl font-semibold transition-all duration-200 text-center"
           >
             Tillbaka

@@ -47,6 +47,16 @@ export default function Navigation() {
               Guider
             </Link>
             <Link
+              href="/viktigt"
+              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                isActive('/viktigt')
+                  ? 'bg-gold-500/10 text-gold-500'
+                  : 'text-warm-300 hover:text-white hover:bg-navy-800'
+              }`}
+            >
+              Viktigt
+            </Link>
+            <Link
               href="/om-oss"
               className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
                 isActive('/om-oss')
@@ -66,16 +76,7 @@ export default function Navigation() {
             >
               Kontakt
             </Link>
-            <Link
-              href="/bankid-test"
-              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                isActive('/bankid-test')
-                  ? 'bg-gold-500/10 text-gold-500'
-                  : 'text-warm-300 hover:text-white hover:bg-navy-800'
-              }`}
-            >
-              BankID Test
-            </Link>
+
 
             {!loading && (
               <>
@@ -172,6 +173,17 @@ export default function Navigation() {
               Guider
             </Link>
             <Link
+              href="/viktigt"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`block px-4 py-3 text-base font-semibold rounded-lg transition-all duration-200 ${
+                isActive('/viktigt')
+                  ? 'bg-gold-500/10 text-gold-500'
+                  : 'text-warm-300 hover:text-white hover:bg-navy-800'
+              }`}
+            >
+              Viktigt
+            </Link>
+            <Link
               href="/om-oss"
               onClick={() => setMobileMenuOpen(false)}
               className={`block px-4 py-3 text-base font-semibold rounded-lg transition-all duration-200 ${
@@ -193,17 +205,7 @@ export default function Navigation() {
             >
               Kontakt
             </Link>
-            <Link
-              href="/bankid-test"
-              onClick={() => setMobileMenuOpen(false)}
-              className={`block px-4 py-3 text-base font-semibold rounded-lg transition-all duration-200 ${
-                isActive('/bankid-test')
-                  ? 'bg-gold-500/10 text-gold-500'
-                  : 'text-warm-300 hover:text-white hover:bg-navy-800'
-              }`}
-            >
-              BankID Test
-            </Link>
+
 
             {!loading && (
               <>

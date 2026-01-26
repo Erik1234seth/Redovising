@@ -21,14 +21,14 @@ export default function DelegationGuidePage() {
 
   const handleContinue = () => {
     if (hasCompleted) {
-      router.push(`/flow/${packageType}/confirmation?bank=${bankId}`);
+      router.push(`/flow/${packageType}/contact-info?bank=${bankId}`);
     }
   };
 
   return (
     <FlowContainer
       title="Registrera oss som ombud på Skatteverket"
-      description="För att vi ska kunna lämna in din deklaration åt dig behöver du registrera oss som ombud på Skatteverket."
+      description="För att vi ska kunna lämna in din deklaration åt dig behöver du registrera oss som ombud på Skatteverket. Detta behöver göras varje år."
       currentStep={6}
       totalSteps={totalSteps}
       packageType={packageType}
@@ -46,6 +46,7 @@ export default function DelegationGuidePage() {
         </h3>
         <p className="text-sm sm:text-base text-warm-200">
           Genom att registrera oss som ombud får vi behörighet att lämna in din inkomstdeklaration direkt till Skatteverket åt dig.
+          Fullmakten behöver förnyas varje år, så även om du har beställt från oss tidigare behöver du registrera oss som ombud på nytt.
           Du behåller full kontroll och kan när som helst återkalla behörigheten på Skatteverkets webbplats.
         </p>
       </div>
@@ -203,7 +204,7 @@ export default function DelegationGuidePage() {
                 d="M5 13l4 4L19 7"
               />
             </svg>
-            <span>Fullmakten gäller endast för innevarande år</span>
+            <span>Fullmakten gäller endast för innevarande år och behöver förnyas årligen</span>
           </li>
         </ul>
       </div>
@@ -217,7 +218,7 @@ export default function DelegationGuidePage() {
             className="mt-1 w-5 h-5 text-gold-500 bg-navy-700 border-navy-600 rounded focus:ring-gold-500 focus:ring-offset-navy-800"
           />
           <span className="text-warm-200 group-hover:text-white font-medium">
-            Jag bekräftar att jag har registrerat er som ombud på Skatteverket och gett behörighet att lämna in min inkomstdeklaration
+            Jag bekräftar att jag har registrerat er som ombud på Skatteverket för i år och gett behörighet att lämna in min inkomstdeklaration
           </span>
         </label>
       </div>

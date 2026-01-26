@@ -32,7 +32,7 @@ export default function Footer() {
               <li>
                 <Link href="/flow/ne-bilaga/bank-selection" className="text-warm-400 hover:text-gold-500 transition-colors text-sm flex items-center group">
                   <span className="w-1.5 h-1.5 bg-gold-500 rounded-full mr-2 group-hover:w-2 transition-all"></span>
-                  NE-Bilaga - 1499kr
+                  NE-Bilaga - 2499kr
                 </Link>
               </li>
               <li>
