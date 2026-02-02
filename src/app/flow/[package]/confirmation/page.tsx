@@ -33,7 +33,7 @@ export default function ConfirmationPage() {
 
   const bank = banks.find((b) => b.id === bankId);
   const packageInfo = packages.find((p) => p.id === packageType);
-  const totalSteps = 8;
+  const totalSteps = packageType === 'komplett' ? 7 : 8;
   const [orderSaved, setOrderSaved] = useState(false);
 
   // Save order to database on mount
@@ -89,6 +89,24 @@ export default function ConfirmationPage() {
               guest_name: user ? null : name,
             })
             .eq('order_id', tempOrderId);
+
+          // Also update parsed transactions to use the real order ID
+          await supabase
+            .from('parsed_transactions')
+            .update({ order_id: newOrder.id })
+            .eq('order_id', tempOrderId);
+        }
+
+        // Export transactions to Excel and save to Supabase
+        try {
+          await fetch('/api/export-transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: newOrder.id }),
+          });
+          console.log('Transactions exported successfully');
+        } catch (exportError) {
+          console.error('Error exporting transactions:', exportError);
         }
 
         // Clean up sessionStorage

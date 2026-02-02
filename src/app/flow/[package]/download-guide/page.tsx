@@ -17,7 +17,7 @@ export default function DownloadGuidePage() {
   const bankId = searchParams.get('bank') as Bank;
 
   const bank = banks.find((b) => b.id === bankId);
-  const totalSteps = 8;
+  const totalSteps = packageType === 'komplett' ? 7 : 8;
 
   // Protect route - require authentication
   useEffect(() => {
@@ -95,7 +95,7 @@ export default function DownloadGuidePage() {
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>Filformatet ska vara CSV eller Excel</span>
+                <span>Filformatet ska vara Excel</span>
               </li>
               <li className="flex items-start">
                 <svg

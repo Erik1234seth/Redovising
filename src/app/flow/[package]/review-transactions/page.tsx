@@ -49,8 +49,11 @@ export default function ReviewTransactionsPage() {
   const [orderId, setOrderId] = useState<string>('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [editingGroupName, setEditingGroupName] = useState<string | null>(null);
+  const [groupNoteText, setGroupNoteText] = useState('');
 
-  const totalSteps = 8; // Updated to include this new step
+  const totalSteps = packageType === 'komplett' ? 7 : 8;
 
   // Protect route - require authentication
   useEffect(() => {
@@ -170,7 +173,7 @@ export default function ReviewTransactionsPage() {
 
     } catch (err) {
       console.error('📄 Error parsing file:', err);
-      setError('Kunde inte läsa kontoutdraget. Kontrollera att filen är i rätt format (Excel/CSV).');
+      setError('Kunde inte läsa kontoutdraget. Kontrollera att filen är i rätt format (Excel).');
     } finally {
       setLoading(false);
       setParsing(false);
@@ -219,6 +222,51 @@ export default function ReviewTransactionsPage() {
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString('sv-SE');
+  };
+
+  // Group transactions by description
+  const groupedTransactions = transactions.reduce((groups, transaction) => {
+    const key = transaction.description || transaction.reference || 'Ingen beskrivning';
+    if (!groups[key]) {
+      groups[key] = [];
+    }
+    groups[key].push(transaction);
+    return groups;
+  }, {} as Record<string, ParsedTransaction[]>);
+
+  // Sort groups: income first (positive total), then expenses (negative total)
+  // Within each category, sort by absolute amount (largest first)
+  const sortedGroups = Object.entries(groupedTransactions).sort((a, b) => {
+    const totalA = a[1].reduce((sum, t) => sum + t.amount, 0);
+    const totalB = b[1].reduce((sum, t) => sum + t.amount, 0);
+
+    // Income (positive) comes before expenses (negative)
+    if (totalA >= 0 && totalB < 0) return -1;
+    if (totalA < 0 && totalB >= 0) return 1;
+
+    // Within same category, sort by absolute amount (largest first)
+    return Math.abs(totalB) - Math.abs(totalA);
+  });
+
+  const toggleGroup = (groupName: string) => {
+    setExpandedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupName)) {
+        newSet.delete(groupName);
+      } else {
+        newSet.add(groupName);
+      }
+      return newSet;
+    });
+  };
+
+  // Add note to all transactions in a group
+  const handleGroupNoteSubmit = async (groupName: string, groupTransactions: ParsedTransaction[]) => {
+    for (const transaction of groupTransactions) {
+      await updateTransaction(transaction.id, { note: groupNoteText });
+    }
+    setEditingGroupName(null);
+    setGroupNoteText('');
   };
 
   if (loading || parsing) {
@@ -284,152 +332,272 @@ export default function ReviewTransactionsPage() {
             </div>
           )}
 
-          {/* Transactions List */}
+          {/* Grouped Transactions List */}
           <div className="bg-navy-800/50 border border-navy-600 rounded-xl overflow-hidden mb-6">
             <div className="p-4 border-b border-navy-600">
               <h3 className="text-lg font-bold text-white">
-                Transaktioner ({transactions.length})
+                Transaktioner ({transactions.length} st i {sortedGroups.length} grupper)
               </h3>
               <p className="text-sm text-warm-400 mt-1">
-                Klicka på en transaktion för att lägga till anteckning eller markera som EU-transaktion
+                Klicka på en grupp för att expandera och se alla transaktioner
               </p>
             </div>
 
-            <div className="max-h-[500px] overflow-y-auto">
-              {transactions.map((transaction) => (
-                <div
-                  key={transaction.id}
-                  className={`border-b border-navy-700 last:border-b-0 ${
-                    transaction.is_private ? 'opacity-50' : ''
-                  }`}
-                >
-                  <div className="p-3 sm:p-4 hover:bg-navy-700/30 transition-colors">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-warm-400 text-xs sm:text-sm">
-                            {formatDate(transaction.booking_date)}
-                          </span>
-                          {transaction.is_eu_transaction && (
-                            <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full">
-                              EU
-                            </span>
-                          )}
-                          {transaction.is_private && (
-                            <span className="px-2 py-0.5 bg-warm-500/20 text-warm-400 text-xs rounded-full">
-                              Privat
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-white font-medium text-sm sm:text-base truncate">
-                          {transaction.description || transaction.reference || 'Ingen beskrivning'}
-                        </p>
-                        {transaction.note && (
-                          <p className="text-gold-500/80 text-xs sm:text-sm mt-1 italic border-l-2 border-gold-500/30 pl-2">
-                            {transaction.note}
-                          </p>
-                        )}
-                      </div>
+            <div className="max-h-[600px] overflow-y-auto">
+              {sortedGroups.map(([groupName, groupTransactions]) => {
+                const isExpanded = expandedGroups.has(groupName);
+                const totalAmount = groupTransactions.reduce((sum, t) => sum + t.amount, 0);
+                const hasMultiple = groupTransactions.length > 1;
+                const hasEuTransaction = groupTransactions.some(t => t.is_eu_transaction);
+                const hasPrivate = groupTransactions.some(t => t.is_private);
 
-                      <div className="flex items-center gap-3">
+                return (
+                  <div key={groupName} className="border-b border-navy-700 last:border-b-0">
+                    {/* Group Header */}
+                    <div className={`${hasPrivate ? 'opacity-60' : ''}`}>
+                      <button
+                        onClick={() => hasMultiple && toggleGroup(groupName)}
+                        className={`w-full p-3 sm:p-4 flex items-center justify-between gap-3 hover:bg-navy-700/30 transition-colors ${
+                          hasMultiple ? 'cursor-pointer' : 'cursor-default'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          {hasMultiple && (
+                            <div className={`flex-shrink-0 w-6 h-6 rounded-full bg-navy-600 flex items-center justify-center transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                              <svg className="w-4 h-4 text-warm-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0 text-left">
+                            <div className="flex items-center gap-2 mb-1">
+                              {hasMultiple && (
+                                <span className="px-2 py-0.5 bg-navy-600 text-warm-300 text-xs rounded-full font-medium">
+                                  {groupTransactions.length} st
+                                </span>
+                              )}
+                              {hasEuTransaction && (
+                                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full">
+                                  EU
+                                </span>
+                              )}
+                              {hasPrivate && (
+                                <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded-full">
+                                  Privat
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-white font-medium text-sm sm:text-base truncate">
+                              {groupName}
+                            </p>
+                          </div>
+                        </div>
                         <span
                           className={`text-base sm:text-lg font-bold whitespace-nowrap ${
-                            transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'
+                            totalAmount >= 0 ? 'text-green-400' : 'text-red-400'
                           }`}
                         >
-                          {formatAmount(transaction.amount)}
+                          {formatAmount(totalAmount)}
                         </span>
-                      </div>
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-navy-700/50">
-                      {/* Note button - text style */}
-                      <button
-                        onClick={() => {
-                          setEditingId(transaction.id);
-                          setNoteText(transaction.note || '');
-                        }}
-                        className="text-xs sm:text-sm text-warm-400 hover:text-gold-500 transition-colors flex items-center gap-1.5"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        {transaction.note ? 'Redigera anteckning' : 'Lägg till anteckning'}
                       </button>
 
-                      <span className="text-navy-600">|</span>
-
-                      {/* Toggle buttons */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => updateTransaction(transaction.id, {
-                            is_eu_transaction: !transaction.is_eu_transaction
-                          })}
-                          className={`px-3 py-1 text-xs font-medium rounded border transition-all ${
-                            transaction.is_eu_transaction
-                              ? 'bg-blue-500/10 border-blue-500/50 text-blue-400'
-                              : 'bg-transparent border-navy-600 text-warm-500 hover:border-warm-500 hover:text-warm-400'
-                          }`}
-                        >
-                          {transaction.is_eu_transaction && (
-                            <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
+                      {/* Group Note Button (for groups with multiple transactions) */}
+                      {hasMultiple && (
+                        <div className="px-3 sm:px-4 pb-3">
+                          {editingGroupName === groupName ? (
+                            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="text"
+                                value={groupNoteText}
+                                onChange={(e) => setGroupNoteText(e.target.value)}
+                                placeholder="Skriv anteckning för hela gruppen..."
+                                className="flex-1 px-3 py-2 bg-navy-700 border border-navy-600 rounded-lg text-white text-sm placeholder-warm-500 focus:outline-none focus:border-gold-500"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => handleGroupNoteSubmit(groupName, groupTransactions)}
+                                className="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-lg text-sm font-semibold transition-colors"
+                              >
+                                Spara alla
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingGroupName(null);
+                                  setGroupNoteText('');
+                                }}
+                                className="px-4 py-2 bg-navy-700 hover:bg-navy-600 text-warm-300 rounded-lg text-sm transition-colors"
+                              >
+                                Avbryt
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingGroupName(groupName);
+                                setGroupNoteText('');
+                              }}
+                              className="text-xs text-warm-400 hover:text-gold-500 transition-colors flex items-center gap-1.5"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Lägg till anteckning på alla {groupTransactions.length} transaktioner
+                            </button>
                           )}
-                          EU-transaktion
-                        </button>
-                        <button
-                          onClick={() => updateTransaction(transaction.id, {
-                            is_private: !transaction.is_private
-                          })}
-                          className={`px-3 py-1 text-xs font-medium rounded border transition-all ${
-                            transaction.is_private
-                              ? 'bg-purple-500/10 border-purple-500/50 text-purple-400'
-                              : 'bg-transparent border-navy-600 text-warm-500 hover:border-warm-500 hover:text-warm-400'
-                          }`}
-                        >
-                          {transaction.is_private && (
-                            <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                          Privat
-                        </button>
-                      </div>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Note input */}
-                    {editingId === transaction.id && (
-                      <div className="mt-3 flex gap-2">
-                        <input
-                          type="text"
-                          value={noteText}
-                          onChange={(e) => setNoteText(e.target.value)}
-                          placeholder="Skriv en anteckning..."
-                          className="flex-1 px-3 py-2 bg-navy-700 border border-navy-600 rounded-lg text-white text-sm placeholder-warm-500 focus:outline-none focus:border-gold-500"
-                          autoFocus
-                        />
-                        <button
-                          onClick={() => handleNoteSubmit(transaction.id)}
-                          className="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-lg text-sm font-semibold transition-colors"
-                        >
-                          Spara
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingId(null);
-                            setNoteText('');
-                          }}
-                          className="px-4 py-2 bg-navy-700 hover:bg-navy-600 text-warm-300 rounded-lg text-sm transition-colors"
-                        >
-                          Avbryt
-                        </button>
+                    {/* Expanded Transactions */}
+                    {(isExpanded || !hasMultiple) && (
+                      <div className={`${hasMultiple ? 'bg-navy-900/30 border-t border-navy-700' : ''}`}>
+                        {groupTransactions.map((transaction, idx) => (
+                          <div
+                            key={transaction.id}
+                            className={`${hasMultiple ? 'ml-4 sm:ml-8 border-l-2 border-navy-600' : ''} ${
+                              transaction.is_private ? 'opacity-50' : ''
+                            }`}
+                          >
+                            <div className="p-3 sm:p-4 hover:bg-navy-700/20 transition-colors">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-warm-400 text-xs sm:text-sm">
+                                      {formatDate(transaction.booking_date)}
+                                    </span>
+                                    {transaction.is_eu_transaction && (
+                                      <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full">
+                                        EU
+                                      </span>
+                                    )}
+                                    {transaction.is_private && (
+                                      <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded-full">
+                                        Privat
+                                      </span>
+                                    )}
+                                  </div>
+                                  {hasMultiple && (
+                                    <p className="text-white font-medium text-sm sm:text-base">
+                                      {groupName} ({idx + 1})
+                                    </p>
+                                  )}
+                                  {transaction.note && (
+                                    <p className="text-gold-500/80 text-xs sm:text-sm mt-1 italic border-l-2 border-gold-500/30 pl-2">
+                                      {transaction.note}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                  <span
+                                    className={`text-base sm:text-lg font-bold whitespace-nowrap ${
+                                      transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'
+                                    }`}
+                                  >
+                                    {formatAmount(transaction.amount)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Action buttons */}
+                              <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-navy-700/50">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingId(transaction.id);
+                                    setNoteText(transaction.note || '');
+                                  }}
+                                  className="text-xs sm:text-sm text-warm-400 hover:text-gold-500 transition-colors flex items-center gap-1.5"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                  {transaction.note ? 'Redigera anteckning' : 'Lägg till anteckning'}
+                                </button>
+
+                                <span className="text-navy-600">|</span>
+
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateTransaction(transaction.id, {
+                                        is_eu_transaction: !transaction.is_eu_transaction
+                                      });
+                                    }}
+                                    className={`px-3 py-1 text-xs font-medium rounded border transition-all ${
+                                      transaction.is_eu_transaction
+                                        ? 'bg-blue-500/10 border-blue-500/50 text-blue-400'
+                                        : 'bg-transparent border-navy-600 text-warm-500 hover:border-warm-500 hover:text-warm-400'
+                                    }`}
+                                  >
+                                    {transaction.is_eu_transaction && (
+                                      <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    )}
+                                    EU-transaktion
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateTransaction(transaction.id, {
+                                        is_private: !transaction.is_private
+                                      });
+                                    }}
+                                    className={`px-3 py-1 text-xs font-medium rounded border transition-all ${
+                                      transaction.is_private
+                                        ? 'bg-purple-500/10 border-purple-500/50 text-purple-400'
+                                        : 'bg-transparent border-navy-600 text-warm-500 hover:border-warm-500 hover:text-warm-400'
+                                    }`}
+                                  >
+                                    {transaction.is_private && (
+                                      <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    )}
+                                    Privat
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Note input */}
+                              {editingId === transaction.id && (
+                                <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="text"
+                                    value={noteText}
+                                    onChange={(e) => setNoteText(e.target.value)}
+                                    placeholder="Skriv en anteckning..."
+                                    className="flex-1 px-3 py-2 bg-navy-700 border border-navy-600 rounded-lg text-white text-sm placeholder-warm-500 focus:outline-none focus:border-gold-500"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleNoteSubmit(transaction.id)}
+                                    className="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-lg text-sm font-semibold transition-colors"
+                                  >
+                                    Spara
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingId(null);
+                                      setNoteText('');
+                                    }}
+                                    className="px-4 py-2 bg-navy-700 hover:bg-navy-600 text-warm-300 rounded-lg text-sm transition-colors"
+                                  >
+                                    Avbryt
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {transactions.length === 0 && (
                 <div className="p-8 text-center">
@@ -450,8 +618,8 @@ export default function ReviewTransactionsPage() {
               <div>
                 <h3 className="text-white font-semibold mb-2">Tips för granskning</h3>
                 <div className="text-warm-300 text-sm space-y-1.5">
-                  <p><span className="text-purple-400 font-medium">Privat</span> – Markera transaktioner som inte ska ingå i bokföringen</p>
-                  <p><span className="text-blue-400 font-medium">EU-transaktion</span> – Markera köp från andra EU-länder för korrekt momshantering</p>
+                  <p><span className="text-gold-500 font-medium">Privat</span> – Markera transaktioner som inte ska ingå i bokföringen</p>
+                  <p><span className="text-gold-500 font-medium">EU-transaktion</span> – Markera köp från andra EU-länder för korrekt momshantering</p>
                   <p><span className="text-gold-500 font-medium">Anteckningar</span> – Lägg till förklaringar för oklara transaktioner</p>
                 </div>
               </div>

@@ -4,7 +4,7 @@ export const packages: PackageInfo[] = [
   {
     id: 'ne-bilaga',
     name: 'NE-Bilaga',
-    price: 1499,
+    price: 1999,
     description: 'Perfekt för dig som vill sköta inlämningen själv',
     features: [
       'Vi upprättar din NE-bilaga',

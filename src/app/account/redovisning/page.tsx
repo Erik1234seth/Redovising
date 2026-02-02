@@ -19,11 +19,18 @@ interface AccountingDocument {
 
 export default function RedovisningPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [documents, setDocuments] = useState<AccountingDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const supabase = createClient();
+
+  // Question form state
+  const [showQuestionForm, setShowQuestionForm] = useState(false);
+  const [questionForm, setQuestionForm] = useState({ message: '' });
+  const [sendingQuestion, setSendingQuestion] = useState(false);
+  const [questionSent, setQuestionSent] = useState(false);
+  const [questionError, setQuestionError] = useState('');
 
   // Protect route - require authentication
   useEffect(() => {
@@ -63,6 +70,38 @@ export default function RedovisningPage() {
       fetchDocuments();
     }
   }, [user, supabase]);
+
+  const handleSendQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!questionForm.message.trim()) return;
+
+    setSendingQuestion(true);
+    setQuestionError('');
+
+    try {
+      const response = await fetch('/api/send-question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: profile?.full_name || user?.email || 'Okänd användare',
+          email: user?.email || '',
+          message: questionForm.message,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Kunde inte skicka frågan');
+      }
+
+      setQuestionSent(true);
+      setQuestionForm({ message: '' });
+    } catch (err) {
+      console.error('Error sending question:', err);
+      setQuestionError('Kunde inte skicka frågan. Försök igen senare.');
+    } finally {
+      setSendingQuestion(false);
+    }
+  };
 
   if (authLoading || (!user && !authLoading)) {
     return (
@@ -122,7 +161,7 @@ export default function RedovisningPage() {
               href="/"
               className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-xl font-bold transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40"
             >
-              Beställ redovisning
+              Gå till startsidan
               <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
@@ -217,6 +256,117 @@ export default function RedovisningPage() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Question Section */}
+        <div className="mt-8 bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl overflow-hidden">
+          <button
+            onClick={() => {
+              setShowQuestionForm(!showQuestionForm);
+              if (questionSent) {
+                setQuestionSent(false);
+              }
+            }}
+            className="w-full p-6 flex items-center justify-between hover:bg-navy-600/30 transition-colors"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-gold-500/10 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <h3 className="font-bold text-white">
+                  Har du en fråga?
+                </h3>
+                <p className="text-sm text-warm-300">
+                  Skicka en fråga direkt till oss
+                </p>
+              </div>
+            </div>
+            <svg
+              className={`w-5 h-5 text-warm-400 transition-transform duration-200 ${showQuestionForm ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showQuestionForm && (
+            <div className="px-6 pb-6 border-t border-navy-600">
+              {questionSent ? (
+                <div className="pt-6 text-center">
+                  <div className="w-12 h-12 bg-green-500/20 border-2 border-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h4 className="font-bold text-white mb-2">Tack för din fråga!</h4>
+                  <p className="text-sm text-warm-300 mb-4">
+                    Vi återkommer till dig så snart som möjligt.
+                  </p>
+                  <button
+                    onClick={() => setQuestionSent(false)}
+                    className="text-gold-500 hover:text-gold-400 font-semibold text-sm"
+                  >
+                    Skicka en ny fråga
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSendQuestion} className="pt-6 space-y-4">
+                  <div>
+                    <label htmlFor="question-message" className="block text-sm font-medium text-warm-300 mb-2">
+                      Din fråga
+                    </label>
+                    <textarea
+                      id="question-message"
+                      rows={4}
+                      value={questionForm.message}
+                      onChange={(e) => setQuestionForm({ message: e.target.value })}
+                      placeholder="Skriv din fråga här..."
+                      className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition resize-none placeholder-warm-500"
+                      required
+                    />
+                  </div>
+
+                  {questionError && (
+                    <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3">
+                      <p className="text-sm text-red-400">{questionError}</p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-warm-400">
+                      Vi svarar till: {user?.email}
+                    </p>
+                    <button
+                      type="submit"
+                      disabled={sendingQuestion || !questionForm.message.trim()}
+                      className={`px-6 py-2.5 rounded-xl font-bold transition-all duration-200 ${
+                        sendingQuestion || !questionForm.message.trim()
+                          ? 'bg-navy-600 text-navy-400 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40'
+                      }`}
+                    >
+                      {sendingQuestion ? (
+                        <span className="flex items-center">
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Skickar...
+                        </span>
+                      ) : (
+                        'Skicka fråga'
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

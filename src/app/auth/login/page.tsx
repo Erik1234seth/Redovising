@@ -19,17 +19,31 @@ function LoginForm() {
     e.preventDefault();
     setError('');
     setLoading(true);
+    console.log('[Login] Starting login attempt for:', email);
 
-    const { error } = await signIn(email, password);
+    try {
+      console.log('[Login] Calling signIn...');
+      const { error } = await signIn(email, password);
+      console.log('[Login] signIn returned, error:', error);
 
-    if (error) {
-      setError('Fel e-postadress eller lösenord');
+      if (error) {
+        console.log('[Login] Login failed with error');
+        setError('Fel e-postadress eller lösenord');
+        setLoading(false);
+      } else {
+        console.log('[Login] Login successful, waiting 500ms...');
+        // Wait a moment for auth state to update, then refresh profile and redirect
+        await new Promise(resolve => setTimeout(resolve, 500));
+        console.log('[Login] Calling refreshProfile...');
+        await refreshProfile();
+        console.log('[Login] refreshProfile done, redirecting to:', redirectUrl);
+        router.push(redirectUrl);
+        console.log('[Login] router.push called');
+      }
+    } catch (err) {
+      console.error('[Login] Unexpected error:', err);
+      setError('Något gick fel. Försök igen.');
       setLoading(false);
-    } else {
-      // Wait a moment for auth state to update, then refresh profile and redirect
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await refreshProfile();
-      router.push(redirectUrl);
     }
   };
 

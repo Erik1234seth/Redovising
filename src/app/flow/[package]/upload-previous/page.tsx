@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import FlowContainer from '@/components/FlowContainer';
-import VideoPlayer from '@/components/VideoPlayer';
-import { banks } from '@/data/banks';
 import { Bank } from '@/types';
 import { uploadFile } from '@/lib/uploadFile';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,8 +21,7 @@ export default function UploadPreviousPage() {
   const [uploadError, setUploadError] = useState<string>('');
   const [orderId, setOrderId] = useState<string>('');
 
-  const bank = banks.find((b) => b.id === bankId);
-  const totalSteps = 8;
+  const totalSteps = packageType === 'komplett' ? 7 : 8;
 
   // Protect route - require authentication
   useEffect(() => {
@@ -104,11 +101,29 @@ export default function UploadPreviousPage() {
       totalSteps={totalSteps}
       packageType={packageType}
     >
-      <div className="mb-8">
-        <VideoPlayer
-          videoUrl={bank?.downloadVideoUrl || ''}
-          title={`Så här hittar du din tidigare NE-bilaga i ${bank?.name}`}
-        />
+      <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-6 mb-8">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0 w-10 h-10 bg-gold-500/20 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="font-semibold text-white mb-2">Var hittar jag min NE-bilaga?</h3>
+            <p className="text-sm text-warm-300">
+              Du hittar din tidigare NE-bilaga på{' '}
+              <a
+                href="https://www.skatteverket.se"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gold-500 hover:text-gold-400 font-medium underline"
+              >
+                skatteverket.se
+              </a>
+              . Logga in med BankID och gå till dina tidigare inlämnade deklarationer.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className={`border-2 border-dashed rounded-xl p-6 sm:p-12 text-center transition-all duration-200 ${
@@ -192,13 +207,13 @@ export default function UploadPreviousPage() {
             <h3 className="text-lg font-bold text-white mb-2">
               Ladda upp tidigare NE-bilaga
             </h3>
-            <p className="text-warm-400 mb-4">CSV, Excel eller PDF</p>
+            <p className="text-warm-400 mb-4">Ladda upp din fil</p>
             <label className="inline-block px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-xl font-bold cursor-pointer transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105">
               Välj fil från dator
               <input
                 type="file"
                 onChange={handleFileSelect}
-                accept=".pdf,.csv,.xlsx,.xls"
+                accept=".pdf,.xlsx,.xls"
                 className="hidden"
               />
             </label>

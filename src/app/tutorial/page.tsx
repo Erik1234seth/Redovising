@@ -36,7 +36,7 @@ export default function TutorialPage() {
                   : 'text-warm-300 hover:text-white'
               }`}
             >
-              NE-Bilaga (1499 kr)
+              NE-Bilaga (1999 kr)
             </button>
             <button
               onClick={() => setActiveTab('komplett')}
@@ -142,7 +142,7 @@ export default function TutorialPage() {
               </p>
               <div className="ml-0 sm:ml-14 bg-navy-800/50 border border-navy-600 rounded-lg p-3 sm:p-4">
                 <p className="text-xs sm:text-sm text-warm-300">
-                  <strong className="text-gold-500">Tips:</strong> Se till att filerna är i CSV eller Excel-format
+                  <strong className="text-gold-500">Tips:</strong> Se till att filerna är i Excel-format
                   och att alla transaktioner syns tydligt.
                 </p>
               </div>
@@ -256,7 +256,7 @@ export default function TutorialPage() {
                     <li>Välj det konto som du använder för din verksamhet</li>
                     <li>Leta efter alternativet "Kontoutdrag" eller "Transaktioner"</li>
                     <li>Välj tidsperiod: Hela föregående år (1 januari - 31 december)</li>
-                    <li>Välj format: CSV eller Excel</li>
+                    <li>Välj format: Excel</li>
                     <li>Klicka på "Ladda ner" eller "Exportera"</li>
                   </ol>
                 </div>
@@ -296,7 +296,7 @@ export default function TutorialPage() {
                 </div>
                 <div className="bg-navy-800/50 border border-navy-600 rounded-lg p-3 sm:p-4">
                   <p className="text-xs sm:text-sm text-warm-300">
-                    <strong className="text-gold-500">Godkända format:</strong> CSV och Excel (.xlsx, .xls, .csv)
+                    <strong className="text-gold-500">Godkända format:</strong> Excel (.xlsx, .xls)
                   </p>
                 </div>
               </div>
@@ -336,21 +336,6 @@ export default function TutorialPage() {
               <div className="flex items-center mb-3 sm:mb-4">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold mr-3 sm:mr-4 text-sm sm:text-base flex-shrink-0">
                   5
-                </div>
-                <h2 className="text-lg sm:text-2xl font-bold text-white">
-                  Ladda upp tidigare NE-bilaga (ej första året)
-                </h2>
-              </div>
-              <p className="text-sm sm:text-base text-warm-300 ml-11 sm:ml-14">
-                Om du har drivit din firma tidigare år, ladda upp din senaste NE-bilaga så vi kan
-                använda samma struktur. Hoppa över detta steg om det är ditt första år.
-              </p>
-            </div>
-
-            <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl p-6 sm:p-8">
-              <div className="flex items-center mb-3 sm:mb-4">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold mr-3 sm:mr-4 text-sm sm:text-base flex-shrink-0">
-                  6
                 </div>
                 <h2 className="text-lg sm:text-2xl font-bold text-white">
                   Registrera oss som ombud hos Skatteverket
@@ -415,7 +400,7 @@ export default function TutorialPage() {
             <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl p-6 sm:p-8">
               <div className="flex items-center mb-3 sm:mb-4">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold mr-3 sm:mr-4 text-sm sm:text-base flex-shrink-0">
-                  7
+                  6
                 </div>
                 <h2 className="text-lg sm:text-2xl font-bold text-white">
                   Granska och godkänn

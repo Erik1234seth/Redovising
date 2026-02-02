@@ -27,16 +27,21 @@ function SignupForm() {
       return;
     }
 
-    const { error } = await signUp(email, password, fullName);
+    try {
+      const { error } = await signUp(email, password, fullName);
 
-    if (error) {
-      setError(error.message || 'Ett fel uppstod vid registrering');
+      if (error) {
+        setError(error.message || 'Ett fel uppstod vid registrering');
+        setLoading(false);
+      } else {
+        // Wait a moment for auth state to update, then refresh profile and redirect
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await refreshProfile();
+        router.push(redirectUrl);
+      }
+    } catch (err) {
+      setError('Något gick fel. Försök igen.');
       setLoading(false);
-    } else {
-      // Wait a moment for auth state to update, then refresh profile and redirect
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await refreshProfile();
-      router.push(redirectUrl);
     }
   };
 

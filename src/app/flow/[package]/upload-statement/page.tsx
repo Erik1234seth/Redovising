@@ -21,7 +21,7 @@ export default function UploadStatementPage() {
   const [uploadError, setUploadError] = useState<string>('');
   const [orderId, setOrderId] = useState<string>('');
 
-  const totalSteps = 8;
+  const totalSteps = packageType === 'komplett' ? 7 : 8;
 
   // Protect route - require authentication
   useEffect(() => {
@@ -209,12 +209,12 @@ export default function UploadStatementPage() {
               <input
                 type="file"
                 onChange={handleFileSelect}
-                accept=".csv,.xlsx,.xls"
+                accept=".xlsx,.xls"
                 className="hidden"
               />
             </label>
             <p className="text-sm text-warm-500 mt-6">
-              Godkända filformat: CSV, Excel (.xlsx, .xls, .csv)
+              Godkända filformat: Excel (.xlsx, .xls)
             </p>
           </div>
         )}

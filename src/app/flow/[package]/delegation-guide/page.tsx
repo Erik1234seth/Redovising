@@ -142,7 +142,7 @@ export default function DelegationGuidePage() {
             </span>
             <div>
               <strong className="text-white block mb-1">Valfritt: Sätt ett slutdatum</strong>
-              <span className="text-sm text-warm-300">Om du vill kan du ange ett "till och med"-datum. Se till att det är efter deklarationens deadline.</span>
+              <span className="text-sm text-warm-300">Om du vill kan du ange ett "till och med"-datum. Se till att det är efter deklarationens deadline. Om du sätter ett slutdatum behöver du ge ett nytt medgivande till nästa år.</span>
             </div>
           </li>
           <li className="flex items-start">

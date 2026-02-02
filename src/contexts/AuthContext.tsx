@@ -25,44 +25,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
 
   const fetchProfile = async (userId: string) => {
+    console.log('[Auth] fetchProfile called for userId:', userId);
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
 
+    console.log('[Auth] fetchProfile result - data:', data, 'error:', error);
     if (data) {
       setProfile(data);
     }
   };
 
   const refreshProfile = async () => {
+    console.log('[Auth] refreshProfile called, user:', user?.id);
     if (user) {
       await fetchProfile(user.id);
     }
+    console.log('[Auth] refreshProfile done');
   };
 
   useEffect(() => {
+    console.log('[Auth] useEffect starting, getting initial session...');
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[Auth] getSession result - session:', session?.user?.id);
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
       }
       setLoading(false);
+      console.log('[Auth] Initial loading complete');
     });
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log('[Auth] onAuthStateChange - event:', _event, 'user:', session?.user?.id);
       setUser(session?.user ?? null);
+      setLoading(false); // Set loading false immediately so UI updates
       if (session?.user) {
-        await fetchProfile(session.user.id);
+        // Fetch profile in background, don't block UI
+        fetchProfile(session.user.id);
       } else {
         setProfile(null);
       }
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -95,12 +104,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
+    console.log('[Auth] signIn called for:', email);
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+    console.log('[Auth] signInWithPassword result - error:', error);
 
     if (!error && user) {
+      console.log('[Auth] Updating last login for user:', user.id);
       // Update last login
       await supabase
         .from('profiles')
@@ -108,6 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', user.id);
     }
 
+    console.log('[Auth] signIn returning');
     return { error };
   };
 

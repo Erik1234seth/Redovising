@@ -34,7 +34,7 @@ export default function AddTransactionsPage() {
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
   const [formError, setFormError] = useState('');
 
-  const totalSteps = 8;
+  const totalSteps = packageType === 'komplett' ? 7 : 8;
 
   // Protect route - require authentication
   useEffect(() => {
@@ -143,7 +143,12 @@ export default function AddTransactionsPage() {
   };
 
   const handleContinue = () => {
-    router.push(`/flow/${packageType}/upload-previous?bank=${bankId}`);
+    if (packageType === 'komplett') {
+      // Skip upload-previous for komplett package, go directly to delegation-guide
+      router.push(`/flow/${packageType}/delegation-guide?bank=${bankId}`);
+    } else {
+      router.push(`/flow/${packageType}/upload-previous?bank=${bankId}`);
+    }
   };
 
   const handleSkip = () => {
