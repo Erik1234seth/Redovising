@@ -7,10 +7,11 @@ export const packages: PackageInfo[] = [
     price: 1999,
     description: 'Perfekt för dig som vill sköta inlämningen själv',
     features: [
-      'Vi upprättar din NE-bilaga',
-      'Baserat på dina kontoutdrag',
-      'Snabb leverans',
       'Du lämnar in själv till Skatteverket',
+      'Bokföring baserat på dina kontoutdrag',
+      'Förenklat årsbokslut',
+      'Vi upprättar din NE-bilaga',
+      'Snabb leverans',
       'Support vid frågor'
     ]
   },
@@ -20,11 +21,11 @@ export const packages: PackageInfo[] = [
     price: 3499,
     description: 'Vi sköter allt åt dig från början till slut',
     features: [
+      'Vi sköter inlämningen till Skatteverket',
+      'Bokföring baserat på dina kontoutdrag',
+      'Förenklat årsbokslut',
       'Vi upprättar din NE-bilaga',
-      'Vi lämnar in till Skatteverket åt dig',
-      'Baserat på dina kontoutdrag',
       'Komplett hantering',
-      'Snabb leverans',
       'Full support'
     ]
   }

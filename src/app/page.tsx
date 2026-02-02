@@ -34,7 +34,7 @@ export default function Home() {
             </h1>
 
             <p className="text-base sm:text-xl md:text-2xl text-warm-300 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed px-2">
-              Årsbokslut och förenklad årsredovisning – utan onödiga moment,
+              Bokföring och förenklat årsbokslut – utan onödiga moment,
               <span className="block mt-2">
                 utan dyra byråtimmar och utan krångel.
               </span>
