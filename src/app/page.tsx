@@ -476,74 +476,74 @@ export default function Home() {
             </button>
 
             {/* Header */}
-            <div className="bg-gradient-to-br from-gold-500/10 to-gold-600/5 border-b border-navy-600 p-6 sm:p-8">
-              <div className="w-14 h-14 bg-gold-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-7 h-7 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-gradient-to-br from-gold-500/10 to-gold-600/5 border-b border-navy-600 p-4 sm:p-8">
+              <div className="w-10 h-10 sm:w-14 sm:h-14 bg-gold-500/20 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-4">
+                <svg className="w-5 h-5 sm:w-7 sm:h-7 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                 </svg>
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold text-white text-center">
+              <h2 className="text-lg sm:text-2xl font-bold text-white text-center">
                 Välkommen hit!
               </h2>
-              <p className="text-warm-300 text-center mt-2">
+              <p className="text-warm-300 text-center mt-1 sm:mt-2 text-sm sm:text-base">
                 Kul att du startat enskild firma - här är några tips
               </p>
             </div>
 
             {/* Content */}
-            <div className="p-6 sm:p-8 space-y-5">
+            <div className="p-4 sm:p-8 space-y-4 sm:space-y-5">
               {/* Point 1 - Law requirement */}
-              <div className="flex gap-4">
-                <div className="flex-shrink-0 w-10 h-10 bg-gold-500/20 rounded-full flex items-center justify-center">
-                  <svg className="w-5 h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex gap-3 sm:gap-4">
+                <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-gold-500/20 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-bold text-white mb-1">Det är lag på att redovisa</h3>
-                  <p className="text-sm text-warm-300">
-                    Som enskild näringsidkare måste du enligt lag lämna in en NE-bilaga till Skatteverket varje år. Det låter krångligt, men vi gör det enkelt!
+                  <h3 className="font-bold text-white text-sm sm:text-base">Det är lag på att redovisa</h3>
+                  <p className="text-xs sm:text-sm text-warm-300">
+                    Som enskild näringsidkare måste du enligt lag lämna in en NE-bilaga till Skatteverket varje år. Vi gör det enkelt!
                   </p>
                 </div>
               </div>
 
               {/* Point 2 - We have instructions */}
-              <div className="flex gap-4">
-                <div className="flex-shrink-0 w-10 h-10 bg-gold-500/20 rounded-full flex items-center justify-center">
-                  <svg className="w-5 h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex gap-3 sm:gap-4">
+                <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-gold-500/20 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-bold text-white mb-1">Vi guidar dig hela vägen</h3>
-                  <p className="text-sm text-warm-300">
-                    Steg-för-steg instruktioner för allt - från att hämta kontoutdrag till färdig inlämning. Du klarar det!
+                  <h3 className="font-bold text-white text-sm sm:text-base">Vi guidar dig hela vägen</h3>
+                  <p className="text-xs sm:text-sm text-warm-300">
+                    Steg-för-steg instruktioner för allt - från att hämta kontoutdrag till färdig inlämning.
                   </p>
                 </div>
               </div>
 
-              {/* Point 4 - Important note */}
-              <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-4">
-                <div className="flex gap-3">
+              {/* Point 3 - Important note */}
+              <div className="bg-navy-700/50 border border-navy-600 rounded-lg sm:rounded-xl p-3 sm:p-4">
+                <div className="flex gap-2 sm:gap-3">
                   <div className="flex-shrink-0">
-                    <svg className="w-5 h-5 text-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 text-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-warm-300 text-sm mb-1">Viktigt att tänka på</h3>
+                    <h3 className="font-semibold text-warm-300 text-xs sm:text-sm mb-0.5 sm:mb-1">Viktigt att tänka på</h3>
                     <p className="text-xs text-warm-400">
-                      Vi kan tyvärr inte hjälpa till med redovisning för jordbruk, skogsbruk, byggverksamhet, taxi eller liknande verksamheter.
+                      Vi kan tyvärr inte hjälpa till med jordbruk, skogsbruk, byggverksamhet, taxi eller liknande.
                     </p>
                   </div>
                 </div>
               </div>
 
               {/* Button */}
-              <div className="pt-2">
+              <div className="pt-1 sm:pt-2">
                 <button
                   onClick={closePopup}
-                  className="w-full text-center px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20"
+                  className="w-full text-center px-6 py-2.5 sm:py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20"
                 >
                   Fortsätt
                 </button>
