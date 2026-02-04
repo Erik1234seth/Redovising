@@ -456,7 +456,7 @@ export default function Home() {
 
       {/* Info Popup for New Visitors */}
       {showInfoPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 py-8 sm:py-4">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-navy-900/80 backdrop-blur-sm"
@@ -464,7 +464,7 @@ export default function Home() {
           ></div>
 
           {/* Modal */}
-          <div className="relative bg-navy-800 border border-navy-600 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-navy-800 border border-navy-600 rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             {/* Close button */}
             <button
               onClick={closePopup}
