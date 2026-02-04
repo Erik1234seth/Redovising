@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import VideoPlayer from '@/components/VideoPlayer';
 import { banks } from '@/data/banks';
 import { Bank } from '@/types';
@@ -10,8 +10,19 @@ type TabType = 'ne-bilaga' | 'komplett';
 export default function TutorialPage() {
   const [activeTab, setActiveTab] = useState<TabType>('ne-bilaga');
   const [selectedBank, setSelectedBank] = useState<Bank>('swedbank');
+  const firstStepRef = useRef<HTMLDivElement>(null);
 
   const bank = banks.find((b) => b.id === selectedBank);
+
+  const handleBankSelect = (bankId: Bank) => {
+    setSelectedBank(bankId);
+    // Scroll to first step only on mobile (screen width < 768px)
+    if (window.innerWidth < 768) {
+      setTimeout(() => {
+        firstStepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-navy-800 py-8 sm:py-12">
@@ -63,7 +74,7 @@ export default function TutorialPage() {
             {banks.map((b) => (
               <button
                 key={b.id}
-                onClick={() => setSelectedBank(b.id)}
+                onClick={() => handleBankSelect(b.id)}
                 className={`p-3 sm:p-4 border-2 rounded-lg sm:rounded-xl transition-all duration-200 ${
                   selectedBank === b.id
                     ? 'border-gold-500 bg-gold-500/10 shadow-lg shadow-gold-500/20'
@@ -81,7 +92,7 @@ export default function TutorialPage() {
         {/* NE-Bilaga Tab Content */}
         {activeTab === 'ne-bilaga' && (
           <div className="space-y-4 sm:space-y-6">
-            <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl p-6 sm:p-8">
+            <div ref={firstStepRef} className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl p-6 sm:p-8 scroll-mt-24">
               <div className="flex items-center mb-3 sm:mb-4">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold mr-3 sm:mr-4 text-sm sm:text-base flex-shrink-0">
                   1
@@ -216,7 +227,7 @@ export default function TutorialPage() {
         {/* Komplett Tab Content */}
         {activeTab === 'komplett' && (
           <div className="space-y-4 sm:space-y-6">
-            <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl p-6 sm:p-8">
+            <div ref={firstStepRef} className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl p-6 sm:p-8 scroll-mt-24">
               <div className="flex items-center mb-3 sm:mb-4">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold mr-3 sm:mr-4 text-sm sm:text-base flex-shrink-0">
                   1
