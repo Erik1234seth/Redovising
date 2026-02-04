@@ -507,22 +507,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Point 2 - Bank statements needed */}
-              <div className="flex gap-4">
-                <div className="flex-shrink-0 w-10 h-10 bg-gold-500/20 rounded-full flex items-center justify-center">
-                  <svg className="w-5 h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-white mb-1">Spara dina kontoutdrag</h3>
-                  <p className="text-sm text-warm-300">
-                    Ett tips: ladda ner kontoutdrag från din bank redan nu. Du kommer behöva dem oavsett vem som hjälper dig.
-                  </p>
-                </div>
-              </div>
-
-              {/* Point 3 - We have instructions */}
+              {/* Point 2 - We have instructions */}
               <div className="flex gap-4">
                 <div className="flex-shrink-0 w-10 h-10 bg-gold-500/20 rounded-full flex items-center justify-center">
                   <svg className="w-5 h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -554,29 +539,13 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Divider */}
-              <div className="border-t border-navy-600 pt-5 mt-6">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Link
-                    href="/auth/signup"
-                    onClick={closePopup}
-                    className="flex-1 text-center px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20"
-                  >
-                    Skapa konto
-                  </Link>
-                  <Link
-                    href="/tutorial"
-                    onClick={closePopup}
-                    className="flex-1 text-center px-6 py-3 bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white font-semibold rounded-xl transition-all duration-200"
-                  >
-                    Läs mer först
-                  </Link>
-                </div>
+              {/* Button */}
+              <div className="pt-2">
                 <button
                   onClick={closePopup}
-                  className="w-full mt-3 text-warm-400 hover:text-warm-300 text-sm transition-colors"
+                  className="w-full text-center px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20"
                 >
-                  Jag kollar runt lite först
+                  Fortsätt
                 </button>
               </div>
             </div>

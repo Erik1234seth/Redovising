@@ -37,27 +37,29 @@ export default function TutorialPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex justify-center mb-8 sm:mb-12 px-2 sm:px-4">
-          <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-lg sm:rounded-xl p-1 sm:p-1.5 inline-flex flex-col sm:flex-row w-full sm:w-auto gap-1 sm:gap-0">
+        <div className="flex justify-center mb-8 sm:mb-12">
+          <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl p-1.5 grid grid-cols-2 sm:inline-flex sm:flex-row w-full sm:w-auto gap-1.5 sm:gap-1">
             <button
               onClick={() => setActiveTab('ne-bilaga')}
-              className={`px-3 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3 rounded-lg text-xs sm:text-sm md:text-base font-semibold transition-all duration-200 ${
+              className={`px-4 sm:px-6 md:px-8 py-3 sm:py-2.5 md:py-3 rounded-lg text-sm sm:text-sm md:text-base font-semibold transition-all duration-200 ${
                 activeTab === 'ne-bilaga'
                   ? 'bg-gold-500 text-navy-900 shadow-lg shadow-gold-500/20'
-                  : 'text-warm-300 hover:text-white'
+                  : 'text-warm-300 hover:text-white bg-navy-800/50'
               }`}
             >
-              NE-Bilaga (1999 kr)
+              <span className="block sm:inline">NE-Bilaga</span>
+              <span className="block sm:inline text-xs sm:text-sm opacity-80 sm:opacity-100 mt-0.5 sm:mt-0 sm:ml-1">(1999 kr)</span>
             </button>
             <button
               onClick={() => setActiveTab('komplett')}
-              className={`px-3 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3 rounded-lg text-xs sm:text-sm md:text-base font-semibold transition-all duration-200 ${
+              className={`px-4 sm:px-6 md:px-8 py-3 sm:py-2.5 md:py-3 rounded-lg text-sm sm:text-sm md:text-base font-semibold transition-all duration-200 ${
                 activeTab === 'komplett'
                   ? 'bg-gold-500 text-navy-900 shadow-lg shadow-gold-500/20'
-                  : 'text-warm-300 hover:text-white'
+                  : 'text-warm-300 hover:text-white bg-navy-800/50'
               }`}
             >
-              Komplett Tjänst (3499 kr)
+              <span className="block sm:inline">Komplett</span>
+              <span className="block sm:inline text-xs sm:text-sm opacity-80 sm:opacity-100 mt-0.5 sm:mt-0 sm:ml-1">(3499 kr)</span>
             </button>
           </div>
         </div>
