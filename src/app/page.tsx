@@ -500,9 +500,9 @@ export default function Home() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-bold text-white mb-1">Alla behöver redovisa</h3>
+                  <h3 className="font-bold text-white mb-1">Det är lag på att redovisa</h3>
                   <p className="text-sm text-warm-300">
-                    Som företagare lämnar du in en NE-bilaga till Skatteverket varje år. Det låter krångligt, men vi gör det enkelt!
+                    Som enskild näringsidkare måste du enligt lag lämna in en NE-bilaga till Skatteverket varje år. Det låter krångligt, men vi gör det enkelt!
                   </p>
                 </div>
               </div>
@@ -534,6 +534,23 @@ export default function Home() {
                   <p className="text-sm text-warm-300">
                     Steg-för-steg instruktioner för allt - från att hämta kontoutdrag till färdig inlämning. Du klarar det!
                   </p>
+                </div>
+              </div>
+
+              {/* Point 4 - Important note */}
+              <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-4">
+                <div className="flex gap-3">
+                  <div className="flex-shrink-0">
+                    <svg className="w-5 h-5 text-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-warm-300 text-sm mb-1">Viktigt att tänka på</h3>
+                    <p className="text-xs text-warm-400">
+                      Vi kan tyvärr inte hjälpa till med redovisning för jordbruk, skogsbruk, byggverksamhet, taxi eller liknande verksamheter.
+                    </p>
+                  </div>
                 </div>
               </div>
 
