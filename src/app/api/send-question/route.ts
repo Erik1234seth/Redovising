@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
-      to: ['info@enklabokslut.se'],
+      to: ['enklabokslut@gmail.com'],
       replyTo: email,
       subject: `Fråga från ${name}${orderId ? ` (Order: ${orderId})` : ''}`,
       html: `
