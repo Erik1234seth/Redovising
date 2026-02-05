@@ -165,9 +165,9 @@ export async function POST(request: Request) {
     // Generate buffer
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-    // Save to Supabase Storage
-    const fileName = `transaktioner_komplett_${orderId}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    const filePath = `exports/${orderId}/${fileName}`;
+    // Save to Supabase Storage (in the same folder as original files)
+    const fileName = `transaktioner_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const filePath = `${orderId}/exports/${fileName}`;
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('order-files')

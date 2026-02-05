@@ -41,6 +41,21 @@ export default function UploadStatementPage() {
   }, []);
 
   const handleFileUpload = async (file: File) => {
+    // Validate file type based on bank
+    const fileName = file.name.toLowerCase();
+    const isCSV = fileName.endsWith('.csv');
+    const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+
+    if (bankId === 'nordea' && !isCSV) {
+      setUploadError('Nordea kräver CSV-format. Ladda ner kontoutdraget som CSV från Nordeas internetbank.');
+      return;
+    }
+
+    if (bankId !== 'nordea' && !isExcel) {
+      setUploadError('Vänligen ladda upp en Excel-fil (.xlsx eller .xls).');
+      return;
+    }
+
     setSelectedFile(file);
     setUploadError('');
     setUploading(true);
@@ -209,12 +224,14 @@ export default function UploadStatementPage() {
               <input
                 type="file"
                 onChange={handleFileSelect}
-                accept=".xlsx,.xls"
+                accept={bankId === 'nordea' ? '.csv' : '.xlsx,.xls'}
                 className="hidden"
               />
             </label>
             <p className="text-sm text-warm-500 mt-6">
-              Godkända filformat: Excel (.xlsx, .xls)
+              {bankId === 'nordea'
+                ? 'Godkänt filformat: CSV (.csv)'
+                : 'Godkända filformat: Excel (.xlsx, .xls)'}
             </p>
           </div>
         )}

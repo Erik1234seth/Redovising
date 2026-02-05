@@ -17,6 +17,7 @@
     "@supabase/supabase-js": "^2.89.0",
     "archiver": "^7.0.1",
     "claude": "^0.1.1",
+    "exceljs": "^4.4.0",
     "next": "^16.1.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

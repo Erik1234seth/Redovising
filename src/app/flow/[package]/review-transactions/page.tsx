@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import FlowContainer from '@/components/FlowContainer';
 import { Bank } from '@/types';
@@ -53,6 +53,9 @@ export default function ReviewTransactionsPage() {
   const [editingGroupName, setEditingGroupName] = useState<string | null>(null);
   const [groupNoteText, setGroupNoteText] = useState('');
 
+  // Ref to prevent double parsing (React StrictMode runs useEffect twice)
+  const hasStartedParsing = useRef(false);
+
   const totalSteps = packageType === 'komplett' ? 7 : 8;
 
   // Protect route - require authentication
@@ -65,6 +68,13 @@ export default function ReviewTransactionsPage() {
   // Get order ID and parse the uploaded file
   useEffect(() => {
     const initializeTransactions = async () => {
+      // Prevent double execution (React StrictMode)
+      if (hasStartedParsing.current) {
+        console.log('🔍 Review Transactions: Already parsing, skipping...');
+        return;
+      }
+      hasStartedParsing.current = true;
+
       const id = sessionStorage.getItem('tempOrderId');
       const fileUrl = sessionStorage.getItem('statementFileUrl');
 
@@ -73,15 +83,12 @@ export default function ReviewTransactionsPage() {
 
       if (id) {
         setOrderId(id);
-        // First try to fetch existing parsed transactions
-        const hasData = await fetchTransactions(id);
-        console.log('🔍 Review Transactions: Has existing data:', hasData);
 
-        if (!hasData && fileUrl) {
-          // If no existing data, parse the file
+        if (fileUrl) {
+          // Always parse the file fresh - never use cached transactions
           console.log('🔍 Review Transactions: Parsing file...');
-          parseUploadedFile(id);
-        } else if (!hasData && !fileUrl) {
+          await parseUploadedFile(id);
+        } else {
           console.log('🔍 Review Transactions: No file URL found');
           setError('Ingen fil hittades. Gå tillbaka och ladda upp ditt kontoutdrag först.');
           setLoading(false);
@@ -117,6 +124,26 @@ export default function ReviewTransactionsPage() {
     }
   };
 
+  // Fetch only the latest batch of transactions (by created_at)
+  const fetchLatestTransactions = async (orderId: string): Promise<void> => {
+    try {
+      console.log('🔍 Fetching latest transactions for order:', orderId);
+      const response = await fetch(`/api/parsed-transactions?orderId=${orderId}&latest=true`);
+      const data = await response.json();
+      console.log('🔍 Fetch response:', response.status, data);
+
+      if (response.ok && data.transactions && data.transactions.length > 0) {
+        console.log('🔍 Found', data.transactions.length, 'latest transactions');
+        setTransactions(data.transactions);
+        setSummary(data.summary);
+      }
+      setLoading(false);
+    } catch (err) {
+      console.error('🔍 Error fetching transactions:', err);
+      setLoading(false);
+    }
+  };
+
   const parseUploadedFile = async (orderId: string) => {
     setParsing(true);
     setError('');
@@ -145,9 +172,15 @@ export default function ReviewTransactionsPage() {
       console.log('📄 File blob size:', fileBlob.size);
 
       // Create FormData with the file
+      // Get the original filename from the URL to preserve file extension
+      const urlPath = fileUrl.split('/').pop() || 'statement.xlsx';
+      // Remove timestamp prefix if present (e.g., "1234567890_filename.csv" -> "filename.csv")
+      const originalFilename = urlPath.replace(/^\d+_/, '');
+
       const formData = new FormData();
-      formData.append('file', fileBlob, 'statement.xlsx');
+      formData.append('file', fileBlob, originalFilename);
       formData.append('orderId', orderId);
+      formData.append('bank', bankId);
       if (user?.id) {
         formData.append('userId', user.id);
       }
@@ -168,8 +201,12 @@ export default function ReviewTransactionsPage() {
 
       console.log('📄 Parse successful! Transaction count:', parseData.transactionCount);
 
-      // Fetch the saved transactions
-      await fetchTransactions(orderId);
+      // Wait for database to complete insert, then fetch with IDs
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Fetch from database to get proper IDs for updates
+      // Only get latest transactions by filtering on the parse session
+      await fetchLatestTransactions(orderId);
 
     } catch (err) {
       console.error('📄 Error parsing file:', err);

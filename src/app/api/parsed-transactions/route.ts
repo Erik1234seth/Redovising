@@ -6,8 +6,10 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const orderId = searchParams.get('orderId');
+    const latest = searchParams.get('latest') === 'true';
 
     console.log('📋 Fetching parsed transactions for order:', orderId);
+    console.log('📋 Latest only:', latest);
 
     if (!orderId) {
       return NextResponse.json({ error: 'Order ID required' }, { status: 400 });
@@ -18,11 +20,46 @@ export async function GET(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    const { data: transactions, error } = await supabase
-      .from('parsed_transactions')
-      .select('*')
-      .eq('order_id', orderId)
-      .order('row_number', { ascending: true });
+    let transactions;
+    let error;
+
+    if (latest) {
+      // First, get the max created_at for this order
+      const { data: maxData } = await supabase
+        .from('parsed_transactions')
+        .select('created_at')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (maxData) {
+        // Get all transactions within 5 seconds of the max created_at
+        const maxTime = new Date(maxData.created_at);
+        const minTime = new Date(maxTime.getTime() - 5000); // 5 seconds window
+
+        const result = await supabase
+          .from('parsed_transactions')
+          .select('*')
+          .eq('order_id', orderId)
+          .gte('created_at', minTime.toISOString())
+          .order('row_number', { ascending: true });
+
+        transactions = result.data;
+        error = result.error;
+      } else {
+        transactions = [];
+      }
+    } else {
+      const result = await supabase
+        .from('parsed_transactions')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('row_number', { ascending: true });
+
+      transactions = result.data;
+      error = result.error;
+    }
 
     if (error) {
       console.error('Error fetching transactions:', error);

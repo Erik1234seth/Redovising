@@ -122,5 +122,7 @@ export async function uploadFile(
 }
 
 export function generateOrderId(): string {
-  return `temp_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+  const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const randomId = Math.random().toString(36).slice(2, 8);
+  return `order_${date}_${randomId}`;
 }
