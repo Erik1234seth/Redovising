@@ -78,38 +78,36 @@ export async function POST(request: Request) {
     const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
     console.log('📊 Parse Statement API: Total rows:', rows.length);
 
-    // Extract account info from metadata rows
-    const accountInfo: AccountInfo = {
-      accountHolder: extractValue(rows[0]?.[0] as string, 'Transaktioner '),
-      currency: extractValue(rows[3]?.[0] as string, 'Valuta: '),
-      period: rows[3]?.[3] as string || '',
-      clearingNumber: extractValue(rows[4]?.[0] as string, 'Clearingnummer: '),
-      accountNumber: extractValue(rows[5]?.[0] as string, 'Kontonummer: '),
-    };
+    // Detect bank format and extract account info
+    const accountInfo = extractAccountInfo(rows);
 
     // Find header row (usually row 7, index 7)
     console.log('📊 Parse Statement API: Looking for header row...');
     let headerRowIndex = 7;
     for (let i = 0; i < Math.min(15, rows.length); i++) {
       const row = rows[i];
-      if (row && Array.isArray(row) &&
-          (row.includes('Bokföringsdag') || row.includes('Transaktionsdag') || row.includes('Belopp'))) {
-        headerRowIndex = i;
-        console.log('📊 Parse Statement API: Found header at row:', i);
-        break;
+      if (row && Array.isArray(row)) {
+        const rowStr = row.map(cell => String(cell || '').toLowerCase()).join(' ');
+        // Check for common header keywords across different banks
+        if (rowStr.includes('bokföringsdag') || rowStr.includes('bokföringsdatum') ||
+            rowStr.includes('transaktionsdag') || rowStr.includes('belopp')) {
+          headerRowIndex = i;
+          console.log('📊 Parse Statement API: Found header at row:', i);
+          break;
+        }
       }
     }
 
     const headers = rows[headerRowIndex] as string[];
     console.log('📊 Parse Statement API: Headers:', headers);
 
-    // Map column indices
+    // Map column indices (supports multiple banks)
     const columnMap = {
       rowNumber: findColumnIndex(headers, ['Radnummer', 'Rad']),
-      bookingDate: findColumnIndex(headers, ['Bokföringsdag', 'Bokfört datum']),
+      bookingDate: findColumnIndex(headers, ['Bokföringsdag', 'Bokfört datum', 'Bokföringsdatum']),
       transactionDate: findColumnIndex(headers, ['Transaktionsdag', 'Transaktionsdatum']),
       valueDate: findColumnIndex(headers, ['Valutadag', 'Valutadatum']),
-      reference: findColumnIndex(headers, ['Referens', 'Ref']),
+      reference: findColumnIndex(headers, ['Referens', 'Ref', 'Verifikationsnummer']),
       description: findColumnIndex(headers, ['Beskrivning', 'Text', 'Meddelande']),
       amount: findColumnIndex(headers, ['Belopp', 'Summa']),
       balance: findColumnIndex(headers, ['Bokfört saldo', 'Saldo', 'Balans']),
@@ -216,6 +214,38 @@ export async function POST(request: Request) {
 }
 
 // Helper functions
+
+// Detect bank and extract account info
+function extractAccountInfo(rows: unknown[][]): AccountInfo {
+  const firstRow = String(rows[0]?.[0] || '');
+
+  // SEB format detection
+  if (firstRow.includes('Export från internetbanken')) {
+    console.log('📊 Parse Statement API: Detected SEB format');
+    const accountRow = String(rows[4]?.[0] || '');
+    // Parse "Privatkonto (5019 01 305 71)" format
+    const accountMatch = accountRow.match(/(.+?)\s*\((\d{4})\s*(\d{2})\s*(\d+)\s*(\d+)\)/);
+
+    return {
+      accountHolder: accountMatch?.[1]?.trim() || accountRow,
+      currency: 'SEK', // SEB doesn't show currency in export
+      period: String(rows[2]?.[1] || ''),
+      clearingNumber: accountMatch ? `${accountMatch[2]}-${accountMatch[3]}` : '',
+      accountNumber: accountMatch ? `${accountMatch[4]} ${accountMatch[5]}` : '',
+    };
+  }
+
+  // Handelsbanken format (default)
+  console.log('📊 Parse Statement API: Detected Handelsbanken format');
+  return {
+    accountHolder: extractValue(firstRow, 'Transaktioner '),
+    currency: extractValue(String(rows[3]?.[0] || ''), 'Valuta: '),
+    period: String(rows[3]?.[3] || ''),
+    clearingNumber: extractValue(String(rows[4]?.[0] || ''), 'Clearingnummer: '),
+    accountNumber: extractValue(String(rows[5]?.[0] || ''), 'Kontonummer: '),
+  };
+}
+
 function extractValue(text: string | undefined, prefix: string): string {
   if (!text) return '';
   if (text.startsWith(prefix)) {
