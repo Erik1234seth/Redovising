@@ -26,6 +26,7 @@ export async function PATCH(
       'is_eu_transaction',
       'is_business_expense',
       'is_private',
+      'is_business',
       'vat_rate',
     ];
 

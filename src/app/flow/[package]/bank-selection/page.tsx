@@ -14,7 +14,20 @@ export default function BankSelectionPage() {
   const packageType = params.package as string;
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
 
-  const totalSteps = 8;
+  // Total steps: 9 for all, except ne-bilaga first year = 8
+  const [totalSteps, setTotalSteps] = useState(9);
+
+  useEffect(() => {
+    const answersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
+    if (answersStr) {
+      const answers = JSON.parse(answersStr);
+      if (packageType !== 'komplett' && answers.isFirstYear === true) {
+        setTotalSteps(8);
+        return;
+      }
+    }
+    setTotalSteps(9);
+  }, [packageType]);
 
   // Protect route - require authentication
   useEffect(() => {
@@ -34,7 +47,7 @@ export default function BankSelectionPage() {
     <FlowContainer
       title="Välj din bank"
       description="Vi behöver veta vilken bank du använder för att visa rätt instruktioner."
-      currentStep={1}
+      currentStep={packageType === 'komplett' || packageType === 'ne-bilaga' ? 2 : 1}
       totalSteps={totalSteps}
       packageType={packageType}
     >

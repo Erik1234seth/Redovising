@@ -34,7 +34,22 @@ export default function AddTransactionsPage() {
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
   const [formError, setFormError] = useState('');
 
-  const totalSteps = packageType === 'komplett' ? 7 : 8;
+  // Total steps: 9 for all, except ne-bilaga first year = 8
+  const [totalSteps, setTotalSteps] = useState(9);
+
+  useEffect(() => {
+    const answersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
+    if (answersStr) {
+      const answers = JSON.parse(answersStr);
+      if (packageType !== 'komplett' && answers.isFirstYear === true) {
+        setTotalSteps(8);
+      } else {
+        setTotalSteps(9);
+      }
+    } else {
+      setTotalSteps(9);
+    }
+  }, [packageType]);
 
   // Protect route - require authentication
   useEffect(() => {
@@ -143,9 +158,16 @@ export default function AddTransactionsPage() {
   };
 
   const handleContinue = () => {
+    // Check if user indicated it's their first year (skip upload-previous if so)
+    const answersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
+    const isFirstYear = answersStr ? JSON.parse(answersStr).isFirstYear === true : false;
+
     if (packageType === 'komplett') {
       // Skip upload-previous for komplett package, go directly to delegation-guide
       router.push(`/flow/${packageType}/delegation-guide?bank=${bankId}`);
+    } else if (isFirstYear) {
+      // Skip upload-previous if it's user's first year, go directly to contact-info
+      router.push(`/flow/${packageType}/contact-info?bank=${bankId}`);
     } else {
       router.push(`/flow/${packageType}/upload-previous?bank=${bankId}`);
     }

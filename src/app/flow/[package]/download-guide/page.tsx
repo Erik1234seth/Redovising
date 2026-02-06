@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import FlowContainer from '@/components/FlowContainer';
 import VideoPlayer from '@/components/VideoPlayer';
@@ -17,7 +17,21 @@ export default function DownloadGuidePage() {
   const bankId = searchParams.get('bank') as Bank;
 
   const bank = banks.find((b) => b.id === bankId);
-  const totalSteps = packageType === 'komplett' ? 7 : 8;
+
+  // Total steps: 9 for all, except ne-bilaga first year = 8
+  const [totalSteps, setTotalSteps] = useState(9);
+
+  useEffect(() => {
+    const answersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
+    if (answersStr) {
+      const answers = JSON.parse(answersStr);
+      if (packageType !== 'komplett' && answers.isFirstYear === true) {
+        setTotalSteps(8);
+        return;
+      }
+    }
+    setTotalSteps(9);
+  }, [packageType]);
 
   // Protect route - require authentication
   useEffect(() => {

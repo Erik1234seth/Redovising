@@ -215,14 +215,14 @@ export default function Home() {
 
                   {user ? (
                     <Link
-                      href={`/flow/${pkg.id}/bank-selection`}
+                      href={`/flow/${pkg.id}/${pkg.id === 'komplett' || pkg.id === 'ne-bilaga' ? 'qualification' : 'bank-selection'}`}
                       className="block w-full bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 text-center font-bold py-3 sm:py-4 px-6 rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-[1.02] text-sm sm:text-base"
                     >
                       Välj {pkg.name} →
                     </Link>
                   ) : (
                     <Link
-                      href={`/auth/login?redirect=/flow/${pkg.id}/bank-selection`}
+                      href={`/auth/login?redirect=/flow/${pkg.id}/${pkg.id === 'komplett' || pkg.id === 'ne-bilaga' ? 'qualification' : 'bank-selection'}`}
                       className="block w-full bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 text-center font-bold py-3 sm:py-4 px-6 rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-[1.02] text-sm sm:text-base"
                     >
                       Logga in för att välja {pkg.name} →
@@ -311,115 +311,6 @@ export default function Home() {
                 </p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Reviews Section */}
-      <section className="relative py-16 sm:py-24 bg-navy-800">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/2 left-0 w-64 h-64 bg-gold-500/5 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/4 right-0 w-48 h-48 bg-gold-500/5 rounded-full blur-3xl"></div>
-        </div>
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 sm:mb-16">
-            <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-gold-500/10 border border-gold-500/20 rounded-full mb-4 sm:mb-6">
-              <svg className="w-4 h-4 text-gold-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-              <span className="text-gold-500 text-xs sm:text-sm font-semibold">
-                Kundrecensioner
-              </span>
-            </div>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 sm:mb-6">
-              Vad våra kunder säger
-            </h2>
-            <div className="w-20 sm:w-24 h-1 bg-gradient-to-r from-gold-500 to-gold-600 mx-auto"></div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
-            {[
-              {
-                name: 'Anna Lindström',
-                company: 'Freelance Designer',
-                text: 'Äntligen en tjänst som förstår enskilda firmor! Snabbt, enkelt och till ett bra pris. Rekommenderas varmt!',
-                rating: 5
-              },
-              {
-                name: 'Erik Johansson',
-                company: 'Konsult',
-                text: 'Har använt Enkla Bokslut två år i rad nu. Sparar mig både tid och pengar jämfört med traditionell redovisningsbyrå.',
-                rating: 5
-              },
-              {
-                name: 'Maria Andersson',
-                company: 'Frisör',
-                text: 'Jag som inte är så teknisk tyckte ändå det var lätt att följa instruktionerna. Supporten var snabb och hjälpsam!',
-                rating: 5
-              }
-            ].map((review, index) => (
-              <div
-                key={index}
-                className="group bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl p-6 sm:p-8 hover:border-gold-500/30 transition-all duration-300 hover:shadow-xl hover:shadow-gold-500/5"
-              >
-                {/* Stars */}
-                <div className="flex gap-1 mb-4">
-                  {[...Array(review.rating)].map((_, i) => (
-                    <svg
-                      key={i}
-                      className="w-5 h-5 text-gold-500"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-
-                {/* Quote */}
-                <div className="relative mb-6">
-                  <svg className="absolute -top-2 -left-2 w-8 h-8 text-gold-500/20" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
-                  </svg>
-                  <p className="text-warm-200 text-sm sm:text-base leading-relaxed pl-4">
-                    {review.text}
-                  </p>
-                </div>
-
-                {/* Author */}
-                <div className="flex items-center">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-gold-500/20 to-gold-600/10 rounded-full flex items-center justify-center mr-3 sm:mr-4">
-                    <span className="text-gold-500 font-bold text-sm sm:text-base">
-                      {review.name.split(' ').map(n => n[0]).join('')}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-white font-semibold text-sm sm:text-base">{review.name}</p>
-                    <p className="text-warm-400 text-xs sm:text-sm">{review.company}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Trust badge */}
-          <div className="mt-12 sm:mt-16 text-center">
-            <div className="inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-navy-700/50 border border-navy-600 rounded-full">
-              <div className="flex -space-x-2">
-                {['A', 'E', 'M'].map((initial, i) => (
-                  <div
-                    key={i}
-                    className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-gold-500/30 to-gold-600/20 rounded-full flex items-center justify-center border-2 border-navy-700"
-                  >
-                    <span className="text-gold-500 font-bold text-xs">{initial}</span>
-                  </div>
-                ))}
-              </div>
-              <span className="text-warm-300 text-xs sm:text-sm">
-                Över <span className="text-gold-500 font-semibold">100+</span> nöjda kunder
-              </span>
-            </div>
           </div>
         </div>
       </section>

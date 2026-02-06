@@ -20,8 +20,20 @@ export default function UploadStatementPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string>('');
   const [orderId, setOrderId] = useState<string>('');
+  // Total steps: 9 for all, except ne-bilaga first year = 8
+  const [totalSteps, setTotalSteps] = useState(9);
 
-  const totalSteps = packageType === 'komplett' ? 7 : 8;
+  useEffect(() => {
+    const answersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
+    if (answersStr) {
+      const answers = JSON.parse(answersStr);
+      if (packageType !== 'komplett' && answers.isFirstYear === true) {
+        setTotalSteps(8);
+        return;
+      }
+    }
+    setTotalSteps(9);
+  }, [packageType]);
 
   // Protect route - require authentication
   useEffect(() => {

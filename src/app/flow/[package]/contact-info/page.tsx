@@ -33,6 +33,16 @@ export default function ContactInfoPage() {
 
   const [existingCustomer, setExistingCustomer] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isFirstYear, setIsFirstYear] = useState(false);
+
+  // Check if it's user's first year (to determine back navigation)
+  useEffect(() => {
+    const answersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
+    if (answersStr) {
+      const answers = JSON.parse(answersStr);
+      setIsFirstYear(answers.isFirstYear === true);
+    }
+  }, [packageType]);
 
   // Pre-fill form for logged-in users
   useEffect(() => {
@@ -88,12 +98,17 @@ export default function ContactInfoPage() {
     router.push(`/flow/${packageType}/review-and-accept?${params.toString()}`);
   };
 
+  // Total steps: 9 for all, except ne-bilaga first year = 8
+  const totalSteps = (packageType !== 'komplett' && isFirstYear) ? 8 : 9;
+  // contact-info is step 7 normally, step 6 if ne-bilaga first year (skipped upload-previous)
+  const currentStep = (packageType !== 'komplett' && isFirstYear) ? 6 : 7;
+
   return (
     <FlowContainer
       title="Kontaktuppgifter"
       description="Fyll i dina uppgifter så kan vi nå dig när din NE-bilaga är klar."
-      currentStep={7}
-      totalSteps={8}
+      currentStep={currentStep}
+      totalSteps={totalSteps}
       packageType={packageType}
     >
       <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
@@ -209,7 +224,9 @@ export default function ContactInfoPage() {
 
         <div className="flex gap-4 pt-4">
           <Link
-            href={`/flow/${packageType}/upload-previous?bank=${bank}`}
+            href={packageType === 'komplett'
+              ? `/flow/${packageType}/delegation-guide?bank=${bank}`
+              : (isFirstYear ? `/flow/${packageType}/add-transactions?bank=${bank}` : `/flow/${packageType}/upload-previous?bank=${bank}`)}
             className="flex-1 px-6 py-3 bg-navy-800 hover:bg-navy-600 border border-navy-600 hover:border-gold-500/50 text-white rounded-xl font-semibold transition-all duration-200 text-center"
           >
             Tillbaka

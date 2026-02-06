@@ -16,12 +16,12 @@ export default function UploadPreviousPage() {
   const bankId = searchParams.get('bank') as Bank;
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [hasNoPrevious, setHasNoPrevious] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string>('');
   const [orderId, setOrderId] = useState<string>('');
 
-  const totalSteps = packageType === 'komplett' ? 7 : 8;
+  // This page is only shown when it's not the first year, so totalSteps is always 9
+  const totalSteps = 9;
 
   // Protect route - require authentication
   useEffect(() => {
@@ -42,7 +42,6 @@ export default function UploadPreviousPage() {
     setSelectedFile(file);
     setUploadError('');
     setUploading(true);
-    setHasNoPrevious(false);
 
     try {
       const result = await uploadFile(
@@ -81,11 +80,6 @@ export default function UploadPreviousPage() {
   };
 
   const handleContinue = () => {
-    if (hasNoPrevious) {
-      // Clear any previously uploaded file
-      sessionStorage.removeItem('previousFileUrl');
-      sessionStorage.removeItem('previousFilePath');
-    }
     if (packageType === 'komplett') {
       router.push(`/flow/${packageType}/delegation-guide?bank=${bankId}`);
     } else {
@@ -95,8 +89,8 @@ export default function UploadPreviousPage() {
 
   return (
     <FlowContainer
-      title="Ladda upp tidigare NE-bilaga (ej första året)"
-      description="Om du har drivit din firma tidigare år, ladda upp din senaste NE-bilaga. Hoppa över om det är ditt första år."
+      title="Ladda upp tidigare NE-bilaga"
+      description="Ladda upp din senaste NE-bilaga för att vi ska kunna följa samma struktur som tidigare år."
       currentStep={6}
       totalSteps={totalSteps}
       packageType={packageType}
@@ -235,29 +229,7 @@ export default function UploadPreviousPage() {
         </div>
       )}
 
-      <div className="text-center mb-8 mt-8">
-        <p className="text-warm-300 mb-3">Har du ingen tidigare NE-bilaga?</p>
-        <label className="flex items-center justify-center space-x-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={hasNoPrevious}
-            onChange={(e) => {
-              setHasNoPrevious(e.target.checked);
-              if (e.target.checked) {
-                setSelectedFile(null);
-                sessionStorage.removeItem('previousFileUrl');
-                sessionStorage.removeItem('previousFilePath');
-              }
-            }}
-            className="w-5 h-5 text-gold-500 bg-navy-800 border-navy-600 rounded focus:ring-gold-500"
-          />
-          <span className="text-warm-300">
-            Jag har ingen tidigare NE-bilaga (första året som enskild firma)
-          </span>
-        </label>
-      </div>
-
-      <div className="bg-gold-500/10 border-l-4 border-gold-500 rounded-r-xl p-6 mb-8">
+      <div className="bg-gold-500/10 border-l-4 border-gold-500 rounded-r-xl p-6 mb-8 mt-8">
         <h3 className="font-semibold text-gold-500 mb-2">
           Varför behöver vi detta?
         </h3>
@@ -280,9 +252,9 @@ export default function UploadPreviousPage() {
         </button>
         <button
           onClick={handleContinue}
-          disabled={(!selectedFile && !hasNoPrevious) || uploading}
+          disabled={!selectedFile || uploading}
           className={`px-8 py-3 rounded-xl font-bold transition-all duration-200 ${
-            (selectedFile || hasNoPrevious) && !uploading
+            selectedFile && !uploading
               ? 'bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105'
               : 'bg-navy-600 text-navy-400 cursor-not-allowed'
           }`}

@@ -19,7 +19,8 @@ export default function DelegationGuidePage() {
   const [hasCompleted, setHasCompleted] = useState(false);
 
   const bank = banks.find((b) => b.id === bankId);
-  const totalSteps = 8;
+  // Komplett always has 9 steps
+  const totalSteps = 9;
 
   // Protect route - require authentication
   useEffect(() => {
@@ -30,7 +31,7 @@ export default function DelegationGuidePage() {
 
   const handleContinue = () => {
     if (hasCompleted) {
-      router.push(`/flow/${packageType}/confirmation?bank=${bankId}`);
+      router.push(`/flow/${packageType}/contact-info?bank=${bankId}`);
     }
   };
 
@@ -38,7 +39,7 @@ export default function DelegationGuidePage() {
     <FlowContainer
       title="Registrera oss som ombud hos Skatteverket"
       description="För att vi ska kunna lämna in din deklaration åt dig behöver du registrera oss som ombud hos Skatteverket."
-      currentStep={7}
+      currentStep={6}
       totalSteps={totalSteps}
       packageType={packageType}
     >

@@ -22,7 +22,24 @@ export default function ReviewAndAcceptPage() {
   const [invoiceAccepted, setInvoiceAccepted] = useState(false);
 
   const packageInfo = packages.find((p) => p.id === packageType);
-  const totalSteps = 8;
+
+  // Total steps: 9 for all, except ne-bilaga first year = 8
+  const [totalSteps, setTotalSteps] = useState(9);
+  const currentStep = totalSteps - 1;
+
+  useEffect(() => {
+    const answersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
+    if (answersStr) {
+      const answers = JSON.parse(answersStr);
+      if (packageType !== 'komplett' && answers.isFirstYear === true) {
+        setTotalSteps(8);
+      } else {
+        setTotalSteps(9);
+      }
+    } else {
+      setTotalSteps(9);
+    }
+  }, [packageType]);
 
   // Protect route - require authentication
   useEffect(() => {
@@ -48,7 +65,7 @@ export default function ReviewAndAcceptPage() {
     <FlowContainer
       title="Granska och godkänn"
       description="Granska din beställning och godkänn villkoren innan vi går vidare."
-      currentStep={8}
+      currentStep={currentStep}
       totalSteps={totalSteps}
       packageType={packageType}
     >

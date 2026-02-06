@@ -1,4 +1,6 @@
-import { ReactNode } from 'react';
+'use client';
+
+import { ReactNode, useEffect } from 'react';
 import FlowProgress from './FlowProgress';
 
 interface FlowContainerProps {
@@ -8,6 +10,7 @@ interface FlowContainerProps {
   currentStep: number;
   totalSteps: number;
   packageType: string;
+  hideProgress?: boolean;
 }
 
 export default function FlowContainer({
@@ -17,15 +20,23 @@ export default function FlowContainer({
   currentStep,
   totalSteps,
   packageType,
+  hideProgress = false,
 }: FlowContainerProps) {
+  // Scroll to top when entering a flow step
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="min-h-screen bg-navy-800 py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <FlowProgress
-          currentStep={currentStep}
-          totalSteps={totalSteps}
-          packageType={packageType}
-        />
+        {!hideProgress && (
+          <FlowProgress
+            currentStep={currentStep}
+            totalSteps={totalSteps}
+            packageType={packageType}
+          />
+        )}
 
         <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-2xl shadow-2xl p-4 sm:p-8 md:p-12">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">

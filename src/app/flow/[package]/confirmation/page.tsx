@@ -33,8 +33,24 @@ export default function ConfirmationPage() {
 
   const bank = banks.find((b) => b.id === bankId);
   const packageInfo = packages.find((p) => p.id === packageType);
-  const totalSteps = packageType === 'komplett' ? 7 : 8;
+
+  // Total steps: 9 for all, except ne-bilaga first year = 8
+  const [totalSteps, setTotalSteps] = useState(9);
   const [orderSaved, setOrderSaved] = useState(false);
+
+  useEffect(() => {
+    const answersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
+    if (answersStr) {
+      const answers = JSON.parse(answersStr);
+      if (packageType !== 'komplett' && answers.isFirstYear === true) {
+        setTotalSteps(8);
+      } else {
+        setTotalSteps(9);
+      }
+    } else {
+      setTotalSteps(9);
+    }
+  }, [packageType]);
 
   // Save order to database on mount
   useEffect(() => {
@@ -45,6 +61,10 @@ export default function ConfirmationPage() {
       const statementFileId = sessionStorage.getItem('statementFileId');
       const previousFileId = sessionStorage.getItem('previousFileId');
 
+      // Retrieve qualification answers for komplett/ne-bilaga packages
+      const qualificationAnswersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
+      const qualificationAnswers = qualificationAnswersStr ? JSON.parse(qualificationAnswersStr) : null;
+
       const orderData = {
         user_id: user?.id || null,
         guest_email: user ? null : email,
@@ -54,6 +74,7 @@ export default function ConfirmationPage() {
         package_type: packageType,
         bank: bankId,
         status: 'pending',
+        qualification_answers: qualificationAnswers,
       };
 
       const { data: newOrder, error } = await supabase
@@ -117,6 +138,8 @@ export default function ConfirmationPage() {
         sessionStorage.removeItem('previousFilePath');
         sessionStorage.removeItem('previousFileId');
         sessionStorage.removeItem('tempOrderId');
+        sessionStorage.removeItem(`qualificationAnswers_${packageType}`);
+        sessionStorage.removeItem(`qualificationPopup_${packageType}`);
 
         // Increment order count for logged-in users
         if (user) {
@@ -136,7 +159,7 @@ export default function ConfirmationPage() {
     <FlowContainer
       title="Tack för din beställning!"
       description="Vi har tagit emot dina uppgifter och börjar arbeta med din redovisning."
-      currentStep={8}
+      currentStep={totalSteps}
       totalSteps={totalSteps}
       packageType={packageType}
     >
@@ -157,11 +180,53 @@ export default function ConfirmationPage() {
           </svg>
         </div>
         <h2 className="text-2xl font-bold text-white mb-4">
-          Allt är klart!
+          Beställningen är mottagen!
         </h2>
-        <p className="text-lg text-warm-300">
-          Du kommer få en bekräftelse via e-post inom kort.
-        </p>
+      </div>
+
+      {/* Next steps */}
+      <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-6 mb-8">
+        <h3 className="font-semibold text-white mb-4 text-center">Vad händer nu?</h3>
+        <div className="space-y-4">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold">
+              1
+            </div>
+            <p className="text-warm-300 pt-1">
+              Vi granskar dina kontoutdrag och börjar arbeta med dina uppgifter
+            </p>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold">
+              2
+            </div>
+            <p className="text-warm-300 pt-1">
+              {packageType === 'komplett'
+                ? 'Du får ett mail när vi är klara'
+                : 'Du får en länk via e-post när vi är klara där du kan hämta din färdiga NE-bilaga'
+              }
+            </p>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold">
+              3
+            </div>
+            <p className="text-warm-300 pt-1">
+              {packageType === 'komplett'
+                ? 'Vi lämnar in din deklaration åt dig hos Skatteverket'
+                : 'Du loggar in hos Skatteverket och lämnar in NE-bilagan själv'
+              }
+            </p>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold">
+              4
+            </div>
+            <p className="text-warm-300 pt-1">
+              Klart! Kontakta oss vid frågor
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-6 mb-8">
@@ -207,67 +272,6 @@ export default function ConfirmationPage() {
             </>
           )}
         </div>
-      </div>
-
-      <div className="bg-gold-500/10 border-l-4 border-gold-500 rounded-r-lg p-6 mb-8">
-        <h3 className="font-semibold text-gold-500 mb-3">
-          Vad händer nu?
-        </h3>
-        {packageType === 'ne-bilaga' ? (
-          <ol className="space-y-3 text-warm-300">
-            <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
-                1
-              </span>
-              <span>Vi granskar dina kontoutdrag och börjar arbeta med dina uppgifter</span>
-            </li>
-            <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
-                2
-              </span>
-              <span>Du får din färdiga NE-bilaga via e-post så snart som möjligt</span>
-            </li>
-            <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
-                3
-              </span>
-              <span>Du loggar in hos Skatteverket och lämnar in NE-bilagan själv</span>
-            </li>
-            <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
-                4
-              </span>
-              <span>Klart! Kontakta oss vid frågor</span>
-            </li>
-          </ol>
-        ) : (
-          <ol className="space-y-3 text-warm-300">
-            <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
-                1
-              </span>
-              <span>Vi granskar dina kontoutdrag och börjar arbeta med dina uppgifter</span>
-            </li>
-            <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
-                2
-              </span>
-              <span>Innan inlämning får du en kopia på e-post för granskning</span>
-            </li>
-            <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
-                3
-              </span>
-              <span>Efter din godkännande lämnar vi in deklarationen åt dig</span>
-            </li>
-            <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center text-sm font-bold mr-3">
-                4
-              </span>
-              <span>Du får bekräftelse när allt är inlämnat - Klart!</span>
-            </li>
-          </ol>
-        )}
       </div>
 
       {/* Important Notice */}
@@ -318,10 +322,10 @@ export default function ConfirmationPage() {
           Tillbaka till startsidan
         </Link>
         <Link
-          href="/tutorial"
+          href="/kontakt"
           className="px-8 py-3 bg-navy-800 hover:bg-navy-600 border-2 border-gold-500/50 hover:border-gold-500 text-white rounded-xl font-bold transition-all duration-200 text-center"
         >
-          Se guider
+          Kontakta oss
         </Link>
       </div>
     </FlowContainer>
