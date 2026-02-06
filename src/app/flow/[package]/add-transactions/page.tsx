@@ -31,6 +31,7 @@ export default function AddTransactionsPage() {
   const [date, setDate] = useState('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
+  const [quantity, setQuantity] = useState('1');
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
   const [formError, setFormError] = useState('');
 
@@ -87,7 +88,7 @@ export default function AddTransactionsPage() {
     setFormError('');
 
     // Validate form
-    if (!date || !description || !amount) {
+    if (!date || !description || !amount || !quantity) {
       setFormError('Alla fält måste fyllas i');
       return;
     }
@@ -97,36 +98,53 @@ export default function AddTransactionsPage() {
       return;
     }
 
+    const qty = parseInt(quantity);
+    if (qty <= 0) {
+      setFormError('Antal måste vara minst 1');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      const response = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId,
-          userId: user?.id || null,
-          guestEmail: null,
-          guestName: null,
-          transactionDate: date,
-          description,
-          amount: parseFloat(amount),
-          transactionType,
-        }),
-      });
+      const newTransactions: Transaction[] = [];
 
-      const data = await response.json();
+      // Create multiple transactions if quantity > 1
+      for (let i = 0; i < qty; i++) {
+        const response = await fetch('/api/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId,
+            userId: user?.id || null,
+            guestEmail: null,
+            guestName: null,
+            transactionDate: date,
+            description: qty > 1 ? `${description} (${i + 1}/${qty})` : description,
+            amount: parseFloat(amount),
+            transactionType,
+          }),
+        });
 
-      if (response.ok) {
-        // Add new transaction to list
-        setTransactions([data.transaction, ...transactions]);
+        const data = await response.json();
+
+        if (response.ok) {
+          newTransactions.push(data.transaction);
+        } else {
+          setFormError(data.error || 'Ett fel uppstod');
+          break;
+        }
+      }
+
+      if (newTransactions.length > 0) {
+        // Add new transactions to list
+        setTransactions([...newTransactions, ...transactions]);
         // Reset form
         setDate('');
         setDescription('');
         setAmount('');
+        setQuantity('1');
         setTransactionType('expense');
-      } else {
-        setFormError(data.error || 'Ett fel uppstod');
       }
     } catch (error) {
       setFormError('Ett oväntat fel uppstod');
@@ -231,22 +249,46 @@ export default function AddTransactionsPage() {
             />
           </div>
 
-          {/* Amount */}
-          <div>
-            <label htmlFor="amount" className="block text-sm font-semibold text-warm-300 mb-2">
-              Belopp (kr, inklusive moms)
-            </label>
-            <input
-              type="number"
-              id="amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-              step="0.01"
-              min="0"
-              className="w-full px-4 py-3 bg-navy-700 border border-navy-600 rounded-xl text-white placeholder-warm-500 focus:outline-none focus:border-gold-500 transition-colors"
-              required
-            />
+          {/* Amount and Quantity in a grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Amount */}
+            <div>
+              <label htmlFor="amount" className="block text-sm font-semibold text-warm-300 mb-2">
+                Belopp (kr, inklusive moms)
+              </label>
+              <input
+                type="number"
+                id="amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                step="0.01"
+                min="0"
+                className="w-full px-4 py-3 bg-navy-700 border border-navy-600 rounded-xl text-white placeholder-warm-500 focus:outline-none focus:border-gold-500 transition-colors"
+                required
+              />
+            </div>
+
+            {/* Quantity */}
+            <div>
+              <label htmlFor="quantity" className="block text-sm font-semibold text-warm-300 mb-2">
+                Antal
+              </label>
+              <input
+                type="number"
+                id="quantity"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="1"
+                step="1"
+                min="1"
+                className="w-full px-4 py-3 bg-navy-700 border border-navy-600 rounded-xl text-white placeholder-warm-500 focus:outline-none focus:border-gold-500 transition-colors"
+                required
+              />
+              <p className="text-xs text-warm-500 mt-1">
+                Lägg till flera identiska transaktioner
+              </p>
+            </div>
           </div>
 
           {/* Transaction Type */}
