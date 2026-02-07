@@ -5,7 +5,7 @@ En modern, professionell webbplats för en redovisningsbyrå som specialiserar s
 ## Översikt
 
 Denna webbplats är byggd med Next.js, React och TypeScript, och erbjuder två huvudtjänster:
-- **NE-Bilaga** (1499 kr) - Kunden lämnar in själv
+- **NE-Bilaga** (1999 kr) - Kunden lämnar in själv
 - **Komplett Tjänst** (3499 kr) - Vi sköter hela inlämningen
 
 ## Funktioner
