@@ -170,27 +170,6 @@ export default function Home() {
                       Snabb leverans
                     </span>
                   </div>
-                  {!user && (
-                    <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-navy-600">
-                      <p className="text-warm-400 text-xs sm:text-sm mb-3 sm:mb-4">
-                        Har du ett konto? Logga in för snabbare checkout.
-                      </p>
-                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
-                        <Link
-                          href="/auth/login"
-                          className="px-6 py-2 bg-navy-800 hover:bg-navy-600 border border-gold-500/50 hover:border-gold-500 text-white rounded-lg font-semibold transition-all duration-200"
-                        >
-                          Logga in
-                        </Link>
-                        <Link
-                          href="/auth/signup"
-                          className="px-6 py-2 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-lg font-bold transition-all duration-200 shadow-lg shadow-gold-500/20"
-                        >
-                          Skapa konto
-                        </Link>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
