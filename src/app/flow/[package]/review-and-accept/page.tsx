@@ -178,7 +178,7 @@ export default function ReviewAndAcceptPage() {
             <svg className="w-4 h-4 text-gold-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <span>Kontakta oss vid frågor på info@enklabokslut.se</span>
+            <span>Kontakta oss vid frågor på erik@enklabokslut.se</span>
           </li>
         </ul>
       </div>

@@ -93,10 +93,10 @@ export default function KontaktPage() {
                 <div>
                   <h3 className="font-semibold text-white text-sm sm:text-base mb-1">E-post</h3>
                   <a
-                    href="mailto:info@enklabokslut.se"
+                    href="mailto:erik@enklabokslut.se"
                     className="text-gold-500 hover:text-gold-400 transition-colors text-sm sm:text-base"
                   >
-                    info@enklabokslut.se
+                    erik@enklabokslut.se
                   </a>
                 </div>
               </div>
