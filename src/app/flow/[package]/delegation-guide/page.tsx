@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import FlowContainer from '@/components/FlowContainer';
+import { useTrackStep } from '@/hooks/useTrackStep';
 import VideoPlayer from '@/components/VideoPlayer';
 import { banks } from '@/data/banks';
 import { Bank } from '@/types';
@@ -15,6 +16,7 @@ export default function DelegationGuidePage() {
   const { user, loading } = useAuth();
   const packageType = params.package as string;
   const bankId = searchParams.get('bank') as Bank;
+  useTrackStep('delegation-guide', packageType, bankId, user?.id);
 
   const [hasCompleted, setHasCompleted] = useState(false);
 

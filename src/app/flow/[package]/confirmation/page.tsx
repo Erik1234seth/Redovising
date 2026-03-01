@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import FlowContainer from '@/components/FlowContainer';
+import { useTrackStep } from '@/hooks/useTrackStep';
 import { banks } from '@/data/banks';
 import { packages } from '@/data/packages';
 import { Bank } from '@/types';
@@ -22,6 +23,7 @@ export default function ConfirmationPage() {
   const company = searchParams.get('company') || '';
 
   const { user, refreshProfile, loading } = useAuth();
+  useTrackStep('confirmation', packageType, bankId, user?.id);
 
   // Protect route - require authentication
   useEffect(() => {

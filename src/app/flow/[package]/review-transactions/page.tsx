@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import FlowContainer from '@/components/FlowContainer';
+import { useTrackStep } from '@/hooks/useTrackStep';
 import { Bank } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -41,6 +42,7 @@ export default function ReviewTransactionsPage() {
   const { user, loading: authLoading } = useAuth();
   const packageType = params.package as string;
   const bankId = searchParams.get('bank') as Bank;
+  useTrackStep('review-transactions', packageType, bankId, user?.id);
 
   const [transactions, setTransactions] = useState<ParsedTransaction[]>([]);
   const [summary, setSummary] = useState<TransactionSummary | null>(null);

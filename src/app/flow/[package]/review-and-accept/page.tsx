@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import FlowContainer from '@/components/FlowContainer';
+import { useTrackStep } from '@/hooks/useTrackStep';
 import { packages } from '@/data/packages';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -13,6 +14,7 @@ export default function ReviewAndAcceptPage() {
   const { user, loading } = useAuth();
   const packageType = params.package as string;
   const bank = searchParams.get('bank') || '';
+  useTrackStep('review-and-accept', packageType, bank, user?.id);
   const email = searchParams.get('email') || '';
   const name = searchParams.get('name') || '';
   const phone = searchParams.get('phone') || '';

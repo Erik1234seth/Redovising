@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import FlowContainer from '@/components/FlowContainer';
+import { useTrackStep } from '@/hooks/useTrackStep';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
 
@@ -15,6 +16,7 @@ export default function ContactInfoPage() {
   const bank = searchParams.get('bank') || '';
 
   const { user, profile, loading: authLoading } = useAuth();
+  useTrackStep('contact-info', packageType, bank, user?.id);
 
   // Protect route - require authentication
   useEffect(() => {

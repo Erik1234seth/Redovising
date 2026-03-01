@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import FlowContainer from '@/components/FlowContainer';
+import { useTrackStep } from '@/hooks/useTrackStep';
 import { Bank } from '@/types';
 import { uploadFile, generateOrderId } from '@/lib/uploadFile';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,6 +15,7 @@ export default function UploadStatementPage() {
   const { user, loading } = useAuth();
   const packageType = params.package as string;
   const bankId = searchParams.get('bank') as Bank;
+  useTrackStep('upload-statement', packageType, bankId, user?.id);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);

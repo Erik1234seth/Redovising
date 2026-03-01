@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import FlowContainer from '@/components/FlowContainer';
+import { useTrackStep } from '@/hooks/useTrackStep';
 import { banks } from '@/data/banks';
 import { Bank } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,6 +14,7 @@ export default function BankSelectionPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const packageType = params.package as string;
+  useTrackStep('bank-selection', packageType, undefined, user?.id);
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
 
   // Total steps: 9 for all, except ne-bilaga first year = 8

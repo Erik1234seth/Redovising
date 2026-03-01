@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import FlowContainer from '@/components/FlowContainer';
+import { useTrackStep } from '@/hooks/useTrackStep';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface QualificationAnswers {
@@ -17,6 +18,7 @@ export default function QualificationPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const packageType = params.package as string;
+  useTrackStep('qualification', packageType, undefined, user?.id);
   const [answers, setAnswers] = useState<QualificationAnswers>({
     hasSeparateAccount: null,
     hasEmployees: null,
