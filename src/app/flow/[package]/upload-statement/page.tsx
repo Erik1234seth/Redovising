@@ -293,17 +293,27 @@ export default function UploadStatementPage() {
           </svg>
           Tillbaka
         </button>
-        <button
-          onClick={handleContinue}
-          disabled={!selectedFile || uploading}
-          className={`px-8 py-3 rounded-xl font-bold transition-all duration-200 ${
-            selectedFile && !uploading
-              ? 'bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105'
-              : 'bg-navy-600 text-navy-400 cursor-not-allowed'
-          }`}
-        >
-          {uploading ? 'Laddar upp...' : 'Fortsätt →'}
-        </button>
+        <div className="flex items-center gap-4">
+          {!selectedFile && !uploading && (
+            <button
+              onClick={() => router.push(`/flow/${packageType}/add-transactions?bank=${bankId}`)}
+              className="text-warm-400 hover:text-white font-semibold transition-colors"
+            >
+              Hoppa över
+            </button>
+          )}
+          <button
+            onClick={handleContinue}
+            disabled={!selectedFile || uploading}
+            className={`px-8 py-3 rounded-xl font-bold transition-all duration-200 ${
+              selectedFile && !uploading
+                ? 'bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105'
+                : 'bg-navy-600 text-navy-400 cursor-not-allowed'
+            }`}
+          >
+            {uploading ? 'Laddar upp...' : 'Fortsätt →'}
+          </button>
+        </div>
       </div>
     </FlowContainer>
   );
