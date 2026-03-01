@@ -8,8 +8,6 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function Home() {
   const { user, profile, isReturningCustomer, loading } = useAuth();
   const [showInfoPopup, setShowInfoPopup] = useState(false);
-  const [showExitIntent, setShowExitIntent] = useState(false);
-
   // Show popup for non-logged-in users after a short delay
   useEffect(() => {
     if (!loading && !user) {
@@ -27,34 +25,6 @@ export default function Home() {
   const closePopup = () => {
     setShowInfoPopup(false);
     sessionStorage.setItem('hasSeenInfoPopup', 'true');
-  };
-
-  // Exit intent detection
-  useEffect(() => {
-    const hasSeenExitIntent = localStorage.getItem('hasSeenExitIntent');
-    if (hasSeenExitIntent) return;
-
-    const handleMouseLeave = (e: MouseEvent) => {
-      // Detect if mouse is leaving from the top of the viewport
-      if (e.clientY <= 0) {
-        setShowExitIntent(true);
-        localStorage.setItem('hasSeenExitIntent', 'true');
-      }
-    };
-
-    // Add listener after a short delay to avoid triggering immediately
-    const timer = setTimeout(() => {
-      document.addEventListener('mouseleave', handleMouseLeave);
-    }, 5000);
-
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('mouseleave', handleMouseLeave);
-    };
-  }, []);
-
-  const closeExitIntent = () => {
-    setShowExitIntent(false);
   };
 
   return (
@@ -319,47 +289,6 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Trust Signals */}
-          <div className="mt-12 sm:mt-16 max-w-5xl mx-auto">
-            {/* Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-8">
-              <div className="bg-navy-700/30 border border-navy-600 rounded-xl p-4 sm:p-6 text-center">
-                <div className="text-3xl sm:text-4xl font-bold text-gold-500 mb-2">500+</div>
-                <div className="text-xs sm:text-sm text-warm-300">Godkända deklarationer 2024</div>
-              </div>
-              <div className="bg-navy-700/30 border border-navy-600 rounded-xl p-4 sm:p-6 text-center">
-                <div className="text-3xl sm:text-4xl font-bold text-gold-500 mb-2">3 dagar</div>
-                <div className="text-xs sm:text-sm text-warm-300">Genomsnittlig leveranstid</div>
-              </div>
-              <div className="bg-navy-700/30 border border-navy-600 rounded-xl p-4 sm:p-6 text-center">
-                <div className="text-3xl sm:text-4xl font-bold text-gold-500 mb-2">98%</div>
-                <div className="text-xs sm:text-sm text-warm-300">Godkänt första gången</div>
-              </div>
-              <div className="bg-navy-700/30 border border-navy-600 rounded-xl p-4 sm:p-6 text-center">
-                <div className="text-3xl sm:text-4xl font-bold text-gold-500 mb-2">10+</div>
-                <div className="text-xs sm:text-sm text-warm-300">Banker stöds</div>
-              </div>
-            </div>
-
-            {/* Guarantee Badge */}
-            <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-2 border-green-500/30 rounded-xl p-6 sm:p-8">
-              <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-                <div className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 bg-green-500/20 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 sm:w-10 sm:h-10 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                </div>
-                <div className="flex-1 text-center sm:text-left">
-                  <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
-                    100% Godkänd-garanti
-                  </h3>
-                  <p className="text-sm sm:text-base text-warm-300">
-                    Godkänt av Skatteverket eller pengarna tillbaka. Vi står för kvaliteten i varje deklaration.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -572,87 +501,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Exit Intent Popup */}
-      {showExitIntent && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-fadeIn">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-navy-900/90 backdrop-blur-sm"
-            onClick={closeExitIntent}
-          ></div>
-
-          {/* Modal */}
-          <div className="relative bg-gradient-to-br from-navy-800 to-navy-900 border-2 border-gold-500 rounded-2xl shadow-2xl max-w-md w-full animate-slideUp">
-            {/* Close button */}
-            <button
-              onClick={closeExitIntent}
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-warm-400 hover:text-white transition-colors z-10 rounded-full hover:bg-navy-700"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            {/* Content */}
-            <div className="p-6 sm:p-8">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-gold-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-                  </svg>
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">
-                  Vänta! Innan du går...
-                </h2>
-                <p className="text-base sm:text-lg text-warm-300 mb-6">
-                  Få <span className="text-gold-500 font-bold">10% rabatt</span> på din första beställning!
-                </p>
-              </div>
-
-              <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-4 mb-6">
-                <div className="flex items-start gap-3 mb-3">
-                  <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <p className="text-sm text-warm-200">Spara upp till 11 000 kr jämfört med traditionell byrå</p>
-                </div>
-                <div className="flex items-start gap-3 mb-3">
-                  <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <p className="text-sm text-warm-200">Leverans inom 3 dagar</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <p className="text-sm text-warm-200">100% godkänd-garanti</p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Link
-                  href="#packages"
-                  onClick={closeExitIntent}
-                  className="block w-full text-center px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20"
-                >
-                  Ja, ge mig 10% rabatt! →
-                </Link>
-                <button
-                  onClick={closeExitIntent}
-                  className="w-full text-center px-6 py-3 text-warm-400 hover:text-white font-semibold transition-colors text-sm"
-                >
-                  Nej tack, jag vill betala fullt pris
-                </button>
-              </div>
-
-              <p className="text-xs text-warm-500 text-center mt-4">
-                Använd kod: <span className="font-mono font-bold text-gold-500">VÄLKOMMEN10</span> vid beställning
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
     </>
   );
