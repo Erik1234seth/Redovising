@@ -35,13 +35,6 @@ export default function QualificationPage() {
     }
   }, [packageType, router]);
 
-  // Protect route - require authentication
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push(`/auth/login?redirect=/flow/${packageType}/qualification`);
-    }
-  }, [user, loading, router, packageType]);
-
   const handleAnswer = (question: keyof QualificationAnswers, value: boolean) => {
     setAnswers(prev => ({ ...prev, [question]: value }));
   };
@@ -51,7 +44,7 @@ export default function QualificationPage() {
   const handleContinue = () => {
     // Store answers in session storage
     sessionStorage.setItem(`qualificationAnswers_${packageType}`, JSON.stringify(answers));
-    router.push(`/flow/${packageType}/bank-selection`);
+    router.push(`/flow/${packageType}/method-selection`);
   };
 
   return (
