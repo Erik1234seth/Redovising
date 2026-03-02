@@ -85,7 +85,7 @@ export default function Home() {
           })
         }}
       />
-      <div className="bg-navy-800">
+      <div className="bg-navy-700">
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         {/* Decorative elements */}
@@ -94,85 +94,143 @@ export default function Home() {
           <div className="absolute top-40 -left-20 sm:top-60 sm:-left-40 w-48 h-48 sm:w-96 sm:h-96 bg-gold-500/5 rounded-full blur-3xl"></div>
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20">
-          <div className="text-center">
-            {/* Badge */}
-            <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-gold-500/10 border border-gold-500/20 rounded-full mb-6 sm:mb-8">
-              <span className="text-gold-500 text-xs sm:text-sm font-semibold">
-                Det som krävs. Inget mer.
-              </span>
-            </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-20 pb-16">
 
-            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold text-white mb-4 sm:mb-6 leading-tight">
-              Bokslut för
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-gold-400 to-gold-600">
-                Enskilda Firmor
-              </span>
-            </h1>
+          {/* Split hero */}
+          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16 mb-14 sm:mb-20">
 
-            <p className="text-base sm:text-xl md:text-2xl text-warm-300 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed px-2">
-              Bokföring och förenklat årsbokslut – utan onödiga moment,
-              <span className="block mt-2">
+            {/* Left: text */}
+            <div className="flex-1 lg:max-w-xl text-center lg:text-left">
+              <div className="inline-flex items-center px-3 sm:px-4 py-1.5 bg-gold-500/10 border border-gold-500/20 rounded-full mb-5 sm:mb-6">
+                <span className="text-gold-500 text-xs sm:text-sm font-semibold">
+                  Det som krävs. Inget mer.
+                </span>
+              </div>
+
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-white mb-4 sm:mb-6 leading-tight">
+                Bokslut för
+                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-gold-400 to-gold-600">
+                  Enskilda Firmor
+                </span>
+              </h1>
+
+              <p className="text-base sm:text-lg text-warm-300 mb-7 sm:mb-9 max-w-lg mx-auto lg:mx-0 leading-relaxed">
+                Bokföring och förenklat årsbokslut – utan onödiga moment,
                 utan dyra byråtimmar och utan krångel.
-              </span>
-            </p>
+              </p>
 
-            {/* Welcome Message - Auto-detected based on auth */}
-            <div className="mb-12 sm:mb-20">
-              {!loading && user && isReturningCustomer ? (
-                <div className="bg-gradient-to-br from-gold-500/10 to-gold-600/5 border border-gold-500/20 rounded-xl sm:rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto backdrop-blur-sm">
-                  <div className="flex items-center justify-center mb-3 sm:mb-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gold-500/20 rounded-full flex items-center justify-center">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">
-                    Välkommen tillbaka{profile?.full_name ? `, ${profile.full_name}` : ''}!
-                  </h2>
-                  <p className="text-warm-300 text-base sm:text-lg">
-                    Du har gjort {profile?.order_count || 0} {profile?.order_count === 1 ? 'beställning' : 'beställningar'} hos oss tidigare.
-                    Välj ditt paket nedan för att komma igång direkt.
-                  </p>
-                </div>
-              ) : !loading && user && !isReturningCustomer ? (
-                <div className="bg-gradient-to-br from-gold-500/10 to-gold-600/5 border border-gold-500/20 rounded-xl sm:rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto backdrop-blur-sm">
-                  <div className="flex items-center justify-center mb-3 sm:mb-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gold-500/20 rounded-full flex items-center justify-center">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">
-                    Välkommen{profile?.full_name ? `, ${profile.full_name}` : ''}!
-                  </h2>
-                  <p className="text-warm-300 text-base sm:text-lg">
-                    Detta är din första beställning hos oss. Vi guidar dig genom hela processen steg för steg.
-                  </p>
-                </div>
-              ) : (
-                <div className="bg-navy-700/50 border border-navy-600 rounded-xl sm:rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto backdrop-blur-sm">
-                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-3 sm:mb-4">
-                    Så här fungerar det
-                  </h2>
-                  <p className="text-warm-300 text-base sm:text-lg mb-3 sm:mb-4 leading-relaxed">
-                    Välj det paket som passar dig bäst nedan. Därefter guidar vi dig
-                    steg för steg genom hela processen - från att ladda ner dina kontoutdrag
-                    till färdig NE-bilaga.
-                  </p>
-                  <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-gold-500/10 rounded-lg">
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gold-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    <span className="text-gold-500 text-sm sm:text-base font-semibold">
-                      Snabb leverans
-                    </span>
-                  </div>
-                </div>
-              )}
+              <a
+                href="#packages"
+                className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl shadow-lg shadow-gold-500/20 hover:scale-[1.02] transition-all duration-200 text-sm sm:text-base"
+              >
+                Se våra paket
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </a>
             </div>
+
+            {/* Right: card mockup */}
+            <div className="flex-1 w-full max-w-sm lg:max-w-none flex justify-center lg:justify-end">
+              <div className="relative w-full max-w-sm">
+                {/* Glow behind card */}
+                <div className="absolute -inset-4 bg-gold-500/5 rounded-3xl blur-2xl"></div>
+
+                {/* Main card */}
+                <div className="relative bg-white/8 backdrop-blur-sm border border-white/15 rounded-2xl p-5 sm:p-6 shadow-2xl">
+
+                  {/* Card header */}
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <p className="text-xs text-warm-400 uppercase tracking-widest mb-0.5">Förenklat Bokslut</p>
+                      <h4 className="text-base font-bold text-white">NE-Bilaga 2024</h4>
+                    </div>
+                    <div className="w-9 h-9 rounded-full bg-gold-500/20 border border-gold-500/30 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-gold-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Progress */}
+                  <div className="flex gap-1 mb-5">
+                    <div className="flex-1 h-1 bg-gold-500 rounded-full"></div>
+                    <div className="flex-1 h-1 bg-gold-500/60 rounded-full"></div>
+                    <div className="flex-1 h-1 bg-navy-400/40 rounded-full"></div>
+                  </div>
+
+                  {/* Rows */}
+                  <div className="space-y-0 mb-4">
+                    {[
+                      { label: 'Intäkter', value: '285 000 kr' },
+                      { label: 'Kostnader', value: '−142 500 kr' },
+                      { label: 'Avskrivningar', value: '−12 000 kr' },
+                    ].map((row) => (
+                      <div key={row.label} className="flex justify-between py-2.5 border-b border-navy-500/50">
+                        <span className="text-sm text-warm-400">{row.label}</span>
+                        <span className="text-sm font-medium text-warm-200">{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Result */}
+                  <div className="flex justify-between items-center p-3 bg-gold-500/10 border border-gold-500/20 rounded-xl">
+                    <span className="text-sm font-semibold text-white">Årets resultat</span>
+                    <span className="font-bold text-gold-400 text-base">130 500 kr</span>
+                  </div>
+
+                  {/* Status badge */}
+                  <div className="mt-4 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                    <span className="text-xs text-warm-400">Klar för inlämning till Skatteverket</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Trust belt */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-14 sm:mb-20">
+            {[
+              {
+                icon: (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                ),
+                title: 'Enkla & moderna tjänster',
+                desc: 'Digital redovisning utan krångel – smidig från start till mål.',
+              },
+              {
+                icon: (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                ),
+                title: 'Fatta rätt beslut',
+                desc: 'Vi hjälper dig förstå din ekonomi och ta välgrundade beslut.',
+              },
+              {
+                icon: (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+                ),
+                title: 'Hjälp när du behöver',
+                desc: 'Praktisk support genom hela processen – du är aldrig ensam.',
+              },
+              {
+                icon: (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 8l3 5m0 0l3-5m-3 5v4m-3-5h6m-6.5 3.5a7.5 7.5 0 1115 0" />
+                ),
+                title: 'Fast pris, inga överraskningar',
+                desc: 'Du vet exakt vad det kostar – inga dolda avgifter eller extra timmar.',
+              },
+            ].map((item) => (
+              <div key={item.title} className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-5">
+                <div className="w-9 h-9 bg-gold-500/10 border border-gold-500/20 rounded-lg flex items-center justify-center mb-3">
+                  <svg className="w-5 h-5 text-gold-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {item.icon}
+                  </svg>
+                </div>
+                <h3 className="text-sm font-semibold text-white mb-1 leading-snug">{item.title}</h3>
+                <p className="text-xs text-warm-300 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
           </div>
 
           {/* Packages Section */}
@@ -180,7 +238,7 @@ export default function Home() {
             {packages.map((pkg, index) => (
               <div
                 key={pkg.id}
-                className="group relative bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl overflow-hidden hover:border-gold-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-gold-500/10"
+                className="group relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl sm:rounded-2xl overflow-hidden hover:border-gold-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-gold-500/10"
               >
                 {/* Popular badge for komplett */}
                 {pkg.id === 'komplett' && (
@@ -192,7 +250,7 @@ export default function Home() {
                 )}
 
                 {/* Header with gradient */}
-                <div className="relative bg-gradient-to-br from-navy-600 to-navy-700 p-6 sm:p-8 border-b border-navy-600">
+                <div className="relative bg-white/5 p-6 sm:p-8 border-b border-white/10">
                   <div className="absolute inset-0 bg-gradient-to-br from-gold-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
                   <div className="relative">
@@ -246,8 +304,8 @@ export default function Home() {
       </section>
 
       {/* Trust Section */}
-      <section className="relative py-16 sm:py-24 bg-navy-900">
-        <div className="absolute inset-0 bg-gradient-to-b from-navy-800 to-navy-900"></div>
+      <section className="relative py-16 sm:py-24 bg-navy-800">
+        <div className="absolute inset-0 bg-gradient-to-b from-navy-700 to-navy-800"></div>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
@@ -301,7 +359,7 @@ export default function Home() {
             ].map((item, index) => (
               <div
                 key={index}
-                className="group bg-navy-800/50 backdrop-blur-sm border border-navy-700 rounded-xl sm:rounded-2xl p-6 sm:p-8 hover:border-gold-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-gold-500/5"
+                className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl sm:rounded-2xl p-6 sm:p-8 hover:border-gold-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-gold-500/5"
               >
                 <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-gold-500/20 to-gold-600/10 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
                   <svg
@@ -326,7 +384,7 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="relative py-16 sm:py-20 bg-gradient-to-br from-navy-800 to-navy-900">
+      <section className="relative py-16 sm:py-20 bg-gradient-to-br from-navy-700 to-navy-800">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-gold-500/20 to-transparent"></div>
         </div>
@@ -347,7 +405,7 @@ export default function Home() {
             </a>
             <Link
               href="/kontakt"
-              className="px-6 sm:px-8 py-3 sm:py-4 bg-navy-700 hover:bg-navy-600 border border-navy-600 hover:border-gold-500/50 text-white font-bold rounded-lg sm:rounded-xl transition-all duration-200 text-sm sm:text-base"
+              className="px-6 sm:px-8 py-3 sm:py-4 bg-white/5 hover:bg-white/10 border border-white/15 hover:border-gold-500/50 text-white font-bold rounded-lg sm:rounded-xl transition-all duration-200 text-sm sm:text-base"
             >
               Kontakta oss
             </Link>
@@ -365,7 +423,7 @@ export default function Home() {
           ></div>
 
           {/* Modal */}
-          <div className="relative bg-navy-800 border border-navy-600 rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-navy-700 border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
             {/* Close button */}
             <button
               onClick={closePopup}
@@ -377,7 +435,7 @@ export default function Home() {
             </button>
 
             {/* Header */}
-            <div className="bg-gradient-to-br from-gold-500/10 to-gold-600/5 border-b border-navy-600 p-4 sm:p-8">
+            <div className="bg-gradient-to-br from-gold-500/10 to-gold-600/5 border-b border-white/10 p-4 sm:p-8">
               <div className="w-10 h-10 sm:w-14 sm:h-14 bg-gold-500/20 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-4">
                 <svg className="w-5 h-5 sm:w-7 sm:h-7 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
@@ -424,7 +482,7 @@ export default function Home() {
               </div>
 
               {/* Point 3 - Important note */}
-              <div className="bg-navy-700/50 border border-navy-600 rounded-lg sm:rounded-xl p-3 sm:p-4">
+              <div className="bg-white/5 border border-white/10 rounded-lg sm:rounded-xl p-3 sm:p-4">
                 <div className="flex gap-2 sm:gap-3">
                   <div className="flex-shrink-0">
                     <svg className="w-4 h-4 sm:w-5 sm:h-5 text-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
