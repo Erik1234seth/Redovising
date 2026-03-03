@@ -3,6 +3,47 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+const ADMIN_CODE = 'Erik0511';
+
+function CodeGate({ onUnlock }: { onUnlock: () => void }) {
+  const [code, setCode] = useState('');
+  const [error, setError] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code === ADMIN_CODE) {
+      sessionStorage.setItem('admin_unlocked', '1');
+      onUnlock();
+    } else {
+      setError(true);
+      setCode('');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-navy-800 flex items-center justify-center px-4">
+      <form onSubmit={handleSubmit} className="bg-navy-700/50 border border-navy-600 rounded-2xl p-8 w-full max-w-sm">
+        <h1 className="text-2xl font-bold text-white mb-6 text-center">Admin</h1>
+        <label className="block text-sm font-medium text-warm-300 mb-2">Kod</label>
+        <input
+          type="password"
+          value={code}
+          onChange={(e) => { setCode(e.target.value); setError(false); }}
+          autoFocus
+          className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition mb-4"
+        />
+        {error && <p className="text-red-400 text-sm mb-3">Fel kod, försök igen</p>}
+        <button
+          type="submit"
+          className="w-full py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200"
+        >
+          Logga in
+        </button>
+      </form>
+    </div>
+  );
+}
+
 interface Order {
   id: string;
   package_type: string;
@@ -36,13 +77,22 @@ const FLOW_STEPS = [
 ];
 
 export default function AdminPage() {
+  const [unlocked, setUnlocked] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [contactRequests, setContactRequests] = useState<{ id: string; email: string; package_type: string; created_at: string }[]>([]);
   const [stepCounts, setStepCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'orders' | 'funnel'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'contacts' | 'funnel'>('orders');
 
   useEffect(() => {
+    if (sessionStorage.getItem('admin_unlocked') === '1') {
+      setUnlocked(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!unlocked) return;
     const fetchData = async () => {
       try {
         const res = await fetch('/api/admin/orders');
@@ -52,6 +102,7 @@ export default function AdminPage() {
         } else {
           setOrders(data.orders || []);
           setStepCounts(data.stepCounts || {});
+          setContactRequests(data.contactRequests || []);
         }
       } catch (err) {
         setError('Kunde inte hämta data');
@@ -60,7 +111,11 @@ export default function AdminPage() {
       }
     };
     fetchData();
-  }, []);
+  }, [unlocked]);
+
+  if (!unlocked) {
+    return <CodeGate onUnlock={() => setUnlocked(true)} />;
+  }
 
   const maxCount = Math.max(...Object.values(stepCounts), 1);
 
@@ -143,6 +198,16 @@ export default function AdminPage() {
             Beställningar
           </button>
           <button
+            onClick={() => setActiveTab('contacts')}
+            className={`px-5 py-2 rounded-lg font-semibold text-sm transition-all ${
+              activeTab === 'contacts'
+                ? 'bg-gold-500 text-navy-900'
+                : 'bg-navy-700 text-warm-300 hover:text-white'
+            }`}
+          >
+            Kontaktförfrågningar ({contactRequests.length})
+          </button>
+          <button
             onClick={() => setActiveTab('funnel')}
             className={`px-5 py-2 rounded-lg font-semibold text-sm transition-all ${
               activeTab === 'funnel'
@@ -206,6 +271,42 @@ export default function AdminPage() {
                         <td className="px-4 py-3">
                           <span className={`px-2 py-1 rounded-md text-xs font-semibold border ${statusColor(order.status)}`}>
                             {order.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Contacts tab */}
+        {!loading && activeTab === 'contacts' && (
+          <div className="bg-navy-700/50 border border-navy-600 rounded-xl overflow-hidden">
+            {contactRequests.length === 0 ? (
+              <div className="text-center py-16 text-warm-400">Inga kontaktförfrågningar ännu</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-navy-600 text-warm-400 text-left">
+                      <th className="px-4 py-3 font-medium">Datum</th>
+                      <th className="px-4 py-3 font-medium">Email</th>
+                      <th className="px-4 py-3 font-medium">Paket</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contactRequests.map((req) => (
+                      <tr key={req.id} className="border-b border-navy-600/50 hover:bg-navy-700/30 transition-colors">
+                        <td className="px-4 py-3 text-warm-400 whitespace-nowrap">
+                          {new Date(req.created_at).toLocaleDateString('sv-SE')}
+                        </td>
+                        <td className="px-4 py-3 text-white font-medium">{req.email}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded-md text-xs font-semibold ${packageColor(req.package_type)}`}>
+                            {req.package_type === 'komplett' ? 'Komplett tjänst' : 'NE-bilaga'}
                           </span>
                         </td>
                       </tr>
