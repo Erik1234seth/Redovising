@@ -79,7 +79,7 @@ const FLOW_STEPS = [
 export default function AdminPage() {
   const [unlocked, setUnlocked] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [contactRequests, setContactRequests] = useState<{ id: string; email: string; package_type: string; created_at: string }[]>([]);
+  const [contactRequests, setContactRequests] = useState<{ id: string; email: string; phone: string | null; package_type: string; created_at: string }[]>([]);
   const [stepCounts, setStepCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -294,6 +294,7 @@ export default function AdminPage() {
                     <tr className="border-b border-navy-600 text-warm-400 text-left">
                       <th className="px-4 py-3 font-medium">Datum</th>
                       <th className="px-4 py-3 font-medium">Email</th>
+                      <th className="px-4 py-3 font-medium">Telefon</th>
                       <th className="px-4 py-3 font-medium">Paket</th>
                     </tr>
                   </thead>
@@ -304,6 +305,7 @@ export default function AdminPage() {
                           {new Date(req.created_at).toLocaleDateString('sv-SE')}
                         </td>
                         <td className="px-4 py-3 text-white font-medium">{req.email}</td>
+                        <td className="px-4 py-3 text-warm-300">{req.phone || '—'}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-1 rounded-md text-xs font-semibold ${packageColor(req.package_type)}`}>
                             {req.package_type === 'komplett' ? 'Komplett tjänst' : 'NE-bilaga'}

@@ -14,6 +14,7 @@ export default function MethodSelectionPage() {
 
   const [selected, setSelected] = useState<Method>(null);
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
@@ -31,7 +32,7 @@ export default function MethodSelectionPage() {
       const res = await fetch('/api/contact-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, packageType }),
+        body: JSON.stringify({ email, phone, packageType }),
       });
       if (!res.ok) throw new Error('Något gick fel');
       setDone(true);
@@ -161,6 +162,16 @@ export default function MethodSelectionPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="din@email.se"
+              className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition placeholder-warm-500 mb-4"
+            />
+            <label className="block text-sm font-medium text-warm-300 mb-2">
+              Ditt telefonnummer
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="070-000 00 00"
               className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition placeholder-warm-500 mb-4"
               onKeyDown={(e) => e.key === 'Enter' && handleContactSubmit()}
             />

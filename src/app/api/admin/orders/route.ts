@@ -62,7 +62,7 @@ export async function GET() {
     // Fetch contact requests
     const { data: contactRequests } = await supabase
       .from('contact_requests')
-      .select('id, email, package_type, created_at')
+      .select('id, email, phone, package_type, created_at')
       .order('created_at', { ascending: false });
 
     return NextResponse.json({ orders: orders || [], stepCounts, contactRequests: contactRequests || [] });
