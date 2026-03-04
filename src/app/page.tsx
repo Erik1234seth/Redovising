@@ -55,7 +55,7 @@ export default function Home() {
             {/* Left – text */}
             <div className="flex-1 lg:max-w-[520px] text-center lg:text-left">
               <div
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold mb-6"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold mb-6"
                 style={{ backgroundColor: `${CORAL}15`, color: CORAL }}
               >
                 <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: CORAL }} />
