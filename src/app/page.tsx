@@ -98,15 +98,15 @@ export default function Home() {
               </div>
 
               {/* Mini trust signals */}
-              <div className="flex items-center gap-5 mt-8 justify-center lg:justify-start">
+              <div className="flex items-center gap-5 lg:gap-7 mt-8 justify-center lg:justify-start">
                 {[
                   { value: 'Fast pris', label: 'inga timarvoden' },
                   { value: '< 5 dagar', label: 'leveranstid' },
                   { value: '100%', label: 'fokus på enskilda firmor' },
                 ].map(({ value, label }) => (
                   <div key={label} className="text-center lg:text-left">
-                    <p className="text-sm font-extrabold" style={{ color: NAV_BG }}>{value}</p>
-                    <p className="text-xs text-slate-400">{label}</p>
+                    <p className="text-sm lg:text-base font-extrabold" style={{ color: NAV_BG }}>{value}</p>
+                    <p className="text-xs lg:text-sm text-slate-400">{label}</p>
                   </div>
                 ))}
               </div>
