@@ -66,7 +66,7 @@ function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition placeholder-warm-500"
+            className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-warm-500"
             placeholder="din@epost.se"
           />
         </div>
@@ -81,7 +81,7 @@ function LoginForm() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition placeholder-warm-500"
+            className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-warm-500"
             placeholder="••••••••"
           />
         </div>
@@ -89,7 +89,7 @@ function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 disabled:from-gold-600 disabled:to-gold-600 disabled:opacity-50 text-navy-900 font-bold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-[1.02]"
+          className="w-full bg-[#E95C63] hover:bg-[#d04e55] disabled:opacity-50 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02]"
         >
           {loading ? 'Loggar in...' : 'Logga in'}
         </button>
@@ -98,7 +98,7 @@ function LoginForm() {
       <div className="mt-6 text-center">
         <p className="text-warm-400 text-sm">
           Har du inget konto?{' '}
-          <Link href="/auth/signup" className="text-gold-500 hover:text-gold-400 font-semibold">
+          <Link href="/auth/signup" className="text-[#E95C63] hover:opacity-80 font-semibold">
             Skapa konto
           </Link>
         </p>

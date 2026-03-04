@@ -63,9 +63,9 @@ export const metadata: Metadata = {
     images: ['/loggautantext.png'],
   },
   icons: {
-    icon: '/loggautantext.png',
-    shortcut: '/loggautantext.png',
-    apple: '/loggautantext.png',
+    icon: '/favicon-check.svg',
+    shortcut: '/favicon-check.svg',
+    apple: '/favicon-check.svg',
   },
   alternates: {
     canonical: 'https://enklabokslut.se',

@@ -161,9 +161,9 @@ export default function Home() {
       {/* ══════════════════════════════════════════
           TRUST BELT
       ══════════════════════════════════════════ */}
-      <section className="hidden lg:block mt-20" style={{ backgroundColor: NAV_BG }}>
+      <section className="py-12 sm:py-16" style={{ backgroundColor: NAV_BG }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {[
               {
                 icon: (
@@ -197,27 +197,22 @@ export default function Home() {
                 title: 'Fast pris alltid',
                 desc: 'Inga timarvoden. Du vet vad det kostar.',
               },
-            ].map((item, i) => (
+            ].map((item) => (
               <div
                 key={item.title}
-                className="flex items-center gap-3 px-4 py-4 lg:items-start lg:gap-4 lg:px-8 lg:py-10"
-                style={{
-                  borderRight: i % 2 === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                  borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                }}
+                className="flex flex-col items-center text-center p-5 sm:p-6 lg:p-8 rounded-2xl"
+                style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
               >
                 <div
-                  className="w-7 h-7 lg:w-9 lg:h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  className="w-11 h-11 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-xl flex items-center justify-center mb-4"
                   style={{ backgroundColor: CORAL }}
                 >
-                  <svg className="w-3.5 h-3.5 lg:w-[18px] lg:h-[18px] text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {item.icon}
                   </svg>
                 </div>
-                <div>
-                  <p className="text-xs lg:text-sm font-bold text-white mb-0.5 lg:mb-1">{item.title}</p>
-                  <p className="hidden lg:block text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>{item.desc}</p>
-                </div>
+                <p className="text-sm sm:text-base lg:text-lg font-bold text-white mb-1.5 lg:mb-2">{item.title}</p>
+                <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>{item.desc}</p>
               </div>
             ))}
           </div>

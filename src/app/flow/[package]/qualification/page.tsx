@@ -6,9 +6,6 @@ import FlowContainer from '@/components/FlowContainer';
 import { useTrackStep } from '@/hooks/useTrackStep';
 import { useAuth } from '@/contexts/AuthContext';
 
-const CORAL = '#E95C63';
-const NAV_BG = '#173b57';
-
 interface QualificationAnswers {
   hasSeparateAccount: boolean | null;
   hasEmployees: boolean | null;
@@ -31,7 +28,6 @@ export default function QualificationPage() {
 
   const totalSteps = 9;
 
-  // Redirect if not komplett or ne-bilaga
   useEffect(() => {
     if (packageType !== 'komplett' && packageType !== 'ne-bilaga') {
       router.push(`/flow/${packageType}/bank-selection`);
@@ -49,13 +45,6 @@ export default function QualificationPage() {
     router.push(`/flow/${packageType}/method-selection`);
   };
 
-  const questions: { key: keyof QualificationAnswers; label: string }[] = [
-    { key: 'hasSeparateAccount', label: 'Har du ett separat bankkonto för din enskilda firma?' },
-    { key: 'hasEmployees', label: 'Har du anställda i din enskilda firma?' },
-    { key: 'hasTaxPayments', label: 'Har du gjort inbetalningar till Skatteverket som berör årets verksamhet?' },
-    { key: 'isFirstYear', label: 'Är detta ditt första år med enskild firma?' },
-  ];
-
   return (
     <FlowContainer
       title="Några snabba frågor"
@@ -66,33 +55,127 @@ export default function QualificationPage() {
       hideProgress={true}
     >
       <div className="space-y-6 mb-8">
-        {questions.map(({ key, label }) => (
-          <div key={key} className="bg-gray-50 border border-gray-200 rounded-xl p-5">
-            <p className="text-slate-800 font-medium mb-4">{label}</p>
-            <div className="flex gap-3">
-              {[true, false].map((val) => (
-                <button
-                  key={String(val)}
-                  onClick={() => handleAnswer(key, val)}
-                  className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all border ${
-                    answers[key] === val
-                      ? 'text-white border-transparent'
-                      : 'bg-white text-slate-600 border-gray-200 hover:border-slate-300'
-                  }`}
-                  style={answers[key] === val ? { backgroundColor: NAV_BG } : {}}
-                >
-                  {val ? 'Ja' : 'Nej'}
-                </button>
-              ))}
-            </div>
+        {/* Question 1 */}
+        <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-5">
+          <p className="text-white font-medium mb-4">
+            Har du ett separat bankkonto för din enskilda firma?
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleAnswer('hasSeparateAccount', true)}
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+                answers.hasSeparateAccount === true
+                  ? 'bg-[#E95C63] text-white'
+                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
+              }`}
+            >
+              Ja
+            </button>
+            <button
+              onClick={() => handleAnswer('hasSeparateAccount', false)}
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+                answers.hasSeparateAccount === false
+                  ? 'bg-[#E95C63] text-white'
+                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
+              }`}
+            >
+              Nej
+            </button>
           </div>
-        ))}
+        </div>
+
+        {/* Question 2 */}
+        <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-5">
+          <p className="text-white font-medium mb-4">
+            Har du anställda i din enskilda firma?
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleAnswer('hasEmployees', true)}
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+                answers.hasEmployees === true
+                  ? 'bg-[#E95C63] text-white'
+                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
+              }`}
+            >
+              Ja
+            </button>
+            <button
+              onClick={() => handleAnswer('hasEmployees', false)}
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+                answers.hasEmployees === false
+                  ? 'bg-[#E95C63] text-white'
+                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
+              }`}
+            >
+              Nej
+            </button>
+          </div>
+        </div>
+
+        {/* Question 3 */}
+        <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-5">
+          <p className="text-white font-medium mb-4">
+            Har du gjort inbetalningar till Skatteverket som berör årets verksamhet?
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleAnswer('hasTaxPayments', true)}
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+                answers.hasTaxPayments === true
+                  ? 'bg-[#E95C63] text-white'
+                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
+              }`}
+            >
+              Ja
+            </button>
+            <button
+              onClick={() => handleAnswer('hasTaxPayments', false)}
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+                answers.hasTaxPayments === false
+                  ? 'bg-[#E95C63] text-white'
+                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
+              }`}
+            >
+              Nej
+            </button>
+          </div>
+        </div>
+
+        {/* Question 4 */}
+        <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-5">
+          <p className="text-white font-medium mb-4">
+            Är detta ditt första år med enskild firma?
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleAnswer('isFirstYear', true)}
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+                answers.isFirstYear === true
+                  ? 'bg-[#E95C63] text-white'
+                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
+              }`}
+            >
+              Ja
+            </button>
+            <button
+              onClick={() => handleAnswer('isFirstYear', false)}
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+                answers.isFirstYear === false
+                  ? 'bg-[#E95C63] text-white'
+                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
+              }`}
+            >
+              Nej
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="flex justify-between items-center pt-6 border-t border-gray-200">
+      <div className="flex justify-between items-center pt-6 border-t border-navy-600">
         <button
           onClick={() => router.push('/')}
-          className="text-slate-500 hover:text-slate-800 font-semibold transition-colors flex items-center"
+          className="text-warm-300 hover:text-white font-semibold transition-colors flex items-center"
         >
           <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -102,8 +185,11 @@ export default function QualificationPage() {
         <button
           onClick={handleContinue}
           disabled={!allQuestionsAnswered}
-          className="px-8 py-3 rounded-xl font-bold transition-all duration-200 text-white"
-          style={allQuestionsAnswered ? { backgroundColor: NAV_BG } : { backgroundColor: '#d1d5db', color: '#9ca3af', cursor: 'not-allowed' }}
+          className={`px-8 py-3 rounded-xl font-bold transition-all duration-200 ${
+            allQuestionsAnswered
+              ? 'bg-[#E95C63] hover:bg-[#d04e55] text-white shadow-lg hover:scale-105'
+              : 'bg-navy-600 text-navy-400 cursor-not-allowed'
+          }`}
         >
           Fortsätt →
         </button>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="2.0" baseProfile="tiny-ps" viewBox="0 0 100 100" width="100" height="100">
+  <title>Enkla Bokslut</title>
+  <rect width="100" height="100" rx="22" fill="#E95C63"/>
+  <path d="M22 53l17 17 39-39" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

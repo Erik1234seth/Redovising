@@ -419,7 +419,7 @@ export default function ReviewTransactionsPage() {
       {/* Warning modal when no business transactions are marked - positioned outside FlowContainer */}
       {showNoBusinessWarning && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white border-2 border-amber-300 rounded-xl p-6 max-w-md w-full shadow-2xl">
+          <div className="bg-[#0d2235] border-2 border-amber-300 rounded-xl p-6 max-w-md w-full shadow-2xl">
             <div className="flex items-start gap-4 mb-4">
               <div className="flex-shrink-0 w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center">
                 <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -430,7 +430,7 @@ export default function ReviewTransactionsPage() {
                 <h3 className="text-amber-500 font-bold text-lg mb-2">
                   Inga verksamhetstransaktioner markerade
                 </h3>
-                <p className="text-slate-600 text-sm mb-3">
+                <p className="text-slate-300 text-sm mb-3">
                   Du har inte markerat någon transaktion som tillhör din verksamhet. Är du säker på att du vill fortsätta?
                 </p>
                 <p className="text-slate-400 text-xs italic">
@@ -441,7 +441,7 @@ export default function ReviewTransactionsPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowNoBusinessWarning(false)}
-                className="flex-1 px-6 py-3 rounded-xl font-bold text-white transition-all" style={{ backgroundColor: '#173b57' }}
+                className="flex-1 px-6 py-3 bg-[#173b57] text-white rounded-xl font-semibold hover:opacity-80 transition-all"
               >
                 Gå tillbaka
               </button>
@@ -481,7 +481,7 @@ export default function ReviewTransactionsPage() {
           {/* Summary Cards */}
           {summary && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 sm:p-4">
+              <div className="bg-[#0d2235] border border-[#173b57]/50 rounded-xl p-3 sm:p-4">
                 <p className="text-slate-400 text-xs sm:text-sm mb-1">Totalt</p>
                 <p className="text-white text-lg sm:text-xl font-bold">{summary.totalCount} st</p>
               </div>
@@ -493,7 +493,7 @@ export default function ReviewTransactionsPage() {
                 <p className="text-red-400 text-xs sm:text-sm mb-1">Utgifter</p>
                 <p className="text-red-400 text-lg sm:text-xl font-bold">{formatAmount(summary.totalExpenses)}</p>
               </div>
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 sm:p-4">
+              <div className="bg-[#0d2235] border border-[#173b57]/50 rounded-xl p-3 sm:p-4">
                 <p className="text-slate-400 text-xs sm:text-sm mb-1">Netto</p>
                 <p className={`text-lg sm:text-xl font-bold ${summary.netAmount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {formatAmount(summary.netAmount)}
@@ -504,13 +504,13 @@ export default function ReviewTransactionsPage() {
 
           {/* Interactive tutorial - example transaction with arrows */}
           {showTooltip && (
-            <div className="bg-white border border-[#173b57] rounded-xl mb-4 shadow-lg overflow-hidden">
+            <div className="bg-[#0d2235] border border-[#173b57] rounded-xl mb-4 shadow-lg overflow-hidden">
               {/* Header */}
               <div className="bg-[#173b57] px-4 py-2 flex items-center justify-between">
-                <p className="font-bold text-navy-900">Så här granskar du transaktioner</p>
+                <p className="font-bold text-white">Så här granskar du transaktioner</p>
                 <button
                   onClick={() => setShowTooltip(false)}
-                  className="text-[#173b57] hover:opacity-80 p-1"
+                  className="text-white hover:opacity-80 p-1"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -522,7 +522,7 @@ export default function ReviewTransactionsPage() {
               <div className={`p-4 ${!hasSeparateAccount ? 'pt-8' : ''}`}>
                 <div className="relative">
                   {/* The example transaction row */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="bg-[#173b57]/30 border border-[#173b57]/50 rounded-lg p-3">
                     <div className="flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -551,7 +551,7 @@ export default function ReviewTransactionsPage() {
                     {/* Action buttons row */}
                     <div className="flex flex-wrap items-center gap-3 mt-2 pt-2 border-t border-gray-200">
                       <div className="relative">
-                        <button className="text-xs text-slate-400 flex items-center gap-1.5">
+                        <button className="text-xs text-slate-300 flex items-center gap-1.5">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
@@ -567,7 +567,7 @@ export default function ReviewTransactionsPage() {
                       <span className="text-gray-300">|</span>
 
                       <div className="relative">
-                        <button className="px-3 py-1 text-xs font-medium rounded border bg-transparent border-gray-200 text-slate-400">
+                        <button className="px-3 py-1 text-xs font-medium rounded border bg-transparent border-[#173b57]/50 text-slate-400">
                           EU-transaktion
                         </button>
                         {/* Arrow pointing to EU */}
@@ -580,7 +580,7 @@ export default function ReviewTransactionsPage() {
                       {/* Privat button - only show when user has separate account */}
                       {hasSeparateAccount && (
                         <div className="relative">
-                          <button className="px-3 py-1 text-xs font-medium rounded border bg-transparent border-gray-200 text-slate-400">
+                          <button className="px-3 py-1 text-xs font-medium rounded border bg-transparent border-[#173b57]/50 text-slate-400">
                             Privat
                           </button>
                           {/* Arrow pointing to Privat */}
@@ -611,8 +611,8 @@ export default function ReviewTransactionsPage() {
           )}
 
           {/* Grouped Transactions List */}
-          <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden mb-6">
-            <div className="p-4 border-b border-gray-200">
+          <div className="bg-[#0d2235] border border-[#173b57]/50 rounded-xl overflow-hidden mb-6">
+            <div className="p-4 border-b border-[#173b57]/50">
               <h3 className="text-lg font-bold text-white">
                 Transaktioner ({transactions.length} st i {sortedGroups.length} grupper)
               </h3>
@@ -652,20 +652,20 @@ export default function ReviewTransactionsPage() {
                 };
 
                 return (
-                  <div key={groupName} className="border-b border-gray-200 last:border-b-0">
+                  <div key={groupName} className="border-b border-[#173b57]/30 last:border-b-0">
                     {/* Group Header */}
                     <div className={`${shouldDim ? 'opacity-60' : ''}`}>
                       <div className="flex items-center">
                         <button
                           onClick={() => hasMultiple && toggleGroup(groupName)}
-                          className={`flex-1 p-3 sm:p-4 flex items-center gap-3 hover:bg-gray-100/30 transition-colors ${
+                          className={`flex-1 p-3 sm:p-4 flex items-center gap-3 hover:bg-[#173b57]/20 transition-colors ${
                             hasMultiple ? 'cursor-pointer' : 'cursor-default'
                           }`}
                         >
                           <div className="flex items-center gap-3 flex-1 min-w-0">
                             {hasMultiple && (
-                              <div className={`flex-shrink-0 w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                                <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <div className={`flex-shrink-0 w-6 h-6 rounded-full bg-[#173b57]/60 flex items-center justify-center transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                                <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                               </div>
@@ -673,7 +673,7 @@ export default function ReviewTransactionsPage() {
                             <div className="flex-1 min-w-0 text-left">
                               <div className="flex items-center gap-2 mb-1">
                                 {hasMultiple && (
-                                  <span className="px-2 py-0.5 bg-gray-200 text-slate-600 text-xs rounded-full font-medium">
+                                  <span className="px-2 py-0.5 bg-[#173b57]/60 text-slate-300 text-xs rounded-full font-medium">
                                     {groupTransactions.length} st
                                   </span>
                                 )}
@@ -720,7 +720,7 @@ export default function ReviewTransactionsPage() {
                             className={`flex-shrink-0 mr-3 sm:mr-4 w-10 h-10 sm:w-12 sm:h-12 rounded-lg border-2 flex items-center justify-center transition-all ${
                               allBusiness
                                 ? 'bg-green-500 border-green-500 text-white'
-                                : 'bg-gray-100 border-gray-300 text-slate-400 hover:border-green-500/50'
+                                : 'bg-[#173b57]/30 border-[#173b57]/50 text-slate-400 hover:border-green-500/50'
                             }`}
                             title={allBusiness ? 'Ta bort från företag' : 'Markera som företag'}
                           >
@@ -747,7 +747,7 @@ export default function ReviewTransactionsPage() {
                                 value={groupNoteText}
                                 onChange={(e) => setGroupNoteText(e.target.value)}
                                 placeholder="Skriv anteckning för hela gruppen..."
-                                className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-slate-900 text-sm placeholder-gray-400 focus:outline-none focus:border-[#173b57]"
+                                className="flex-1 px-3 py-2 bg-[#0d2235] border border-[#173b57]/50 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-[#173b57]"
                                 autoFocus
                               />
                               <button
@@ -761,7 +761,7 @@ export default function ReviewTransactionsPage() {
                                   setEditingGroupName(null);
                                   setGroupNoteText('');
                                 }}
-                                className="px-4 py-2 bg-gray-100 hover:bg-gray-50 text-slate-600 rounded-lg text-sm transition-colors"
+                                className="px-4 py-2 bg-[#173b57]/30 hover:bg-[#173b57]/50 text-slate-300 rounded-lg text-sm transition-colors"
                               >
                                 Avbryt
                               </button>
@@ -787,15 +787,15 @@ export default function ReviewTransactionsPage() {
 
                     {/* Expanded Transactions */}
                     {(isExpanded || !hasMultiple) && (
-                      <div className={`${hasMultiple ? 'bg-gray-100/50 border-t border-gray-200' : ''}`}>
+                      <div className={`${hasMultiple ? 'bg-[#173b57]/10 border-t border-[#173b57]/30' : ''}`}>
                         {groupTransactions.map((transaction, idx) => (
                           <div
                             key={transaction.id}
-                            className={`${hasMultiple ? 'ml-4 sm:ml-8 border-l-2 border-gray-200' : ''} ${
+                            className={`${hasMultiple ? 'ml-4 sm:ml-8 border-l-2 border-[#173b57]/40' : ''} ${
                               (hasSeparateAccount && transaction.is_private) || (!hasSeparateAccount && !transaction.is_business) ? 'opacity-50' : ''
                             }`}
                           >
-                            <div className="p-3 sm:p-4 hover:bg-gray-100/20 transition-colors">
+                            <div className="p-3 sm:p-4 hover:bg-[#173b57]/15 transition-colors">
                               <div className="flex items-center gap-3">
                                 <div className="flex-1 min-w-0">
                                   {/* Only show date/badges row for grouped transactions (single transactions show date in header) */}
@@ -852,7 +852,7 @@ export default function ReviewTransactionsPage() {
                                     className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg border-2 flex items-center justify-center transition-all ${
                                       transaction.is_business
                                         ? 'bg-green-500 border-green-500 text-white'
-                                        : 'bg-gray-100 border-gray-300 text-slate-400 hover:border-green-500/50'
+                                        : 'bg-[#173b57]/30 border-[#173b57]/50 text-slate-400 hover:border-green-500/50'
                                     }`}
                                     title={transaction.is_business ? 'Ta bort från företag' : 'Markera som företag'}
                                   >
@@ -866,7 +866,7 @@ export default function ReviewTransactionsPage() {
                               </div>
 
                               {/* Action buttons - less spacing for single transactions */}
-                              <div className={`flex flex-wrap items-center gap-3 ${hasMultiple ? 'mt-3 pt-3 border-t border-gray-200' : 'mt-1'}`}>
+                              <div className={`flex flex-wrap items-center gap-3 ${hasMultiple ? 'mt-3 pt-3 border-t border-[#173b57]/30' : 'mt-1'}`}>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -894,7 +894,7 @@ export default function ReviewTransactionsPage() {
                                     className={`px-3 py-1 text-xs font-medium rounded border transition-all ${
                                       transaction.is_eu_transaction
                                         ? 'bg-blue-500/10 border-blue-500/50 text-blue-400'
-                                        : 'bg-transparent border-gray-200 text-slate-400 hover:border-slate-400 hover:text-slate-500'
+                                        : 'bg-transparent border-[#173b57]/50 text-slate-400 hover:border-slate-400 hover:text-slate-300'
                                     }`}
                                   >
                                     {transaction.is_eu_transaction && (
@@ -916,7 +916,7 @@ export default function ReviewTransactionsPage() {
                                       className={`px-3 py-1 text-xs font-medium rounded border transition-all ${
                                         transaction.is_private
                                           ? 'bg-purple-500/10 border-purple-500/50 text-purple-400'
-                                          : 'bg-transparent border-gray-200 text-slate-400 hover:border-slate-400 hover:text-slate-500'
+                                          : 'bg-transparent border-[#173b57]/50 text-slate-400 hover:border-slate-400 hover:text-slate-300'
                                       }`}
                                     >
                                       {transaction.is_private && (
@@ -938,7 +938,7 @@ export default function ReviewTransactionsPage() {
                                     value={noteText}
                                     onChange={(e) => setNoteText(e.target.value)}
                                     placeholder="Skriv en anteckning..."
-                                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-slate-900 text-sm placeholder-gray-400 focus:outline-none focus:border-[#173b57]"
+                                    className="flex-1 px-3 py-2 bg-[#0d2235] border border-[#173b57]/50 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-[#173b57]"
                                     autoFocus
                                   />
                                   <button
@@ -952,7 +952,7 @@ export default function ReviewTransactionsPage() {
                                       setEditingId(null);
                                       setNoteText('');
                                     }}
-                                    className="px-4 py-2 bg-gray-100 hover:bg-gray-50 text-slate-600 rounded-lg text-sm transition-colors"
+                                    className="px-4 py-2 bg-[#173b57]/30 hover:bg-[#173b57]/50 text-slate-300 rounded-lg text-sm transition-colors"
                                   >
                                     Avbryt
                                   </button>
@@ -986,11 +986,11 @@ export default function ReviewTransactionsPage() {
                 </div>
                 <div>
                   <h3 className="text-green-400 font-semibold mb-2">Klicka i rutan för företagstransaktioner</h3>
-                  <p className="text-slate-600 text-sm mb-3">
+                  <p className="text-slate-400 text-sm mb-3">
                     Eftersom du inte har ett separat företagskonto behöver du markera vilka transaktioner som tillhör din enskilda firma.
                     Klicka på den gröna rutan till höger om varje transaktion för att välja.
                   </p>
-                  <div className="text-slate-600 text-sm space-y-1.5">
+                  <div className="text-slate-400 text-sm space-y-1.5">
                     <p className="flex items-center gap-2">
                       <span className="inline-flex w-5 h-5 bg-green-500 rounded items-center justify-center">
                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1000,7 +1000,7 @@ export default function ReviewTransactionsPage() {
                       <span>= Tillhör verksamheten (ingår i bokföringen)</span>
                     </p>
                     <p className="flex items-center gap-2">
-                      <span className="inline-flex w-5 h-5 bg-gray-100 border border-gray-300 rounded"></span>
+                      <span className="inline-flex w-5 h-5 bg-[#173b57]/30 border border-[#173b57]/50 rounded"></span>
                       <span>= Privat transaktion (ingår inte)</span>
                     </p>
                   </div>
@@ -1008,16 +1008,16 @@ export default function ReviewTransactionsPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 sm:p-6 mb-6">
+            <div className="bg-[#0d2235] border border-[#173b57]/40 rounded-xl p-4 sm:p-6 mb-6">
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-8 h-8 bg-[#173b57]/10 rounded-lg flex items-center justify-center">
+                <div className="flex-shrink-0 w-8 h-8 bg-[#173b57]/40 rounded-lg flex items-center justify-center">
                   <svg className="w-4 h-4 text-[#E95C63]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div>
                   <h3 className="text-white font-semibold mb-2">Tips för granskning</h3>
-                  <div className="text-slate-600 text-sm space-y-1.5">
+                  <div className="text-slate-400 text-sm space-y-1.5">
                     <p><span className="text-purple-400 font-medium">Privat</span> – Markera transaktioner som inte ska ingå i bokföringen</p>
                     <p><span className="text-blue-400 font-medium">EU-transaktion</span> – Markera köp från andra EU-länder för korrekt momshantering</p>
                     <p><span className="text-[#E95C63] font-medium">Anteckningar</span> – Lägg till förklaringar för oklara transaktioner</p>
@@ -1030,7 +1030,7 @@ export default function ReviewTransactionsPage() {
       )}
 
       {/* Navigation */}
-      <div className="flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-6 border-t border-gray-200">
+      <div className="flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-6 border-t border-[#173b57]/30">
         <button
           onClick={() => router.push(`/flow/${packageType}/upload-statement?bank=${bankId}`)}
           className="text-slate-600 hover:text-white font-semibold transition-colors flex items-center justify-center sm:justify-start py-3 sm:py-0"

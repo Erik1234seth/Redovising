@@ -6,7 +6,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, phone, packageType } = await request.json();
+    const { email, phone, name, packageType } = await request.json();
 
     if (!email) {
       return NextResponse.json({ error: 'Email saknas' }, { status: 400 });
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
-    await supabase.from('contact_requests').insert({ email, phone: phone || null, package_type: packageType });
+    await supabase.from('contact_requests').insert({ email, phone: phone || null, name: name || null, package_type: packageType });
 
     await resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       html: `
         <h2>Ny kontaktförfrågan</h2>
         <p><strong>Paket:</strong> ${packageName}</p>
+        <p><strong>Namn:</strong> ${name || '—'}</p>
         <p><strong>Email:</strong> ${email}</p>
         <p><strong>Telefon:</strong> ${phone || '—'}</p>
         <p>Kunden vill bli kontaktad via mail.</p>
