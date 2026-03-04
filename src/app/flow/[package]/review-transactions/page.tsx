@@ -441,7 +441,7 @@ export default function ReviewTransactionsPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowNoBusinessWarning(false)}
-                className="flex-1 px-6 py-3 "bg-[#173b57]""
+                className="flex-1 px-6 py-3 rounded-xl font-bold text-white transition-all" style={{ backgroundColor: '#173b57' }}
               >
                 Gå tillbaka
               </button>
@@ -747,7 +747,7 @@ export default function ReviewTransactionsPage() {
                                 value={groupNoteText}
                                 onChange={(e) => setGroupNoteText(e.target.value)}
                                 placeholder="Skriv anteckning för hela gruppen..."
-                                className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:border-[#173b57]"
+                                className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-slate-900 text-sm placeholder-gray-400 focus:outline-none focus:border-[#173b57]"
                                 autoFocus
                               />
                               <button
@@ -938,7 +938,7 @@ export default function ReviewTransactionsPage() {
                                     value={noteText}
                                     onChange={(e) => setNoteText(e.target.value)}
                                     placeholder="Skriv en anteckning..."
-                                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:border-[#173b57]"
+                                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-slate-900 text-sm placeholder-gray-400 focus:outline-none focus:border-[#173b57]"
                                     autoFocus
                                   />
                                   <button
