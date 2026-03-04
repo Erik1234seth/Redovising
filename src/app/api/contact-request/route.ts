@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
         <html lang="sv">
         <head><meta charset="UTF-8"></head>
         <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+          <span style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Vi hör av oss inom kort med hjälp för ditt bokslut 📋</span>
           <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:40px 16px;">
             <tr><td align="center">
               <table width="100%" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
