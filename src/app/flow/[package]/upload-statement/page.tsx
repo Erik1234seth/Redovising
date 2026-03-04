@@ -8,6 +8,8 @@ import { Bank } from '@/types';
 import { uploadFile, generateOrderId } from '@/lib/uploadFile';
 import { useAuth } from '@/contexts/AuthContext';
 
+const NAV_BG = '#173b57';
+
 export default function UploadStatementPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -22,7 +24,6 @@ export default function UploadStatementPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string>('');
   const [orderId, setOrderId] = useState<string>('');
-  // Total steps: 9 for all, except ne-bilaga first year = 8
   const [totalSteps, setTotalSteps] = useState(9);
 
   useEffect(() => {
@@ -55,7 +56,6 @@ export default function UploadStatementPage() {
   }, []);
 
   const handleFileUpload = async (file: File) => {
-    // Validate file type based on bank
     const fileName = file.name.toLowerCase();
     const isCSV = fileName.endsWith('.csv');
     const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
@@ -75,20 +75,12 @@ export default function UploadStatementPage() {
     setUploading(true);
 
     try {
-      const result = await uploadFile(
-        file,
-        orderId,
-        'statement',
-        user?.id || null,
-        null, // Guest email (not available yet on this page)
-        null  // Guest name (not available yet on this page)
-      );
+      const result = await uploadFile(file, orderId, 'statement', user?.id || null, null, null);
 
       if (result.error) {
         setUploadError(result.error);
         setSelectedFile(null);
       } else {
-        // Store file info in sessionStorage
         sessionStorage.setItem('statementFileUrl', result.url);
         sessionStorage.setItem('statementFilePath', result.path);
         if (result.fileId) {
@@ -105,19 +97,14 @@ export default function UploadStatementPage() {
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && orderId) {
-      handleFileUpload(file);
-    }
+    if (file && orderId) handleFileUpload(file);
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setIsDragging(false);
-
     const file = event.dataTransfer.files?.[0];
-    if (file && orderId) {
-      handleFileUpload(file);
-    }
+    if (file && orderId) handleFileUpload(file);
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
@@ -125,15 +112,23 @@ export default function UploadStatementPage() {
     setIsDragging(true);
   };
 
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
+  const handleDragLeave = () => setIsDragging(false);
 
   const handleContinue = () => {
     if (selectedFile && !uploading) {
       router.push(`/flow/${packageType}/review-transactions?bank=${bankId}`);
     }
   };
+
+  const uploadZoneClass = isDragging
+    ? 'border-2 border-dashed rounded-xl p-6 sm:p-12 text-center transition-all duration-200 scale-[1.02]'
+    : 'border-2 border-dashed rounded-xl p-6 sm:p-12 text-center transition-all duration-200';
+
+  const uploadZoneStyle = isDragging
+    ? { borderColor: NAV_BG, backgroundColor: `${NAV_BG}08` }
+    : selectedFile
+    ? { borderColor: `${NAV_BG}50`, backgroundColor: `${NAV_BG}05` }
+    : { borderColor: '#e5e7eb', backgroundColor: '#ffffff' };
 
   return (
     <FlowContainer
@@ -147,93 +142,54 @@ export default function UploadStatementPage() {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        className={`border-2 border-dashed rounded-xl p-6 sm:p-12 text-center transition-all duration-200 ${
-          isDragging
-            ? 'border-gold-500 bg-gold-500/10 scale-[1.02]'
-            : selectedFile
-            ? 'border-gold-500/50 bg-gold-500/5'
-            : 'border-navy-600 bg-navy-800/30 hover:border-gold-500/30 hover:bg-navy-800/50'
-        }`}
+        className={uploadZoneClass}
+        style={uploadZoneStyle}
       >
         {uploading ? (
           <div>
-            <div className="w-20 h-20 bg-gold-500/20 border-2 border-gold-500 rounded-xl flex items-center justify-center mx-auto mb-6 animate-pulse">
-              <svg
-                className="w-10 h-10 text-gold-500 animate-spin"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
+            <div className="w-20 h-20 rounded-xl flex items-center justify-center mx-auto mb-6 animate-pulse border-2"
+              style={{ backgroundColor: `${NAV_BG}15`, borderColor: NAV_BG }}>
+              <svg className="w-10 h-10 animate-spin" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">
-              Laddar upp fil...
-            </h3>
-            <p className="text-warm-300">Vänta medan filen laddas upp</p>
+            <h3 className="text-xl font-bold mb-2" style={{ color: NAV_BG }}>Laddar upp fil...</h3>
+            <p className="text-slate-500">Vänta medan filen laddas upp</p>
           </div>
         ) : selectedFile ? (
           <div>
-            <div className="w-20 h-20 bg-gold-500/20 border-2 border-gold-500 rounded-xl flex items-center justify-center mx-auto mb-6">
-              <svg
-                className="w-10 h-10 text-gold-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
+            <div className="w-20 h-20 rounded-xl flex items-center justify-center mx-auto mb-6 border-2"
+              style={{ backgroundColor: `${NAV_BG}15`, borderColor: NAV_BG }}>
+              <svg className="w-10 h-10" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">
-              Fil uppladdad!
-            </h3>
-            <p className="text-warm-300 mb-4 font-medium">{selectedFile.name}</p>
-            <p className="text-sm text-warm-400 mb-4">
-              {(selectedFile.size / 1024).toFixed(2)} KB
-            </p>
+            <h3 className="text-xl font-bold mb-2" style={{ color: NAV_BG }}>Fil uppladdad!</h3>
+            <p className="text-slate-600 mb-4 font-medium">{selectedFile.name}</p>
+            <p className="text-sm text-slate-400 mb-4">{(selectedFile.size / 1024).toFixed(2)} KB</p>
             <button
               onClick={() => {
                 setSelectedFile(null);
                 sessionStorage.removeItem('statementFileUrl');
                 sessionStorage.removeItem('statementFilePath');
               }}
-              className="text-gold-500 hover:text-gold-400 font-semibold transition-colors"
+              className="font-semibold transition-colors hover:opacity-80"
+              style={{ color: NAV_BG }}
             >
               Välj en annan fil
             </button>
           </div>
         ) : (
           <div>
-            <div className="w-20 h-20 bg-navy-700 border-2 border-navy-600 rounded-xl flex items-center justify-center mx-auto mb-6">
-              <svg
-                className="w-10 h-10 text-warm-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
+            <div className="w-20 h-20 bg-gray-100 border-2 border-gray-200 rounded-xl flex items-center justify-center mx-auto mb-6">
+              <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">
-              Dra och släpp din fil här
-            </h3>
-            <p className="text-warm-400 mb-6">eller</p>
-            <label className="inline-block px-8 py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-xl font-bold cursor-pointer transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105">
+            <h3 className="text-xl font-bold mb-2" style={{ color: NAV_BG }}>Dra och släpp din fil här</h3>
+            <p className="text-slate-400 mb-6">eller</p>
+            <label className="inline-block px-8 py-3 text-white rounded-xl font-bold cursor-pointer transition-all duration-200 hover:opacity-90"
+              style={{ backgroundColor: NAV_BG }}>
               Välj fil från dator
               <input
                 type="file"
@@ -242,41 +198,37 @@ export default function UploadStatementPage() {
                 className="hidden"
               />
             </label>
-            <p className="text-sm text-warm-500 mt-6">
-              {bankId === 'nordea'
-                ? 'Godkänt filformat: CSV (.csv)'
-                : 'Godkända filformat: Excel (.xlsx, .xls)'}
+            <p className="text-sm text-slate-400 mt-6">
+              {bankId === 'nordea' ? 'Godkänt filformat: CSV (.csv)' : 'Godkända filformat: Excel (.xlsx, .xls)'}
             </p>
           </div>
         )}
       </div>
 
       {uploadError && (
-        <div className="mt-6 bg-red-500/10 border border-red-500/50 rounded-xl p-4">
+        <div className="mt-6 bg-red-50 border border-red-200 rounded-xl p-4">
           <div className="flex items-start">
             <svg className="w-5 h-5 text-red-400 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <div>
-              <h4 className="font-semibold text-red-400 mb-1">Uppladdning misslyckades</h4>
-              <p className="text-sm text-red-300">{uploadError}</p>
+              <h4 className="font-semibold text-red-500 mb-1">Uppladdning misslyckades</h4>
+              <p className="text-sm text-red-400">{uploadError}</p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="mt-8 bg-navy-800/50 border border-navy-600 rounded-xl p-6">
+      <div className="mt-8 bg-gray-50 border border-gray-200 rounded-xl p-6">
         <div className="flex items-start">
-          <div className="flex-shrink-0 w-10 h-10 bg-gold-500/10 rounded-lg flex items-center justify-center mr-4">
-            <svg className="w-5 h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center mr-4" style={{ backgroundColor: `${NAV_BG}10` }}>
+            <svg className="w-5 h-5" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
           <div>
-            <h3 className="font-bold text-white mb-2">
-              Säkerhet och integritet
-            </h3>
-            <p className="text-sm text-warm-300">
+            <h3 className="font-bold mb-2" style={{ color: NAV_BG }}>Säkerhet och integritet</h3>
+            <p className="text-sm text-slate-600">
               Dina filer krypteras och hanteras säkert enligt GDPR. Vi använder endast
               informationen för att upprätta din NE-bilaga och raderar all data efter
               att tjänsten är slutförd.
@@ -285,10 +237,10 @@ export default function UploadStatementPage() {
         </div>
       </div>
 
-      <div className="flex justify-between items-center pt-6 border-t border-navy-600 mt-8">
+      <div className="flex justify-between items-center pt-6 border-t border-gray-200 mt-8">
         <button
           onClick={() => router.back()}
-          className="text-warm-300 hover:text-white font-semibold transition-colors flex items-center"
+          className="text-slate-500 hover:text-slate-800 font-semibold transition-colors flex items-center"
         >
           <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -299,7 +251,7 @@ export default function UploadStatementPage() {
           {!selectedFile && !uploading && (
             <button
               onClick={() => router.push(`/flow/${packageType}/add-transactions?bank=${bankId}`)}
-              className="text-warm-400 hover:text-white font-semibold transition-colors"
+              className="text-slate-400 hover:text-slate-700 font-semibold transition-colors"
             >
               Hoppa över
             </button>
@@ -307,11 +259,10 @@ export default function UploadStatementPage() {
           <button
             onClick={handleContinue}
             disabled={!selectedFile || uploading}
-            className={`px-8 py-3 rounded-xl font-bold transition-all duration-200 ${
-              selectedFile && !uploading
-                ? 'bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105'
-                : 'bg-navy-600 text-navy-400 cursor-not-allowed'
-            }`}
+            className="px-8 py-3 rounded-xl font-bold transition-all duration-200 text-white"
+            style={selectedFile && !uploading
+              ? { backgroundColor: NAV_BG }
+              : { backgroundColor: '#d1d5db', color: '#9ca3af', cursor: 'not-allowed' }}
           >
             {uploading ? 'Laddar upp...' : 'Fortsätt →'}
           </button>
