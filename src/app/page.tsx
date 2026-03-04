@@ -161,7 +161,7 @@ export default function Home() {
       {/* ══════════════════════════════════════════
           TRUST BELT
       ══════════════════════════════════════════ */}
-      <section className="mt-16 sm:mt-20" style={{ backgroundColor: NAV_BG }}>
+      <section className="hidden lg:block mt-20" style={{ backgroundColor: NAV_BG }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4">
             {[
@@ -200,23 +200,23 @@ export default function Home() {
             ].map((item, i) => (
               <div
                 key={item.title}
-                className="flex items-start gap-4 px-8 py-8 lg:py-10"
+                className="flex items-center gap-3 px-4 py-4 lg:items-start lg:gap-4 lg:px-8 lg:py-10"
                 style={{
-                  borderRight: i < 3 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                  borderRight: i % 2 === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
                   borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.08)' : 'none',
                 }}
               >
                 <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                  className="w-7 h-7 lg:w-9 lg:h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: CORAL }}
                 >
-                  <svg className="w-4.5 h-4.5 text-white w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 lg:w-[18px] lg:h-[18px] text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {item.icon}
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-white mb-1">{item.title}</p>
-                  <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>{item.desc}</p>
+                  <p className="text-xs lg:text-sm font-bold text-white mb-0.5 lg:mb-1">{item.title}</p>
+                  <p className="hidden lg:block text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>{item.desc}</p>
                 </div>
               </div>
             ))}
