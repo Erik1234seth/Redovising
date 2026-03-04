@@ -129,15 +129,15 @@ export default function Home() {
                 </div>
 
                 {/* Floating badge – bottom left */}
-                <div className="absolute -bottom-4 -left-4 lg:bottom-8 lg:-left-8 bg-white rounded-2xl shadow-xl p-4 flex items-center gap-3 border border-gray-100">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${NAV_BG}12` }}>
-                    <svg className="w-5 h-5" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="absolute -bottom-4 -left-4 lg:bottom-8 lg:-left-8 bg-white rounded-2xl shadow-xl p-4 lg:p-5 flex items-center gap-3 lg:gap-4 border border-gray-100">
+                  <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${NAV_BG}12` }}>
+                    <svg className="w-5 h-5 lg:w-6 lg:h-6" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
                   <div>
-                    <p className="text-xs font-bold" style={{ color: NAV_BG }}>Från 1 999 kr</p>
-                    <p className="text-[11px] text-slate-400">Fast pris, inga dolda avgifter</p>
+                    <p className="text-xs lg:text-sm font-bold" style={{ color: NAV_BG }}>Från 1 999 kr</p>
+                    <p className="text-[11px] lg:text-xs text-slate-400">Fast pris, inga dolda avgifter</p>
                   </div>
                 </div>
 
