@@ -101,7 +101,7 @@ export default function Home() {
               <div className="flex items-center gap-5 lg:gap-7 mt-8 justify-center lg:justify-start">
                 {[
                   { value: 'Fast pris', label: 'inga timarvoden' },
-                  { value: '< 5 dagar', label: 'leveranstid' },
+                  { value: 'Trygg', label: 'bokföring' },
                   { value: '100%', label: 'fokus på enskilda firmor' },
                 ].map(({ value, label }) => (
                   <div key={label} className="text-center lg:text-left">
