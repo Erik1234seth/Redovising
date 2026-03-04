@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Script from "next/script";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "700", "800"], variable: "--font-plus-jakarta" });
 
 export const metadata: Metadata = {
   title: "Enkla Bokslut - Årsredovisning & Bokslut för Enskild Firma | NE-bilaga",
@@ -84,7 +88,7 @@ export default function RootLayout({
           gtag('config', 'G-8XZDRG1PSH');
         `}</Script>
       </head>
-      <body>
+      <body className={`${inter.variable} ${plusJakarta.variable} ${plusJakarta.className}`}>
         <AuthProvider>
           <Navigation />
           <main className="min-h-screen">

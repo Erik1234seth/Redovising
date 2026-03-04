@@ -11,16 +11,16 @@ const config: Config = {
       colors: {
         // Mörkblå - Huvudfärg
         navy: {
-          50: '#f0f3f7',
-          100: '#dce3ec',
-          200: '#b8c7d9',
-          300: '#94abc6',
-          400: '#4d6d8f',
-          500: '#3a5270',
-          600: '#2e4159',
-          700: '#273749',
-          800: '#1f2a37', // Basfärg
-          900: '#151d26',
+          50: '#f0f4f9',
+          100: '#dde6f3',
+          200: '#bacde7',
+          300: '#8fb0d7',
+          400: '#5a8ec4',
+          500: '#3a6fa6',
+          600: '#2d5585',
+          700: '#253a5e', // Hero-bakgrund (likt Ludvig)
+          800: '#1b2d4f', // Knappar – tydligt blå, inte svart
+          900: '#101c36',
         },
         // Ljus varm grå - Sekundär
         warm: {

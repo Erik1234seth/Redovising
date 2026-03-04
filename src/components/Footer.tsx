@@ -1,97 +1,92 @@
 import Link from 'next/link';
 
+const CORAL = '#E95C63';
+const NAV_BG = '#173b57';
+
 export default function Footer() {
   return (
-    <footer className="bg-navy-900 border-t border-navy-700">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <footer style={{ backgroundColor: NAV_BG }} className="border-t border-white/10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
+
+          {/* Brand */}
           <div>
-            <div className="mb-4">
-              <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gold-400 to-gold-600">
-                Enkla bokslut
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: CORAL }}>
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <span className="text-[18px] leading-none tracking-tight">
+                <span className="text-white/55 font-medium">Enkla </span>
+                <span className="text-white font-extrabold">Bokslut</span>
               </span>
             </div>
-            <p className="text-warm-400 text-sm leading-relaxed mb-4">
+            <p className="text-white/50 text-sm leading-relaxed mb-4">
               Specialister på redovisning för enskilda firmor.
-              Vi erbjuder låga priser genom att fokusera på det vi är bäst på.
+              Låga priser, professionellt resultat.
             </p>
             <a
               href="mailto:erik@enklabokslut.se"
-              className="inline-flex items-center text-gold-500 hover:text-gold-400 transition-colors text-sm group"
+              className="inline-flex items-center gap-2 text-sm font-medium text-white/60 hover:text-white transition-colors"
             >
-              <svg className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
               erik@enklabokslut.se
             </a>
           </div>
 
+          {/* Services */}
           <div>
-            <h3 className="text-lg font-bold text-white mb-4">Våra tjänster</h3>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5">Våra tjänster</h3>
             <ul className="space-y-3">
-              <li>
-                <Link href="/flow/ne-bilaga/bank-selection" className="text-warm-400 hover:text-gold-500 transition-colors text-sm flex items-center group">
-                  <span className="w-1.5 h-1.5 bg-gold-500 rounded-full mr-2 group-hover:w-2 transition-all"></span>
-                  NE-Bilaga - 1999kr
-                </Link>
-              </li>
-              <li>
-                <Link href="/flow/komplett/bank-selection" className="text-warm-400 hover:text-gold-500 transition-colors text-sm flex items-center group">
-                  <span className="w-1.5 h-1.5 bg-gold-500 rounded-full mr-2 group-hover:w-2 transition-all"></span>
-                  Komplett tjänst - 3499kr
-                </Link>
-              </li>
+              {[
+                { href: '/flow/ne-bilaga/qualification', label: 'NE-Bilaga', price: '1 999 kr' },
+                { href: '/flow/komplett/qualification', label: 'Komplett redovisning', price: '3 499 kr' },
+              ].map(({ href, label, price }) => (
+                <li key={href}>
+                  <Link href={href} className="group flex items-center justify-between text-sm text-white/55 hover:text-white transition-colors">
+                    <span className="flex items-center gap-2">
+                      <span className="w-1 h-1 rounded-full bg-white/30 group-hover:bg-white transition-colors" />
+                      {label}
+                    </span>
+                    <span className="text-white/35 group-hover:text-white/60 transition-colors">{price}</span>
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
+          {/* Quick links */}
           <div>
-            <h3 className="text-lg font-bold text-white mb-4">Snabblänkar</h3>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5">Snabblänkar</h3>
             <ul className="space-y-3">
-              <li>
-                <Link href="/tutorial" className="text-warm-400 hover:text-gold-500 transition-colors text-sm flex items-center group">
-                  <span className="w-1.5 h-1.5 bg-gold-500 rounded-full mr-2 group-hover:w-2 transition-all"></span>
-                  Guider
-                </Link>
-              </li>
-              <li>
-                <Link href="/om-oss" className="text-warm-400 hover:text-gold-500 transition-colors text-sm flex items-center group">
-                  <span className="w-1.5 h-1.5 bg-gold-500 rounded-full mr-2 group-hover:w-2 transition-all"></span>
-                  Om oss
-                </Link>
-              </li>
-              <li>
-                <Link href="/kontakt" className="text-warm-400 hover:text-gold-500 transition-colors text-sm flex items-center group">
-                  <span className="w-1.5 h-1.5 bg-gold-500 rounded-full mr-2 group-hover:w-2 transition-all"></span>
-                  Kontakt
-                </Link>
-              </li>
+              {[
+                { href: '/tutorial', label: 'Guider' },
+                { href: '/om-oss', label: 'Om oss' },
+                { href: '/kontakt', label: 'Kontakt' },
+              ].map(({ href, label }) => (
+                <li key={href}>
+                  <Link href={href} className="group flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
+                    <span className="w-1 h-1 rounded-full bg-white/30 group-hover:bg-white transition-colors" />
+                    {label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
 
-        <div className="border-t border-navy-700 pt-8">
-          <div className="bg-navy-800/50 border border-navy-700 rounded-xl p-6 mb-8">
-            <div className="flex items-start">
-              <div className="flex-shrink-0 w-10 h-10 bg-gold-500/10 rounded-lg flex items-center justify-center mr-4">
-                <svg className="w-5 h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-white font-semibold mb-2">Varför så låga priser?</h4>
-                <p className="text-warm-400 text-sm leading-relaxed">
-                  Vi kan erbjuda dessa priser eftersom enskilda firmor kan använda
-                  <span className="text-gold-500 font-semibold"> förenklad redovisning</span>, vilket gör processen mer effektiv.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center text-warm-500 text-sm">
-            <p>
-              © {new Date().getFullYear()} Enkla bokslut. Alla rättigheter förbehållna.
-            </p>
-          </div>
+        {/* Bottom bar */}
+        <div className="border-t border-white/10 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-white/35 text-xs">
+            © {new Date().getFullYear()} Enkla Bokslut. Alla rättigheter förbehållna.
+          </p>
+          <p className="text-white/35 text-xs">
+            Specialiserade på förenklad redovisning för enskilda firmor
+          </p>
         </div>
       </div>
     </footer>

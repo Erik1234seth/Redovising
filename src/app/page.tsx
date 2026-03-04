@@ -2,21 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { packages } from '@/data/packages';
 import { useAuth } from '@/contexts/AuthContext';
 
+const CORAL = '#E95C63';
+const NAV_BG = '#173b57';
+
 export default function Home() {
-  const { user, profile, isReturningCustomer, loading } = useAuth();
+  const { user, loading } = useAuth();
   const [showInfoPopup, setShowInfoPopup] = useState(false);
-  // Show popup for non-logged-in users after a short delay
+
   useEffect(() => {
     if (!loading && !user) {
-      // Check if user has already seen the popup this session
       const hasSeenPopup = sessionStorage.getItem('hasSeenInfoPopup');
       if (!hasSeenPopup) {
-        const timer = setTimeout(() => {
-          setShowInfoPopup(true);
-        }, 1500);
+        const timer = setTimeout(() => setShowInfoPopup(true), 1500);
         return () => clearTimeout(timer);
       }
     }
@@ -29,7 +30,6 @@ export default function Home() {
 
   return (
     <>
-      {/* Structured Data for SEO */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -37,375 +37,371 @@ export default function Home() {
             "@context": "https://schema.org",
             "@type": "ProfessionalService",
             "name": "Enkla Bokslut",
-            "description": "Professionell årsredovisning och bokslut för enskilda firmor. Vi hjälper enskilda näringsidkare med NE-bilaga och förenklat årsbokslut.",
+            "description": "Professionell årsredovisning och bokslut för enskilda firmor.",
             "url": "https://enklabokslut.se",
-            "logo": "https://enklabokslut.se/loggautantext.png",
-            "image": "https://enklabokslut.se/loggautantext.png",
             "priceRange": "1999 kr - 3499 kr",
-            "areaServed": {
-              "@type": "Country",
-              "name": "Sverige"
-            },
-            "serviceType": [
-              "Årsredovisning",
-              "Bokslut",
-              "NE-bilaga",
-              "Förenklat årsbokslut",
-              "Redovisning för enskild firma",
-              "Bokföring enskild näringsidkare"
-            ],
-            "hasOfferCatalog": {
-              "@type": "OfferCatalog",
-              "name": "Bokslut och Redovisningstjänster",
-              "itemListElement": [
-                {
-                  "@type": "Offer",
-                  "itemOffered": {
-                    "@type": "Service",
-                    "name": "NE-bilaga",
-                    "description": "Förenklat årsbokslut för enskilda firmor enligt K1-regelverket",
-                    "serviceType": "Årsredovisning"
-                  },
-                  "price": "1999",
-                  "priceCurrency": "SEK"
-                },
-                {
-                  "@type": "Offer",
-                  "itemOffered": {
-                    "@type": "Service",
-                    "name": "Komplett Redovisning",
-                    "description": "Fullständig redovisning och bokslut för enskilda firmor inklusive inlämning till Skatteverket",
-                    "serviceType": "Bokslut och Redovisning"
-                  },
-                  "price": "3499",
-                  "priceCurrency": "SEK"
-                }
-              ]
-            }
+            "areaServed": { "@type": "Country", "name": "Sverige" },
           })
         }}
       />
-      <div className="bg-navy-700">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        {/* Decorative elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-20 -right-20 sm:-top-40 sm:-right-40 w-40 h-40 sm:w-80 sm:h-80 bg-gold-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-40 -left-20 sm:top-60 sm:-left-40 w-48 h-48 sm:w-96 sm:h-96 bg-gold-500/5 rounded-full blur-3xl"></div>
-        </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-20 pb-16">
+      {/* ══════════════════════════════════════════
+          HERO
+      ══════════════════════════════════════════ */}
+      <section className="bg-white overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row items-center gap-0 lg:gap-16 min-h-[580px] py-16 lg:py-10">
 
-          {/* Split hero */}
-          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16 mb-14 sm:mb-20">
-
-            {/* Left: text */}
-            <div className="flex-1 lg:max-w-xl text-center lg:text-left">
-              <div className="inline-flex items-center px-3 sm:px-4 py-1.5 bg-gold-500/10 border border-gold-500/20 rounded-full mb-5 sm:mb-6">
-                <span className="text-gold-500 text-xs sm:text-sm font-semibold">
-                  Det som krävs. Inget mer.
-                </span>
+            {/* Left – text */}
+            <div className="flex-1 lg:max-w-[520px] text-center lg:text-left">
+              <div
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold mb-6"
+                style={{ backgroundColor: `${CORAL}15`, color: CORAL }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: CORAL }} />
+                Specialiserade på enskilda firmor
               </div>
 
-              <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-white mb-4 sm:mb-6 leading-tight">
-                Bokslut för
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-gold-400 to-gold-600">
-                  Enskilda Firmor
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-[1.1] mb-6" style={{ color: NAV_BG }}>
+                Bokslut gjort{' '}
+                <span className="relative inline-block">
+                  rätt
+                  <svg className="absolute -bottom-1 left-0 w-full" viewBox="0 0 120 8" fill="none" preserveAspectRatio="none">
+                    <path d="M2 6 Q60 2 118 6" stroke={CORAL} strokeWidth="3" strokeLinecap="round" fill="none" />
+                  </svg>
+                </span>
+                <br />
+                <span className="text-3xl sm:text-4xl md:text-5xl font-bold" style={{ color: '#64748b' }}>
+                  utan krångel
                 </span>
               </h1>
 
-              <p className="text-base sm:text-lg text-warm-300 mb-7 sm:mb-9 max-w-lg mx-auto lg:mx-0 leading-relaxed">
-                Bokföring och förenklat årsbokslut – utan onödiga moment,
-                utan dyra byråtimmar och utan krångel.
+              <p className="text-slate-500 text-base sm:text-lg leading-relaxed mb-8 max-w-md mx-auto lg:mx-0">
+                Förenklat årsbokslut och NE-bilaga för enskilda firmor –
+                fast pris, snabb leverans och ingen onödig byrå&shy;kostnad.
               </p>
 
-              <a
-                href="#packages"
-                className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl shadow-lg shadow-gold-500/20 hover:scale-[1.02] transition-all duration-200 text-sm sm:text-base"
-              >
-                Se våra paket
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                </svg>
-              </a>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+                <a
+                  href="#packages"
+                  className="px-7 py-3.5 font-bold text-white rounded-xl shadow-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.02] text-sm sm:text-base"
+                  style={{ backgroundColor: NAV_BG, boxShadow: `0 8px 24px ${NAV_BG}30` }}
+                >
+                  Se våra paket
+                </a>
+                <Link
+                  href="/om-oss"
+                  className="px-7 py-3.5 font-semibold text-slate-600 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm sm:text-base"
+                >
+                  Om oss
+                </Link>
+              </div>
+
+              {/* Mini trust signals */}
+              <div className="flex items-center gap-5 mt-8 justify-center lg:justify-start">
+                {[
+                  { value: 'Fast pris', label: 'inga timarvoden' },
+                  { value: '< 5 dagar', label: 'leveranstid' },
+                  { value: '100%', label: 'fokus på enskilda firmor' },
+                ].map(({ value, label }) => (
+                  <div key={label} className="text-center lg:text-left">
+                    <p className="text-sm font-extrabold" style={{ color: NAV_BG }}>{value}</p>
+                    <p className="text-xs text-slate-400">{label}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Right: card mockup */}
-            <div className="flex-1 w-full max-w-sm lg:max-w-none flex justify-center lg:justify-end">
-              <div className="relative w-full max-w-sm">
-                {/* Glow behind card */}
-                <div className="absolute -inset-4 bg-gold-500/5 rounded-3xl blur-2xl"></div>
+            {/* Right – photo with floating badge */}
+            <div className="flex-1 w-full lg:w-auto flex justify-center lg:justify-end relative mt-10 lg:mt-0 lg:self-stretch">
+              <div className="relative w-full max-w-lg lg:max-w-none lg:h-full lg:min-h-[580px]">
+                {/* Photo */}
+                <div className="relative w-full h-[340px] sm:h-[420px] lg:h-full lg:min-h-[580px] rounded-2xl lg:rounded-[32px] overflow-hidden">
+                  <Image
+                    src="/ChatGPT Image 4 mars 2026 09_04_31.png"
+                    alt="Glada småföretagare som fått hjälp med bokslut"
+                    fill
+                    className="object-cover object-center"
+                    priority
+                  />
+                  {/* Subtle gradient overlay at bottom */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                </div>
 
-                {/* Main card */}
-                <div className="relative bg-white/8 backdrop-blur-sm border border-white/15 rounded-2xl p-5 sm:p-6 shadow-2xl">
+                {/* Floating badge – bottom left */}
+                <div className="absolute -bottom-4 -left-4 lg:bottom-8 lg:-left-8 bg-white rounded-2xl shadow-xl p-4 flex items-center gap-3 border border-gray-100">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${NAV_BG}12` }}>
+                    <svg className="w-5 h-5" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold" style={{ color: NAV_BG }}>Från 1 999 kr</p>
+                    <p className="text-[11px] text-slate-400">Fast pris, inga dolda avgifter</p>
+                  </div>
+                </div>
 
-                  {/* Card header */}
-                  <div className="flex items-center justify-between mb-5">
-                    <div>
-                      <p className="text-xs text-warm-400 uppercase tracking-widest mb-0.5">Förenklat Bokslut</p>
-                      <h4 className="text-base font-bold text-white">NE-Bilaga 2024</h4>
-                    </div>
-                    <div className="w-9 h-9 rounded-full bg-gold-500/20 border border-gold-500/30 flex items-center justify-center">
-                      <svg className="w-4 h-4 text-gold-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                {/* Floating badge – top right */}
+                <div className="absolute -top-4 -right-4 lg:top-8 lg:-right-8 bg-white rounded-2xl shadow-xl p-3.5 border border-gray-100">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <svg key={i} className="w-3 h-3 text-amber-400 fill-amber-400" viewBox="0 0 24 24">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                       </svg>
-                    </div>
-                  </div>
-
-                  {/* Progress */}
-                  <div className="flex gap-1 mb-5">
-                    <div className="flex-1 h-1 bg-gold-500 rounded-full"></div>
-                    <div className="flex-1 h-1 bg-gold-500/60 rounded-full"></div>
-                    <div className="flex-1 h-1 bg-navy-400/40 rounded-full"></div>
-                  </div>
-
-                  {/* Rows */}
-                  <div className="space-y-0 mb-4">
-                    {[
-                      { label: 'Intäkter', value: '285 000 kr' },
-                      { label: 'Kostnader', value: '−142 500 kr' },
-                      { label: 'Avskrivningar', value: '−12 000 kr' },
-                    ].map((row) => (
-                      <div key={row.label} className="flex justify-between py-2.5 border-b border-navy-500/50">
-                        <span className="text-sm text-warm-400">{row.label}</span>
-                        <span className="text-sm font-medium text-warm-200">{row.value}</span>
-                      </div>
                     ))}
                   </div>
-
-                  {/* Result */}
-                  <div className="flex justify-between items-center p-3 bg-gold-500/10 border border-gold-500/20 rounded-xl">
-                    <span className="text-sm font-semibold text-white">Årets resultat</span>
-                    <span className="font-bold text-gold-400 text-base">130 500 kr</span>
-                  </div>
-
-                  {/* Status badge */}
-                  <div className="mt-4 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-                    <span className="text-xs text-warm-400">Klar för inlämning till Skatteverket</span>
-                  </div>
+                  <p className="text-[11px] font-semibold" style={{ color: NAV_BG }}>Nöjda kunder</p>
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Trust belt */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-14 sm:mb-20">
-            {[
-              {
-                icon: (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                ),
-                title: 'Enkla & moderna tjänster',
-                desc: 'Digital redovisning utan krångel – smidig från start till mål.',
-              },
-              {
-                icon: (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                ),
-                title: 'Fatta rätt beslut',
-                desc: 'Vi hjälper dig förstå din ekonomi och ta välgrundade beslut.',
-              },
-              {
-                icon: (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
-                ),
-                title: 'Hjälp när du behöver',
-                desc: 'Praktisk support genom hela processen – du är aldrig ensam.',
-              },
-              {
-                icon: (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 8l3 5m0 0l3-5m-3 5v4m-3-5h6m-6.5 3.5a7.5 7.5 0 1115 0" />
-                ),
-                title: 'Fast pris, inga överraskningar',
-                desc: 'Du vet exakt vad det kostar – inga dolda avgifter eller extra timmar.',
-              },
-            ].map((item) => (
-              <div key={item.title} className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-5">
-                <div className="w-9 h-9 bg-gold-500/10 border border-gold-500/20 rounded-lg flex items-center justify-center mb-3">
-                  <svg className="w-5 h-5 text-gold-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {item.icon}
-                  </svg>
-                </div>
-                <h3 className="text-sm font-semibold text-white mb-1 leading-snug">{item.title}</h3>
-                <p className="text-xs text-warm-300 leading-relaxed">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Packages Section */}
-          <div id="packages" className="grid md:grid-cols-2 gap-6 sm:gap-8 max-w-5xl mx-auto">
-            {packages.map((pkg, index) => (
-              <div
-                key={pkg.id}
-                className="group relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl sm:rounded-2xl overflow-hidden hover:border-gold-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-gold-500/10"
-              >
-                {/* Popular badge for komplett */}
-                {pkg.id === 'komplett' && (
-                  <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10">
-                    <span className="px-2 py-1 sm:px-3 bg-gold-500 text-navy-900 text-xs font-bold rounded-full">
-                      POPULÄRAST
-                    </span>
-                  </div>
-                )}
-
-                {/* Header with gradient */}
-                <div className="relative bg-white/5 p-6 sm:p-8 border-b border-white/10">
-                  <div className="absolute inset-0 bg-gradient-to-br from-gold-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
-                  <div className="relative">
-                    <h3 className="text-2xl sm:text-3xl font-bold text-white mb-2">{pkg.name}</h3>
-                    <p className="text-warm-300 text-sm sm:text-base mb-4 sm:mb-6">{pkg.description}</p>
-
-                    <div className="flex items-baseline">
-                      <span className="text-4xl sm:text-5xl font-bold text-gold-500">{pkg.price}</span>
-                      <span className="text-xl sm:text-2xl text-warm-400 ml-2">kr</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Features */}
-                <div className="p-6 sm:p-8">
-                  <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
-                    {pkg.features.map((feature, featureIndex) => (
-                      <li key={featureIndex} className="flex items-start">
-                        <div className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 bg-gold-500/20 rounded-full flex items-center justify-center mr-2 sm:mr-3 mt-0.5">
-                          <svg
-                            className="w-3 h-3 sm:w-4 sm:h-4 text-gold-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        </div>
-                        <span className="text-warm-200 text-sm sm:text-base leading-relaxed">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Link
-                    href={`/flow/${pkg.id}/${pkg.id === 'komplett' || pkg.id === 'ne-bilaga' ? 'qualification' : 'bank-selection'}`}
-                    className="block w-full bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 text-center font-bold py-3 sm:py-4 px-6 rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-[1.02] text-sm sm:text-base"
-                  >
-                    Välj {pkg.name} →
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-
         </div>
       </section>
 
-      {/* Trust Section */}
-      <section className="relative py-16 sm:py-24 bg-navy-800">
-        <div className="absolute inset-0 bg-gradient-to-b from-navy-700 to-navy-800"></div>
+      {/* ══════════════════════════════════════════
+          TRUST BELT
+      ══════════════════════════════════════════ */}
+      <section className="mt-16 sm:mt-20" style={{ backgroundColor: NAV_BG }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                icon: (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                ),
+                title: 'Enkelt & digitalt',
+                desc: 'Hela processen online – inga papper.',
+              },
+              {
+                icon: (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                ),
+                title: 'Bara enskilda firmor',
+                desc: 'En sak – gjord bättre än alla andra.',
+              },
+              {
+                icon: (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                ),
+                title: 'Support hela vägen',
+                desc: 'Vi svarar snabbt om du har frågor.',
+              },
+              {
+                icon: (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                ),
+                title: 'Fast pris alltid',
+                desc: 'Inga timarvoden. Du vet vad det kostar.',
+              },
+            ].map((item, i) => (
+              <div
+                key={item.title}
+                className="flex items-start gap-4 px-8 py-8 lg:py-10"
+                style={{
+                  borderRight: i < 3 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                  borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                }}
+              >
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{ backgroundColor: CORAL }}
+                >
+                  <svg className="w-4.5 h-4.5 text-white w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {item.icon}
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white mb-1">{item.title}</p>
+                  <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 sm:mb-6">
-              Varför välja oss?
+      {/* ══════════════════════════════════════════
+          PACKAGES
+      ══════════════════════════════════════════ */}
+      <section id="packages" className="py-20 sm:py-24 bg-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Priser</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold" style={{ color: NAV_BG }}>
+              Välj ditt paket
             </h2>
-            <div className="w-20 sm:w-24 h-1 bg-gradient-to-r from-gold-500 to-gold-600 mx-auto mb-4 sm:mb-6"></div>
-            <p className="text-base sm:text-xl text-warm-300 max-w-2xl mx-auto px-4">
-              Vi är specialister på enskilda firmor och vet exakt vad som krävs.
+            <p className="text-slate-500 mt-3 text-base max-w-md mx-auto">
+              Två tydliga alternativ. Fast pris. Inget krångel.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
+          <div className="grid md:grid-cols-2 gap-6 sm:gap-8 items-start">
+            {packages.map((pkg) => {
+              const isPopular = pkg.id === 'komplett';
+              return (
+                <div
+                  key={pkg.id}
+                  className="relative rounded-2xl overflow-hidden transition-all duration-300"
+                  style={isPopular
+                    ? { backgroundColor: NAV_BG, boxShadow: `0 20px 60px ${NAV_BG}40` }
+                    : { backgroundColor: 'white', border: '1px solid #e5e7eb', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }
+                  }
+                >
+                  {isPopular && (
+                    <div className="px-8 pt-5 pb-0 flex justify-end">
+                      <span
+                        className="px-3 py-1 text-xs font-bold rounded-full"
+                        style={{ backgroundColor: CORAL, color: 'white' }}
+                      >
+                        POPULÄRAST
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="p-7 sm:p-9">
+                    {/* Header */}
+                    <div className="mb-7 pb-7" style={{ borderBottom: `1px solid ${isPopular ? 'rgba(255,255,255,0.12)' : '#f1f5f9'}` }}>
+                      <h3 className={`text-xl font-bold mb-1 ${isPopular ? 'text-white' : ''}`} style={!isPopular ? { color: NAV_BG } : {}}>
+                        {pkg.name}
+                      </h3>
+                      <p className={`text-sm mb-5 ${isPopular ? 'text-white/60' : 'text-slate-400'}`}>
+                        {pkg.description}
+                      </p>
+                      <div className="flex items-end gap-1.5">
+                        <span className={`text-5xl font-extrabold ${isPopular ? 'text-white' : ''}`} style={!isPopular ? { color: NAV_BG } : {}}>
+                          {pkg.price.toLocaleString('sv')}
+                        </span>
+                        <span className={`text-xl mb-1 ${isPopular ? 'text-white/50' : 'text-slate-300'}`}>kr</span>
+                      </div>
+                    </div>
+
+                    {/* Features */}
+                    <ul className="space-y-3 mb-8">
+                      {pkg.features.map((feature) => (
+                        <li key={feature} className="flex items-start gap-3">
+                          <div
+                            className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                            style={{ backgroundColor: isPopular ? `${CORAL}30` : `${NAV_BG}12` }}
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                              style={{ color: isPopular ? CORAL : NAV_BG }}>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <span className={`text-sm leading-relaxed ${isPopular ? 'text-white/80' : 'text-slate-600'}`}>
+                            {feature}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* CTA */}
+                    <Link
+                      href={`/flow/${pkg.id}/${pkg.id === 'komplett' || pkg.id === 'ne-bilaga' ? 'qualification' : 'bank-selection'}`}
+                      className="block w-full text-center font-bold py-3.5 rounded-xl transition-all duration-200 hover:scale-[1.02] text-sm"
+                      style={isPopular
+                        ? { backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 20px ${CORAL}40` }
+                        : { backgroundColor: NAV_BG, color: 'white', boxShadow: `0 8px 20px ${NAV_BG}20` }
+                      }
+                    >
+                      Välj {pkg.name} →
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="text-center text-xs text-slate-400 mt-8">
+            Osäker på vilket paket som passar dig?{' '}
+            <Link href="/kontakt" className="font-semibold hover:underline" style={{ color: CORAL }}>
+              Kontakta oss
+            </Link>{' '}
+            – vi hjälper dig välja.
+          </p>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          WHY US
+      ══════════════════════════════════════════ */}
+      <section className="py-20 sm:py-24 bg-gray-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Varför vi</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold" style={{ color: NAV_BG }}>
+              Det vi lovar – och håller
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                icon: (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                  />
-                ),
+                icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />,
                 title: 'Säkert och pålitligt',
-                description: 'Dina uppgifter hanteras med högsta säkerhet och följer alla regelverk.'
+                desc: 'Dina uppgifter hanteras med högsta säkerhet och följer alla regelverk.'
               },
               {
-                icon: (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
-                ),
+                icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />,
                 title: 'Snabbt och enkelt',
-                description: 'Snabb leverans av din NE-bilaga. Enkla steg-för-steg instruktioner.'
+                desc: 'Snabb leverans av din NE-bilaga. Enkla steg-för-steg instruktioner.'
               },
               {
-                icon: (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                ),
+                icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
                 title: 'Bästa priset',
-                description: 'Genom att fokusera enbart på enskilda firmor kan vi hålla priserna låga.'
-              }
-            ].map((item, index) => (
+                desc: 'Fokus på enskilda firmor gör att vi kan hålla priserna låga utan att tumma på kvaliteten.'
+              },
+            ].map((item) => (
               <div
-                key={index}
-                className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl sm:rounded-2xl p-6 sm:p-8 hover:border-gold-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-gold-500/5"
+                key={item.title}
+                className="group bg-white rounded-2xl p-7 border border-gray-100 shadow-sm hover:shadow-md hover:border-navy-200 transition-all duration-200"
               >
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-gold-500/20 to-gold-600/10 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <svg
-                    className="w-6 h-6 sm:w-8 sm:h-8 text-gold-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-200"
+                  style={{ backgroundColor: `${NAV_BG}10` }}
+                >
+                  <svg className="w-6 h-6" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {item.icon}
                   </svg>
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-3 text-center">
-                  {item.title}
-                </h3>
-                <p className="text-warm-300 text-sm sm:text-base text-center leading-relaxed">
-                  {item.description}
-                </p>
+                <h3 className="font-bold text-base mb-2" style={{ color: NAV_BG }}>{item.title}</h3>
+                <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="relative py-16 sm:py-20 bg-gradient-to-br from-navy-700 to-navy-800">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-gold-500/20 to-transparent"></div>
+      {/* ══════════════════════════════════════════
+          CTA
+      ══════════════════════════════════════════ */}
+      <section className="py-20 relative overflow-hidden" style={{ backgroundColor: NAV_BG }}>
+        {/* Subtle background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-white -translate-y-1/2 translate-x-1/3" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full bg-white translate-y-1/2 -translate-x-1/3" />
         </div>
-
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 sm:mb-6">
+        <div className="relative max-w-3xl mx-auto px-4 text-center">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-4">
             Redo att komma igång?
           </h2>
-          <p className="text-base sm:text-xl text-warm-300 mb-6 sm:mb-8 px-4">
-            Välj ditt paket och kom igång direkt
+          <p className="text-white/60 text-base sm:text-lg mb-8 max-w-xl mx-auto">
+            Välj ditt paket och kom igång direkt. Snabbt, enkelt och till ett fast pris.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a
               href="#packages"
-              className="px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105 text-sm sm:text-base"
+              className="px-8 py-3.5 font-bold text-navy-900 bg-white hover:bg-gray-100 rounded-full shadow-lg transition-all duration-200 hover:scale-[1.02]"
             >
               Se våra paket
             </a>
             <Link
               href="/kontakt"
-              className="px-6 sm:px-8 py-3 sm:py-4 bg-white/5 hover:bg-white/10 border border-white/15 hover:border-gold-500/50 text-white font-bold rounded-lg sm:rounded-xl transition-all duration-200 text-sm sm:text-base"
+              className="px-8 py-3.5 font-semibold text-white rounded-full border border-white/20 hover:bg-white/10 transition-all duration-200"
             >
               Kontakta oss
             </Link>
@@ -413,106 +409,88 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Info Popup for New Visitors */}
+      {/* ══════════════════════════════════════════
+          INFO POPUP
+      ══════════════════════════════════════════ */}
       {showInfoPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 py-8 sm:py-4">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-navy-900/80 backdrop-blur-sm"
-            onClick={closePopup}
-          ></div>
-
-          {/* Modal */}
-          <div className="relative bg-navy-700 border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
-            {/* Close button */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closePopup} />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <button
               onClick={closePopup}
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-warm-400 hover:text-white transition-colors z-10"
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors z-10 rounded-full hover:bg-gray-100"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
 
             {/* Header */}
-            <div className="bg-gradient-to-br from-gold-500/10 to-gold-600/5 border-b border-white/10 p-4 sm:p-8">
-              <div className="w-10 h-10 sm:w-14 sm:h-14 bg-gold-500/20 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-4">
-                <svg className="w-5 h-5 sm:w-7 sm:h-7 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="rounded-t-2xl p-7 pb-5" style={{ backgroundColor: NAV_BG }}>
+              <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                 </svg>
               </div>
-              <h2 className="text-lg sm:text-2xl font-bold text-white text-center">
-                Välkommen hit!
-              </h2>
-              <p className="text-warm-300 text-center mt-1 sm:mt-2 text-sm sm:text-base">
-                Kul att du startat enskild firma - här är några tips
-              </p>
+              <h2 className="text-xl font-extrabold text-white text-center">Välkommen hit!</h2>
+              <p className="text-white/60 text-center mt-1 text-sm">Kul att du startat enskild firma – här är några tips</p>
             </div>
 
             {/* Content */}
-            <div className="p-4 sm:p-8 space-y-4 sm:space-y-5">
-              {/* Point 1 - Law requirement */}
-              <div className="flex gap-3 sm:gap-4">
-                <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-gold-500/20 rounded-full flex items-center justify-center">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="p-7 space-y-5">
+              <div className="flex gap-4">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: `${NAV_BG}10` }}>
+                  <svg className="w-4 h-4" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-sm sm:text-base">Det är lag på att redovisa</h3>
-                  <p className="text-xs sm:text-sm text-warm-300">
-                    Som enskild näringsidkare måste du enligt lag lämna in en NE-bilaga till Skatteverket varje år. Vi gör det enkelt!
+                  <h3 className="font-bold text-navy-900 text-sm">Det är lag på att redovisa</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Som enskild näringsidkare måste du lämna in en NE-bilaga till Skatteverket varje år. Vi gör det enkelt!
                   </p>
                 </div>
               </div>
 
-              {/* Point 2 - We have instructions */}
-              <div className="flex gap-3 sm:gap-4">
-                <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-gold-500/20 rounded-full flex items-center justify-center">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex gap-4">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: `${NAV_BG}10` }}>
+                  <svg className="w-4 h-4" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-sm sm:text-base">Vi guidar dig hela vägen</h3>
-                  <p className="text-xs sm:text-sm text-warm-300">
-                    Steg-för-steg instruktioner för allt - från att hämta kontoutdrag till färdig inlämning.
+                  <h3 className="font-bold text-navy-900 text-sm">Vi guidar dig hela vägen</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Steg-för-steg instruktioner för allt – från kontoutdrag till färdig inlämning.
                   </p>
                 </div>
               </div>
 
-              {/* Point 3 - Important note */}
-              <div className="bg-white/5 border border-white/10 rounded-lg sm:rounded-xl p-3 sm:p-4">
-                <div className="flex gap-2 sm:gap-3">
-                  <div className="flex-shrink-0">
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5 text-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                <div className="flex gap-3">
+                  <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                   <div>
-                    <h3 className="font-semibold text-warm-300 text-xs sm:text-sm mb-0.5 sm:mb-1">Viktigt att tänka på</h3>
-                    <p className="text-xs text-warm-400">
+                    <h3 className="font-semibold text-amber-800 text-xs mb-0.5">Viktigt att tänka på</h3>
+                    <p className="text-xs text-amber-700 leading-relaxed">
                       Vi kan tyvärr inte hjälpa till med jordbruk, skogsbruk, byggverksamhet, taxi eller liknande.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Button */}
-              <div className="pt-1 sm:pt-2">
-                <button
-                  onClick={closePopup}
-                  className="w-full text-center px-6 py-2.5 sm:py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200 shadow-lg shadow-gold-500/20"
-                >
-                  Fortsätt
-                </button>
-              </div>
+              <button
+                onClick={closePopup}
+                className="w-full py-3 font-bold text-white rounded-xl transition-all duration-200 hover:opacity-90 text-sm"
+                style={{ backgroundColor: NAV_BG }}
+              >
+                Kom igång →
+              </button>
             </div>
           </div>
         </div>
       )}
-
-    </div>
     </>
   );
 }
