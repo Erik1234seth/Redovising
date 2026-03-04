@@ -3,6 +3,7 @@ import "./globals.css";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { AuthProvider } from "@/contexts/AuthContext";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "Enkla Bokslut - Årsredovisning & Bokslut för Enskild Firma | NE-bilaga",
@@ -74,6 +75,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="sv">
+      <head>
+        <Script async src="https://www.googletagmanager.com/gtag/js?id=G-8XZDRG1PSH" strategy="afterInteractive" />
+        <Script id="google-analytics" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-8XZDRG1PSH');
+        `}</Script>
+      </head>
       <body>
         <AuthProvider>
           <Navigation />
