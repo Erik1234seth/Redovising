@@ -11,9 +11,6 @@ import { Bank } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
 
-const CORAL = '#E95C63';
-const NAV_BG = '#173b57';
-
 export default function ConfirmationPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -34,11 +31,12 @@ export default function ConfirmationPage() {
       router.push(`/auth/login?redirect=/flow/${packageType}/confirmation?bank=${bankId}`);
     }
   }, [user, loading, router, packageType, bankId]);
-
   const supabase = createClient();
+
   const bank = banks.find((b) => b.id === bankId);
   const packageInfo = packages.find((p) => p.id === packageType);
 
+  // Total steps: 9 for all, except ne-bilaga first year = 8
   const [totalSteps, setTotalSteps] = useState(9);
   const [orderSaved, setOrderSaved] = useState(false);
 
@@ -46,7 +44,11 @@ export default function ConfirmationPage() {
     const answersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
     if (answersStr) {
       const answers = JSON.parse(answersStr);
-      setTotalSteps(packageType !== 'komplett' && answers.isFirstYear === true ? 8 : 9);
+      if (packageType !== 'komplett' && answers.isFirstYear === true) {
+        setTotalSteps(8);
+      } else {
+        setTotalSteps(9);
+      }
     } else {
       setTotalSteps(9);
     }
@@ -55,10 +57,13 @@ export default function ConfirmationPage() {
   // Save order to database on mount
   useEffect(() => {
     const saveOrder = async () => {
-      if (orderSaved) return;
+      if (orderSaved) return; // Prevent duplicate saves
 
+      // Retrieve uploaded file IDs from sessionStorage
       const statementFileId = sessionStorage.getItem('statementFileId');
       const previousFileId = sessionStorage.getItem('previousFileId');
+
+      // Retrieve qualification answers for komplett/ne-bilaga packages
       const qualificationAnswersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
       const qualificationAnswers = qualificationAnswersStr ? JSON.parse(qualificationAnswersStr) : null;
 
@@ -74,32 +79,60 @@ export default function ConfirmationPage() {
         qualification_answers: qualificationAnswers,
       };
 
-      const { data: newOrder, error } = await supabase.from('orders').insert(orderData).select('id').single();
+      const { data: newOrder, error } = await supabase
+        .from('orders')
+        .insert(orderData)
+        .select('id')
+        .single();
 
       if (!error && newOrder) {
         setOrderSaved(true);
 
+        // Link uploaded files to the order
         const fileIds = [statementFileId, previousFileId].filter(Boolean);
         if (fileIds.length > 0) {
-          await supabase.from('files').update({ order_id: newOrder.id, guest_email: user ? null : email, guest_name: user ? null : name }).in('id', fileIds);
+          await supabase
+            .from('files')
+            .update({
+              order_id: newOrder.id,
+              guest_email: user ? null : email,
+              guest_name: user ? null : name,
+            })
+            .in('id', fileIds);
         }
 
+        // Link manual transactions to the order
         const tempOrderId = sessionStorage.getItem('tempOrderId');
         if (tempOrderId) {
-          await supabase.from('manual_transactions').update({ order_id: newOrder.id, guest_email: user ? null : email, guest_name: user ? null : name }).eq('order_id', tempOrderId);
-          await supabase.from('parsed_transactions').update({ order_id: newOrder.id }).eq('order_id', tempOrderId);
+          await supabase
+            .from('manual_transactions')
+            .update({
+              order_id: newOrder.id,
+              guest_email: user ? null : email,
+              guest_name: user ? null : name,
+            })
+            .eq('order_id', tempOrderId);
+
+          // Also update parsed transactions to use the real order ID
+          await supabase
+            .from('parsed_transactions')
+            .update({ order_id: newOrder.id })
+            .eq('order_id', tempOrderId);
         }
 
+        // Export transactions to Excel and save to Supabase
         try {
           await fetch('/api/export-transactions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ orderId: newOrder.id }),
           });
+          console.log('Transactions exported successfully');
         } catch (exportError) {
           console.error('Error exporting transactions:', exportError);
         }
 
+        // Clean up sessionStorage
         sessionStorage.removeItem('statementFileUrl');
         sessionStorage.removeItem('statementFilePath');
         sessionStorage.removeItem('statementFileId');
@@ -110,8 +143,10 @@ export default function ConfirmationPage() {
         sessionStorage.removeItem(`qualificationAnswers_${packageType}`);
         sessionStorage.removeItem(`qualificationPopup_${packageType}`);
 
+        // Increment order count for logged-in users
         if (user) {
           await supabase.rpc('increment_order_count', { user_id: user.id });
+          // Refresh profile to update order count in UI
           await refreshProfile();
         }
       }
@@ -122,17 +157,6 @@ export default function ConfirmationPage() {
     }
   }, [bankId, packageType, email, user, orderSaved, supabase, refreshProfile, name, phone, company]);
 
-  const nextSteps = [
-    'Vi granskar dina kontoutdrag och börjar arbeta med dina uppgifter',
-    packageType === 'komplett'
-      ? 'Du får ett mail när vi är klara'
-      : 'Du får en länk via e-post när vi är klara där du kan hämta din färdiga NE-bilaga',
-    packageType === 'komplett'
-      ? 'Vi lämnar in din deklaration åt dig hos Skatteverket'
-      : 'Du loggar in hos Skatteverket och lämnar in NE-bilagan själv',
-    'Klart! Kontakta oss vid frågor',
-  ];
-
   return (
     <FlowContainer
       title="Tack för din beställning!"
@@ -142,68 +166,109 @@ export default function ConfirmationPage() {
       packageType={packageType}
     >
       <div className="text-center mb-8">
-        <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2"
-          style={{ backgroundColor: `${NAV_BG}15`, borderColor: NAV_BG }}>
-          <svg className="w-12 h-12" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        <div className="w-20 h-20 bg-gold-500/20 border-2 border-gold-500 rounded-full flex items-center justify-center mx-auto mb-6">
+          <svg
+            className="w-12 h-12 text-gold-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold mb-4" style={{ color: NAV_BG }}>Beställningen är mottagen!</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">
+          Beställningen är mottagen!
+        </h2>
       </div>
 
       {/* Next steps */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 mb-8">
-        <h3 className="font-semibold mb-4 text-center" style={{ color: NAV_BG }}>Vad händer nu?</h3>
+      <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-6 mb-8">
+        <h3 className="font-semibold text-white mb-4 text-center">Vad händer nu?</h3>
         <div className="space-y-4">
-          {nextSteps.map((step, i) => (
-            <div key={i} className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white"
-                style={{ backgroundColor: NAV_BG }}>
-                {i + 1}
-              </div>
-              <p className="text-slate-600 pt-1">{step}</p>
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold">
+              1
             </div>
-          ))}
+            <p className="text-warm-300 pt-1">
+              Vi granskar dina kontoutdrag och börjar arbeta med dina uppgifter
+            </p>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold">
+              2
+            </div>
+            <p className="text-warm-300 pt-1">
+              {packageType === 'komplett'
+                ? 'Du får ett mail när vi är klara'
+                : 'Du får en länk via e-post när vi är klara där du kan hämta din färdiga NE-bilaga'
+              }
+            </p>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold">
+              3
+            </div>
+            <p className="text-warm-300 pt-1">
+              {packageType === 'komplett'
+                ? 'Vi lämnar in din deklaration åt dig hos Skatteverket'
+                : 'Du loggar in hos Skatteverket och lämnar in NE-bilagan själv'
+              }
+            </p>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-gold-500 text-navy-900 rounded-full flex items-center justify-center font-bold">
+              4
+            </div>
+            <p className="text-warm-300 pt-1">
+              Klart! Kontakta oss vid frågor
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Order summary */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 mb-8">
-        <h3 className="font-semibold mb-4" style={{ color: NAV_BG }}>Sammanfattning av din beställning:</h3>
-        <div className="space-y-3 text-slate-600">
+      <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-6 mb-8">
+        <h3 className="font-semibold text-white mb-4">
+          Sammanfattning av din beställning:
+        </h3>
+        <div className="space-y-3 text-warm-300">
           <div className="flex justify-between">
             <span>Paket:</span>
-            <span className="font-semibold" style={{ color: NAV_BG }}>{packageInfo?.name}</span>
+            <span className="font-semibold text-gold-500">{packageInfo?.name}</span>
           </div>
           <div className="flex justify-between">
             <span>Bank:</span>
-            <span className="font-semibold text-slate-800">{bank?.name}</span>
+            <span className="font-semibold text-white">{bank?.name}</span>
           </div>
           <div className="flex justify-between">
             <span>Pris:</span>
-            <span className="font-semibold" style={{ color: NAV_BG }}>{packageInfo?.price} kr</span>
+            <span className="font-semibold text-gold-500">{packageInfo?.price} kr</span>
           </div>
           {(name || email) && (
             <>
-              <div className="border-t border-gray-200 my-3 pt-3"></div>
+              <div className="border-t border-navy-600 my-3 pt-3"></div>
               <div className="flex justify-between">
                 <span>Kontakt:</span>
-                <span className="font-semibold text-slate-800 text-right">{name}</span>
+                <span className="font-semibold text-white text-right">{name}</span>
               </div>
               <div className="flex justify-between">
                 <span>E-post:</span>
-                <span className="font-semibold text-slate-500 text-right">{email}</span>
+                <span className="font-semibold text-warm-400 text-right">{email}</span>
               </div>
               {phone && (
                 <div className="flex justify-between">
                   <span>Telefon:</span>
-                  <span className="font-semibold text-slate-500 text-right">{phone}</span>
+                  <span className="font-semibold text-warm-400 text-right">{phone}</span>
                 </div>
               )}
               {company && (
                 <div className="flex justify-between">
                   <span>Företag:</span>
-                  <span className="font-semibold text-slate-500 text-right">{company}</span>
+                  <span className="font-semibold text-warm-400 text-right">{company}</span>
                 </div>
               )}
             </>
@@ -212,32 +277,38 @@ export default function ConfirmationPage() {
       </div>
 
       {/* Important Notice */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8">
+      <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-6 mb-8">
         <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex-shrink-0 w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
           <div>
-            <h3 className="font-semibold text-amber-700 mb-2">Viktigt att tänka på</h3>
-            <p className="text-sm text-amber-700 mb-2">
-              <strong>Du ansvarar för dina underlag.</strong> Vi utgår från dina kontoutdrag, men du behöver ha kvitton och fakturor för alla transaktioner som ingår i verksamheten.
+            <h3 className="font-semibold text-amber-500 mb-2">
+              Viktigt att tänka på
+            </h3>
+            <p className="text-sm text-warm-300 mb-2">
+              <strong className="text-white">Du ansvarar för dina underlag.</strong> Vi utgår från dina kontoutdrag, men du behöver ha kvitton och fakturor för alla transaktioner som ingår i verksamheten.
             </p>
-            <p className="text-sm text-amber-700">
+            <p className="text-sm text-warm-300">
               Vid en eventuell granskning från Skatteverket kan du behöva visa upp dessa. Vi hör av oss om vi har frågor om specifika transaktioner.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Contact */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 mb-8">
-        <h3 className="font-semibold mb-3" style={{ color: NAV_BG }}>Kontakta oss vid frågor</h3>
-        <p className="text-sm text-slate-600 mb-3">
+      <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-6 mb-8">
+        <h3 className="font-semibold text-white mb-3">
+          Kontakta oss vid frågor
+        </h3>
+        <p className="text-sm text-warm-300 mb-3">
           Om du har några frågor eller funderingar, tveka inte att höra av dig!
         </p>
-        <Link href="/kontakt" className="inline-flex items-center font-semibold transition-colors hover:opacity-80" style={{ color: CORAL }}>
+        <Link
+          href="/kontakt"
+          className="inline-flex items-center text-gold-500 hover:text-gold-400 font-semibold transition-colors"
+        >
           Gå till kontaktsidan
           <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -248,14 +319,13 @@ export default function ConfirmationPage() {
       <div className="flex flex-col sm:flex-row justify-center gap-4">
         <Link
           href="/"
-          className="px-8 py-3 text-white rounded-xl font-bold transition-all duration-200 hover:opacity-90 text-center"
-          style={{ backgroundColor: NAV_BG }}
+          className="px-8 py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-xl font-bold transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105 text-center"
         >
           Tillbaka till startsidan
         </Link>
         <Link
           href="/kontakt"
-          className="px-8 py-3 bg-white hover:bg-gray-50 border-2 border-gray-200 hover:border-slate-300 text-slate-700 rounded-xl font-bold transition-all duration-200 text-center"
+          className="px-8 py-3 bg-navy-800 hover:bg-navy-600 border-2 border-gold-500/50 hover:border-gold-500 text-white rounded-xl font-bold transition-all duration-200 text-center"
         >
           Kontakta oss
         </Link>

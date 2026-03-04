@@ -9,8 +9,6 @@ import { banks } from '@/data/banks';
 import { Bank } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 
-const NAV_BG = '#173b57';
-
 export default function BankSelectionPage() {
   const params = useParams();
   const router = useRouter();
@@ -19,6 +17,7 @@ export default function BankSelectionPage() {
   useTrackStep('bank-selection', packageType, undefined, user?.id);
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
 
+  // Total steps: 9 for all, except ne-bilaga first year = 8
   const [totalSteps, setTotalSteps] = useState(9);
 
   useEffect(() => {
@@ -36,6 +35,7 @@ export default function BankSelectionPage() {
   // Protect route - require authentication
   useEffect(() => {
     if (!loading && !user) {
+      // Redirect to login with return URL
       router.push(`/auth/login?redirect=/flow/${packageType}/bank-selection`);
     }
   }, [user, loading, router, packageType]);
@@ -59,34 +59,55 @@ export default function BankSelectionPage() {
           <button
             key={bank.id}
             onClick={() => setSelectedBank(bank.id)}
-            className={`group relative p-6 rounded-xl transition-all duration-200 text-left border-2 bg-white ${
-              selectedBank === bank.id ? '' : 'border-gray-200 hover:border-slate-300'
+            className={`group relative p-6 rounded-xl transition-all duration-200 text-left ${
+              selectedBank === bank.id
+                ? 'bg-gradient-to-br from-gold-500/20 to-gold-600/10 border-2 border-gold-500 shadow-lg shadow-gold-500/20'
+                : 'bg-navy-800/50 border-2 border-navy-600 hover:border-gold-500/50 hover:bg-navy-800'
             }`}
-            style={selectedBank === bank.id ? { borderColor: NAV_BG, backgroundColor: `${NAV_BG}06` } : {}}
           >
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h3 className={`text-xl font-bold mb-1 ${selectedBank === bank.id ? '' : 'text-slate-800'}`}
-                  style={selectedBank === bank.id ? { color: NAV_BG } : {}}>
+                <h3 className={`text-xl font-bold mb-1 ${
+                  selectedBank === bank.id ? 'text-gold-500' : 'text-white'
+                }`}>
                   {bank.name}
                 </h3>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-warm-400">
                   Klicka för att välja
                 </p>
               </div>
-              <div
-                className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all"
-                style={selectedBank === bank.id
-                  ? { backgroundColor: NAV_BG }
-                  : { backgroundColor: '#f3f4f6', border: '1px solid #e5e7eb' }}
-              >
+              <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                selectedBank === bank.id
+                  ? 'bg-gold-500 shadow-lg shadow-gold-500/50'
+                  : 'bg-navy-700 border border-navy-600 group-hover:border-gold-500/50'
+              }`}>
                 {selectedBank === bank.id ? (
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  <svg
+                    className="w-6 h-6 text-navy-900"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={3}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 ) : (
-                  <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <svg
+                    className="w-6 h-6 text-warm-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
                   </svg>
                 )}
               </div>
@@ -97,30 +118,40 @@ export default function BankSelectionPage() {
         {/* Contact option for unlisted banks */}
         <Link
           href="/kontakt"
-          className="md:col-span-2 group relative p-6 rounded-xl transition-all duration-200 text-left bg-white border-2 border-gray-200 hover:border-amber-400/60 hover:bg-amber-50/30"
+          className="md:col-span-2 group relative p-6 rounded-xl transition-all duration-200 text-left bg-navy-800/30 border-2 border-navy-600 hover:border-amber-500/50 hover:bg-navy-800/50"
         >
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <h3 className="text-xl font-bold mb-1 text-slate-800 group-hover:text-amber-600 transition-colors">
+              <h3 className="text-xl font-bold mb-1 text-white group-hover:text-amber-400 transition-colors">
                 Min bank finns inte här
               </h3>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-warm-400">
                 Kontakta oss för hjälp - nämn gärna vilken bank du har
               </p>
             </div>
-            <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all bg-gray-100 border border-gray-200 group-hover:border-amber-400/50 group-hover:bg-amber-50">
-              <svg className="w-6 h-6 text-slate-400 group-hover:text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all bg-navy-700 border border-navy-600 group-hover:border-amber-500/50 group-hover:bg-amber-500/10">
+              <svg
+                className="w-6 h-6 text-warm-400 group-hover:text-amber-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
             </div>
           </div>
         </Link>
       </div>
 
-      <div className="flex justify-between items-center pt-6 border-t border-gray-200">
+      <div className="flex justify-between items-center pt-6 border-t border-navy-600">
         <button
           onClick={() => router.back()}
-          className="text-slate-500 hover:text-slate-800 font-semibold transition-colors flex items-center"
+          className="text-warm-300 hover:text-white font-semibold transition-colors flex items-center"
         >
           <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -130,10 +161,11 @@ export default function BankSelectionPage() {
         <button
           onClick={handleContinue}
           disabled={!selectedBank}
-          className="px-8 py-3 rounded-xl font-bold transition-all duration-200 text-white"
-          style={selectedBank
-            ? { backgroundColor: NAV_BG }
-            : { backgroundColor: '#d1d5db', color: '#9ca3af', cursor: 'not-allowed' }}
+          className={`px-8 py-3 rounded-xl font-bold transition-all duration-200 ${
+            selectedBank
+              ? 'bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105'
+              : 'bg-navy-600 text-navy-400 cursor-not-allowed'
+          }`}
         >
           Fortsätt →
         </button>

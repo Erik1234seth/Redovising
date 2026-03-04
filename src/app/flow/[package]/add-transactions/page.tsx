@@ -7,8 +7,6 @@ import { useTrackStep } from '@/hooks/useTrackStep';
 import { Bank } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 
-const NAV_BG = '#173b57';
-
 interface Transaction {
   id: string;
   transaction_date: string;
@@ -31,6 +29,7 @@ export default function AddTransactionsPage() {
   const [fetching, setFetching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Form state
   const [date, setDate] = useState('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -38,6 +37,7 @@ export default function AddTransactionsPage() {
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
   const [formError, setFormError] = useState('');
 
+  // Total steps: 9 for all, except ne-bilaga first year = 8
   const [totalSteps, setTotalSteps] = useState(9);
 
   useEffect(() => {
@@ -61,6 +61,7 @@ export default function AddTransactionsPage() {
     }
   }, [user, loading, router, packageType, bankId]);
 
+  // Get order ID from sessionStorage
   useEffect(() => {
     const id = sessionStorage.getItem('tempOrderId');
     if (id) {
@@ -74,7 +75,9 @@ export default function AddTransactionsPage() {
     try {
       const response = await fetch(`/api/transactions?orderId=${orderId}`);
       const data = await response.json();
-      if (response.ok) setTransactions(data.transactions || []);
+      if (response.ok) {
+        setTransactions(data.transactions || []);
+      }
     } catch (error) {
       console.error('Error fetching transactions:', error);
     } finally {
@@ -86,14 +89,17 @@ export default function AddTransactionsPage() {
     e.preventDefault();
     setFormError('');
 
+    // Validate form
     if (!date || !description || !amount || !quantity) {
       setFormError('Alla fält måste fyllas i');
       return;
     }
+
     if (parseFloat(amount) <= 0) {
       setFormError('Beloppet måste vara större än 0');
       return;
     }
+
     const qty = parseInt(quantity);
     if (qty <= 0) {
       setFormError('Antal måste vara minst 1');
@@ -104,6 +110,8 @@ export default function AddTransactionsPage() {
 
     try {
       const newTransactions: Transaction[] = [];
+
+      // Create multiple transactions if quantity > 1
       for (let i = 0; i < qty; i++) {
         const response = await fetch('/api/transactions', {
           method: 'POST',
@@ -119,7 +127,9 @@ export default function AddTransactionsPage() {
             transactionType,
           }),
         });
+
         const data = await response.json();
+
         if (response.ok) {
           newTransactions.push(data.transaction);
         } else {
@@ -127,8 +137,11 @@ export default function AddTransactionsPage() {
           break;
         }
       }
+
       if (newTransactions.length > 0) {
+        // Add new transactions to list
         setTransactions([...newTransactions, ...transactions]);
+        // Reset form
         setDate('');
         setDescription('');
         setAmount('');
@@ -144,9 +157,15 @@ export default function AddTransactionsPage() {
   };
 
   const handleDelete = async (transactionId: string) => {
-    if (!confirm('Är du säker på att du vill ta bort denna transaktion?')) return;
+    if (!confirm('Är du säker på att du vill ta bort denna transaktion?')) {
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/transactions/${transactionId}`, { method: 'DELETE' });
+      const response = await fetch(`/api/transactions/${transactionId}`, {
+        method: 'DELETE',
+      });
+
       if (response.ok) {
         setTransactions(transactions.filter((t) => t.id !== transactionId));
       } else {
@@ -159,22 +178,32 @@ export default function AddTransactionsPage() {
   };
 
   const handleContinue = () => {
+    // Check if user indicated it's their first year (skip upload-previous if so)
     const answersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
     const isFirstYear = answersStr ? JSON.parse(answersStr).isFirstYear === true : false;
 
     if (packageType === 'komplett') {
+      // Skip upload-previous for komplett package, go directly to delegation-guide
       router.push(`/flow/${packageType}/delegation-guide?bank=${bankId}`);
     } else if (isFirstYear) {
+      // Skip upload-previous if it's user's first year, go directly to contact-info
       router.push(`/flow/${packageType}/contact-info?bank=${bankId}`);
     } else {
       router.push(`/flow/${packageType}/upload-previous?bank=${bankId}`);
     }
   };
 
-  const totalIncome = transactions.filter((t) => t.transaction_type === 'income').reduce((sum, t) => sum + t.amount, 0);
-  const totalExpense = transactions.filter((t) => t.transaction_type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+  const handleSkip = () => {
+    handleContinue();
+  };
 
-  const inputClass = "w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-slate-900 placeholder-gray-400 outline-none transition";
+  // Calculate totals
+  const totalIncome = transactions
+    .filter((t) => t.transaction_type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const totalExpense = transactions
+    .filter((t) => t.transaction_type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
 
   return (
     <FlowContainer
@@ -185,75 +214,115 @@ export default function AddTransactionsPage() {
       packageType={packageType}
     >
       {/* Add Transaction Form */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 sm:p-6 mb-6">
-        <h3 className="text-lg sm:text-xl font-bold mb-4" style={{ color: NAV_BG }}>
+      <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-4 sm:p-6 mb-6">
+        <h3 className="text-lg sm:text-xl font-bold text-white mb-4">
           Lägg till transaktion
         </h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Date */}
           <div>
-            <label htmlFor="date" className="block text-sm font-semibold text-slate-600 mb-2">Datum</label>
-            <input type="date" id="date" value={date} onChange={(e) => setDate(e.target.value)}
-              className={inputClass}
-              onFocus={e => e.currentTarget.style.borderColor = NAV_BG}
-              onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
-              required />
+            <label htmlFor="date" className="block text-sm font-semibold text-warm-300 mb-2">
+              Datum
+            </label>
+            <input
+              type="date"
+              id="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full px-4 py-3 bg-navy-700 border border-navy-600 rounded-xl text-white placeholder-warm-500 focus:outline-none focus:border-gold-500 transition-colors"
+              required
+            />
           </div>
 
+          {/* Description */}
           <div>
-            <label htmlFor="description" className="block text-sm font-semibold text-slate-600 mb-2">Beskrivning</label>
-            <input type="text" id="description" value={description} onChange={(e) => setDescription(e.target.value)}
+            <label htmlFor="description" className="block text-sm font-semibold text-warm-300 mb-2">
+              Beskrivning
+            </label>
+            <input
+              type="text"
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               placeholder="T.ex. Kontorsmaterial, Konsultarvode..."
-              className={inputClass}
-              onFocus={e => e.currentTarget.style.borderColor = NAV_BG}
-              onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
-              required />
+              className="w-full px-4 py-3 bg-navy-700 border border-navy-600 rounded-xl text-white placeholder-warm-500 focus:outline-none focus:border-gold-500 transition-colors"
+              required
+            />
           </div>
 
+          {/* Amount and Quantity in a grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Amount */}
             <div>
-              <label htmlFor="amount" className="block text-sm font-semibold text-slate-600 mb-2">Belopp (kr, inklusive moms)</label>
-              <input type="number" id="amount" value={amount} onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00" step="0.01" min="0"
-                className={inputClass}
-                onFocus={e => e.currentTarget.style.borderColor = NAV_BG}
-                onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
-                required />
+              <label htmlFor="amount" className="block text-sm font-semibold text-warm-300 mb-2">
+                Belopp (kr, inklusive moms)
+              </label>
+              <input
+                type="number"
+                id="amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                step="0.01"
+                min="0"
+                className="w-full px-4 py-3 bg-navy-700 border border-navy-600 rounded-xl text-white placeholder-warm-500 focus:outline-none focus:border-gold-500 transition-colors"
+                required
+              />
             </div>
+
+            {/* Quantity */}
             <div>
-              <label htmlFor="quantity" className="block text-sm font-semibold text-slate-600 mb-2">Antal</label>
-              <input type="number" id="quantity" value={quantity} onChange={(e) => setQuantity(e.target.value)}
-                placeholder="1" step="1" min="1"
-                className={inputClass}
-                onFocus={e => e.currentTarget.style.borderColor = NAV_BG}
-                onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
-                required />
-              <p className="text-xs text-slate-400 mt-1">Lägg till flera identiska transaktioner</p>
+              <label htmlFor="quantity" className="block text-sm font-semibold text-warm-300 mb-2">
+                Antal
+              </label>
+              <input
+                type="number"
+                id="quantity"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="1"
+                step="1"
+                min="1"
+                className="w-full px-4 py-3 bg-navy-700 border border-navy-600 rounded-xl text-white placeholder-warm-500 focus:outline-none focus:border-gold-500 transition-colors"
+                required
+              />
+              <p className="text-xs text-warm-500 mt-1">
+                Lägg till flera identiska transaktioner
+              </p>
             </div>
           </div>
 
+          {/* Transaction Type */}
           <div>
-            <label htmlFor="type" className="block text-sm font-semibold text-slate-600 mb-2">Typ</label>
-            <select id="type" value={transactionType} onChange={(e) => setTransactionType(e.target.value as 'income' | 'expense')}
-              className={inputClass}
-              onFocus={e => e.currentTarget.style.borderColor = NAV_BG}
-              onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}>
+            <label htmlFor="type" className="block text-sm font-semibold text-warm-300 mb-2">
+              Typ
+            </label>
+            <select
+              id="type"
+              value={transactionType}
+              onChange={(e) => setTransactionType(e.target.value as 'income' | 'expense')}
+              className="w-full px-4 py-3 bg-navy-700 border border-navy-600 rounded-xl text-white focus:outline-none focus:border-gold-500 transition-colors"
+            >
               <option value="expense">Utgift</option>
               <option value="income">Inkomst</option>
             </select>
           </div>
 
           {formError && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-              <p className="text-sm text-red-500">{formError}</p>
+            <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-3">
+              <p className="text-sm text-red-400">{formError}</p>
             </div>
           )}
 
           <button
             type="submit"
             disabled={submitting}
-            className="w-full px-6 py-3 rounded-xl font-bold transition-all duration-200 text-white"
-            style={submitting ? { backgroundColor: '#d1d5db', color: '#9ca3af', cursor: 'not-allowed' } : { backgroundColor: NAV_BG }}
+            className={`w-full px-6 py-3 rounded-xl font-bold transition-all duration-200 ${
+              submitting
+                ? 'bg-navy-600 text-navy-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40'
+            }`}
           >
             {submitting ? 'Lägger till...' : '+ Lägg till transaktion'}
           </button>
@@ -263,33 +332,44 @@ export default function AddTransactionsPage() {
       {/* Transactions List */}
       {fetching ? (
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: NAV_BG }}></div>
-          <p className="text-slate-500">Laddar transaktioner...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold-500 mx-auto mb-4"></div>
+          <p className="text-warm-300">Laddar transaktioner...</p>
         </div>
       ) : transactions.length > 0 ? (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 sm:p-6 mb-6">
+        <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-4 sm:p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-            <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-0" style={{ color: NAV_BG }}>
+            <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-0">
               Tillagda transaktioner ({transactions.length})
             </h3>
             <div className="flex gap-3 text-sm">
-              <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-1">
-                <span className="text-green-600 font-semibold">Inkomst: {totalIncome.toFixed(2)} kr</span>
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-1">
+                <span className="text-green-400 font-semibold">
+                  Inkomst: {totalIncome.toFixed(2)} kr
+                </span>
               </div>
-              <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-1">
-                <span className="text-red-500 font-semibold">Utgift: {totalExpense.toFixed(2)} kr</span>
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-1">
+                <span className="text-red-400 font-semibold">
+                  Utgift: {totalExpense.toFixed(2)} kr
+                </span>
               </div>
             </div>
           </div>
 
           <div className="space-y-3">
             {transactions.map((transaction) => (
-              <div key={transaction.id} className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div
+                key={transaction.id}
+                className="bg-navy-700/50 border border-navy-600 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+              >
                 <div className="flex-1">
                   <div className="flex items-start gap-3">
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
-                      transaction.transaction_type === 'income' ? 'bg-green-50 text-green-500' : 'bg-red-50 text-red-400'
-                    }`}>
+                    <div
+                      className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
+                        transaction.transaction_type === 'income'
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'bg-red-500/20 text-red-400'
+                      }`}
+                    >
                       {transaction.transaction_type === 'income' ? (
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -301,18 +381,37 @@ export default function AddTransactionsPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 truncate">{transaction.description}</p>
-                      <p className="text-sm text-slate-400">{new Date(transaction.transaction_date).toLocaleDateString('sv-SE')}</p>
+                      <p className="font-semibold text-white truncate">
+                        {transaction.description}
+                      </p>
+                      <p className="text-sm text-warm-400">
+                        {new Date(transaction.transaction_date).toLocaleDateString('sv-SE')}
+                      </p>
                     </div>
                   </div>
                 </div>
+
                 <div className="flex items-center gap-3 sm:gap-4">
-                  <span className={`text-lg font-bold ${transaction.transaction_type === 'income' ? 'text-green-500' : 'text-red-400'}`}>
-                    {transaction.transaction_type === 'income' ? '+' : '-'}{transaction.amount.toFixed(2)} kr
+                  <span
+                    className={`text-lg font-bold ${
+                      transaction.transaction_type === 'income' ? 'text-green-400' : 'text-red-400'
+                    }`}
+                  >
+                    {transaction.transaction_type === 'income' ? '+' : '-'}
+                    {transaction.amount.toFixed(2)} kr
                   </span>
-                  <button onClick={() => handleDelete(transaction.id)} className="text-red-400 hover:text-red-500 transition-colors p-2" title="Ta bort">
+                  <button
+                    onClick={() => handleDelete(transaction.id)}
+                    className="text-red-400 hover:text-red-300 transition-colors p-2"
+                    title="Ta bort"
+                  >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -321,25 +420,42 @@ export default function AddTransactionsPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center mb-6">
-          <svg className="w-16 h-16 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-8 text-center mb-6">
+          <svg
+            className="w-16 h-16 text-warm-500 mx-auto mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
           </svg>
-          <p className="text-slate-400">Inga transaktioner tillagda än. Lägg till dina första transaktioner ovan.</p>
+          <p className="text-warm-400">
+            Inga transaktioner tillagda än. Lägg till dina första transaktioner ovan.
+          </p>
         </div>
       )}
 
       {/* Info Box */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 sm:p-6 mb-6">
+      <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-4 sm:p-6 mb-6">
         <div className="flex items-start">
-          <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center mr-4" style={{ backgroundColor: `${NAV_BG}10` }}>
-            <svg className="w-5 h-5" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <div className="flex-shrink-0 w-10 h-10 bg-gold-500/10 rounded-lg flex items-center justify-center mr-4">
+            <svg className="w-5 h-5 text-gold-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
           <div>
-            <h3 className="font-bold mb-2" style={{ color: NAV_BG }}>Om transaktioner</h3>
-            <p className="text-sm text-slate-600">
+            <h3 className="font-bold text-white mb-2">Om transaktioner</h3>
+            <p className="text-sm text-warm-300">
               Här kan du lägga till transaktioner som inte syns i ditt kontoutdrag, till exempel
               kontantbetalningar eller andra transaktioner som behöver rapporteras. Detta är helt valfritt och kan hoppas över om du inte har några sådana
               transaktioner.
@@ -349,10 +465,10 @@ export default function AddTransactionsPage() {
       </div>
 
       {/* Navigation */}
-      <div className="flex justify-between items-center pt-6 border-t border-gray-200">
+      <div className="flex justify-between items-center pt-6 border-t border-navy-600">
         <button
           onClick={() => router.back()}
-          className="text-slate-500 hover:text-slate-800 font-semibold transition-colors flex items-center"
+          className="text-warm-300 hover:text-white font-semibold transition-colors flex items-center"
         >
           <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -361,13 +477,15 @@ export default function AddTransactionsPage() {
         </button>
 
         <div className="flex gap-3">
-          <button onClick={handleContinue} className="px-6 py-3 text-slate-500 hover:text-slate-800 font-semibold transition-colors">
+          <button
+            onClick={handleSkip}
+            className="px-6 py-3 text-warm-300 hover:text-white font-semibold transition-colors"
+          >
             Hoppa över
           </button>
           <button
             onClick={handleContinue}
-            className="px-8 py-3 text-white rounded-xl font-bold transition-all duration-200 hover:opacity-90"
-            style={{ backgroundColor: NAV_BG }}
+            className="px-8 py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-xl font-bold transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105"
           >
             Fortsätt →
           </button>
