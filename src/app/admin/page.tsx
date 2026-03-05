@@ -206,7 +206,7 @@ export default function AdminPage() {
   const [stepCounts, setStepCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'orders' | 'pipeline' | 'funnel'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'funnel'>('orders');
 
   // Edit/create/delete state
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -217,6 +217,11 @@ export default function AdminPage() {
   const [createContactForm, setCreateContactForm] = useState({ name: '', email: '', phone: '', package_type: 'ne-bilaga' });
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Expanded rows + files
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [contactFiles, setContactFiles] = useState<Record<string, { id: string; stage: number; file_name: string; file_url: string; file_path: string; file_size: number | null }[]>>({});
+  const [uploadingStep, setUploadingStep] = useState<number | null>(null);
 
   useEffect(() => {
     if (sessionStorage.getItem('admin_unlocked') === '1') {
@@ -310,6 +315,39 @@ export default function AdminPage() {
       setCreateForm(EMPTY_FORM);
     }
     setSaving(false);
+  };
+
+  const handleToggleExpand = async (id: string) => {
+    if (expandedId === id) { setExpandedId(null); return; }
+    setExpandedId(id);
+    if (!contactFiles[id]) {
+      const res = await fetch(`/api/admin/contact-files?contact_id=${id}`);
+      const data = await res.json();
+      setContactFiles((prev) => ({ ...prev, [id]: data.files || [] }));
+    }
+  };
+
+  const handleFileUpload = async (contactId: string, stage: number, file: File) => {
+    setUploadingStep(stage);
+    const form = new FormData();
+    form.append('file', file);
+    form.append('contact_id', contactId);
+    form.append('stage', String(stage));
+    const res = await fetch('/api/admin/contact-files', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.file) {
+      setContactFiles((prev) => ({ ...prev, [contactId]: [...(prev[contactId] || []), data.file] }));
+    }
+    setUploadingStep(null);
+  };
+
+  const handleFileDelete = async (contactId: string, fileId: string, filePath: string) => {
+    await fetch('/api/admin/contact-files', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: fileId, file_path: filePath }),
+    });
+    setContactFiles((prev) => ({ ...prev, [contactId]: prev[contactId].filter((f) => f.id !== fileId) }));
   };
 
   const handleUpdateStage = async (id: string, stage: number) => {
@@ -513,16 +551,6 @@ export default function AdminPage() {
             Beställningar
           </button>
           <button
-            onClick={() => setActiveTab('pipeline')}
-            className={`px-5 py-2 rounded-lg font-semibold text-sm transition-all ${
-              activeTab === 'pipeline'
-                ? 'bg-gold-500 text-navy-900'
-                : 'bg-navy-700 text-warm-300 hover:text-white'
-            }`}
-          >
-            Pipeline
-          </button>
-          <button
             onClick={() => setActiveTab('funnel')}
             className={`px-5 py-2 rounded-lg font-semibold text-sm transition-all ${
               activeTab === 'funnel'
@@ -596,47 +624,167 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {allRows.map((row) => (
-                        <tr
-                          key={row.id}
-                          className="border-b border-navy-600/50 hover:bg-navy-700/30 transition-colors"
-                        >
-                          <td className="px-4 py-3 text-warm-400 whitespace-nowrap">
-                            {new Date(row.created_at).toLocaleDateString('sv-SE')}
-                          </td>
-                          <td className="px-4 py-3 text-white font-medium">{row.email}</td>
-                          <td className="px-4 py-3 text-warm-300">{row.phone}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded-md text-xs font-semibold ${packageColor(row.package_type)}`}>
-                              {row.package_type}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            {row.isContact ? (
-                              <select
-                                value={row.stage ?? 1}
-                                onChange={(e) => handleUpdateStage(row.id, Number(e.target.value))}
-                                className="px-2 py-1 text-xs bg-navy-700 border border-navy-600 text-warm-200 rounded-lg outline-none"
-                              >
-                                {PIPELINE_STAGES.filter((s) => s.step < 5 || row.package_type === 'komplett').map((s) => (
-                                  <option key={s.step} value={s.step}>{s.step}. {s.label}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <span className="text-warm-500 text-xs">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              onClick={() => handleDelete(row.id, row.isContact)}
-                              disabled={deletingId === row.id}
-                              className="px-2 py-1 text-xs bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-lg transition disabled:opacity-50"
+                      {allRows.map((row) => {
+                        const isExpanded = expandedId === row.id;
+                        const isKomplett = row.package_type === 'komplett';
+                        const stages = PIPELINE_STAGES.filter((s) => s.step < 5 || isKomplett);
+                        const currentStage = row.stage ?? 1;
+                        const files = contactFiles[row.id] || [];
+
+                        return (
+                          <>
+                            <tr
+                              key={row.id}
+                              className={`border-b border-navy-600/50 transition-colors ${isExpanded ? 'bg-navy-700/40' : 'hover:bg-navy-700/20'}`}
                             >
-                              {deletingId === row.id ? '...' : 'Ta bort'}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                              <td className="px-4 py-3 text-warm-400 whitespace-nowrap">
+                                {new Date(row.created_at).toLocaleDateString('sv-SE')}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="text-white font-medium">{row.name !== '—' ? row.name : row.email}</div>
+                                {row.name !== '—' && <div className="text-xs text-warm-500">{row.email}</div>}
+                              </td>
+                              <td className="px-4 py-3 text-warm-300">{row.phone}</td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 rounded-md text-xs font-semibold ${packageColor(row.package_type)}`}>
+                                  {row.package_type}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                {row.isContact ? (
+                                  <span className="text-xs text-warm-300">
+                                    {currentStage}. {PIPELINE_STAGES.find(s => s.step === currentStage)?.label}
+                                  </span>
+                                ) : (
+                                  <span className="text-warm-500 text-xs">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-2 items-center">
+                                  {row.isContact && (
+                                    <button
+                                      onClick={() => handleToggleExpand(row.id)}
+                                      className={`px-2 py-1 text-xs rounded-lg transition border ${
+                                        isExpanded
+                                          ? 'bg-gold-500/20 border-gold-500/40 text-gold-400'
+                                          : 'bg-navy-600 border-navy-500 text-warm-200 hover:text-white'
+                                      }`}
+                                    >
+                                      {isExpanded ? '▲ Stäng' : '▼ Detaljer'}
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDelete(row.id, row.isContact)}
+                                    disabled={deletingId === row.id}
+                                    className="px-2 py-1 text-xs bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-lg transition disabled:opacity-50"
+                                  >
+                                    {deletingId === row.id ? '...' : 'Ta bort'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* Expanded pipeline + files */}
+                            {isExpanded && row.isContact && (
+                              <tr key={`${row.id}-expanded`} className="border-b border-navy-600/50 bg-navy-800/60">
+                                <td colSpan={6} className="px-6 py-6">
+                                  {/* Progress bar */}
+                                  <div className="flex items-start gap-0 mb-6">
+                                    {stages.map((s, i) => {
+                                      const done = currentStage > s.step;
+                                      const active = currentStage === s.step;
+                                      const isLast = i === stages.length - 1;
+                                      return (
+                                        <div key={s.step} className="flex items-center flex-1 min-w-0">
+                                          <button
+                                            onClick={() => handleUpdateStage(row.id, s.step)}
+                                            className="flex flex-col items-center gap-1.5 group flex-shrink-0"
+                                          >
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all border-2 ${
+                                              done
+                                                ? 'bg-gold-500 border-gold-500 text-navy-900'
+                                                : active
+                                                ? 'bg-gold-500/20 border-gold-500 text-gold-400 ring-4 ring-gold-500/20'
+                                                : 'bg-navy-700 border-navy-500 text-warm-500 group-hover:border-warm-400 group-hover:text-warm-300'
+                                            }`}>
+                                              {done ? '✓' : s.step}
+                                            </div>
+                                            <span className={`text-xs font-medium max-w-[72px] text-center leading-tight ${
+                                              active ? 'text-gold-400' : done ? 'text-gold-500/70' : 'text-warm-500'
+                                            }`}>
+                                              {s.label}
+                                            </span>
+                                          </button>
+                                          {!isLast && (
+                                            <div className={`flex-1 h-0.5 mx-1 mb-5 ${done ? 'bg-gold-500' : 'bg-navy-600'}`} />
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Files per step */}
+                                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                                    {stages.map((s) => {
+                                      const stepFiles = files.filter((f) => f.stage === s.step);
+                                      return (
+                                        <div key={s.step} className="bg-navy-700/50 border border-navy-600 rounded-xl p-3">
+                                          <div className="text-xs font-bold text-warm-400 mb-2 uppercase tracking-wide">
+                                            Steg {s.step} — {s.label}
+                                          </div>
+                                          <div className="space-y-1.5 mb-2 min-h-[24px]">
+                                            {stepFiles.length === 0 ? (
+                                              <div className="text-xs text-warm-600">Inga filer</div>
+                                            ) : (
+                                              stepFiles.map((f) => (
+                                                <div key={f.id} className="flex items-center gap-1 group">
+                                                  <a
+                                                    href={f.file_url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="text-xs text-blue-400 hover:text-blue-300 truncate flex-1"
+                                                    title={f.file_name}
+                                                  >
+                                                    📎 {f.file_name}
+                                                  </a>
+                                                  <button
+                                                    onClick={() => handleFileDelete(row.id, f.id, f.file_path)}
+                                                    className="text-red-500/50 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition flex-shrink-0"
+                                                    title="Ta bort fil"
+                                                  >
+                                                    ✕
+                                                  </button>
+                                                </div>
+                                              ))
+                                            )}
+                                          </div>
+                                          <label className={`flex items-center justify-center gap-1 w-full py-1.5 text-xs rounded-lg border border-dashed cursor-pointer transition ${
+                                            uploadingStep === s.step
+                                              ? 'border-navy-500 text-warm-600'
+                                              : 'border-navy-500 text-warm-500 hover:border-gold-500/50 hover:text-gold-400'
+                                          }`}>
+                                            {uploadingStep === s.step ? 'Laddar upp...' : '+ Lägg till fil'}
+                                            <input
+                                              type="file"
+                                              className="hidden"
+                                              disabled={uploadingStep !== null}
+                                              onChange={(e) => {
+                                                const f = e.target.files?.[0];
+                                                if (f) handleFileUpload(row.id, s.step, f);
+                                                e.target.value = '';
+                                              }}
+                                            />
+                                          </label>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -644,88 +792,6 @@ export default function AdminPage() {
             </div>
           );
         })()}
-
-        {/* Pipeline tab */}
-        {!loading && activeTab === 'pipeline' && (
-          <div className="space-y-4">
-            {contactRequests.length === 0 ? (
-              <div className="text-center py-16 text-warm-400">Inga beställningar i pipeline</div>
-            ) : (
-              contactRequests.map((c) => {
-                const isKomplett = c.package_type === 'komplett';
-                const stages = PIPELINE_STAGES.filter((s) => s.step < 5 || isKomplett);
-                const currentStage = c.stage ?? 1;
-                const currentLabel = PIPELINE_STAGES.find((s) => s.step === currentStage)?.label ?? '';
-
-                return (
-                  <div key={c.id} className="bg-navy-700/50 border border-navy-600 rounded-2xl p-6">
-                    {/* Top row: name/email + package + date */}
-                    <div className="flex items-start justify-between mb-5">
-                      <div>
-                        <div className="text-lg font-bold text-white">{c.name || c.email}</div>
-                        {c.name && <div className="text-sm text-warm-400 mt-0.5">{c.email}</div>}
-                        {c.phone && <div className="text-sm text-warm-500 mt-0.5">{c.phone}</div>}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${packageColor(c.package_type)}`}>
-                          {c.package_type}
-                        </span>
-                        <span className="text-sm text-warm-500">
-                          {new Date(c.created_at).toLocaleDateString('sv-SE')}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Current stage label */}
-                    <div className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-3">
-                      Nuvarande steg: <span className="text-gold-400">{currentLabel}</span>
-                    </div>
-
-                    {/* Progress steps */}
-                    <div className="flex items-center gap-0">
-                      {stages.map((s, i) => {
-                        const done = currentStage > s.step;
-                        const active = currentStage === s.step;
-                        const isLast = i === stages.length - 1;
-                        return (
-                          <div key={s.step} className="flex items-center flex-1 min-w-0">
-                            {/* Step */}
-                            <button
-                              onClick={() => handleUpdateStage(c.id, s.step)}
-                              className={`flex flex-col items-center gap-1.5 group flex-shrink-0`}
-                              title={`Sätt till: ${s.label}`}
-                            >
-                              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all border-2 ${
-                                done
-                                  ? 'bg-gold-500 border-gold-500 text-navy-900'
-                                  : active
-                                  ? 'bg-gold-500/20 border-gold-500 text-gold-400 ring-4 ring-gold-500/20'
-                                  : 'bg-navy-800 border-navy-500 text-warm-500 group-hover:border-warm-400 group-hover:text-warm-300'
-                              }`}>
-                                {done ? '✓' : s.step}
-                              </div>
-                              <span className={`text-xs font-medium whitespace-nowrap max-w-[80px] text-center leading-tight ${
-                                active ? 'text-gold-400' : done ? 'text-gold-500/70' : 'text-warm-500'
-                              }`}>
-                                {s.label}
-                              </span>
-                            </button>
-                            {/* Connector line */}
-                            {!isLast && (
-                              <div className={`flex-1 h-0.5 mx-1 mb-5 transition-all ${
-                                done ? 'bg-gold-500' : 'bg-navy-600'
-                              }`} />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
 
         {/* Funnel tab */}
         {!loading && activeTab === 'funnel' && (
