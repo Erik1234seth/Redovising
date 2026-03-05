@@ -218,10 +218,8 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Expanded rows + files
+  // Expanded rows
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [contactFiles, setContactFiles] = useState<Record<string, { id: string; stage: number; file_name: string; file_url: string; file_path: string; file_size: number | null }[]>>({});
-  const [uploadingStep, setUploadingStep] = useState<number | null>(null);
 
   useEffect(() => {
     if (sessionStorage.getItem('admin_unlocked') === '1') {
@@ -315,39 +313,6 @@ export default function AdminPage() {
       setCreateForm(EMPTY_FORM);
     }
     setSaving(false);
-  };
-
-  const handleToggleExpand = async (id: string) => {
-    if (expandedId === id) { setExpandedId(null); return; }
-    setExpandedId(id);
-    if (!contactFiles[id]) {
-      const res = await fetch(`/api/admin/contact-files?contact_id=${id}`);
-      const data = await res.json();
-      setContactFiles((prev) => ({ ...prev, [id]: data.files || [] }));
-    }
-  };
-
-  const handleFileUpload = async (contactId: string, stage: number, file: File) => {
-    setUploadingStep(stage);
-    const form = new FormData();
-    form.append('file', file);
-    form.append('contact_id', contactId);
-    form.append('stage', String(stage));
-    const res = await fetch('/api/admin/contact-files', { method: 'POST', body: form });
-    const data = await res.json();
-    if (data.file) {
-      setContactFiles((prev) => ({ ...prev, [contactId]: [...(prev[contactId] || []), data.file] }));
-    }
-    setUploadingStep(null);
-  };
-
-  const handleFileDelete = async (contactId: string, fileId: string, filePath: string) => {
-    await fetch('/api/admin/contact-files', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: fileId, file_path: filePath }),
-    });
-    setContactFiles((prev) => ({ ...prev, [contactId]: prev[contactId].filter((f) => f.id !== fileId) }));
   };
 
   const handleUpdateStage = async (id: string, stage: number) => {
@@ -503,12 +468,6 @@ export default function AdminPage() {
             >
               + Ny beställning
             </button>
-            <Link
-              href="/admin/upload-pdf"
-              className="px-5 py-2.5 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200 text-sm"
-            >
-              Ladda upp PDF →
-            </Link>
           </div>
         </div>
 
@@ -619,17 +578,15 @@ export default function AdminPage() {
                         <th className="px-4 py-3 font-medium">Email</th>
                         <th className="px-4 py-3 font-medium">Telefon</th>
                         <th className="px-4 py-3 font-medium">Paket</th>
-                        <th className="px-4 py-3 font-medium">Steg</th>
                         <th className="px-4 py-3 font-medium"></th>
                       </tr>
                     </thead>
                     <tbody>
                       {allRows.map((row) => {
-                        const isExpanded = expandedId === row.id;
+                        const isExpanded = true;
                         const isKomplett = row.package_type === 'komplett';
                         const stages = PIPELINE_STAGES.filter((s) => s.step < 5 || isKomplett);
                         const currentStage = row.stage ?? 1;
-                        const files = contactFiles[row.id] || [];
 
                         return (
                           <React.Fragment key={row.id}>
@@ -650,28 +607,7 @@ export default function AdminPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-3">
-                                {row.isContact ? (
-                                  <span className="text-xs text-warm-300">
-                                    {currentStage}. {PIPELINE_STAGES.find(s => s.step === currentStage)?.label}
-                                  </span>
-                                ) : (
-                                  <span className="text-warm-500 text-xs">—</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3">
                                 <div className="flex gap-2 items-center">
-                                  {row.isContact && (
-                                    <button
-                                      onClick={() => handleToggleExpand(row.id)}
-                                      className={`px-2 py-1 text-xs rounded-lg transition border ${
-                                        isExpanded
-                                          ? 'bg-gold-500/20 border-gold-500/40 text-gold-400'
-                                          : 'bg-navy-600 border-navy-500 text-warm-200 hover:text-white'
-                                      }`}
-                                    >
-                                      {isExpanded ? '▲ Stäng' : '▼ Detaljer'}
-                                    </button>
-                                  )}
                                   <button
                                     onClick={() => handleDelete(row.id, row.isContact)}
                                     disabled={deletingId === row.id}
@@ -722,62 +658,6 @@ export default function AdminPage() {
                                     })}
                                   </div>
 
-                                  {/* Files per step */}
-                                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                                    {stages.map((s) => {
-                                      const stepFiles = files.filter((f) => f.stage === s.step);
-                                      return (
-                                        <div key={s.step} className="bg-navy-700/50 border border-navy-600 rounded-xl p-3">
-                                          <div className="text-xs font-bold text-warm-400 mb-2 uppercase tracking-wide">
-                                            Steg {s.step} — {s.label}
-                                          </div>
-                                          <div className="space-y-1.5 mb-2 min-h-[24px]">
-                                            {stepFiles.length === 0 ? (
-                                              <div className="text-xs text-warm-600">Inga filer</div>
-                                            ) : (
-                                              stepFiles.map((f) => (
-                                                <div key={f.id} className="flex items-center gap-1 group">
-                                                  <a
-                                                    href={f.file_url}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="text-xs text-blue-400 hover:text-blue-300 truncate flex-1"
-                                                    title={f.file_name}
-                                                  >
-                                                    📎 {f.file_name}
-                                                  </a>
-                                                  <button
-                                                    onClick={() => handleFileDelete(row.id, f.id, f.file_path)}
-                                                    className="text-red-500/50 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition flex-shrink-0"
-                                                    title="Ta bort fil"
-                                                  >
-                                                    ✕
-                                                  </button>
-                                                </div>
-                                              ))
-                                            )}
-                                          </div>
-                                          <label className={`flex items-center justify-center gap-1 w-full py-1.5 text-xs rounded-lg border border-dashed cursor-pointer transition ${
-                                            uploadingStep === s.step
-                                              ? 'border-navy-500 text-warm-600'
-                                              : 'border-navy-500 text-warm-500 hover:border-gold-500/50 hover:text-gold-400'
-                                          }`}>
-                                            {uploadingStep === s.step ? 'Laddar upp...' : '+ Lägg till fil'}
-                                            <input
-                                              type="file"
-                                              className="hidden"
-                                              disabled={uploadingStep !== null}
-                                              onChange={(e) => {
-                                                const f = e.target.files?.[0];
-                                                if (f) handleFileUpload(row.id, s.step, f);
-                                                e.target.value = '';
-                                              }}
-                                            />
-                                          </label>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
                                 </td>
                               </tr>
                             )}
