@@ -3,6 +3,129 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+const BANKS = ['seb', 'swedbank', 'handelsbanken', 'nordea', 'danske', 'lansforsakringar', 'sparbanken', 'annan'];
+const STATUSES = ['pending', 'completed', 'in_progress'];
+const PACKAGES = ['komplett', 'ne-bilaga'];
+
+const PIPELINE_STAGES = [
+  { step: 1, label: 'Mail', color: 'border-blue-500/40 bg-blue-500/5' },
+  { step: 2, label: 'Bestämt möte', color: 'border-purple-500/40 bg-purple-500/5' },
+  { step: 3, label: 'Skickat in filer', color: 'border-yellow-500/40 bg-yellow-500/5' },
+  { step: 4, label: 'Skickat NE-bilaga', color: 'border-orange-500/40 bg-orange-500/5' },
+  { step: 5, label: 'Lämnat in NE-bilaga', color: 'border-green-500/40 bg-green-500/5' },
+];
+
+interface OrderFormData {
+  guest_name: string;
+  guest_email: string;
+  guest_phone: string;
+  guest_company: string;
+  package_type: string;
+  bank: string;
+  status: string;
+}
+
+const EMPTY_FORM: OrderFormData = {
+  guest_name: '',
+  guest_email: '',
+  guest_phone: '',
+  guest_company: '',
+  package_type: 'komplett',
+  bank: 'seb',
+  status: 'pending',
+};
+
+function OrderModal({
+  title,
+  form,
+  setForm,
+  onSave,
+  onClose,
+  saving,
+}: {
+  title: string;
+  form: OrderFormData;
+  setForm: (f: OrderFormData) => void;
+  onSave: () => void;
+  onClose: () => void;
+  saving: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+      <div className="bg-navy-800 border border-navy-600 rounded-2xl p-6 w-full max-w-lg">
+        <h2 className="text-xl font-bold text-white mb-5">{title}</h2>
+        <div className="space-y-4">
+          {(
+            [
+              { key: 'guest_name', label: 'Namn' },
+              { key: 'guest_email', label: 'Email' },
+              { key: 'guest_phone', label: 'Telefon' },
+              { key: 'guest_company', label: 'Företag' },
+            ] as { key: keyof OrderFormData; label: string }[]
+          ).map(({ key, label }) => (
+            <div key={key}>
+              <label className="block text-sm font-medium text-warm-300 mb-1">{label}</label>
+              <input
+                type="text"
+                value={form[key]}
+                onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                className="w-full px-3 py-2 bg-navy-700 border border-navy-600 text-white rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition text-sm"
+              />
+            </div>
+          ))}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-warm-300 mb-1">Paket</label>
+              <select
+                value={form.package_type}
+                onChange={(e) => setForm({ ...form, package_type: e.target.value })}
+                className="w-full px-3 py-2 bg-navy-700 border border-navy-600 text-white rounded-lg focus:ring-2 focus:ring-gold-500 outline-none transition text-sm"
+              >
+                {PACKAGES.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-warm-300 mb-1">Bank</label>
+              <select
+                value={form.bank}
+                onChange={(e) => setForm({ ...form, bank: e.target.value })}
+                className="w-full px-3 py-2 bg-navy-700 border border-navy-600 text-white rounded-lg focus:ring-2 focus:ring-gold-500 outline-none transition text-sm"
+              >
+                {BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-warm-300 mb-1">Status</label>
+              <select
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+                className="w-full px-3 py-2 bg-navy-700 border border-navy-600 text-white rounded-lg focus:ring-2 focus:ring-gold-500 outline-none transition text-sm"
+              >
+                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 bg-navy-700 text-warm-300 hover:text-white rounded-xl transition text-sm font-medium"
+          >
+            Avbryt
+          </button>
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="flex-1 py-2.5 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition text-sm disabled:opacity-50"
+          >
+            {saving ? 'Sparar...' : 'Spara'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const ADMIN_CODE = 'Erik0511';
 
 function CodeGate({ onUnlock }: { onUnlock: () => void }) {
@@ -79,11 +202,21 @@ const FLOW_STEPS = [
 export default function AdminPage() {
   const [unlocked, setUnlocked] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [contactRequests, setContactRequests] = useState<{ id: string; email: string; phone: string | null; package_type: string; created_at: string }[]>([]);
+  const [contactRequests, setContactRequests] = useState<{ id: string; email: string; phone: string | null; package_type: string; created_at: string; stage: number; name: string | null }[]>([]);
   const [stepCounts, setStepCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'orders' | 'contacts' | 'funnel'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'pipeline' | 'funnel'>('orders');
+
+  // Edit/create/delete state
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [editForm, setEditForm] = useState<OrderFormData>(EMPTY_FORM);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState<OrderFormData>(EMPTY_FORM);
+  const [showCreateContact, setShowCreateContact] = useState(false);
+  const [createContactForm, setCreateContactForm] = useState({ name: '', email: '', phone: '', package_type: 'ne-bilaga' });
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (sessionStorage.getItem('admin_unlocked') === '1') {
@@ -112,6 +245,97 @@ export default function AdminPage() {
     };
     fetchData();
   }, [unlocked]);
+
+  const handleDelete = async (id: string, isContact = false) => {
+    if (!confirm('Är du säker på att du vill ta bort denna rad?')) return;
+    setDeletingId(id);
+    await fetch('/api/admin/orders', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, table: isContact ? 'contact_requests' : 'orders' }),
+    });
+    if (isContact) {
+      setContactRequests((prev) => prev.filter((c) => c.id !== id));
+    } else {
+      setOrders((prev) => prev.filter((o) => o.id !== id));
+    }
+    setDeletingId(null);
+  };
+
+  const handleEditOpen = (order: Order) => {
+    setEditingOrder(order);
+    setEditForm({
+      guest_name: order.guest_name || order.profiles?.full_name || '',
+      guest_email: order.guest_email || order.profiles?.email || '',
+      guest_phone: order.guest_phone || order.profiles?.phone || '',
+      guest_company: order.guest_company || '',
+      package_type: order.package_type,
+      bank: order.bank || 'seb',
+      status: order.status,
+    });
+  };
+
+  const handleEditSave = async () => {
+    if (!editingOrder) return;
+    setSaving(true);
+    const res = await fetch('/api/admin/orders', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editingOrder.id, ...editForm }),
+    });
+    if (res.ok) {
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === editingOrder.id
+            ? { ...o, ...editForm }
+            : o
+        )
+      );
+      setEditingOrder(null);
+    }
+    setSaving(false);
+  };
+
+  const handleCreate = async () => {
+    setSaving(true);
+    const res = await fetch('/api/admin/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(createForm),
+    });
+    const data = await res.json();
+    if (data.order) {
+      setOrders((prev) => [data.order, ...prev]);
+      setShowCreate(false);
+      setCreateForm(EMPTY_FORM);
+    }
+    setSaving(false);
+  };
+
+  const handleUpdateStage = async (id: string, stage: number) => {
+    setContactRequests((prev) => prev.map((c) => c.id === id ? { ...c, stage } : c));
+    await fetch('/api/admin/contacts', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, stage }),
+    });
+  };
+
+  const handleCreateContact = async () => {
+    setSaving(true);
+    const res = await fetch('/api/admin/contacts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(createContactForm),
+    });
+    const data = await res.json();
+    if (data.contact) {
+      setContactRequests((prev) => [data.contact, ...prev]);
+      setShowCreateContact(false);
+      setCreateContactForm({ name: '', email: '', phone: '', package_type: 'ne-bilaga' });
+    }
+    setSaving(false);
+  };
 
   if (!unlocked) {
     return <CodeGate onUnlock={() => setUnlocked(true)} />;
@@ -145,24 +369,115 @@ export default function AdminPage() {
     <div className="min-h-screen bg-navy-800 py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
 
+        {/* Modals */}
+        {editingOrder && (
+          <OrderModal
+            title="Redigera beställning"
+            form={editForm}
+            setForm={setEditForm}
+            onSave={handleEditSave}
+            onClose={() => setEditingOrder(null)}
+            saving={saving}
+          />
+        )}
+        {showCreate && (
+          <OrderModal
+            title="Ny beställning"
+            form={createForm}
+            setForm={setCreateForm}
+            onSave={handleCreate}
+            onClose={() => setShowCreate(false)}
+            saving={saving}
+          />
+        )}
+        {showCreateContact && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <div className="bg-navy-800 border border-navy-600 rounded-2xl p-6 w-full max-w-md">
+              <h2 className="text-xl font-bold text-white mb-5">Ny kontaktförfrågan</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-warm-300 mb-1">Namn</label>
+                  <input
+                    type="text"
+                    value={createContactForm.name}
+                    onChange={(e) => setCreateContactForm({ ...createContactForm, name: e.target.value })}
+                    className="w-full px-3 py-2 bg-navy-700 border border-navy-600 text-white rounded-lg focus:ring-2 focus:ring-gold-500 outline-none transition text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-warm-300 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={createContactForm.email}
+                    onChange={(e) => setCreateContactForm({ ...createContactForm, email: e.target.value })}
+                    className="w-full px-3 py-2 bg-navy-700 border border-navy-600 text-white rounded-lg focus:ring-2 focus:ring-gold-500 outline-none transition text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-warm-300 mb-1">Telefon</label>
+                  <input
+                    type="text"
+                    value={createContactForm.phone}
+                    onChange={(e) => setCreateContactForm({ ...createContactForm, phone: e.target.value })}
+                    className="w-full px-3 py-2 bg-navy-700 border border-navy-600 text-white rounded-lg focus:ring-2 focus:ring-gold-500 outline-none transition text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-warm-300 mb-1">Paket</label>
+                  <select
+                    value={createContactForm.package_type}
+                    onChange={(e) => setCreateContactForm({ ...createContactForm, package_type: e.target.value })}
+                    className="w-full px-3 py-2 bg-navy-700 border border-navy-600 text-white rounded-lg focus:ring-2 focus:ring-gold-500 outline-none transition text-sm"
+                  >
+                    {PACKAGES.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowCreateContact(false)}
+                  className="flex-1 py-2.5 bg-navy-700 text-warm-300 hover:text-white rounded-xl transition text-sm font-medium"
+                >
+                  Avbryt
+                </button>
+                <button
+                  onClick={handleCreateContact}
+                  disabled={saving || !createContactForm.email}
+                  className="flex-1 py-2.5 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition text-sm disabled:opacity-50"
+                >
+                  {saving ? 'Sparar...' : 'Spara'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-white">Admin Panel</h1>
             <p className="text-warm-400 mt-1">Beställningar och funnel-statistik</p>
           </div>
-          <Link
-            href="/admin/upload-pdf"
-            className="px-5 py-2.5 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200 text-sm"
-          >
-            Ladda upp PDF →
-          </Link>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowCreateContact(true)}
+              className="px-5 py-2.5 bg-navy-700 hover:bg-navy-600 text-white font-bold rounded-xl transition-all duration-200 text-sm border border-navy-600"
+            >
+              + Ny beställning
+            </button>
+            <Link
+              href="/admin/upload-pdf"
+              className="px-5 py-2.5 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200 text-sm"
+            >
+              Ladda upp PDF →
+            </Link>
+          </div>
         </div>
 
         {/* Stats row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-5">
-            <div className="text-3xl font-bold text-gold-500">{orders.length}</div>
+            <div className="text-3xl font-bold text-gold-500">{orders.length + contactRequests.length}</div>
             <div className="text-sm text-warm-400 mt-1">Totala beställningar</div>
           </div>
           <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-5">
@@ -173,7 +488,7 @@ export default function AdminPage() {
           </div>
           <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-5">
             <div className="text-3xl font-bold text-yellow-400">
-              {orders.filter(o => o.status === 'pending').length}
+              {orders.filter(o => o.status === 'pending').length + contactRequests.length}
             </div>
             <div className="text-sm text-warm-400 mt-1">Väntande</div>
           </div>
@@ -198,14 +513,14 @@ export default function AdminPage() {
             Beställningar
           </button>
           <button
-            onClick={() => setActiveTab('contacts')}
+            onClick={() => setActiveTab('pipeline')}
             className={`px-5 py-2 rounded-lg font-semibold text-sm transition-all ${
-              activeTab === 'contacts'
+              activeTab === 'pipeline'
                 ? 'bg-gold-500 text-navy-900'
                 : 'bg-navy-700 text-warm-300 hover:text-white'
             }`}
           >
-            Kontaktförfrågningar ({contactRequests.length})
+            Pipeline
           </button>
           <button
             onClick={() => setActiveTab('funnel')}
@@ -230,93 +545,165 @@ export default function AdminPage() {
         )}
 
         {/* Orders tab */}
-        {!loading && activeTab === 'orders' && (
-          <div className="bg-navy-700/50 border border-navy-600 rounded-xl overflow-hidden">
-            {orders.length === 0 ? (
-              <div className="text-center py-16 text-warm-400">Inga beställningar ännu</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-navy-600 text-warm-400 text-left">
-                      <th className="px-4 py-3 font-medium">Datum</th>
-                      <th className="px-4 py-3 font-medium">Namn</th>
-                      <th className="px-4 py-3 font-medium">Email</th>
-                      <th className="px-4 py-3 font-medium">Telefon</th>
-                      <th className="px-4 py-3 font-medium">Företag</th>
-                      <th className="px-4 py-3 font-medium">Paket</th>
-                      <th className="px-4 py-3 font-medium">Bank</th>
-                      <th className="px-4 py-3 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.map((order) => (
-                      <tr
-                        key={order.id}
-                        className="border-b border-navy-600/50 hover:bg-navy-700/30 transition-colors"
-                      >
-                        <td className="px-4 py-3 text-warm-400 whitespace-nowrap">
-                          {new Date(order.created_at).toLocaleDateString('sv-SE')}
-                        </td>
-                        <td className="px-4 py-3 text-white font-medium">{getName(order)}</td>
-                        <td className="px-4 py-3 text-warm-300">{getEmail(order)}</td>
-                        <td className="px-4 py-3 text-warm-300">{getPhone(order)}</td>
-                        <td className="px-4 py-3 text-warm-300">{getCompany(order)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded-md text-xs font-semibold ${packageColor(order.package_type)}`}>
-                            {order.package_type}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-warm-300 capitalize">{order.bank || '—'}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded-md text-xs font-semibold border ${statusColor(order.status)}`}>
-                            {order.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+        {!loading && activeTab === 'orders' && (() => {
+          const contactRows = contactRequests.map((c) => ({
+            id: c.id,
+            created_at: c.created_at,
+            name: c.name || '—',
+            email: c.email,
+            phone: c.phone || '—',
+            company: '—',
+            package_type: c.package_type,
+            bank: '—',
+            status: 'kontakt',
+            stage: c.stage ?? 1,
+            isContact: true as const,
+            _order: undefined as Order | undefined,
+          }));
+          const orderRows = orders.map((o) => ({
+            id: o.id,
+            created_at: o.created_at,
+            name: o.profiles?.full_name || o.guest_name || '—',
+            email: o.profiles?.email || o.guest_email || '—',
+            phone: o.profiles?.phone || o.guest_phone || '—',
+            company: o.guest_company || '—',
+            package_type: o.package_type,
+            bank: o.bank || '—',
+            status: o.status,
+            stage: null as number | null,
+            isContact: false as const,
+            _order: o,
+          }));
+          const allRows = [...contactRows, ...orderRows].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
 
-        {/* Contacts tab */}
-        {!loading && activeTab === 'contacts' && (
-          <div className="bg-navy-700/50 border border-navy-600 rounded-xl overflow-hidden">
-            {contactRequests.length === 0 ? (
-              <div className="text-center py-16 text-warm-400">Inga kontaktförfrågningar ännu</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-navy-600 text-warm-400 text-left">
-                      <th className="px-4 py-3 font-medium">Datum</th>
-                      <th className="px-4 py-3 font-medium">Email</th>
-                      <th className="px-4 py-3 font-medium">Telefon</th>
-                      <th className="px-4 py-3 font-medium">Paket</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {contactRequests.map((req) => (
-                      <tr key={req.id} className="border-b border-navy-600/50 hover:bg-navy-700/30 transition-colors">
-                        <td className="px-4 py-3 text-warm-400 whitespace-nowrap">
-                          {new Date(req.created_at).toLocaleDateString('sv-SE')}
-                        </td>
-                        <td className="px-4 py-3 text-white font-medium">{req.email}</td>
-                        <td className="px-4 py-3 text-warm-300">{req.phone || '—'}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded-md text-xs font-semibold ${packageColor(req.package_type)}`}>
-                            {req.package_type === 'komplett' ? 'Komplett tjänst' : 'NE-bilaga'}
-                          </span>
-                        </td>
+          return (
+            <div className="bg-navy-700/50 border border-navy-600 rounded-xl overflow-hidden">
+              {allRows.length === 0 ? (
+                <div className="text-center py-16 text-warm-400">Inga beställningar ännu</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-navy-600 text-warm-400 text-left">
+                        <th className="px-4 py-3 font-medium">Datum</th>
+                        <th className="px-4 py-3 font-medium">Email</th>
+                        <th className="px-4 py-3 font-medium">Telefon</th>
+                        <th className="px-4 py-3 font-medium">Paket</th>
+                        <th className="px-4 py-3 font-medium">Steg</th>
+                        <th className="px-4 py-3 font-medium"></th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      {allRows.map((row) => (
+                        <tr
+                          key={row.id}
+                          className="border-b border-navy-600/50 hover:bg-navy-700/30 transition-colors"
+                        >
+                          <td className="px-4 py-3 text-warm-400 whitespace-nowrap">
+                            {new Date(row.created_at).toLocaleDateString('sv-SE')}
+                          </td>
+                          <td className="px-4 py-3 text-white font-medium">{row.email}</td>
+                          <td className="px-4 py-3 text-warm-300">{row.phone}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-md text-xs font-semibold ${packageColor(row.package_type)}`}>
+                              {row.package_type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {row.isContact ? (
+                              <select
+                                value={row.stage ?? 1}
+                                onChange={(e) => handleUpdateStage(row.id, Number(e.target.value))}
+                                className="px-2 py-1 text-xs bg-navy-700 border border-navy-600 text-warm-200 rounded-lg outline-none"
+                              >
+                                {PIPELINE_STAGES.filter((s) => s.step < 5 || row.package_type === 'komplett').map((s) => (
+                                  <option key={s.step} value={s.step}>{s.step}. {s.label}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="text-warm-500 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => handleDelete(row.id, row.isContact)}
+                              disabled={deletingId === row.id}
+                              className="px-2 py-1 text-xs bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-lg transition disabled:opacity-50"
+                            >
+                              {deletingId === row.id ? '...' : 'Ta bort'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Pipeline tab */}
+        {!loading && activeTab === 'pipeline' && (
+          <div className="overflow-x-auto pb-4">
+            <div className="flex gap-4 min-w-max">
+              {PIPELINE_STAGES.map((stage) => {
+                const cards = contactRequests.filter((c) => {
+                  if (stage.step === 5) return c.stage === 5 && c.package_type === 'komplett';
+                  return c.stage === stage.step;
+                });
+                return (
+                  <div key={stage.step} className={`w-64 rounded-xl border p-4 ${stage.color}`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <span className="text-xs font-bold text-warm-500 uppercase tracking-wider">Steg {stage.step}</span>
+                        <h3 className="text-sm font-bold text-white mt-0.5">{stage.label}</h3>
+                      </div>
+                      <span className="text-xs bg-navy-700 text-warm-300 px-2 py-1 rounded-full">{cards.length}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {cards.length === 0 ? (
+                        <div className="text-xs text-warm-600 text-center py-4">Tomt</div>
+                      ) : (
+                        cards.map((c) => (
+                          <div key={c.id} className="bg-navy-800/80 border border-navy-600 rounded-lg p-3">
+                            <div className="text-sm text-white font-medium truncate">{c.name || c.email}</div>
+                            {c.name && <div className="text-xs text-warm-400 truncate">{c.email}</div>}
+                            <div className="flex items-center justify-between mt-2">
+                              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${packageColor(c.package_type)}`}>
+                                {c.package_type}
+                              </span>
+                              <div className="flex gap-1">
+                                {stage.step > 1 && (
+                                  <button
+                                    onClick={() => handleUpdateStage(c.id, stage.step - 1)}
+                                    className="text-xs text-warm-500 hover:text-white px-1.5 py-0.5 bg-navy-700 rounded transition"
+                                    title="Steg tillbaka"
+                                  >
+                                    ←
+                                  </button>
+                                )}
+                                {stage.step < 5 && !(stage.step === 4 && c.package_type !== 'komplett') && (
+                                  <button
+                                    onClick={() => handleUpdateStage(c.id, stage.step + 1)}
+                                    className="text-xs text-warm-500 hover:text-white px-1.5 py-0.5 bg-navy-700 rounded transition"
+                                    title="Nästa steg"
+                                  >
+                                    →
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
