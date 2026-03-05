@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const BANKS = ['seb', 'swedbank', 'handelsbanken', 'nordea', 'danske', 'lansforsakringar', 'sparbanken', 'annan'];
@@ -632,9 +632,8 @@ export default function AdminPage() {
                         const files = contactFiles[row.id] || [];
 
                         return (
-                          <>
+                          <React.Fragment key={row.id}>
                             <tr
-                              key={row.id}
                               className={`border-b border-navy-600/50 transition-colors ${isExpanded ? 'bg-navy-700/40' : 'hover:bg-navy-700/20'}`}
                             >
                               <td className="px-4 py-3 text-warm-400 whitespace-nowrap">
@@ -686,7 +685,7 @@ export default function AdminPage() {
 
                             {/* Expanded pipeline + files */}
                             {isExpanded && row.isContact && (
-                              <tr key={`${row.id}-expanded`} className="border-b border-navy-600/50 bg-navy-800/60">
+                              <tr className="border-b border-navy-600/50 bg-navy-800/60">
                                 <td colSpan={6} className="px-6 py-6">
                                   {/* Progress bar */}
                                   <div className="flex items-start gap-0 mb-6">
@@ -782,7 +781,7 @@ export default function AdminPage() {
                                 </td>
                               </tr>
                             )}
-                          </>
+                          </React.Fragment>
                         );
                       })}
                     </tbody>
