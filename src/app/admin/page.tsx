@@ -647,63 +647,83 @@ export default function AdminPage() {
 
         {/* Pipeline tab */}
         {!loading && activeTab === 'pipeline' && (
-          <div className="overflow-x-auto pb-4">
-            <div className="flex gap-4 min-w-max">
-              {PIPELINE_STAGES.map((stage) => {
-                const cards = contactRequests.filter((c) => {
-                  if (stage.step === 5) return c.stage === 5 && c.package_type === 'komplett';
-                  return c.stage === stage.step;
-                });
+          <div className="space-y-4">
+            {contactRequests.length === 0 ? (
+              <div className="text-center py-16 text-warm-400">Inga beställningar i pipeline</div>
+            ) : (
+              contactRequests.map((c) => {
+                const isKomplett = c.package_type === 'komplett';
+                const stages = PIPELINE_STAGES.filter((s) => s.step < 5 || isKomplett);
+                const currentStage = c.stage ?? 1;
+                const currentLabel = PIPELINE_STAGES.find((s) => s.step === currentStage)?.label ?? '';
+
                 return (
-                  <div key={stage.step} className={`w-64 rounded-xl border p-4 ${stage.color}`}>
-                    <div className="flex items-center justify-between mb-4">
+                  <div key={c.id} className="bg-navy-700/50 border border-navy-600 rounded-2xl p-6">
+                    {/* Top row: name/email + package + date */}
+                    <div className="flex items-start justify-between mb-5">
                       <div>
-                        <span className="text-xs font-bold text-warm-500 uppercase tracking-wider">Steg {stage.step}</span>
-                        <h3 className="text-sm font-bold text-white mt-0.5">{stage.label}</h3>
+                        <div className="text-lg font-bold text-white">{c.name || c.email}</div>
+                        {c.name && <div className="text-sm text-warm-400 mt-0.5">{c.email}</div>}
+                        {c.phone && <div className="text-sm text-warm-500 mt-0.5">{c.phone}</div>}
                       </div>
-                      <span className="text-xs bg-navy-700 text-warm-300 px-2 py-1 rounded-full">{cards.length}</span>
+                      <div className="flex items-center gap-3">
+                        <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${packageColor(c.package_type)}`}>
+                          {c.package_type}
+                        </span>
+                        <span className="text-sm text-warm-500">
+                          {new Date(c.created_at).toLocaleDateString('sv-SE')}
+                        </span>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      {cards.length === 0 ? (
-                        <div className="text-xs text-warm-600 text-center py-4">Tomt</div>
-                      ) : (
-                        cards.map((c) => (
-                          <div key={c.id} className="bg-navy-800/80 border border-navy-600 rounded-lg p-3">
-                            <div className="text-sm text-white font-medium truncate">{c.name || c.email}</div>
-                            {c.name && <div className="text-xs text-warm-400 truncate">{c.email}</div>}
-                            <div className="flex items-center justify-between mt-2">
-                              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${packageColor(c.package_type)}`}>
-                                {c.package_type}
-                              </span>
-                              <div className="flex gap-1">
-                                {stage.step > 1 && (
-                                  <button
-                                    onClick={() => handleUpdateStage(c.id, stage.step - 1)}
-                                    className="text-xs text-warm-500 hover:text-white px-1.5 py-0.5 bg-navy-700 rounded transition"
-                                    title="Steg tillbaka"
-                                  >
-                                    ←
-                                  </button>
-                                )}
-                                {stage.step < 5 && !(stage.step === 4 && c.package_type !== 'komplett') && (
-                                  <button
-                                    onClick={() => handleUpdateStage(c.id, stage.step + 1)}
-                                    className="text-xs text-warm-500 hover:text-white px-1.5 py-0.5 bg-navy-700 rounded transition"
-                                    title="Nästa steg"
-                                  >
-                                    →
-                                  </button>
-                                )}
+
+                    {/* Current stage label */}
+                    <div className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-3">
+                      Nuvarande steg: <span className="text-gold-400">{currentLabel}</span>
+                    </div>
+
+                    {/* Progress steps */}
+                    <div className="flex items-center gap-0">
+                      {stages.map((s, i) => {
+                        const done = currentStage > s.step;
+                        const active = currentStage === s.step;
+                        const isLast = i === stages.length - 1;
+                        return (
+                          <div key={s.step} className="flex items-center flex-1 min-w-0">
+                            {/* Step */}
+                            <button
+                              onClick={() => handleUpdateStage(c.id, s.step)}
+                              className={`flex flex-col items-center gap-1.5 group flex-shrink-0`}
+                              title={`Sätt till: ${s.label}`}
+                            >
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all border-2 ${
+                                done
+                                  ? 'bg-gold-500 border-gold-500 text-navy-900'
+                                  : active
+                                  ? 'bg-gold-500/20 border-gold-500 text-gold-400 ring-4 ring-gold-500/20'
+                                  : 'bg-navy-800 border-navy-500 text-warm-500 group-hover:border-warm-400 group-hover:text-warm-300'
+                              }`}>
+                                {done ? '✓' : s.step}
                               </div>
-                            </div>
+                              <span className={`text-xs font-medium whitespace-nowrap max-w-[80px] text-center leading-tight ${
+                                active ? 'text-gold-400' : done ? 'text-gold-500/70' : 'text-warm-500'
+                              }`}>
+                                {s.label}
+                              </span>
+                            </button>
+                            {/* Connector line */}
+                            {!isLast && (
+                              <div className={`flex-1 h-0.5 mx-1 mb-5 transition-all ${
+                                done ? 'bg-gold-500' : 'bg-navy-600'
+                              }`} />
+                            )}
                           </div>
-                        ))
-                      )}
+                        );
+                      })}
                     </div>
                   </div>
                 );
-              })}
-            </div>
+              })
+            )}
           </div>
         )}
 
