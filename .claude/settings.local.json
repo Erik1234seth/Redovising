@@ -10,7 +10,18 @@
       "Bash(for file in src/app/flow/[package]/add-transactions/page.tsx src/app/flow/[package]/bank-selection/page.tsx src/app/flow/[package]/delegation-guide/page.tsx src/app/flow/[package]/download-guide/page.tsx src/app/flow/[package]/upload-previous/page.tsx src/app/flow/[package]/upload-statement/page.tsx)",
       "Bash(do sed -i 's/const totalSteps = 6/const totalSteps = 7/g' \"$file\")",
       "Bash(done)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__apply_migration",
+      "mcp__supabase__execute_sql",
+      "Bash(powershell:*)",
+      "Bash(mv:*)",
+      "Bash(node:*)",
+      "Bash(/c/Users/erijo/Redovising/public/favicon/favicon.svg:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
