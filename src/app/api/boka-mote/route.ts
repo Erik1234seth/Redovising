@@ -19,14 +19,14 @@ function formatDate(dateStr: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, phone, date, time, message } = await req.json();
+    const { name, email, phone, date, time, message, sessionId } = await req.json();
 
     if (!name || !email || !date || !time) {
       return NextResponse.json({ error: 'Namn, email, datum och tid krävs' }, { status: 400 });
     }
 
     const supabase = getSupabase();
-    await supabase.from('meetings').insert({ name, email, phone: phone || null, date, time, message: message || null });
+    await supabase.from('meetings').insert({ name, email, phone: phone || null, date, time, message: message || null, session_id: sessionId || null });
 
     const formattedDate = formatDate(date);
 

@@ -50,8 +50,8 @@ export default function Home() {
           variant = Math.random() < 0.5 ? 'popup' : 'no-popup';
           sessionStorage.setItem('popupVariant', variant);
           // Track which variant was assigned
-          let sessionId = sessionStorage.getItem('sessionId');
-          if (!sessionId) { sessionId = crypto.randomUUID(); sessionStorage.setItem('sessionId', sessionId); }
+          let sessionId = sessionStorage.getItem('analyticsSessionId');
+          if (!sessionId) { sessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`; sessionStorage.setItem('analyticsSessionId', sessionId); }
           fetch('/api/analytics/track', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

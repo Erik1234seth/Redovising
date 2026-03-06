@@ -11,8 +11,8 @@ const MONTHS = [
 ];
 const DAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
 
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
+function toDateStr(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 function getMinDate(): Date {
@@ -65,7 +65,7 @@ export default function BookMeetingPage() {
 
   const handleSelectDate = (day: number) => {
     if (isDisabled(day)) return;
-    setSelectedDate(toDateStr(new Date(viewYear, viewMonth, day)));
+    setSelectedDate(toDateStr(viewYear, viewMonth, day));
     setSelectedTime(null);
   };
 
@@ -118,7 +118,7 @@ export default function BookMeetingPage() {
           <div className="grid grid-cols-7 p-2 gap-1">
             {cells.map((day, i) => {
               if (!day) return <div key={i} />;
-              const ds = toDateStr(new Date(viewYear, viewMonth, day));
+              const ds = toDateStr(viewYear, viewMonth, day);
               const disabled = isDisabled(day);
               const selected = selectedDate === ds;
               return (
