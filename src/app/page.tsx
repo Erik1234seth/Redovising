@@ -13,15 +13,15 @@ export default function Home() {
   const { user, loading } = useAuth();
   const [showInfoPopup, setShowInfoPopup] = useState(false);
 
-  useEffect(() => {
-    if (!loading && !user) {
-      const hasSeenPopup = sessionStorage.getItem('hasSeenInfoPopup');
-      if (!hasSeenPopup) {
-        const timer = setTimeout(() => setShowInfoPopup(true), 1500);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [loading, user]);
+  // useEffect(() => {
+  //   if (!loading && !user) {
+  //     const hasSeenPopup = sessionStorage.getItem('hasSeenInfoPopup');
+  //     if (!hasSeenPopup) {
+  //       const timer = setTimeout(() => setShowInfoPopup(true), 1500);
+  //       return () => clearTimeout(timer);
+  //     }
+  //   }
+  // }, [loading, user]);
 
   const closePopup = () => {
     setShowInfoPopup(false);
