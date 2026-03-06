@@ -206,7 +206,8 @@ export default function AdminPage() {
   const [stepCounts, setStepCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'orders' | 'funnel'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'funnel' | 'ab'>('orders');
+  const [abStats, setAbStats] = useState<{ shown: number; hidden: number; clicks: number; conversionRate: string; recentEvents: { step: string; session_id: string; created_at: string }[] } | null>(null);
 
   // Edit/create/delete state
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -247,6 +248,11 @@ export default function AdminPage() {
       }
     };
     fetchData();
+
+    fetch('/api/admin/ab-stats')
+      .then(r => r.json())
+      .then(d => { if (!d.error) setAbStats(d); })
+      .catch(() => {});
   }, [unlocked]);
 
   const handleDelete = async (id: string, isContact = false) => {
@@ -519,6 +525,16 @@ export default function AdminPage() {
           >
             Funnel
           </button>
+          <button
+            onClick={() => setActiveTab('ab')}
+            className={`px-5 py-2 rounded-lg font-semibold text-sm transition-all ${
+              activeTab === 'ab'
+                ? 'bg-gold-500 text-navy-900'
+                : 'bg-navy-700 text-warm-300 hover:text-white'
+            }`}
+          >
+            A/B Popup
+          </button>
         </div>
 
         {loading && (
@@ -714,6 +730,104 @@ export default function AdminPage() {
             )}
           </div>
         )}
+
+        {/* A/B Popup tab */}
+        {!loading && activeTab === 'ab' && (
+          <div className="space-y-6">
+            {!abStats ? (
+              <div className="text-center py-20 text-warm-400">Laddar A/B-data...</div>
+            ) : (
+              <>
+                {/* Summary cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-5">
+                    <div className="text-3xl font-bold text-blue-400">{abStats.shown}</div>
+                    <div className="text-sm text-warm-400 mt-1">Såg popup</div>
+                  </div>
+                  <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-5">
+                    <div className="text-3xl font-bold text-warm-400">{abStats.hidden}</div>
+                    <div className="text-sm text-warm-400 mt-1">Ingen popup</div>
+                  </div>
+                  <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-5">
+                    <div className="text-3xl font-bold text-gold-500">{abStats.clicks}</div>
+                    <div className="text-sm text-warm-400 mt-1">CTA-klick</div>
+                  </div>
+                  <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-5">
+                    <div className="text-3xl font-bold text-green-400">{abStats.conversionRate}%</div>
+                    <div className="text-sm text-warm-400 mt-1">Konvertering (popup)</div>
+                  </div>
+                </div>
+
+                {/* Visual comparison */}
+                <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-6">
+                  <h3 className="text-sm font-semibold text-warm-300 uppercase tracking-widest mb-5">Fördelning</h3>
+                  <div className="space-y-4">
+                    {[
+                      { label: 'Popup visad', value: abStats.shown, color: 'bg-blue-500' },
+                      { label: 'Ingen popup', value: abStats.hidden, color: 'bg-navy-500' },
+                      { label: 'CTA-klick (konverterade)', value: abStats.clicks, color: 'bg-gold-500' },
+                    ].map(({ label, value, color }) => {
+                      const total = abStats.shown + abStats.hidden || 1;
+                      const pct = Math.round((value / total) * 100);
+                      return (
+                        <div key={label}>
+                          <div className="flex justify-between mb-1.5">
+                            <span className="text-sm text-warm-200">{label}</span>
+                            <span className="text-sm font-bold text-white">{value} <span className="text-warm-500 font-normal text-xs">({pct}%)</span></span>
+                          </div>
+                          <div className="h-2 bg-navy-800 rounded-full overflow-hidden">
+                            <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Recent events */}
+                <div className="bg-navy-700/50 border border-navy-600 rounded-xl overflow-hidden">
+                  <div className="px-6 py-4 border-b border-navy-600">
+                    <h3 className="text-sm font-semibold text-warm-300 uppercase tracking-widest">Senaste händelser</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-navy-600">
+                          <th className="text-left px-6 py-3 text-warm-400 font-medium">Händelse</th>
+                          <th className="text-left px-6 py-3 text-warm-400 font-medium">Session</th>
+                          <th className="text-left px-6 py-3 text-warm-400 font-medium">Tid</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {abStats.recentEvents.map((e, i) => (
+                          <tr key={i} className="border-b border-navy-700/50 hover:bg-navy-700/30 transition-colors">
+                            <td className="px-6 py-3">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                e.step === 'ab_popup_popup' ? 'bg-blue-500/20 text-blue-400' :
+                                e.step === 'ab_popup_cta_click' ? 'bg-gold-500/20 text-gold-400' :
+                                'bg-navy-600 text-warm-400'
+                              }`}>
+                                {e.step === 'ab_popup_popup' ? 'Popup visad' :
+                                 e.step === 'ab_popup_no-popup' ? 'Ingen popup' :
+                                 'CTA-klick'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-3 text-warm-400 font-mono text-xs">{e.session_id?.slice(0, 8)}...</td>
+                            <td className="px-6 py-3 text-warm-400">{new Date(e.created_at).toLocaleString('sv-SE')}</td>
+                          </tr>
+                        ))}
+                        {abStats.recentEvents.length === 0 && (
+                          <tr><td colSpan={3} className="px-6 py-8 text-center text-warm-500">Ingen data ännu</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );
