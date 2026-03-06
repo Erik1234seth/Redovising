@@ -118,7 +118,7 @@ export default function Home() {
                 {/* Photo */}
                 <div className="relative w-full h-[340px] sm:h-[420px] lg:h-full lg:min-h-[580px] rounded-2xl lg:rounded-[32px] overflow-hidden">
                   <Image
-                    src="/ChatGPT Image 4 mars 2026 09_04_31.png"
+                    src="/hero-enkla-bokslut.png"
                     alt="Glada småföretagare som fått hjälp med bokslut"
                     fill
                     className="object-cover object-center"

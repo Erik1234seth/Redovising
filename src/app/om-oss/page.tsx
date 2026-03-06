@@ -74,7 +74,7 @@ export default function OmOssPage() {
         {/* Right: photo */}
         <div className="flex-1 relative min-h-[280px] sm:min-h-[380px]">
           <Image
-            src="/ChatGPT Image 4 mars 2026 09_22_50.png"
+            src="/om-oss-enkla-bokslut.png"
             alt="Småföretagare i sin butik"
             fill
             className="object-cover"
