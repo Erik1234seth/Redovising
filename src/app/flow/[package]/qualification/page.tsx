@@ -42,7 +42,7 @@ export default function QualificationPage() {
 
   const handleContinue = () => {
     sessionStorage.setItem(`qualificationAnswers_${packageType}`, JSON.stringify(answers));
-    router.push(`/flow/${packageType}/method-selection`);
+    router.push(`/flow/${packageType}/book-meeting`);
   };
 
   return (

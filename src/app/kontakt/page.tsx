@@ -101,7 +101,7 @@ export default function KontaktPage() {
               ))}
             </div>
 
-            <div className="border-t border-gray-100 pt-8">
+            <div className="border-t border-gray-100 pt-8 mb-6">
               <h3 className="font-semibold text-navy-900 mb-2">Vanliga frågor?</h3>
               <p className="text-slate-500 text-sm mb-3 leading-relaxed">
                 Kolla in vår guidesida för svar på vanliga frågor och steg-för-steg instruktioner.
@@ -116,6 +116,30 @@ export default function KontaktPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
+            </div>
+
+            <div className="border-t border-gray-100 pt-8">
+              <div className="rounded-2xl p-6" style={{ backgroundColor: NAV_BG }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ backgroundColor: CORAL }}>
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-white mb-1">Boka ett kostnadsfritt möte</h3>
+                <p className="text-white/60 text-sm mb-4 leading-relaxed">
+                  Vill du hellre prata med oss direkt? Boka ett kort möte så ringer vi upp dig.
+                </p>
+                <Link
+                  href="/boka-mote"
+                  className="inline-flex items-center gap-2 text-sm font-bold py-2.5 px-5 rounded-xl transition-all duration-200 hover:opacity-90"
+                  style={{ backgroundColor: CORAL, color: '#fff' }}
+                >
+                  Boka möte
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </div>
             </div>
           </div>
 

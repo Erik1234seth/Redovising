@@ -67,9 +67,7 @@ export default function Navigation() {
 
           {/* ── Right: utility + CTA (desktop) ── */}
           <div className="hidden md:flex items-center gap-5">
-            {loading ? (
-              <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-            ) : user ? (
+            {!loading && user && (
               <Link
                 href="/account"
                 className="text-[14px] font-medium transition-colors"
@@ -78,16 +76,6 @@ export default function Navigation() {
                 onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.72)')}
               >
                 Mitt konto
-              </Link>
-            ) : (
-              <Link
-                href="/auth/login"
-                className="text-[14px] font-medium transition-colors"
-                style={{ color: 'rgba(255,255,255,0.72)' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.72)')}
-              >
-                Logga in
               </Link>
             )}
             <Link
@@ -136,26 +124,15 @@ export default function Navigation() {
             </Link>
           ))}
           <div className="pt-3 border-t border-white/10 space-y-2">
-            {!loading && (
-              user ? (
-                <Link
-                  href="/account"
-                  onClick={() => setMobileOpen(false)}
-                  className="block px-4 py-3 text-[15px] font-medium rounded-xl transition-colors"
-                  style={{ color: 'rgba(255,255,255,0.75)' }}
-                >
-                  Mitt konto
-                </Link>
-              ) : (
-                <Link
-                  href="/auth/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="block px-4 py-3 text-[15px] font-medium rounded-xl transition-colors"
-                  style={{ color: 'rgba(255,255,255,0.75)' }}
-                >
-                  Logga in
-                </Link>
-              )
+            {!loading && user && (
+              <Link
+                href="/account"
+                onClick={() => setMobileOpen(false)}
+                className="block px-4 py-3 text-[15px] font-medium rounded-xl transition-colors"
+                style={{ color: 'rgba(255,255,255,0.75)' }}
+              >
+                Mitt konto
+              </Link>
             )}
             <Link
               href="/kontakt"

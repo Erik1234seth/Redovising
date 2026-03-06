@@ -6,7 +6,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, phone, name, packageType } = await request.json();
+    const { email, phone, name, packageType, meetingDate, meetingTime, sessionId } = await request.json();
 
     if (!email) {
       return NextResponse.json({ error: 'Email saknas' }, { status: 400 });
@@ -21,6 +21,23 @@ export async function POST(request: NextRequest) {
     );
     await supabase.from('contact_requests').insert({ email, phone: phone || null, name: name || null, package_type: packageType });
 
+    // Save meeting booking if a time was selected
+    if (meetingDate && meetingTime) {
+      await supabase.from('meetings').insert({
+        name: name || null,
+        email,
+        phone: phone || null,
+        date: meetingDate,
+        time: meetingTime,
+        message: `Via flödet – ${packageName}`,
+        session_id: sessionId || null,
+      });
+    }
+
+    const formattedMeeting = meetingDate && meetingTime
+      ? new Date(meetingDate + 'T12:00:00').toLocaleDateString('sv-SE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + ' kl. ' + meetingTime
+      : null;
+
     // Notify Erik
     await resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
@@ -32,7 +49,7 @@ export async function POST(request: NextRequest) {
         <p><strong>Namn:</strong> ${name || '—'}</p>
         <p><strong>Email:</strong> ${email}</p>
         <p><strong>Telefon:</strong> ${phone || '—'}</p>
-        <p>Kunden vill bli kontaktad via mail.</p>
+        ${formattedMeeting ? `<p><strong>Möte bokat:</strong> ${formattedMeeting}</p>` : '<p>Kunden vill bli kontaktad via mail.</p>'}
       `,
     });
 
@@ -73,12 +90,16 @@ export async function POST(request: NextRequest) {
                       Tack${name ? ', ' + name.split(' ')[0] : ''}!
                     </p>
                     <p style="margin:0 0 24px;font-size:16px;color:#5a6a7a;line-height:1.6;">
-                      Vi har tagit emot din förfrågan om <strong>${packageName}</strong> och hör av oss inom kort.
+                      ${formattedMeeting
+                        ? `Vi ringer upp dig <strong style="color:#173b57;">${formattedMeeting}</strong> för en kort genomgång av ditt ärende.`
+                        : `Vi har tagit emot din förfrågan om <strong>${packageName}</strong> och hör av oss inom kort.`
+                      }
                     </p>
                     <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:24px;">
                       <tr><td style="padding:20px;">
-                        <p style="margin:0 0 8px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#8fa3b1;">Din förfrågan</p>
+                        <p style="margin:0 0 8px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#8fa3b1;">Din bokning</p>
                         <p style="margin:0;font-size:15px;color:#173b57;"><strong>Paket:</strong> ${packageName}</p>
+                        ${formattedMeeting ? `<p style="margin:4px 0 0;font-size:15px;color:#173b57;"><strong>Tid för möte:</strong> ${formattedMeeting}</p>` : ''}
                         ${phone ? `<p style="margin:4px 0 0;font-size:15px;color:#173b57;"><strong>Telefon:</strong> ${phone}</p>` : ''}
                       </td></tr>
                     </table>

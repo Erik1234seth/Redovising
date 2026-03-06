@@ -207,7 +207,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'orders' | 'funnel' | 'ab'>('orders');
-  const [abStats, setAbStats] = useState<{ shown: number; hidden: number; clicks: number; conversionRate: string; recentEvents: { step: string; session_id: string; created_at: string }[] } | null>(null);
+  const [abStats, setAbStats] = useState<{ shown: number; hidden: number; clicks: number; conversionRate: string; orderedWithPopup: number; orderedWithoutPopup: number; orderConversionWithPopup: string; orderConversionWithoutPopup: string; bookedWithPopup: number; bookedWithoutPopup: number; recentEvents: { step: string; session_id: string; created_at: string }[] } | null>(null);
 
   // Edit/create/delete state
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -738,6 +738,40 @@ export default function AdminPage() {
               <div className="text-center py-20 text-warm-400">Laddar A/B-data...</div>
             ) : (
               <>
+                {/* Order correlation */}
+                <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-6">
+                  <h3 className="text-sm font-semibold text-warm-300 uppercase tracking-widest mb-4">Beställningar per variant</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-navy-800/60 rounded-xl p-4 text-center">
+                      <p className="text-xs text-warm-400 mb-1">Med popup</p>
+                      <p className="text-3xl font-bold text-blue-400">{abStats.orderedWithPopup}</p>
+                      <p className="text-xs text-warm-500 mt-1">beställningar · {abStats.orderConversionWithPopup}% konv.</p>
+                    </div>
+                    <div className="bg-navy-800/60 rounded-xl p-4 text-center">
+                      <p className="text-xs text-warm-400 mb-1">Utan popup</p>
+                      <p className="text-3xl font-bold text-warm-300">{abStats.orderedWithoutPopup}</p>
+                      <p className="text-xs text-warm-500 mt-1">beställningar · {abStats.orderConversionWithoutPopup}% konv.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Booking correlation */}
+                <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-6">
+                  <h3 className="text-sm font-semibold text-warm-300 uppercase tracking-widest mb-4">Bokade möten per variant</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-navy-800/60 rounded-xl p-4 text-center">
+                      <p className="text-xs text-warm-400 mb-1">Med popup</p>
+                      <p className="text-3xl font-bold text-blue-400">{abStats.bookedWithPopup}</p>
+                      <p className="text-xs text-warm-500 mt-1">bokningar</p>
+                    </div>
+                    <div className="bg-navy-800/60 rounded-xl p-4 text-center">
+                      <p className="text-xs text-warm-400 mb-1">Utan popup</p>
+                      <p className="text-3xl font-bold text-warm-300">{abStats.bookedWithoutPopup}</p>
+                      <p className="text-xs text-warm-500 mt-1">bokningar</p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Summary cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-5">

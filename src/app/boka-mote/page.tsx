@@ -1,21 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
 
-const TIME_SLOTS = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00'];
-const WEEKDAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
-const MONTHS = ['Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni', 'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'];
+import { TIME_SLOTS, isSlotBooked } from '@/lib/meetingSlots';
 
-// Deterministic "fake booked" — makes ~30% of slots appear booked
-function isSlotFakeBooked(dateStr: string, time: string): boolean {
-  let hash = 0;
-  const s = dateStr + time;
-  for (let i = 0; i < s.length; i++) hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
-  return Math.abs(hash) % 10 < 3;
-}
+const WEEKDAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
+const MONTHS = ['Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni', 'Juli', 'Augusti', 'September', 'Oktober', 'November', 'december'];
 
 function toDateStr(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -45,6 +38,11 @@ export default function BokaMote() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [bookedSlots, setBookedSlots] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    fetch('/api/booked-slots').then(r => r.json()).then(d => setBookedSlots(d.slots ?? {}));
+  }, []);
 
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
@@ -65,9 +63,6 @@ export default function BokaMote() {
     return d >= minDate;
   }
 
-  const availableSlots = selectedDate
-    ? TIME_SLOTS.filter(t => !isSlotFakeBooked(selectedDate, t))
-    : [];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,10 +70,11 @@ export default function BokaMote() {
     setLoading(true);
     setError('');
     try {
+      const sessionId = sessionStorage.getItem('analyticsSessionId') || null;
       const res = await fetch('/api/boka-mote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, date: selectedDate, time: selectedTime }),
+        body: JSON.stringify({ ...form, date: selectedDate, time: selectedTime, sessionId }),
       });
       if (!res.ok) throw new Error('Något gick fel');
       setStep('done');
@@ -218,7 +214,7 @@ export default function BokaMote() {
                 {selectedDate && (
                   <div className="space-y-2">
                     {TIME_SLOTS.map(t => {
-                      const booked = isSlotFakeBooked(selectedDate, t);
+                      const booked = isSlotBooked(selectedDate, t, bookedSlots);
                       const isSelected = selectedTime === t;
                       return (
                         <button
