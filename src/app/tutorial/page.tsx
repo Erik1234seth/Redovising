@@ -83,6 +83,30 @@ export default function TutorialPage() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
 
+        {/* ── Package explanations ── */}
+        <div className="grid sm:grid-cols-2 gap-4 mb-10">
+          <div className="rounded-2xl p-6 border border-gray-200 bg-white shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: CORAL }}>NE-Bilaga — 1 999 kr</p>
+            <h2 className="text-lg font-bold mb-2" style={{ color: NAV_BG }}>Vad ingår?</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Vi upprättar din <strong>NE-bilaga</strong> — det dokument som visar resultatet av din enskilda firma och som bifogas din inkomstdeklaration. Du lämnar sedan in den själv hos Skatteverket.
+            </p>
+          </div>
+          <div className="rounded-2xl p-6 border border-gray-200 bg-white shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: CORAL }}>Komplett — 3 499 kr</p>
+            <h2 className="text-lg font-bold mb-2" style={{ color: NAV_BG }}>Vad ingår?</h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Vi gör allt — bokföring, NE-bilaga <strong>och</strong> lämnar in deklarationen åt dig hos Skatteverket. Du behöver bara registrera oss som ombud, vilket tar ett par minuter.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl p-5 mb-10" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}15` }}>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            <strong style={{ color: NAV_BG }}>Stegen nedan är för dig som är osäker</strong> på hur du hämtar ditt kontoutdrag från banken eller registrerar ombud hos Skatteverket. Välj ditt paket, så hör vi av oss med personliga instruktioner.
+          </p>
+        </div>
+
         {/* ── Tab nav ── */}
         <div className="flex justify-center mb-10">
           <div className="bg-gray-100 rounded-xl p-1.5 grid grid-cols-2 sm:inline-flex gap-1 w-full sm:w-auto">
@@ -128,100 +152,70 @@ export default function TutorialPage() {
 
         {/* ── NE-Bilaga steps ── */}
         {activeTab === 'ne-bilaga' && (
-          <div className="space-y-4">
-            <div ref={firstStepRef} className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm scroll-mt-24">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style={{ backgroundColor: NAV_BG }}>1</div>
-                <h2 className="text-lg sm:text-xl font-bold text-navy-900">Logga in på din banks hemsida</h2>
-              </div>
-              <div className="ml-[52px] sm:ml-[56px]">
-                <p className="text-sm sm:text-base text-slate-600 mb-3">
-                  Använd ditt BankID för att logga in på {bank?.name}s webbplats.
-                </p>
-                {bank?.websiteUrl && (
-                  <a href={bank.websiteUrl} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm font-semibold hover:underline" style={{ color: CORAL }}>
-                    Gå till {bank.name}
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                )}
-              </div>
-            </div>
+          <div ref={firstStepRef} className="space-y-8">
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style={{ backgroundColor: NAV_BG }}>2</div>
-                <h2 className="text-lg sm:text-xl font-bold text-navy-900">Ladda ner kontoutdrag</h2>
-              </div>
-              <div className="ml-[52px] sm:ml-[56px]">
-                <p className="text-sm sm:text-base text-slate-600 mb-5">
-                  Följ videon nedan för att ladda ner dina kontoutdrag från {bank?.name}.
-                </p>
-                <VideoPlayer videoUrl={bank?.downloadVideoUrl || ''} title={`Ladda ner kontoutdrag från ${bank?.name}`} />
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style={{ backgroundColor: NAV_BG }}>3</div>
-                <h2 className="text-lg sm:text-xl font-bold text-navy-900">Ladda upp kontoutdragen</h2>
-              </div>
-              <div className="ml-[52px] sm:ml-[56px]">
-                <p className="text-sm sm:text-base text-slate-600 mb-3">
-                  När du har laddat ner dina kontoutdrag, ladda upp dem via vår tjänst.
-                </p>
-                <div className="rounded-xl p-4" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
-                  <p className="text-sm text-slate-600">
-                    <strong className="text-navy-800">Tips:</strong> Se till att filerna är i Excel-format och att alla transaktioner syns tydligt.
+            {/* --- Kontoutdrag --- */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-3 ml-1" style={{ color: CORAL }}>Kontoutdrag</p>
+              <div className="space-y-4">
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+                  <h2 className="text-lg sm:text-xl font-bold mb-3" style={{ color: NAV_BG }}>Ladda ner kontoutdrag från din bank</h2>
+                  <div className="border-l-4 rounded-r-xl p-4 mb-5" style={{ borderColor: CORAL, backgroundColor: `${CORAL}08` }}>
+                    <p className="text-sm text-slate-700">
+                      I instruktionsmailet kommer vi be dig om dina kontoutdrag. Nedan hittar du instruktioner för hur du hämtar dem från din bank.
+                    </p>
+                  </div>
+                  <p className="text-sm sm:text-base text-slate-600 mb-3">
+                    Logga in på {bank?.name}s webbplats med BankID och ladda ner kontoutdrag för hela föregående år i Excel-format.
                   </p>
+                  {bank?.websiteUrl && (
+                    <a href={bank.websiteUrl} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-sm font-semibold hover:underline mb-5" style={{ color: CORAL }}>
+                      Gå till {bank.name}
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  )}
+                  <VideoPlayer videoUrl={bank?.downloadVideoUrl || ''} title={`Ladda ner kontoutdrag från ${bank?.name}`} />
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+                  <h2 className="text-lg sm:text-xl font-bold mb-3" style={{ color: NAV_BG }}>Lägg till transaktioner som saknas <span className="text-slate-400 font-normal text-base">(valfritt)</span></h2>
+                  <p className="text-sm sm:text-base text-slate-600 mb-4">
+                    Om du har betalningar eller inkomster som inte syns i kontoutdraget — t.ex. kontantbetalningar eller Swish-transaktioner på ett privat konto — kan du lägga till dem direkt i Excel-filen.
+                  </p>
+                  <div className="rounded-xl p-4 mb-3" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
+                    <p className="text-sm font-semibold mb-3" style={{ color: NAV_BG }}>Öppna Excel-filen och lägg till en ny rad med:</p>
+                    <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                      {['Datum', 'Beskrivning / namn', 'Belopp (kr)'].map((col) => (
+                        <div key={col} className="rounded-lg py-2 px-3 font-medium text-white text-xs" style={{ backgroundColor: NAV_BG }}>{col}</div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-3">Exempel: <span className="font-mono">2025-03-15 | Kontant betalning kund | 1500</span></p>
+                  </div>
+                  <p className="text-xs text-slate-400">Är du osäker på om en transaktion ska vara med? Lägg med den ändå — vi hör av oss om något är oklart.</p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+                  <h2 className="text-lg sm:text-xl font-bold mb-3" style={{ color: NAV_BG }}>Maila kontoutdragen till oss</h2>
+                  <p className="text-sm sm:text-base text-slate-600 mb-3">
+                    Skicka filen som bilaga till den e-postadress vi angett i vårt mail till dig.
+                  </p>
+                  <div className="rounded-xl p-3" style={{ backgroundColor: `${NAV_BG}06`, border: `1px solid ${NAV_BG}15` }}>
+                    <p className="text-sm text-slate-600"><strong className="text-navy-800">Format:</strong> Excel (.xlsx, .xls)</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style={{ backgroundColor: NAV_BG }}>4</div>
-                <h2 className="text-lg sm:text-xl font-bold text-navy-900">Lägg till transaktioner <span className="text-slate-400 font-normal text-base">(valfritt)</span></h2>
-              </div>
-              <div className="ml-[52px] sm:ml-[56px]">
+            {/* --- Klart --- */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-3 ml-1" style={{ color: CORAL }}>Sedan sköter vi resten</p>
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+                <h2 className="text-lg sm:text-xl font-bold mb-3" style={{ color: NAV_BG }}>Vi gör klart din NE-bilaga</h2>
                 <p className="text-sm sm:text-base text-slate-600 mb-3">
-                  Lägg till transaktioner som inte syns i ditt kontoutdrag, t.ex. kontantbetalningar eller fakturor.
-                </p>
-                <div className="rounded-xl p-4" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
-                  <p className="text-sm font-semibold text-navy-800 mb-2">För varje transaktion anger du:</p>
-                  <ul className="space-y-1 text-sm text-slate-600 list-disc list-inside ml-1">
-                    <li>Datum</li>
-                    <li>Beskrivning (t.ex. "Kontorsmaterial", "Konsultarvode")</li>
-                    <li>Belopp i kronor</li>
-                    <li>Typ: Inkomst eller Utgift</li>
-                  </ul>
-                  <p className="text-xs text-slate-400 mt-3">Detta steg är helt valfritt och kan hoppas över.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style={{ backgroundColor: NAV_BG }}>5</div>
-                <h2 className="text-lg sm:text-xl font-bold text-navy-900">Ladda upp tidigare NE-bilaga <span className="text-slate-400 font-normal text-base">(ej första året)</span></h2>
-              </div>
-              <div className="ml-[52px] sm:ml-[56px]">
-                <p className="text-sm sm:text-base text-slate-600">
-                  Om du har drivit din firma tidigare år, ladda upp din senaste NE-bilaga. Hoppa över detta steg om det är ditt första år.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style={{ backgroundColor: NAV_BG }}>6</div>
-                <h2 className="text-lg sm:text-xl font-bold text-navy-900">Bekräfta och vänta</h2>
-              </div>
-              <div className="ml-[52px] sm:ml-[56px]">
-                <p className="text-sm sm:text-base text-slate-600 mb-3">
-                  Efter att du bekräftat din beställning börjar vi arbeta med din NE-bilaga.
+                  När vi fått dina kontoutdrag upprättar vi NE-bilagan och skickar den till dig via e-post.
                 </p>
                 <div className="border-l-4 rounded-r-xl p-4" style={{ borderColor: CORAL, backgroundColor: `${CORAL}08` }}>
                   <p className="text-sm text-slate-700">
@@ -230,103 +224,84 @@ export default function TutorialPage() {
                 </div>
               </div>
             </div>
+
           </div>
         )}
 
         {/* ── Komplett steps ── */}
         {activeTab === 'komplett' && (
-          <div className="space-y-4">
-            <div ref={firstStepRef} className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm scroll-mt-24">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style={{ backgroundColor: NAV_BG }}>1</div>
-                <h2 className="text-lg sm:text-xl font-bold text-navy-900">Logga in på din banks hemsida</h2>
-              </div>
-              <div className="ml-[52px] sm:ml-[56px] space-y-3">
-                <p className="text-sm sm:text-base text-slate-600">Gå till {bank?.name}s hemsida och logga in med ditt BankID.</p>
-                <div className="rounded-xl p-4" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
-                  <p className="text-sm text-slate-600"><strong className="text-navy-800">Tips:</strong> Se till att du har tillgång till BankID på din mobil eller dator.</p>
+          <div ref={firstStepRef} className="space-y-8">
+
+            {/* --- Kontoutdrag --- */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-3 ml-1" style={{ color: CORAL }}>Kontoutdrag</p>
+              <div className="space-y-4">
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+                  <h2 className="text-lg sm:text-xl font-bold mb-3" style={{ color: NAV_BG }}>Ladda ner kontoutdrag från din bank</h2>
+                  <div className="border-l-4 rounded-r-xl p-4 mb-5" style={{ borderColor: CORAL, backgroundColor: `${CORAL}08` }}>
+                    <p className="text-sm text-slate-700">
+                      I instruktionsmailet kommer vi be dig om dina kontoutdrag. Nedan hittar du instruktioner för hur du hämtar dem från din bank.
+                    </p>
+                  </div>
+                  <p className="text-sm sm:text-base text-slate-600 mb-4">
+                    Logga in på {bank?.name}s webbplats med BankID och ladda ner kontoutdrag för hela föregående år i Excel-format.
+                  </p>
+                  {bank?.websiteUrl && (
+                    <a href={bank.websiteUrl} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-sm font-semibold hover:underline mb-5" style={{ color: CORAL }}>
+                      Gå till {bank.name}
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  )}
+                  <VideoPlayer videoUrl={bank?.downloadVideoUrl || ''} title={`Ladda ner kontoutdrag från ${bank?.name}`} />
+                  <div className="border-l-4 rounded-r-xl p-4 mt-4" style={{ borderColor: NAV_BG, backgroundColor: `${NAV_BG}06` }}>
+                    <p className="text-sm text-slate-600"><strong className="text-navy-800">Viktigt:</strong> Ladda ner kontoutdrag för alla konton kopplade till din verksamhet.</p>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+                  <h2 className="text-lg sm:text-xl font-bold mb-3" style={{ color: NAV_BG }}>Lägg till transaktioner som saknas <span className="text-slate-400 font-normal text-base">(valfritt)</span></h2>
+                  <p className="text-sm sm:text-base text-slate-600 mb-4">
+                    Om du har betalningar eller inkomster som inte syns i kontoutdraget — t.ex. kontantbetalningar eller Swish-transaktioner på ett privat konto — kan du lägga till dem direkt i Excel-filen.
+                  </p>
+                  <div className="rounded-xl p-4 mb-3" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
+                    <p className="text-sm font-semibold mb-3" style={{ color: NAV_BG }}>Öppna Excel-filen och lägg till en ny rad med:</p>
+                    <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                      {['Datum', 'Beskrivning / namn', 'Belopp (kr)'].map((col) => (
+                        <div key={col} className="rounded-lg py-2 px-3 font-medium text-white text-xs" style={{ backgroundColor: NAV_BG }}>{col}</div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-3">Exempel: <span className="font-mono">2025-03-15 | Kontant betalning kund | 1500</span></p>
+                  </div>
+                  <p className="text-xs text-slate-400">Är du osäker på om en transaktion ska vara med? Lägg med den ändå — vi hör av oss om något är oklart.</p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+                  <h2 className="text-lg sm:text-xl font-bold mb-3" style={{ color: NAV_BG }}>Maila kontoutdragen till oss</h2>
+                  <p className="text-sm sm:text-base text-slate-600 mb-3">
+                    Skicka filen som bilaga till den e-postadress vi angett i vårt mail till dig.
+                  </p>
+                  <div className="rounded-xl p-3" style={{ backgroundColor: `${NAV_BG}06`, border: `1px solid ${NAV_BG}15` }}>
+                    <p className="text-sm text-slate-600"><strong className="text-navy-800">Format:</strong> Excel (.xlsx, .xls)</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style={{ backgroundColor: NAV_BG }}>2</div>
-                <h2 className="text-lg sm:text-xl font-bold text-navy-900">Ladda ner kontoutdrag</h2>
-              </div>
-              <div className="ml-[52px] sm:ml-[56px] space-y-4">
-                <p className="text-sm sm:text-base text-slate-600">Följ stegen nedan för att ladda ner dina kontoutdrag från {bank?.name}:</p>
-                <div className="rounded-xl p-4" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
-                  <ol className="space-y-2 text-sm text-slate-600 list-decimal list-inside">
-                    <li>Navigera till "Konton" eller "Mina konton"</li>
-                    <li>Välj det konto du använder för din verksamhet</li>
-                    <li>Leta efter "Kontoutdrag" eller "Transaktioner"</li>
-                    <li>Välj tidsperiod: Hela föregående år (1 jan – 31 dec)</li>
-                    <li>Välj format: Excel</li>
-                    <li>Klicka på "Ladda ner" eller "Exportera"</li>
-                  </ol>
-                </div>
-                <VideoPlayer videoUrl={bank?.downloadVideoUrl || ''} title={`Ladda ner kontoutdrag från ${bank?.name}`} />
-                <div className="border-l-4 rounded-r-xl p-4" style={{ borderColor: CORAL, backgroundColor: `${CORAL}08` }}>
-                  <p className="text-sm text-slate-700"><strong style={{ color: NAV_BG }}>Viktigt:</strong> Ladda ner kontoutdrag för alla konton kopplade till din verksamhet.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style={{ backgroundColor: NAV_BG }}>3</div>
-                <h2 className="text-lg sm:text-xl font-bold text-navy-900">Ladda upp kontoutdragen</h2>
-              </div>
-              <div className="ml-[52px] sm:ml-[56px] space-y-3">
-                <p className="text-sm sm:text-base text-slate-600">När du laddat ner kontoutdragen, ladda upp dem via vår tjänst:</p>
-                <div className="rounded-xl p-4" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
-                  <ol className="space-y-2 text-sm text-slate-600 list-decimal list-inside">
-                    <li>Gå tillbaka till din beställning</li>
-                    <li>Klicka på "Ladda upp kontoutdrag"</li>
-                    <li>Dra och släpp filer eller klicka för att välja</li>
-                    <li>Vänta tills uppladdningen är klar (grön bock)</li>
-                    <li>Klicka på "Fortsätt"</li>
-                  </ol>
-                </div>
-                <div className="rounded-xl p-3" style={{ backgroundColor: `${NAV_BG}06`, border: `1px solid ${NAV_BG}15` }}>
-                  <p className="text-sm text-slate-600"><strong className="text-navy-800">Godkända format:</strong> Excel (.xlsx, .xls)</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style={{ backgroundColor: NAV_BG }}>4</div>
-                <h2 className="text-lg sm:text-xl font-bold text-navy-900">Lägg till transaktioner <span className="text-slate-400 font-normal text-base">(valfritt)</span></h2>
-              </div>
-              <div className="ml-[52px] sm:ml-[56px] space-y-3">
-                <p className="text-sm sm:text-base text-slate-600">Lägg till transaktioner utanför kontoutdraget, t.ex. kontantbetalningar.</p>
-                <div className="rounded-xl p-4" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
-                  <p className="text-sm font-semibold text-navy-800 mb-2">För varje transaktion anger du:</p>
-                  <ul className="space-y-1 text-sm text-slate-600 list-disc list-inside ml-1">
-                    <li>Datum</li>
-                    <li>Beskrivning</li>
-                    <li>Belopp i kronor</li>
-                    <li>Typ: Inkomst eller Utgift</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style={{ backgroundColor: NAV_BG }}>5</div>
-                <h2 className="text-lg sm:text-xl font-bold text-navy-900">Registrera oss som ombud hos Skatteverket</h2>
-              </div>
-              <div className="ml-[52px] sm:ml-[56px] space-y-4">
-                <p className="text-sm sm:text-base text-slate-600">
-                  För att vi ska kunna lämna in din deklaration behöver du registrera oss som ombud hos Skatteverket.
+            {/* --- Ombud --- */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-3 ml-1" style={{ color: CORAL }}>Ombud hos Skatteverket</p>
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+                <h2 className="text-lg sm:text-xl font-bold mb-3" style={{ color: NAV_BG }}>Registrera oss som ombud</h2>
+                <p className="text-sm sm:text-base text-slate-600 mb-4">
+                  För att vi ska kunna lämna in din deklaration behöver du registrera oss som ombud hos Skatteverket. Det tar bara ett par minuter.
                 </p>
-                <div className="border-l-4 rounded-r-xl p-4" style={{ borderColor: CORAL, backgroundColor: `${CORAL}08` }}>
+                <div className="border-l-4 rounded-r-xl p-4 mb-4" style={{ borderColor: CORAL, backgroundColor: `${CORAL}08` }}>
                   <p className="text-sm text-slate-700"><strong style={{ color: NAV_BG }}>Varför?</strong> Ombud-registreringen ger oss behörighet att lämna in deklarationen åt dig. Du kan återkalla den när som helst.</p>
                 </div>
-                <div className="rounded-xl p-4" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
+                <div className="rounded-xl p-4 mb-4" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
                   <ol className="space-y-3 text-sm text-slate-600 list-decimal list-inside">
                     <li><strong className="text-navy-800">Gå till Skatteverkets hemsida</strong> – skatteverket.se</li>
                     <li><strong className="text-navy-800">Logga in med BankID</strong></li>
@@ -338,34 +313,32 @@ export default function TutorialPage() {
                   </ol>
                 </div>
                 <VideoPlayer videoUrl={bank?.accessDelegationVideoUrl || ''} title="Ge behörighet via Skatteverket" />
-                <div className="border-l-4 rounded-r-xl p-4" style={{ borderColor: CORAL, backgroundColor: `${CORAL}08` }}>
+                <div className="border-l-4 rounded-r-xl p-4 mt-4" style={{ borderColor: CORAL, backgroundColor: `${CORAL}08` }}>
                   <p className="text-sm text-slate-700"><strong style={{ color: NAV_BG }}>Viktigt:</strong> Fullmakten gäller endast innevarande år och kan återkallas när som helst.</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0" style={{ backgroundColor: NAV_BG }}>6</div>
-                <h2 className="text-lg sm:text-xl font-bold text-navy-900">Granska och godkänn</h2>
-              </div>
-              <div className="ml-[52px] sm:ml-[56px] space-y-4">
-                <p className="text-sm sm:text-base text-slate-600">
-                  Efter bekräftad beställning börjar vi arbeta med din NE-bilaga och deklaration.
+            {/* --- Klart --- */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-3 ml-1" style={{ color: CORAL }}>Sedan sköter vi resten</p>
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+                <h2 className="text-lg sm:text-xl font-bold mb-3" style={{ color: NAV_BG }}>Vi sköter resten</h2>
+                <p className="text-sm sm:text-base text-slate-600 mb-4">
+                  När vi fått dina kontoutdrag och ombud-registreringen klar tar vi hand om allt.
                 </p>
                 <div className="rounded-xl p-4" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
-                  <p className="text-sm font-semibold text-navy-800 mb-3">Så här går det till:</p>
                   <ol className="space-y-2 text-sm text-slate-600 list-decimal list-inside">
                     <li>Vi upprättar NE-bilagan utifrån dina kontoutdrag</li>
                     <li>Du får en kopia via e-post för granskning</li>
-                    <li>Granska att allt stämmer</li>
-                    <li>Svara med ditt godkännande</li>
+                    <li>Granska att allt stämmer och svara med ditt godkännande</li>
                     <li>Vi lämnar in deklarationen åt dig</li>
                     <li>Du får slutgiltig bekräftelse</li>
                   </ol>
                 </div>
               </div>
             </div>
+
           </div>
         )}
 

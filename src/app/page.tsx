@@ -9,19 +9,36 @@ import { useAuth } from '@/contexts/AuthContext';
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
 
+const DEADLINE = new Date('2026-05-02T23:59:59');
+
+function useCountdown() {
+  const [days, setDays] = useState(0);
+  useEffect(() => {
+    const update = () => {
+      const diff = DEADLINE.getTime() - Date.now();
+      setDays(Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24))));
+    };
+    update();
+    const id = setInterval(update, 60000);
+    return () => clearInterval(id);
+  }, []);
+  return days;
+}
+
 export default function Home() {
   const { user, loading } = useAuth();
   const [showInfoPopup, setShowInfoPopup] = useState(false);
+  const daysLeft = useCountdown();
 
-  // useEffect(() => {
-  //   if (!loading && !user) {
-  //     const hasSeenPopup = sessionStorage.getItem('hasSeenInfoPopup');
-  //     if (!hasSeenPopup) {
-  //       const timer = setTimeout(() => setShowInfoPopup(true), 1500);
-  //       return () => clearTimeout(timer);
-  //     }
-  //   }
-  // }, [loading, user]);
+  useEffect(() => {
+    if (!loading && !user) {
+      const hasSeenPopup = sessionStorage.getItem('hasSeenInfoPopup');
+      if (!hasSeenPopup) {
+        const timer = setTimeout(() => setShowInfoPopup(true), 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [loading, user]);
 
   const closePopup = () => {
     setShowInfoPopup(false);
@@ -54,12 +71,22 @@ export default function Home() {
 
             {/* Left – text */}
             <div className="flex-1 lg:max-w-[520px] text-center lg:text-left">
-              <div
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold mb-6"
-                style={{ backgroundColor: `${CORAL}15`, color: CORAL }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: CORAL }} />
-                Specialiserade på enskilda firmor
+              <div className="flex flex-wrap gap-2 justify-center lg:justify-start mb-6">
+                <div
+                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold"
+                  style={{ backgroundColor: `${CORAL}15`, color: CORAL }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: CORAL }} />
+                  Specialiserade på enskilda firmor
+                </div>
+                {daysLeft > 0 && (
+                  <div
+                    className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-bold"
+                    style={{ backgroundColor: CORAL, color: '#fff' }}
+                  >
+                    ⏳ {daysLeft} dagar kvar till 2 maj
+                  </div>
+                )}
               </div>
 
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-[1.1] mb-6" style={{ color: NAV_BG }}>
@@ -159,60 +186,70 @@ export default function Home() {
       </section>
 
       {/* ══════════════════════════════════════════
-          TRUST BELT
+          TESTIMONIALS
       ══════════════════════════════════════════ */}
-      <section className="py-12 sm:py-16" style={{ backgroundColor: NAV_BG }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <section className="py-20 sm:py-24" style={{ backgroundColor: NAV_BG }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Kundrecensioner</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">
+              Vad våra kunder säger
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                icon: (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                ),
-                title: 'Enkelt & digitalt',
-                desc: 'Hela processen online – inga papper.',
+                name: 'Anna Lindgren',
+                role: 'Frilansfotograf',
+                avatar: '/annalindgren.png',
+                quote: 'Äntligen ett ställe som verkligen förstår hur det fungerar att driva enskild firma. Snabbt, tydligt och till ett pris jag faktiskt har råd med.',
               },
               {
-                icon: (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                ),
-                title: 'Bara enskilda firmor',
-                desc: 'En sak – gjord bättre än alla andra.',
+                name: 'Marcus Eriksson',
+                role: 'Webbutvecklare',
+                avatar: '/markus.png',
+                quote: 'Jag hade aldrig gjort bokslut själv och var lite nervös. Men det var superenkelt — de skötte allt och jag visste exakt vad det kostade från start.',
               },
               {
-                icon: (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                ),
-                title: 'Support hela vägen',
-                desc: 'Vi svarar snabbt om du har frågor.',
+                name: 'Sara Berg',
+                role: 'Kostrådgivare',
+                avatar: '/sofia.png',
+                quote: 'Rekommenderar varmt! Tog bara några dagar och NE-bilagan var klar. Slipper oroa mig inför deklarationen nu.',
               },
-              {
-                icon: (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                ),
-                title: 'Fast pris alltid',
-                desc: 'Inga timarvoden. Du vet vad det kostar.',
-              },
-            ].map((item) => (
+            ].map(({ name, role, avatar, quote }) => (
               <div
-                key={item.title}
-                className="flex flex-col items-center text-center p-5 sm:p-6 lg:p-8 rounded-2xl"
-                style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+                key={name}
+                className="rounded-2xl p-7 flex flex-col"
+                style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                <div
-                  className="w-11 h-11 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-xl flex items-center justify-center mb-4"
-                  style={{ backgroundColor: CORAL }}
-                >
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {item.icon}
-                  </svg>
+                {/* Stars */}
+                <div className="flex gap-0.5 mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <svg key={i} className="w-4 h-4 text-amber-400 fill-amber-400" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                  ))}
                 </div>
-                <p className="text-sm sm:text-base lg:text-lg font-bold text-white mb-1.5 lg:mb-2">{item.title}</p>
-                <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>{item.desc}</p>
+
+                {/* Quote */}
+                <p className="text-sm leading-relaxed flex-1 mb-6" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  &ldquo;{quote}&rdquo;
+                </p>
+
+                {/* Author */}
+                <div className="flex items-center gap-3">
+                  <Image
+                    src={avatar}
+                    alt={name}
+                    width={56}
+                    height={56}
+                    className="rounded-full object-cover ring-2 ring-white/20"
+                  />
+                  <div>
+                    <p className="text-sm font-bold text-white">{name}</p>
+                    <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{role}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -372,6 +409,67 @@ export default function Home() {
       </section>
 
       {/* ══════════════════════════════════════════
+          TRUST BELT
+      ══════════════════════════════════════════ */}
+      <section className="py-12 sm:py-16" style={{ backgroundColor: NAV_BG }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {[
+              {
+                icon: (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                ),
+                title: 'Enkelt & digitalt',
+                desc: 'Hela processen online – inga papper.',
+              },
+              {
+                icon: (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                ),
+                title: 'Bara enskilda firmor',
+                desc: 'En sak – gjord bättre än alla andra.',
+              },
+              {
+                icon: (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                ),
+                title: 'Support hela vägen',
+                desc: 'Vi svarar snabbt om du har frågor.',
+              },
+              {
+                icon: (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                ),
+                title: 'Fast pris alltid',
+                desc: 'Inga timarvoden. Du vet vad det kostar.',
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="flex flex-col items-center text-center p-5 sm:p-6 lg:p-8 rounded-2xl"
+                style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <div
+                  className="w-11 h-11 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-xl flex items-center justify-center mb-4"
+                  style={{ backgroundColor: CORAL }}
+                >
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {item.icon}
+                  </svg>
+                </div>
+                <p className="text-sm sm:text-base lg:text-lg font-bold text-white mb-1.5 lg:mb-2">{item.title}</p>
+                <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
           CTA
       ══════════════════════════════════════════ */}
       <section className="py-20 relative overflow-hidden" style={{ backgroundColor: NAV_BG }}>
@@ -409,80 +507,71 @@ export default function Home() {
       ══════════════════════════════════════════ */}
       {showInfoPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closePopup} />
-          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closePopup} />
+          <div className="relative bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden">
+
+            {/* Close */}
             <button
               onClick={closePopup}
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors z-10 rounded-full hover:bg-gray-100"
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-white/60 hover:text-white transition-colors z-10 rounded-full hover:bg-white/10"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
 
-            {/* Header */}
-            <div className="rounded-t-2xl p-7 pb-5" style={{ backgroundColor: NAV_BG }}>
-              <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                </svg>
+            {/* Header med countdown */}
+            <div className="p-8 pb-6 text-center" style={{ backgroundColor: NAV_BG }}>
+              <div
+                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-5"
+                style={{ backgroundColor: CORAL, color: '#fff' }}
+              >
+                ⏳ {daysLeft} dagar kvar att deklarera
               </div>
-              <h2 className="text-xl font-extrabold text-white text-center">Välkommen hit!</h2>
-              <p className="text-white/60 text-center mt-1 text-sm">Kul att du startat enskild firma – här är några tips</p>
+              <h2 className="text-2xl font-extrabold text-white leading-tight mb-2">
+                Missa inte<br />deklarationen 2 maj
+              </h2>
+              <p className="text-white/55 text-sm leading-relaxed">
+                Som enskild firma måste du lämna in NE-bilagan till Skatteverket — varje år. Vi gör det åt dig.
+              </p>
             </div>
 
             {/* Content */}
-            <div className="p-7 space-y-5">
-              <div className="flex gap-4">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: `${NAV_BG}10` }}>
-                  <svg className="w-4 h-4" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-navy-900 text-sm">Det är lag på att redovisa</h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Som enskild näringsidkare måste du lämna in en NE-bilaga till Skatteverket varje år. Vi gör det enkelt!
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: `${NAV_BG}10` }}>
-                  <svg className="w-4 h-4" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-navy-900 text-sm">Vi guidar dig hela vägen</h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Steg-för-steg instruktioner för allt – från kontoutdrag till färdig inlämning.
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-                <div className="flex gap-3">
-                  <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div>
-                    <h3 className="font-semibold text-amber-800 text-xs mb-0.5">Viktigt att tänka på</h3>
-                    <p className="text-xs text-amber-700 leading-relaxed">
-                      Vi kan tyvärr inte hjälpa till med jordbruk, skogsbruk, byggverksamhet, taxi eller liknande.
-                    </p>
+            <div className="p-6 space-y-3">
+              {[
+                { icon: '✓', text: 'Fast pris — från 1 999 kr, inga dolda avgifter' },
+                { icon: '✓', text: 'Allt sköts digitalt, inga möten krävs' },
+                { icon: '✓', text: '100% fokus på enskilda firmor' },
+              ].map(({ icon, text }) => (
+                <div key={text} className="flex items-center gap-3">
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
+                    style={{ backgroundColor: CORAL }}
+                  >
+                    {icon}
                   </div>
+                  <p className="text-sm text-slate-600">{text}</p>
                 </div>
-              </div>
+              ))}
 
-              <button
-                onClick={closePopup}
-                className="w-full py-3 font-bold text-white rounded-xl transition-all duration-200 hover:opacity-90 text-sm"
-                style={{ backgroundColor: NAV_BG }}
-              >
-                Kom igång →
-              </button>
+              <div className="pt-2 space-y-2">
+                <Link
+                  href="#packages"
+                  onClick={closePopup}
+                  className="flex items-center justify-center w-full py-3.5 font-bold text-white rounded-xl transition-all duration-200 hover:opacity-90 text-sm"
+                  style={{ backgroundColor: CORAL, boxShadow: `0 8px 20px ${CORAL}40` }}
+                >
+                  Kom igång nu — innan det är försent →
+                </Link>
+                <button
+                  onClick={closePopup}
+                  className="w-full py-2.5 text-slate-400 hover:text-slate-600 transition-colors text-xs"
+                >
+                  Jag deklarerar själv
+                </button>
+              </div>
             </div>
+
           </div>
         </div>
       )}
