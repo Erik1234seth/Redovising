@@ -6,17 +6,29 @@ import { packages } from '@/data/packages';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
-const DEADLINE = new Date('2026-05-02T23:59:59');
+interface Countdown { days: number; hours: number; minutes: number; seconds: number; }
 
-function useCountdown() {
-  const [days, setDays] = useState(0);
+function useCountdown(): Countdown | null {
+  const [value, setValue] = useState<Countdown | null>(null);
   useEffect(() => {
-    const update = () => setDays(Math.max(0, Math.ceil((DEADLINE.getTime() - Date.now()) / 86400000)));
+    const deadline = new Date();
+    deadline.setDate(deadline.getDate() + 7);
+    deadline.setHours(23, 59, 59, 999);
+
+    const update = () => {
+      const diff = Math.max(deadline.getTime() - Date.now(), 0);
+      setValue({
+        days: Math.floor(diff / 86400000),
+        hours: Math.floor((diff % 86400000) / 3600000),
+        minutes: Math.floor((diff % 3600000) / 60000),
+        seconds: Math.floor((diff % 60000) / 1000),
+      });
+    };
     update();
-    const id = setInterval(update, 60000);
+    const id = setInterval(update, 1000);
     return () => clearInterval(id);
   }, []);
-  return days;
+  return value;
 }
 
 export default function ValjaPaketPage() {
@@ -27,12 +39,36 @@ export default function ValjaPaketPage() {
 
       {/* Header */}
       <div className="py-14 sm:py-16 text-center px-4" style={{ backgroundColor: NAV_BG }}>
-        {daysLeft > 0 && (
-          <div
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-5"
-            style={{ backgroundColor: CORAL, color: '#fff' }}
-          >
-            ⏳ {daysLeft} dagar kvar till 2 maj
+        {daysLeft !== null && (
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              Dagar kvar för att säkert hinna i tid
+            </p>
+            <div className="flex items-start justify-center gap-2">
+              {[
+                { value: daysLeft.days, label: 'dagar' },
+                { value: daysLeft.hours, label: 'tim' },
+                { value: daysLeft.minutes, label: 'min' },
+                { value: daysLeft.seconds, label: 'sek' },
+              ].map(({ value, label }, i, arr) => (
+                <div key={label} className="flex items-start gap-2">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className="w-14 h-14 rounded-xl flex items-center justify-center"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}
+                    >
+                      <span className="text-2xl font-extrabold text-white tabular-nums leading-none">
+                        {String(value).padStart(2, '0')}
+                      </span>
+                    </div>
+                    <span className="text-xs mt-1.5 font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{label}</span>
+                  </div>
+                  {i < arr.length - 1 && (
+                    <span className="text-xl font-bold mt-3" style={{ color: 'rgba(255,255,255,0.25)' }}>:</span>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white mb-3 leading-tight">

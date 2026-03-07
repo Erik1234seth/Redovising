@@ -67,17 +67,15 @@ export default function Navigation() {
 
           {/* ── Right: utility + CTA (desktop) ── */}
           <div className="hidden md:flex items-center gap-5">
-            {!loading && user && (
-              <Link
-                href="/account"
-                className="text-[14px] font-medium transition-colors"
-                style={{ color: 'rgba(255,255,255,0.72)' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.72)')}
-              >
-                Mitt konto
-              </Link>
-            )}
+            <Link
+              href="/valja-paket"
+              className="text-[14px] font-medium transition-colors"
+              style={{ color: 'rgba(255,255,255,0.72)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.72)')}
+            >
+              Priser
+            </Link>
             <Link
               href="/kontakt"
               className="px-5 py-[9px] text-[14px] font-semibold text-white rounded-full transition-all duration-200 shadow-md hover:shadow-lg hover:scale-[1.03]"
@@ -124,16 +122,14 @@ export default function Navigation() {
             </Link>
           ))}
           <div className="pt-3 border-t border-white/10 space-y-2">
-            {!loading && user && (
-              <Link
-                href="/account"
-                onClick={() => setMobileOpen(false)}
-                className="block px-4 py-3 text-[15px] font-medium rounded-xl transition-colors"
-                style={{ color: 'rgba(255,255,255,0.75)' }}
-              >
-                Mitt konto
-              </Link>
-            )}
+            <Link
+              href="/valja-paket"
+              onClick={() => setMobileOpen(false)}
+              className="block px-4 py-3 text-[15px] font-medium rounded-xl transition-colors"
+              style={{ color: 'rgba(255,255,255,0.75)' }}
+            >
+              Priser
+            </Link>
             <Link
               href="/kontakt"
               onClick={() => setMobileOpen(false)}
