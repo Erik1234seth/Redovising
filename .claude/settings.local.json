@@ -17,7 +17,9 @@
       "Bash(powershell:*)",
       "Bash(mv:*)",
       "Bash(node:*)",
-      "Bash(/c/Users/erijo/Redovising/public/favicon/favicon.svg:*)"
+      "Bash(/c/Users/erijo/Redovising/public/favicon/favicon.svg:*)",
+      "Bash(npm install:*)",
+      "Bash(git fetch:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

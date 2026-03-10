@@ -115,7 +115,7 @@ export default function ContactInfoPage() {
     >
       <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {existingCustomer && (
-          <div className="bg-[#E95C63]/8 border border-[#E95C63]/30 rounded-xl p-4 mb-6">
+          <div className="bg-[#E95C63]/10 border border-[#E95C63]/50 rounded-xl p-4 mb-6">
             <div className="flex items-start">
               <svg className="w-6 h-6 text-[#E95C63] mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -124,7 +124,7 @@ export default function ContactInfoPage() {
                 <h4 className="font-semibold text-[#E95C63] mb-1">
                   Vi ser att du har köpt från oss tidigare!
                 </h4>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-warm-300">
                   <Link href="/auth/login" className="text-[#E95C63] hover:opacity-80 underline">
                     Logga in
                   </Link>
@@ -136,7 +136,7 @@ export default function ContactInfoPage() {
         )}
 
         <div>
-          <label htmlFor="email" className="block text-sm font-semibold text-slate-600 mb-1.5">
+          <label htmlFor="email" className="block text-sm font-medium text-warm-300 mb-2">
             E-postadress *
           </label>
           <input
@@ -148,16 +148,16 @@ export default function ContactInfoPage() {
             onChange={handleChange}
             onBlur={handleEmailBlur}
             disabled={!!user}
-            className="w-full px-4 py-3 bg-white border border-gray-200 text-slate-800 rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-warm-500 disabled:opacity-50 disabled:cursor-not-allowed"
             placeholder="din@epost.se"
           />
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-warm-500">
             Vi skickar din färdiga NE-bilaga hit
           </p>
         </div>
 
         <div>
-          <label htmlFor="name" className="block text-sm font-semibold text-slate-600 mb-1.5">
+          <label htmlFor="name" className="block text-sm font-medium text-warm-300 mb-2">
             Namn *
           </label>
           <input
@@ -167,13 +167,13 @@ export default function ContactInfoPage() {
             required
             value={formData.name}
             onChange={handleChange}
-            className="w-full px-4 py-3 bg-white border border-gray-200 text-slate-800 rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-slate-400"
+            className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-warm-500"
             placeholder="För- och efternamn"
           />
         </div>
 
         <div>
-          <label htmlFor="phone" className="block text-sm font-semibold text-slate-600 mb-1.5">
+          <label htmlFor="phone" className="block text-sm font-medium text-warm-300 mb-2">
             Telefonnummer *
           </label>
           <input
@@ -183,16 +183,16 @@ export default function ContactInfoPage() {
             required
             value={formData.phone}
             onChange={handleChange}
-            className="w-full px-4 py-3 bg-white border border-gray-200 text-slate-800 rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-slate-400"
+            className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-warm-500"
             placeholder="070-123 45 67"
           />
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-warm-500">
             För att nå dig vid eventuella frågor
           </p>
         </div>
 
         <div>
-          <label htmlFor="company" className="block text-sm font-semibold text-slate-600 mb-1.5">
+          <label htmlFor="company" className="block text-sm font-medium text-warm-300 mb-2">
             Företagsnamn (Enskild firma) *
           </label>
           <input
@@ -202,14 +202,14 @@ export default function ContactInfoPage() {
             required
             value={formData.company}
             onChange={handleChange}
-            className="w-full px-4 py-3 bg-white border border-gray-200 text-slate-800 rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-slate-400"
+            className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-warm-500"
             placeholder="Namnet på din enskilda firma"
           />
         </div>
 
         {!user && (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-            <p className="text-sm text-slate-500 mb-3">
+          <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-4">
+            <p className="text-sm text-warm-300 mb-3">
               Vill du spara dina uppgifter för framtida beställningar?
             </p>
             <Link
@@ -229,15 +229,14 @@ export default function ContactInfoPage() {
             href={packageType === 'komplett'
               ? `/flow/${packageType}/delegation-guide?bank=${bank}`
               : (isFirstYear ? `/flow/${packageType}/add-transactions?bank=${bank}` : `/flow/${packageType}/upload-previous?bank=${bank}`)}
-            className="flex-1 px-6 py-3 bg-white hover:bg-gray-50 border border-gray-200 text-slate-600 rounded-xl font-semibold transition-all duration-200 text-center"
+            className="flex-1 px-6 py-3 bg-navy-800 hover:bg-navy-600 border border-navy-600 hover:border-[#E95C63]/50 text-white rounded-xl font-semibold transition-all duration-200 text-center"
           >
             Tillbaka
           </Link>
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 px-6 py-3 text-white rounded-xl font-bold transition-all duration-200 hover:scale-[1.02] disabled:opacity-50"
-            style={{ backgroundColor: '#173b57' }}
+            className="flex-1 px-6 py-3 bg-[#E95C63] hover:bg-[#d04e55] disabled:opacity-50 text-white rounded-xl font-bold transition-all duration-200 hover:scale-[1.02]"
           >
             {loading ? 'Bearbetar...' : 'Fortsätt till bekräftelse'}
           </button>
