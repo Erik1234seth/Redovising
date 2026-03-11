@@ -6,7 +6,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, phone, name, packageType, meetingDate, meetingTime, sessionId } = await request.json();
+    const { email, phone, name, packageType, meetingDate, meetingTime, sessionId, qualificationAnswers } = await request.json();
 
     if (!email) {
       return NextResponse.json({ error: 'Email saknas' }, { status: 400 });
@@ -50,6 +50,15 @@ export async function POST(request: NextRequest) {
         <p><strong>Email:</strong> ${email}</p>
         <p><strong>Telefon:</strong> ${phone || '—'}</p>
         ${formattedMeeting ? `<p><strong>Möte bokat:</strong> ${formattedMeeting}</p>` : '<p>Kunden vill bli kontaktad via mail.</p>'}
+        ${qualificationAnswers ? `
+        <hr>
+        <h3>Svar från kvalificeringsfrågor</h3>
+        <p><strong>Separat bankkonto:</strong> ${qualificationAnswers.hasSeparateAccount === true ? 'Ja' : qualificationAnswers.hasSeparateAccount === false ? 'Nej' : '—'}</p>
+        <p><strong>Har anställda:</strong> ${qualificationAnswers.hasEmployees === true ? 'Ja' : qualificationAnswers.hasEmployees === false ? 'Nej' : '—'}</p>
+        <p><strong>Inbetalningar till Skatteverket:</strong> ${qualificationAnswers.hasTaxPayments === true ? 'Ja' : qualificationAnswers.hasTaxPayments === false ? 'Nej' : '—'}</p>
+        <p><strong>Första året med enskild firma:</strong> ${qualificationAnswers.isFirstYear === true ? 'Ja' : qualificationAnswers.isFirstYear === false ? 'Nej' : '—'}</p>
+        <p><strong>Momspliktig:</strong> ${qualificationAnswers.isMomspliktig === true ? 'Ja' : qualificationAnswers.isMomspliktig === false ? 'Nej' : '—'}</p>
+        ` : ''}
       `,
     });
 

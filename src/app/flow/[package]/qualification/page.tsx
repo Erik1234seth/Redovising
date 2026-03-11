@@ -11,6 +11,7 @@ interface QualificationAnswers {
   hasEmployees: boolean | null;
   hasTaxPayments: boolean | null;
   isFirstYear: boolean | null;
+  isMomspliktig: boolean | null;
 }
 
 export default function QualificationPage() {
@@ -24,6 +25,7 @@ export default function QualificationPage() {
     hasEmployees: null,
     hasTaxPayments: null,
     isFirstYear: null,
+    isMomspliktig: null,
   });
 
   const totalSteps = 9;
@@ -54,122 +56,40 @@ export default function QualificationPage() {
       packageType={packageType}
       hideProgress={true}
     >
-      <div className="space-y-6 mb-8">
-        {/* Question 1 */}
-        <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-5">
-          <p className="text-white font-medium mb-4">
-            Har du ett separat bankkonto för din enskilda firma?
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => handleAnswer('hasSeparateAccount', true)}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                answers.hasSeparateAccount === true
-                  ? 'bg-[#E95C63] text-white'
-                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
-              }`}
-            >
-              Ja
-            </button>
-            <button
-              onClick={() => handleAnswer('hasSeparateAccount', false)}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                answers.hasSeparateAccount === false
-                  ? 'bg-[#E95C63] text-white'
-                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
-              }`}
-            >
-              Nej
-            </button>
+      <div className="bg-navy-800/50 border border-navy-600 rounded-xl divide-y divide-navy-600 mb-8">
+        {([
+          { key: 'hasSeparateAccount', label: 'Separat bankkonto för firman?' },
+          { key: 'hasEmployees', label: 'Har du anställda?' },
+          { key: 'hasTaxPayments', label: 'Inbetalningar till Skatteverket i år?' },
+          { key: 'isFirstYear', label: 'Första året med enskild firma?' },
+          { key: 'isMomspliktig', label: 'Är du momspliktig?' },
+        ] as { key: keyof QualificationAnswers; label: string }[]).map(({ key, label }) => (
+          <div key={key} className="flex items-center justify-between px-5 py-4 gap-4">
+            <p className="text-white font-medium text-sm">{label}</p>
+            <div className="flex gap-2 flex-shrink-0">
+              <button
+                onClick={() => handleAnswer(key, true)}
+                className={`py-1.5 px-5 rounded-lg font-semibold text-sm transition-all ${
+                  answers[key] === true
+                    ? 'bg-[#E95C63] text-white'
+                    : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
+                }`}
+              >
+                Ja
+              </button>
+              <button
+                onClick={() => handleAnswer(key, false)}
+                className={`py-1.5 px-5 rounded-lg font-semibold text-sm transition-all ${
+                  answers[key] === false
+                    ? 'bg-[#E95C63] text-white'
+                    : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
+                }`}
+              >
+                Nej
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* Question 2 */}
-        <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-5">
-          <p className="text-white font-medium mb-4">
-            Har du anställda i din enskilda firma?
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => handleAnswer('hasEmployees', true)}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                answers.hasEmployees === true
-                  ? 'bg-[#E95C63] text-white'
-                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
-              }`}
-            >
-              Ja
-            </button>
-            <button
-              onClick={() => handleAnswer('hasEmployees', false)}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                answers.hasEmployees === false
-                  ? 'bg-[#E95C63] text-white'
-                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
-              }`}
-            >
-              Nej
-            </button>
-          </div>
-        </div>
-
-        {/* Question 3 */}
-        <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-5">
-          <p className="text-white font-medium mb-4">
-            Har du gjort inbetalningar till Skatteverket som berör årets verksamhet?
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => handleAnswer('hasTaxPayments', true)}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                answers.hasTaxPayments === true
-                  ? 'bg-[#E95C63] text-white'
-                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
-              }`}
-            >
-              Ja
-            </button>
-            <button
-              onClick={() => handleAnswer('hasTaxPayments', false)}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                answers.hasTaxPayments === false
-                  ? 'bg-[#E95C63] text-white'
-                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
-              }`}
-            >
-              Nej
-            </button>
-          </div>
-        </div>
-
-        {/* Question 4 */}
-        <div className="bg-navy-800/50 border border-navy-600 rounded-xl p-5">
-          <p className="text-white font-medium mb-4">
-            Är detta ditt första år med enskild firma?
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => handleAnswer('isFirstYear', true)}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                answers.isFirstYear === true
-                  ? 'bg-[#E95C63] text-white'
-                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
-              }`}
-            >
-              Ja
-            </button>
-            <button
-              onClick={() => handleAnswer('isFirstYear', false)}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                answers.isFirstYear === false
-                  ? 'bg-[#E95C63] text-white'
-                  : 'bg-navy-700 text-warm-300 hover:bg-navy-600 border border-navy-600'
-              }`}
-            >
-              Nej
-            </button>
-          </div>
-        </div>
+        ))}
       </div>
 
       <div className="flex justify-between items-center pt-6 border-t border-navy-600">
