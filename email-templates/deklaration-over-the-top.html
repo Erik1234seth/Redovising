@@ -1,152 +1,126 @@
 <!DOCTYPE html>
 <html lang="sv">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Enkla Bokslut</title>
 </head>
-<body style="margin:0; padding:0; background-color:#0f1f33; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
 
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#0f1f33; padding: 40px 16px;">
+<body
+  style="margin:0; padding:0; background-color:#f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9; padding: 40px 16px;">
     <tr>
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px; width:100%;">
 
-          <!-- Header / Nav -->
+          <!-- Header -->
           <tr>
-            <td style="background-color:#173b57; border-radius:16px 16px 0 0; padding: 22px 36px;">
-              <a href="https://www.enklabokslut.se" target="_blank" style="text-decoration:none; display:inline-flex; align-items:center; gap:10px;">
-                <span style="display:inline-block; width:36px; height:36px; background-color:#E95C63; border-radius:8px; text-align:center; line-height:36px; font-size:17px; color:#ffffff; font-weight:900; vertical-align:middle;">✓</span>
-                <span style="vertical-align:middle; font-size:19px; line-height:1; letter-spacing:-0.3px;">
-                  <span style="color:rgba(255,255,255,0.55); font-weight:500;">Enkla </span><span style="color:#ffffff; font-weight:800;">Bokslut</span>
+            <td style="background-color:#173b57; border-radius:12px 12px 0 0; padding: 24px 40px; text-align:left;">
+              <a href="https://www.enklabokslut.se" target="_blank"
+                style="text-decoration:none; display:inline-flex; align-items:center; gap:10px;">
+                <span
+                  style="display:inline-block; width:38px; height:38px; background-color:#E95C63; border-radius:8px; text-align:center; line-height:38px; font-size:18px; color:#ffffff; font-weight:900;">✓</span>
+                <span style="font-size:20px; letter-spacing:-0.3px;">
+                  <span style="color:rgba(255,255,255,0.6); font-weight:500;">Enkla </span><span
+                    style="color:#ffffff; font-weight:800;">Bokslut</span>
                 </span>
               </a>
             </td>
           </tr>
 
-          <!-- Hero image -->
+          <!-- Body -->
           <tr>
-            <td style="padding:0; position:relative;">
-              <img src="https://www.enklabokslut.se/hero-enkla-bokslut.png"
-                   alt="Enkla Bokslut – redovisning för enskilda firmor"
-                   width="600"
-                   style="display:block; width:100%; max-width:600px; height:260px; object-fit:cover;" />
-              <!-- Overlay badge -->
-              <div style="position:absolute; bottom:20px; left:32px; background-color:#E95C63; color:#fff; font-size:12px; font-weight:800; letter-spacing:1px; text-transform:uppercase; padding:6px 14px; border-radius:20px;">
-                Deklaration 2025 — 2 maj
-              </div>
-            </td>
-          </tr>
+            <td style="background-color:#ffffff; padding: 40px 40px 32px 40px;">
 
-          <!-- Intro -->
-          <tr>
-            <td style="background: linear-gradient(180deg, #1e3a55 0%, #173b57 100%); padding: 36px 36px 28px 36px;">
-              <p style="margin:0 0 6px 0; font-size:13px; font-weight:700; color:#E95C63; text-transform:uppercase; letter-spacing:1px;">Hej {{ contact.FIRSTNAME }}</p>
-              <h1 style="margin:0 0 20px 0; font-size:28px; font-weight:800; color:#ffffff; line-height:1.2; letter-spacing:-0.5px;">
-                Dags att ha koll på<br>bokslut och deklaration.
-              </h1>
-              <p style="margin:0 0 16px 0; font-size:15px; line-height:1.75; color:rgba(255,255,255,0.72);">
-                Eftersom du driver en enskild firma hör vi av oss. Deklarationen ska lämnas in senast den <strong style="color:#ffffff;">2 maj</strong> — och för att hinna i tid behöver bokföring och NE-bilaga bli klart dessförinnan.
+              <p style="margin:0 0 24px 0; font-size:16px; color:#173b57; font-weight:600;">
+                Hej {{ contact.FIRSTNAME }},
               </p>
-              <p style="margin:0; font-size:15px; line-height:1.75; color:rgba(255,255,255,0.72);">
-                Vi arbetar <strong style="color:#ffffff;">enbart med enskilda firmor</strong>, vilket gör att vi kan hålla arbetet enkelt och priserna rimliga.
+
+              <p style="margin:0 0 16px 0; font-size:15px; line-height:1.7; color:#374151;">
+                Jag hör av mig eftersom du driver en enskild firma — och deklarationen ska lämnas in senast den <strong
+                  style="color:#173b57;">2 maj</strong>.
               </p>
-            </td>
-          </tr>
 
-          <!-- Divider -->
-          <tr>
-            <td style="background-color:#173b57; padding: 0 36px;">
-              <div style="height:1px; background-color:rgba(255,255,255,0.08);"></div>
-            </td>
-          </tr>
+              <p style="margin:0 0 28px 0; font-size:15px; line-height:1.7; color:#374151;">
+                Vi arbetar enbart med enskilda firmor och hjälper till med bokföring, momsredovisning, bokslut och deklarationen inför
+                inlämningen till Skatteverket. Målet är att göra processen enkel och tydlig.
+              </p>
 
-          <!-- Trust signals -->
-          <tr>
-            <td style="background-color:#173b57; padding: 24px 36px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td width="33%" style="text-align:center; padding: 0 8px;">
-                    <p style="margin:0 0 4px 0; font-size:22px; font-weight:800; color:#E95C63;">100%</p>
-                    <p style="margin:0; font-size:12px; color:rgba(255,255,255,0.5); line-height:1.4;">Fokus på<br>enskilda firmor</p>
-                  </td>
-                  <td width="33%" style="text-align:center; padding: 0 8px; border-left:1px solid rgba(255,255,255,0.08); border-right:1px solid rgba(255,255,255,0.08);">
-                    <p style="margin:0 0 4px 0; font-size:22px; font-weight:800; color:#E95C63;">Fast pris</p>
-                    <p style="margin:0; font-size:12px; color:rgba(255,255,255,0.5); line-height:1.4;">Inga dolda<br>avgifter</p>
-                  </td>
-                  <td width="33%" style="text-align:center; padding: 0 8px;">
-                    <p style="margin:0 0 4px 0; font-size:22px; font-weight:800; color:#E95C63;">Enkelt</p>
-                    <p style="margin:0; font-size:12px; color:rgba(255,255,255,0.5); line-height:1.4;">Allt sköts<br>digitalt</p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Pricing -->
-          <tr>
-            <td style="background-color:#ffffff; padding: 36px 36px 28px 36px;">
-              <p style="margin:0 0 4px 0; font-size:12px; font-weight:700; color:#E95C63; text-transform:uppercase; letter-spacing:1px;">Priser</p>
-              <h2 style="margin:0 0 24px 0; font-size:22px; font-weight:800; color:#173b57; letter-spacing:-0.3px;">Välj det som passar dig</h2>
-
+              <!-- Pricing cards -->
               <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
                 <tr>
-                  <td width="48%" style="background-color:#f8fafc; border:1px solid #e5e7eb; border-radius:12px; padding:22px; vertical-align:top;">
-                    <p style="margin:0 0 4px 0; font-size:11px; font-weight:700; color:#E95C63; text-transform:uppercase; letter-spacing:0.8px;">NE-bilaga</p>
-                    <p style="margin:0 0 10px 0; font-size:30px; font-weight:800; color:#173b57; line-height:1;">1 999 kr</p>
-                    <div style="height:1px; background-color:#e5e7eb; margin-bottom:12px;"></div>
-                    <p style="margin:0 0 8px 0; font-size:13px; color:#4b5563; line-height:1.5;">✓ &nbsp;NE-bilaga framtagen</p>
-                    <p style="margin:0 0 8px 0; font-size:13px; color:#4b5563; line-height:1.5;">✓ &nbsp;Klar inför deklaration</p>
-                    <p style="margin:0; font-size:13px; color:#4b5563; line-height:1.5;">✓ &nbsp;Fast pris</p>
+
+                  <!-- NE-bilaga -->
+                  <td width="48%"
+                    style="background-color:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:20px 22px; vertical-align:top;">
+                    <p
+                      style="margin:0 0 4px 0; font-size:12px; font-weight:700; color:#E95C63; text-transform:uppercase; letter-spacing:0.8px;">
+                      NE-bilaga</p>
+                    <p style="margin:0 0 12px 0; font-size:26px; font-weight:800; color:#173b57;">1 999 kr</p>
+
+                    <ul style="margin:0; padding-left:18px; font-size:13px; color:#6b7280; line-height:1.6;">
+                      <li>Framtagning av NE-bilaga</li>
+                      <li>Underlag till din deklaration</li>
+                      <li>Klart för inlämning till Skatteverket</li>
+                    </ul>
                   </td>
+
                   <td width="4%"></td>
-                  <td width="48%" style="background-color:#173b57; border-radius:12px; padding:22px; vertical-align:top; position:relative;">
-                    <p style="margin:0 0 4px 0; font-size:11px; font-weight:700; color:#E95C63; text-transform:uppercase; letter-spacing:0.8px;">Komplett tjänst</p>
-                    <p style="margin:0 0 10px 0; font-size:30px; font-weight:800; color:#ffffff; line-height:1;">3 499 kr</p>
-                    <div style="height:1px; background-color:rgba(255,255,255,0.1); margin-bottom:12px;"></div>
-                    <p style="margin:0 0 8px 0; font-size:13px; color:rgba(255,255,255,0.7); line-height:1.5;">✓ &nbsp;Bokföring genomgången</p>
-                    <p style="margin:0 0 8px 0; font-size:13px; color:rgba(255,255,255,0.7); line-height:1.5;">✓ &nbsp;NE-bilaga framtagen</p>
-                    <p style="margin:0; font-size:13px; color:rgba(255,255,255,0.7); line-height:1.5;">✓ &nbsp;Vi sköter hela deklarationen</p>
+
+                  <!-- Komplett tjänst -->
+                  <td width="48%"
+                    style="background-color:#173b57; border-radius:10px; padding:20px 22px; vertical-align:top;">
+                    <p
+                      style="margin:0 0 4px 0; font-size:12px; font-weight:700; color:#E95C63; text-transform:uppercase; letter-spacing:0.8px;">
+                      Komplett tjänst</p>
+                    <p style="margin:0 0 12px 0; font-size:26px; font-weight:800; color:#ffffff;">3 499 kr</p>
+
+                    <ul
+                      style="margin:0; padding-left:18px; font-size:13px; color:rgba(255,255,255,0.75); line-height:1.6;">
+                      <li>Bokföring</li>
+                      <li>Momsredovisning</li>
+                      <li>Överföring till momsdeklarationen</li>
+                      <li>NE-bilaga</li>
+                      <li>Hela deklarationsprocessen</li>
+                    </ul>
                   </td>
+
                 </tr>
               </table>
 
-              <!-- CTA button -->
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
+              <p style="margin:0 0 32px 0; font-size:15px; line-height:1.7; color:#374151;">
+                Har du frågor eller vill komma igång är du välkommen att svara direkt på detta mejl — eller läsa mer på
+                vår hemsida.
+              </p>
+
+              <!-- CTA -->
+              <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px;">
                 <tr>
-                  <td align="center" style="background-color:#E95C63; border-radius:10px;">
+                  <td style="background-color:#E95C63; border-radius:8px;">
                     <a href="https://www.enklabokslut.se" target="_blank"
-                       style="display:block; padding:16px 32px; font-size:16px; font-weight:800; color:#ffffff; text-decoration:none; letter-spacing:0.2px; text-align:center;">
-                      Kom igång idag &nbsp;→
+                      style="display:inline-block; padding:14px 32px; font-size:15px; font-weight:700; color:#ffffff; text-decoration:none;">
+                      Läs mer och kom igång →
                     </a>
                   </td>
                 </tr>
               </table>
 
-              <p style="margin:0; font-size:13px; color:#9ca3af; text-align:center;">
-                Eller svara direkt på detta mejl med dina frågor.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Sign off -->
-          <tr>
-            <td style="background-color:#f8fafc; border:1px solid #e5e7eb; border-top:none; padding: 28px 36px;">
-              <p style="margin:0 0 16px 0; font-size:15px; line-height:1.7; color:#374151;">
-                Hör gärna av dig om du har frågor — jag hjälper dig gärna att komma igång.
-              </p>
               <p style="margin:0; font-size:15px; line-height:1.7; color:#374151;">
                 Vänliga hälsningar,<br>
-                <strong style="color:#173b57; font-size:16px;">Erik</strong><br>
-                <span style="color:#9ca3af; font-size:13px;">Enkla Bokslut &nbsp;·&nbsp; <a href="https://www.enklabokslut.se" style="color:#E95C63; text-decoration:none;">enklabokslut.se</a></span>
+                <strong style="color:#173b57;">Erik</strong><br>
+                <span style="color:#6b7280; font-size:13px;">Enkla Bokslut</span>
               </p>
+
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="background-color:#f1f5f9; border-radius:0 0 16px 16px; padding:16px 36px; text-align:center;">
-              <p style="margin:0; font-size:11px; color:#b0b7c3; line-height:1.6;">
+            <td
+              style="background-color:#f8fafc; border:1px solid #e5e7eb; border-top:none; border-radius:0 0 12px 12px; padding:20px 40px; text-align:center;">
+              <p style="margin:0; font-size:12px; color:#9ca3af; line-height:1.6;">
                 Vill du inte få fler mejl från oss kan du svara på detta mejl så tar vi bort dig från framtida utskick.
               </p>
             </td>
@@ -158,4 +132,5 @@
   </table>
 
 </body>
+
 </html>
