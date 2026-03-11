@@ -25,8 +25,8 @@ export const packages: PackageInfo[] = [
       'Bokföring baserat på dina kontoutdrag',
       'Förenklat årsbokslut',
       'Vi upprättar din NE-bilaga',
-      'Komplett hantering',
-      'Full support'
+      'Momsredovisning',
+      'Överföring till momsdeklaration'
     ]
   }
 ];
