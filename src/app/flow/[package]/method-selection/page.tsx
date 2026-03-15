@@ -32,10 +32,11 @@ export default function MethodSelectionPage() {
       const sessionId = sessionStorage.getItem('analyticsSessionId') || null;
       const qualificationAnswersStr = sessionStorage.getItem(`qualificationAnswers_${packageType}`);
       const qualificationAnswers = qualificationAnswersStr ? JSON.parse(qualificationAnswersStr) : null;
+      const contactMethod = sessionStorage.getItem('contactMethod') || (meetingDate ? 'meeting' : 'email');
       const res = await fetch('/api/contact-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone, packageType, meetingDate, meetingTime, sessionId, qualificationAnswers }),
+        body: JSON.stringify({ name, email, phone, packageType, meetingDate, meetingTime, sessionId, qualificationAnswers, contactMethod }),
       });
       if (!res.ok) throw new Error('Något gick fel');
       setDone(true);

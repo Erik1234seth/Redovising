@@ -6,7 +6,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, phone, name, packageType, meetingDate, meetingTime, sessionId, qualificationAnswers } = await request.json();
+    const { email, phone, name, packageType, meetingDate, meetingTime, sessionId, qualificationAnswers, contactMethod } = await request.json();
 
     if (!email) {
       return NextResponse.json({ error: 'Email saknas' }, { status: 400 });
@@ -62,80 +62,100 @@ export async function POST(request: NextRequest) {
       `,
     });
 
+    const firstName = name ? name.split(' ')[0] : '';
+    const emailHeader = `
+      <table width="100%" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr>
+          <td style="background-color:#173b57;padding:28px 40px;text-align:center;">
+            <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+              <tr>
+                <td style="background-color:#E95C63;border-radius:8px;width:36px;height:36px;text-align:center;vertical-align:middle;">
+                  <span style="color:#ffffff;font-size:20px;font-weight:bold;line-height:36px;">✓</span>
+                </td>
+                <td style="padding-left:12px;color:#ffffff;font-size:20px;font-weight:700;vertical-align:middle;">Enkla Bokslut</td>
+              </tr>
+            </table>
+          </td>
+        </tr>`;
+    const emailFooter = `
+        <tr>
+          <td style="background-color:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#8fa3b1;">Enkla Bokslut · <a href="https://enklabokslut.se" style="color:#E95C63;text-decoration:none;">enklabokslut.se</a></p>
+          </td>
+        </tr>
+      </table>`;
+
+    const customerHtml = contactMethod === 'meeting' ? `
+      <!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"></head>
+      <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+        <span style="display:none;max-height:0;overflow:hidden;">Vi ringer upp dig ${formattedMeeting} — hör av dig om du behöver ändra.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</span>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:40px 16px;">
+          <tr><td align="center">
+            ${emailHeader}
+            <tr><td style="padding:40px;">
+              <p style="margin:0 0 8px;font-size:24px;font-weight:700;color:#173b57;">Möte bokat${firstName ? ', ' + firstName : ''}!</p>
+              <p style="margin:0 0 24px;font-size:16px;color:#5a6a7a;line-height:1.6;">Vi ringer upp dig <strong style="color:#173b57;">${formattedMeeting}</strong> för en kort genomgång av ditt ärende.</p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:24px;">
+                <tr><td style="padding:20px;">
+                  <p style="margin:0 0 8px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#8fa3b1;">Din bokning</p>
+                  <p style="margin:0;font-size:15px;color:#173b57;"><strong>Paket:</strong> ${packageName}</p>
+                  <p style="margin:4px 0 0;font-size:15px;color:#173b57;"><strong>Tid:</strong> ${formattedMeeting}</p>
+                  ${phone ? `<p style="margin:4px 0 0;font-size:15px;color:#173b57;"><strong>Vi ringer:</strong> ${phone}</p>` : ''}
+                </td></tr>
+              </table>
+              <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.6;">Behöver du ändra tid? Svara direkt på detta mail.</p>
+              <p style="margin:0;font-size:15px;color:#173b57;">Med vänlig hälsning,<br><strong>Erik</strong><br><span style="color:#8fa3b1;">Enkla Bokslut</span></p>
+            </td></tr>
+            ${emailFooter}
+          </td></tr>
+        </table>
+      </body></html>
+    ` : `
+      <!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"></head>
+      <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+        <span style="display:none;max-height:0;overflow:hidden;">Tack för att du valde oss — här är allt du behöver för att komma igång.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</span>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:40px 16px;">
+          <tr><td align="center">
+            ${emailHeader}
+            <tr><td style="padding:40px;">
+              <p style="margin:0 0 20px;font-size:16px;color:#173b57;font-weight:600;">Hej${firstName ? ' ' + firstName : ''},</p>
+              ${packageType === 'komplett' ? `
+              <p style="margin:0 0 16px;font-size:15px;color:#5a6a7a;line-height:1.7;">Tack för att du valt Komplett tjänst — kul att du hoppade ombord! Det betyder att vi tar hand om allt åt dig: bokföring, momsredovisning, bokslut och NE-bilaga. Vi sköter även inlämningen till Skatteverket som ditt ombud, så du slipper hålla koll på det själv.</p>
+              <p style="margin:0 0 12px;font-size:15px;color:#5a6a7a;line-height:1.7;">Innan vi sätter igång undrar jag ett par saker för att få en bra bild av läget:</p>
+              <ul style="margin:0 0 16px;padding-left:20px;font-size:15px;color:#5a6a7a;line-height:1.9;">
+                <li>Har du bokfört under året — och i så fall hur? (program, Excel, eller inte kommit igång med det ännu?)</li>
+                <li>Hur länge har du haft firman?</li>
+                <li>Har du haft några större inköp eller investeringar under året?</li>
+                <li>Fakturerar du via något system, som Fortnox, eller gör du det manuellt?</li>
+              </ul>
+              <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Det spelar absolut ingen roll vad svaret är — vi hjälper till oavsett. Jag frågar bara för att vi ska kunna lägga upp arbetet på bästa sätt från start.</p>
+              ` : `
+              <p style="margin:0 0 16px;font-size:15px;color:#5a6a7a;line-height:1.7;">Tack för att du valt NE-bilaga — roligt att du valt oss! Vi tar fram din NE-bilaga inför deklarationen, så lämnar du sedan in den till Skatteverket själv.</p>
+              <p style="margin:0 0 12px;font-size:15px;color:#5a6a7a;line-height:1.7;">För att vi ska komma igång på rätt sätt undrar jag ett par saker:</p>
+              <ul style="margin:0 0 16px;padding-left:20px;font-size:15px;color:#5a6a7a;line-height:1.9;">
+                <li>Har du bokfört under året — och i så fall hur? (program, Excel, eller har det inte blivit gjort än?)</li>
+                <li>Hur länge har du haft firman?</li>
+                <li>Har du haft några större inköp eller investeringar under året?</li>
+                <li>Fakturerar du via något system, som Fortnox, eller gör du det manuellt?</li>
+              </ul>
+              <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Inget rätt eller fel svar — vi löser det oavsett. Jag frågar bara för att kunna ge dig rätt info direkt.</p>
+              `}
+              <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Svara gärna direkt på detta mail med dina svar — eller om du har egna frågor är det bara att ställa dem där, det är jag som läser det.</p>
+              <p style="margin:0;font-size:15px;color:#173b57;">Med vänlig hälsning,<br><strong>Erik</strong><br><span style="color:#8fa3b1;">Enkla Bokslut</span></p>
+            </td></tr>
+            ${emailFooter}
+          </td></tr>
+        </table>
+      </body></html>
+    `;
+
     // Send confirmation to customer
     await resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
       replyTo: 'erik@enklabokslut.se',
       to: email,
-      subject: 'Välkommen till Enkla Bokslut – Vi kontaktar dig inom kort',
-      html: `
-        <!DOCTYPE html>
-        <html lang="sv">
-        <head><meta charset="UTF-8"></head>
-        <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-          <span style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${formattedMeeting ? `Vi ringer upp dig ${formattedMeeting} — hör av dig om du behöver ändra.` : 'Vi ser fram emot att hjälpa dig med ditt bokslut.'}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</span>
-          <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:40px 16px;">
-            <tr><td align="center">
-              <table width="100%" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-                <!-- Header -->
-                <tr>
-                  <td style="background-color:#173b57;padding:32px 40px;text-align:center;">
-                    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
-                      <tr>
-                        <td style="background-color:#E95C63;border-radius:8px;width:36px;height:36px;text-align:center;vertical-align:middle;">
-                          <span style="color:#ffffff;font-size:20px;font-weight:bold;line-height:36px;">✓</span>
-                        </td>
-                        <td style="padding-left:12px;color:#ffffff;font-size:20px;font-weight:700;vertical-align:middle;">
-                          Enkla Bokslut
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                <!-- Body -->
-                <tr>
-                  <td style="padding:40px;">
-                    <p style="margin:0 0 8px;font-size:24px;font-weight:700;color:#173b57;">
-                      Tack${name ? ', ' + name.split(' ')[0] : ''}!
-                    </p>
-                    <p style="margin:0 0 24px;font-size:16px;color:#5a6a7a;line-height:1.6;">
-                      ${formattedMeeting
-                        ? `Vi ringer upp dig <strong style="color:#173b57;">${formattedMeeting}</strong> för en kort genomgång av ditt ärende.`
-                        : `Vi har tagit emot din förfrågan om <strong>${packageName}</strong> och hör av oss inom kort.`
-                      }
-                    </p>
-                    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:24px;">
-                      <tr><td style="padding:20px;">
-                        <p style="margin:0 0 8px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#8fa3b1;">Din bokning</p>
-                        <p style="margin:0;font-size:15px;color:#173b57;"><strong>Paket:</strong> ${packageName}</p>
-                        ${formattedMeeting ? `<p style="margin:4px 0 0;font-size:15px;color:#173b57;"><strong>Tid för möte:</strong> ${formattedMeeting}</p>` : ''}
-                        ${phone ? `<p style="margin:4px 0 0;font-size:15px;color:#173b57;"><strong>Telefon:</strong> ${phone}</p>` : ''}
-                      </td></tr>
-                    </table>
-                    <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.6;">
-                      Har du frågor? Svara direkt på detta mail så når du mig.
-                    </p>
-                    <p style="margin:0;font-size:15px;color:#173b57;">
-                      Med vänlig hälsning,<br>
-                      <strong>Erik</strong><br>
-                      <span style="color:#8fa3b1;">Enkla Bokslut</span>
-                    </p>
-                  </td>
-                </tr>
-                <!-- Footer -->
-                <tr>
-                  <td style="background-color:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center;">
-                    <p style="margin:0;font-size:12px;color:#8fa3b1;">
-                      Enkla Bokslut · <a href="https://enklabokslut.se" style="color:#E95C63;text-decoration:none;">enklabokslut.se</a>
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td></tr>
-          </table>
-        </body>
-        </html>
-      `,
+      subject: contactMethod === 'meeting' ? `Möte bokat – ${formattedMeeting}` : 'Välkommen – ett par snabba frågor',
+      html: customerHtml,
     });
 
     return NextResponse.json({ ok: true });

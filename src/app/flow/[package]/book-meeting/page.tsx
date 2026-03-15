@@ -29,6 +29,7 @@ export default function BookMeetingPage() {
   const today = new Date();
   const minDate = getMinDate();
 
+  const [contactMethod, setContactMethod] = useState<'email' | 'meeting'>('email');
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -75,9 +76,15 @@ export default function BookMeetingPage() {
     });
 
   const handleContinue = () => {
-    if (!selectedDate || !selectedTime) return;
-    sessionStorage.setItem('meetingDate', selectedDate);
-    sessionStorage.setItem('meetingTime', selectedTime);
+    if (contactMethod === 'meeting') {
+      if (!selectedDate || !selectedTime) return;
+      sessionStorage.setItem('meetingDate', selectedDate);
+      sessionStorage.setItem('meetingTime', selectedTime);
+    } else {
+      sessionStorage.removeItem('meetingDate');
+      sessionStorage.removeItem('meetingTime');
+    }
+    sessionStorage.setItem('contactMethod', contactMethod);
     router.push(`/flow/${packageType}/method-selection`);
   };
 
@@ -85,16 +92,49 @@ export default function BookMeetingPage() {
     <div className="min-h-screen bg-navy-800 flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center px-3 py-1.5 bg-[#E95C63]/10 border border-[#E95C63]/20 rounded-full mb-4">
-            <span className="text-[#E95C63] text-sm font-semibold">Steg 2 av 3</span>
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-3">Välj en tid som passar</h1>
-          <p className="text-warm-300">Vi ringer upp dig på utsatt tid för en kort genomgång — kostnadsfritt.</p>
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold text-white mb-2">Hur vill du komma igång?</h1>
+          <p className="text-warm-300 text-sm">Välj det som passar dig bäst.</p>
+        </div>
+
+        {/* Method selector */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <button
+            onClick={() => setContactMethod('email')}
+            className={`relative flex flex-col items-start p-4 rounded-xl border text-left transition-all ${
+              contactMethod === 'email'
+                ? 'border-[#E95C63] bg-[#E95C63]/10'
+                : 'border-navy-600 bg-navy-700/50 hover:border-navy-500'
+            }`}
+          >
+            <span className="absolute -top-2.5 left-3 bg-[#E95C63] text-white text-xs font-bold px-2 py-0.5 rounded-full">
+              Rekommenderas
+            </span>
+            <svg className="w-5 h-5 text-[#E95C63] mb-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <p className="font-semibold text-white text-sm">Få info via mail</p>
+            <p className="text-warm-400 text-xs mt-1">Vi skickar allt du behöver — du bestämmer takten</p>
+          </button>
+
+          <button
+            onClick={() => setContactMethod('meeting')}
+            className={`flex flex-col items-start p-4 rounded-xl border text-left transition-all ${
+              contactMethod === 'meeting'
+                ? 'border-[#E95C63] bg-[#E95C63]/10'
+                : 'border-navy-600 bg-navy-700/50 hover:border-navy-500'
+            }`}
+          >
+            <svg className="w-5 h-5 text-warm-300 mb-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+            </svg>
+            <p className="font-semibold text-white text-sm">Boka ett möte</p>
+            <p className="text-warm-400 text-xs mt-1">Vi ringer upp dig för en kort genomgång</p>
+          </button>
         </div>
 
         {/* Calendar */}
-        <div className="bg-navy-700/50 border border-navy-600 rounded-xl overflow-hidden mb-4">
+        {contactMethod === 'meeting' && <div className="bg-navy-700/50 border border-navy-600 rounded-xl overflow-hidden mb-4">
           <div className="flex items-center justify-between px-5 py-4 border-b border-navy-600">
             <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-navy-600 text-warm-300 hover:text-white transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,10 +179,10 @@ export default function BookMeetingPage() {
               );
             })}
           </div>
-        </div>
+        </div>}
 
         {/* Time slots */}
-        {selectedDate && (
+        {contactMethod === 'meeting' && selectedDate && (
           <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-5 mb-4">
             <p className="text-sm font-medium text-warm-300 mb-3">
               Välj tid — <span className="text-white capitalize">{formatDate(selectedDate)}</span>
@@ -173,7 +213,7 @@ export default function BookMeetingPage() {
         )}
 
         {/* Selected summary */}
-        {selectedDate && selectedTime && (
+        {contactMethod === 'meeting' && selectedDate && selectedTime && (
           <div className="bg-[#E95C63]/10 border border-[#E95C63]/30 rounded-xl p-4 mb-4 flex items-center gap-3">
             <svg className="w-5 h-5 text-[#E95C63] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -187,7 +227,7 @@ export default function BookMeetingPage() {
 
         <button
           onClick={handleContinue}
-          disabled={!selectedDate || !selectedTime}
+          disabled={contactMethod === 'meeting' && (!selectedDate || !selectedTime)}
           className="w-full py-3 bg-[#E95C63] hover:bg-[#d04e55] text-white font-bold rounded-xl transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed mb-4"
         >
           Fortsätt →
