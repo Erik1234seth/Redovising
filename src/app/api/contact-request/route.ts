@@ -127,6 +127,7 @@ export async function POST(request: NextRequest) {
                 <li>Hur länge har du haft firman?</li>
                 <li>Har du haft några större inköp eller investeringar under året?</li>
                 <li>Fakturerar du via något system, som Fortnox, eller gör du det manuellt?</li>
+                <li>Vad är ditt personnummer / org-nr?</li>
               </ul>
               <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Det spelar absolut ingen roll vad svaret är — vi hjälper till oavsett. Jag frågar bara för att vi ska kunna lägga upp arbetet på bästa sätt från start.</p>
               ` : `
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest) {
                 <li>Hur länge har du haft firman?</li>
                 <li>Har du haft några större inköp eller investeringar under året?</li>
                 <li>Fakturerar du via något system, som Fortnox, eller gör du det manuellt?</li>
+                <li>Vad är ditt personnummer / org-nr?</li>
               </ul>
               <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Inget rätt eller fel svar — vi löser det oavsett. Jag frågar bara för att kunna ge dig rätt info direkt.</p>
               `}
