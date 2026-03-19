@@ -21,6 +21,7 @@ export default function ConfirmationPage() {
   const name = searchParams.get('name') || '';
   const phone = searchParams.get('phone') || '';
   const company = searchParams.get('company') || '';
+  const orgNr = searchParams.get('orgNr') || '';
 
   const { user, refreshProfile, loading } = useAuth();
   useTrackStep('confirmation', packageType, bankId, user?.id);
@@ -73,6 +74,7 @@ export default function ConfirmationPage() {
         guest_name: user ? null : name,
         guest_phone: user ? null : phone,
         guest_company: user ? null : company,
+        guest_org_nr: user ? null : orgNr,
         package_type: packageType,
         bank: bankId,
         status: 'pending',
@@ -155,7 +157,7 @@ export default function ConfirmationPage() {
     if (bankId && packageType && (user || email)) {
       saveOrder();
     }
-  }, [bankId, packageType, email, user, orderSaved, supabase, refreshProfile, name, phone, company]);
+  }, [bankId, packageType, email, user, orderSaved, supabase, refreshProfile, name, phone, company, orgNr]);
 
   return (
     <FlowContainer
@@ -269,6 +271,12 @@ export default function ConfirmationPage() {
                 <div className="flex justify-between">
                   <span>Företag:</span>
                   <span className="font-semibold text-warm-400 text-right">{company}</span>
+                </div>
+              )}
+              {orgNr && (
+                <div className="flex justify-between">
+                  <span>Org-nr:</span>
+                  <span className="font-semibold text-warm-400 text-right">{orgNr}</span>
                 </div>
               )}
             </>

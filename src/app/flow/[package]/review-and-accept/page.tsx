@@ -19,6 +19,7 @@ export default function ReviewAndAcceptPage() {
   const name = searchParams.get('name') || '';
   const phone = searchParams.get('phone') || '';
   const company = searchParams.get('company') || '';
+  const orgNr = searchParams.get('orgNr') || '';
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [invoiceAccepted, setInvoiceAccepted] = useState(false);
@@ -58,6 +59,7 @@ export default function ReviewAndAcceptPage() {
         name,
         phone,
         company,
+        orgNr,
       });
       router.push(`/flow/${packageType}/confirmation?${queryParams.toString()}`);
     }
@@ -95,6 +97,12 @@ export default function ReviewAndAcceptPage() {
             <div className="flex justify-between items-center">
               <span>E-post:</span>
               <span className="text-white">{email}</span>
+            </div>
+          )}
+          {orgNr && (
+            <div className="flex justify-between items-center">
+              <span>Org-nr:</span>
+              <span className="text-white">{orgNr}</span>
             </div>
           )}
         </div>

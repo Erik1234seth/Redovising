@@ -31,6 +31,7 @@ export default function ContactInfoPage() {
     name: '',
     phone: '',
     company: '',
+    orgNr: '',
   });
 
   const [existingCustomer, setExistingCustomer] = useState(false);
@@ -54,6 +55,7 @@ export default function ContactInfoPage() {
         name: profile.full_name || '',
         phone: profile.phone || '',
         company: profile.company_name || '',
+        orgNr: profile.org_nr || '',
       });
     }
   }, [user, profile]);
@@ -95,6 +97,7 @@ export default function ContactInfoPage() {
       name: formData.name,
       phone: formData.phone,
       company: formData.company,
+      orgNr: formData.orgNr,
     });
 
     router.push(`/flow/${packageType}/review-and-accept?${params.toString()}`);
@@ -204,6 +207,22 @@ export default function ContactInfoPage() {
             onChange={handleChange}
             className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-warm-500"
             placeholder="Namnet på din enskilda firma"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="orgNr" className="block text-sm font-medium text-warm-300 mb-2">
+            Organisationsnummer *
+          </label>
+          <input
+            type="text"
+            id="orgNr"
+            name="orgNr"
+            required
+            value={formData.orgNr}
+            onChange={handleChange}
+            className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-warm-500"
+            placeholder="XXXXXX-XXXX"
           />
         </div>
 

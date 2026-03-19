@@ -16,6 +16,7 @@ export interface Order {
   guest_name: string | null;
   guest_phone: string | null;
   guest_company: string | null;
+  guest_org_nr: string | null;
   package_type: string;
   bank: string;
   status: string;

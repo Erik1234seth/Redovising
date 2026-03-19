@@ -177,6 +177,7 @@ interface Order {
   guest_name: string | null;
   guest_phone: string | null;
   guest_company: string | null;
+  guest_org_nr: string | null;
   user_id: string | null;
   profiles: {
     email: string;
@@ -359,6 +360,7 @@ export default function AdminPage() {
   const getPhone = (order: Order) =>
     order.profiles?.phone || order.guest_phone || '—';
   const getCompany = (order: Order) => order.guest_company || '—';
+  const getOrgNr = (order: Order) => order.guest_org_nr || '—';
 
   const statusColor = (status: string) => {
     switch (status) {
@@ -570,6 +572,7 @@ export default function AdminPage() {
             email: o.profiles?.email || o.guest_email || '—',
             phone: o.profiles?.phone || o.guest_phone || '—',
             company: o.guest_company || '—',
+            org_nr: o.guest_org_nr || '—',
             package_type: o.package_type,
             bank: o.bank || '—',
             status: o.status,
@@ -616,7 +619,12 @@ export default function AdminPage() {
                                 <div className="text-white font-medium">{row.name !== '—' ? row.name : row.email}</div>
                                 {row.name !== '—' && <div className="text-xs text-warm-500">{row.email}</div>}
                               </td>
-                              <td className="px-4 py-3 text-warm-300">{row.phone}</td>
+                              <td className="px-4 py-3">
+                                <div className="text-warm-300">{row.phone}</div>
+                                {'org_nr' in row && row.org_nr !== '—' && (
+                                  <div className="text-xs text-warm-500">Org: {row.org_nr}</div>
+                                )}
+                              </td>
                               <td className="px-4 py-3">
                                 <span className={`px-2 py-1 rounded-md text-xs font-semibold ${packageColor(row.package_type)}`}>
                                   {row.package_type}
