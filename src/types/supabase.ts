@@ -4,6 +4,7 @@ export interface Profile {
   full_name: string | null;
   phone: string | null;
   company_name: string | null;
+  org_nr: string | null;
   created_at: string;
   last_login: string | null;
   order_count: number;
