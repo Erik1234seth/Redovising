@@ -49,12 +49,11 @@ export default function QualificationPage() {
 
   return (
     <FlowContainer
-      title="Några snabba frågor"
-      description="För att vi ska kunna hjälpa dig på bästa sätt behöver vi veta lite mer om din verksamhet."
+      title="Berätta lite om din firma"
+      description="Vi behöver veta detta för att upprätta rätt bokslut åt dig."
       currentStep={1}
       totalSteps={totalSteps}
       packageType={packageType}
-      hideProgress={true}
     >
       <div className="bg-navy-800/50 border border-navy-600 rounded-xl divide-y divide-navy-600 mb-8">
         {([

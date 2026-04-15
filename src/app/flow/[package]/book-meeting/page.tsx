@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 import { TIME_SLOTS, isSlotBooked } from '@/lib/meetingSlots';
+import { packages } from '@/data/packages';
 
 const MONTHS = [
   'januari', 'februari', 'mars', 'april', 'maj', 'juni',
@@ -26,6 +27,7 @@ export default function BookMeetingPage() {
   const router = useRouter();
   const packageType = params.package as string;
 
+  const pkg = packages.find((p) => p.id === packageType);
   const today = new Date();
   const minDate = getMinDate();
 
@@ -91,10 +93,22 @@ export default function BookMeetingPage() {
   return (
     <div className="min-h-screen bg-navy-800 flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full">
+        {/* Package context chip */}
+        {pkg && (
+          <div className="flex justify-center mb-5">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold bg-[#E95C63]/15 text-[#E95C63] border border-[#E95C63]/25">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              Beställning: {pkg.name} — {pkg.price.toLocaleString('sv')} kr
+            </span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-white mb-2">Hur vill du komma igång?</h1>
-          <p className="text-warm-300 text-sm">Välj det som passar dig bäst.</p>
+          <h1 className="text-3xl font-bold text-white mb-2">Hur vill du bli kontaktad?</h1>
+          <p className="text-warm-300 text-sm">Sista steget — välj hur vi ska skicka instruktioner till dig.</p>
         </div>
 
         {/* Method selector */}
@@ -113,8 +127,8 @@ export default function BookMeetingPage() {
             <svg className="w-5 h-5 text-[#E95C63] mb-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
-            <p className="font-semibold text-white text-sm">Få info via mail</p>
-            <p className="text-warm-400 text-xs mt-1">Vi skickar allt du behöver — du bestämmer takten</p>
+            <p className="font-semibold text-white text-sm">Få instruktioner via mail</p>
+            <p className="text-warm-400 text-xs mt-1">Vi skickar allt du behöver för att skicka in ditt underlag</p>
           </button>
 
           <button
@@ -128,8 +142,8 @@ export default function BookMeetingPage() {
             <svg className="w-5 h-5 text-warm-300 mb-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
             </svg>
-            <p className="font-semibold text-white text-sm">Boka ett möte</p>
-            <p className="text-warm-400 text-xs mt-1">Vi ringer upp dig för en kort genomgång</p>
+            <p className="font-semibold text-white text-sm">Boka ett samtal</p>
+            <p className="text-warm-400 text-xs mt-1">Vi ringer upp och går igenom vad du ska skicka in</p>
           </button>
         </div>
 
