@@ -18,13 +18,27 @@ export interface Article extends ArticleMeta {
   content: string; // rendered HTML
 }
 
+/** Recursively collect all .md file paths under a directory */
+function collectMdFiles(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectMdFiles(full));
+    } else if (entry.isFile() && entry.name.endsWith('.md')) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
 export function getAllArticleMeta(): ArticleMeta[] {
-  if (!fs.existsSync(ARTICLES_DIR)) return [];
-  const files = fs.readdirSync(ARTICLES_DIR).filter((f) => f.endsWith('.md'));
-  return files
-    .map((file) => {
-      const slug = file.replace('.md', '');
-      const raw = fs.readFileSync(path.join(ARTICLES_DIR, file), 'utf-8');
+  return collectMdFiles(ARTICLES_DIR)
+    .map((filePath) => {
+      const slug = path.basename(filePath, '.md');
+      const raw = fs.readFileSync(filePath, 'utf-8');
       const { data } = matter(raw);
       return {
         slug,
@@ -39,8 +53,9 @@ export function getAllArticleMeta(): ArticleMeta[] {
 }
 
 export function getArticle(slug: string): Article | null {
-  const filePath = path.join(ARTICLES_DIR, `${slug}.md`);
-  if (!fs.existsSync(filePath)) return null;
+  const all = collectMdFiles(ARTICLES_DIR);
+  const filePath = all.find((f) => path.basename(f, '.md') === slug);
+  if (!filePath) return null;
   const raw = fs.readFileSync(filePath, 'utf-8');
   const { data, content } = matter(raw);
   const html = marked(content) as string;
@@ -56,9 +71,5 @@ export function getArticle(slug: string): Article | null {
 }
 
 export function getAllSlugs(): string[] {
-  if (!fs.existsSync(ARTICLES_DIR)) return [];
-  return fs
-    .readdirSync(ARTICLES_DIR)
-    .filter((f) => f.endsWith('.md'))
-    .map((f) => f.replace('.md', ''));
+  return collectMdFiles(ARTICLES_DIR).map((f) => path.basename(f, '.md'));
 }
