@@ -1,6 +1,6 @@
 export type Bank = 'swedbank' | 'seb' | 'nordea' | 'handelsbanken';
 
-export type Package = 'ne-bilaga' | 'komplett';
+export type Package = 'komplett';
 
 export interface BankInfo {
   id: Bank;
@@ -15,6 +15,7 @@ export interface PackageInfo {
   id: Package;
   name: string;
   price: number;
+  period: string;
   description: string;
   features: string[];
 }

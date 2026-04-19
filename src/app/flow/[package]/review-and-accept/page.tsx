@@ -85,7 +85,7 @@ export default function ReviewAndAcceptPage() {
           </div>
           <div className="flex justify-between items-center pb-3 border-b border-navy-600">
             <span className="font-semibold">Pris:</span>
-            <span className="text-gold-500 font-bold text-xl">{packageInfo?.price} kr</span>
+            <span className="text-gold-500 font-bold text-xl">{packageInfo?.price} kr{packageInfo?.period}</span>
           </div>
           {name && (
             <div className="flex justify-between items-center">
@@ -146,10 +146,10 @@ export default function ReviewAndAcceptPage() {
               />
               <div>
                 <span className="text-warm-200 group-hover:text-white font-medium block">
-                  Jag godkänner att faktura skickas när arbetet är klart
+                  Jag godkänner månadsvis debitering
                 </span>
                 <span className="text-sm text-warm-400 mt-1 block">
-                  Du kommer få en faktura på <strong className="text-gold-500">{packageInfo?.price} kr</strong> via e-post när din {packageInfo?.name.toLowerCase()} är färdig och levererad.
+                  Du debiteras <strong className="text-gold-500">{packageInfo?.price} kr{packageInfo?.period}</strong> löpande. Du kan avsluta abonnemanget när du vill.
                 </span>
               </div>
             </label>
@@ -170,13 +170,13 @@ export default function ReviewAndAcceptPage() {
             <svg className="w-4 h-4 text-gold-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <span>Betalning sker efter att arbetet är klart och levererat</span>
+            <span>Abonnemanget löper månadsvis och debiteras automatiskt</span>
           </li>
           <li className="flex items-start">
             <svg className="w-4 h-4 text-gold-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <span>Du får en faktura via e-post med betalningsinstruktioner</span>
+            <span>Du kan avsluta när du vill — ingen bindningstid</span>
           </li>
           <li className="flex items-start">
             <svg className="w-4 h-4 text-gold-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

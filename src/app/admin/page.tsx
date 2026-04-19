@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 const BANKS = ['seb', 'swedbank', 'handelsbanken', 'nordea', 'danske', 'lansforsakringar', 'sparbanken', 'annan'];
 const STATUSES = ['pending', 'completed', 'in_progress'];
-const PACKAGES = ['komplett', 'ne-bilaga'];
+const PACKAGES = ['komplett'];
 
 const PIPELINE_STAGES = [
   { step: 1, label: 'Mail', color: 'border-blue-500/40 bg-blue-500/5' },
