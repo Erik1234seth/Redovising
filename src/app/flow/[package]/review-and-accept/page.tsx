@@ -23,8 +23,14 @@ export default function ReviewAndAcceptPage() {
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [invoiceAccepted, setInvoiceAccepted] = useState(false);
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
 
   const packageInfo = packages.find((p) => p.id === packageType);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem('billingPeriod');
+    if (stored === 'yearly' || stored === 'monthly') setBillingPeriod(stored);
+  }, []);
 
   // Total steps: 9 for all, except ne-bilaga first year = 8
   const [totalSteps, setTotalSteps] = useState(9);
@@ -85,7 +91,16 @@ export default function ReviewAndAcceptPage() {
           </div>
           <div className="flex justify-between items-center pb-3 border-b border-navy-600">
             <span className="font-semibold">Pris:</span>
-            <span className="text-gold-500 font-bold text-xl">{packageInfo?.price} kr{packageInfo?.period}</span>
+            <div className="text-right">
+              <span className="text-gold-500 font-bold text-xl">
+                {billingPeriod === 'yearly' ? packageInfo?.yearlyPrice.toLocaleString('sv') : packageInfo?.price} kr
+              </span>
+              <p className="text-xs text-warm-400">{billingPeriod === 'yearly' ? 'per år' : 'per månad'}</p>
+            </div>
+          </div>
+          <div className="flex justify-between items-center pb-3 border-b border-navy-600">
+            <span className="font-semibold">Fakturering:</span>
+            <span className="text-warm-200">{billingPeriod === 'yearly' ? 'Årsvis' : 'Månadsvis'}</span>
           </div>
           {name && (
             <div className="flex justify-between items-center">
@@ -146,10 +161,10 @@ export default function ReviewAndAcceptPage() {
               />
               <div>
                 <span className="text-warm-200 group-hover:text-white font-medium block">
-                  Jag godkänner månadsvis debitering
+                  Jag godkänner {billingPeriod === 'yearly' ? 'årsvis' : 'månadsvis'} debitering
                 </span>
                 <span className="text-sm text-warm-400 mt-1 block">
-                  Du debiteras <strong className="text-gold-500">{packageInfo?.price} kr{packageInfo?.period}</strong> löpande. Du kan avsluta abonnemanget när du vill.
+                  Du debiteras <strong className="text-gold-500">{billingPeriod === 'yearly' ? `${packageInfo?.yearlyPrice?.toLocaleString('sv')} kr/år` : `${packageInfo?.price} kr/mån`}</strong> löpande. Du kan avsluta abonnemanget när du vill.
                 </span>
               </div>
             </label>
@@ -170,7 +185,7 @@ export default function ReviewAndAcceptPage() {
             <svg className="w-4 h-4 text-gold-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <span>Abonnemanget löper månadsvis och debiteras automatiskt</span>
+            <span>Abonnemanget {billingPeriod === 'yearly' ? 'faktureras årsvis' : 'löper månadsvis och debiteras automatiskt'}</span>
           </li>
           <li className="flex items-start">
             <svg className="w-4 h-4 text-gold-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

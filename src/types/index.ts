@@ -15,6 +15,7 @@ export interface PackageInfo {
   id: Package;
   name: string;
   price: number;
+  yearlyPrice: number;
   period: string;
   description: string;
   features: string[];
