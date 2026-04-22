@@ -15,6 +15,7 @@ export const packages: PackageInfo[] = [
       'Momsredovisning',
       'Överföring till momsdeklaration',
       'Vi sköter inlämningen till Skatteverket',
+      'Inget bokföringsprogram behövs',
       'Avsluta när du vill – ingen bindningstid',
     ]
   }

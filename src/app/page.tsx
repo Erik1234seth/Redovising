@@ -38,7 +38,6 @@ function useFakeCountdown(): Countdown | null {
 
 export default function Home() {
   const { user, loading } = useAuth();
-  const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
   const fakeCountdown = useFakeCountdown();
   const router = useRouter();
@@ -52,12 +51,10 @@ export default function Home() {
     if (!loading && !user) {
       const hasSeenPopup = sessionStorage.getItem('hasSeenInfoPopup');
       if (!hasSeenPopup) {
-        // A/B test: show popup 50% of the time
         let variant = sessionStorage.getItem('popupVariant');
         if (!variant) {
-          variant = Math.random() < 0.5 ? 'popup' : 'no-popup';
+          variant = 'no-popup';
           sessionStorage.setItem('popupVariant', variant);
-          // Track which variant was assigned
           let sessionId = sessionStorage.getItem('analyticsSessionId');
           if (!sessionId) { sessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`; sessionStorage.setItem('analyticsSessionId', sessionId); }
           fetch('/api/analytics/track', {
@@ -66,18 +63,9 @@ export default function Home() {
             body: JSON.stringify({ step: `ab_popup_${variant}`, sessionId }),
           }).catch(() => {});
         }
-        if (variant === 'popup') {
-          const timer = setTimeout(() => setShowInfoPopup(true), 2500);
-          return () => clearTimeout(timer);
-        }
       }
     }
   }, [loading, user]);
-
-  const closePopup = () => {
-    setShowInfoPopup(false);
-    sessionStorage.setItem('hasSeenInfoPopup', 'true');
-  };
 
   return (
     <>
@@ -302,6 +290,7 @@ export default function Home() {
               <div className="space-y-4 mb-10">
                 {[
                   { title: 'Ingen bindningstid', desc: 'Avsluta abonnemanget när du vill, utan förklaring.' },
+                  { title: 'Inget bokföringsprogram', desc: 'Vi jobbar i ett delat kalkylark — inget dyrt program att köpa eller lära sig.' },
                   { title: 'Fast månadsavgift', desc: 'Inga timarvoden, inga tilläggsavgifter. Du vet alltid vad det kostar.' },
                   { title: '100% fokus på enskilda firmor', desc: 'Vi specialiserar oss på en sak — och gör den bra.' },
                 ].map((item) => (
@@ -625,115 +614,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════
-          INFO POPUP
-      ══════════════════════════════════════════ */}
-      {showInfoPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closePopup} />
-          <div className="relative bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden">
-
-            {/* Close */}
-            <button
-              onClick={closePopup}
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-white/60 hover:text-white transition-colors z-10 rounded-full hover:bg-white/10"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            {/* Header med countdown */}
-            <div className="p-8 pb-6 text-center" style={{ backgroundColor: NAV_BG }}>
-              {fakeCountdown !== null && (
-                <div className="mb-5">
-                  <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                    Tid kvar att boka
-                  </p>
-                  <div className="flex items-start justify-center gap-2">
-                    {[
-                      { value: fakeCountdown.days, label: 'dagar' },
-                      { value: fakeCountdown.hours, label: 'tim' },
-                      { value: fakeCountdown.minutes, label: 'min' },
-                      { value: fakeCountdown.seconds, label: 'sek' },
-                    ].map(({ value, label }, i, arr) => (
-                      <div key={label} className="flex items-start gap-2">
-                        <div className="flex flex-col items-center">
-                          <div
-                            className="w-14 h-14 rounded-xl flex items-center justify-center"
-                            style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}
-                          >
-                            <span className="text-2xl font-extrabold text-white tabular-nums leading-none">
-                              {String(value).padStart(2, '0')}
-                            </span>
-                          </div>
-                          <span className="text-xs mt-1.5 font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{label}</span>
-                        </div>
-                        {i < arr.length - 1 && (
-                          <span className="text-xl font-bold mt-3" style={{ color: 'rgba(255,255,255,0.25)' }}>:</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <h2 className="text-2xl font-extrabold text-white leading-tight mb-2">
-                Missa inte<br />deklarationen 2 maj
-              </h2>
-              <p className="text-white/55 text-sm leading-relaxed">
-                Att upprätta en NE-bilaga tar tid — boka din plats nu så hinner vi klart innan 2 maj.
-              </p>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 space-y-3">
-              {[
-                { icon: '✓', text: 'Fast pris — från 1 999 kr, inga dolda avgifter' },
-                { icon: '✓', text: 'Vi hör av oss inom 24 timmar med instruktioner' },
-                { icon: '✓', text: 'Snabb leverans — klar i god tid innan 2 maj' },
-              ].map(({ icon, text }) => (
-                <div key={text} className="flex items-center gap-3">
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
-                    style={{ backgroundColor: CORAL }}
-                  >
-                    {icon}
-                  </div>
-                  <p className="text-sm text-slate-600">{text}</p>
-                </div>
-              ))}
-
-              <div className="pt-2 space-y-2">
-                <Link
-                  href="#packages"
-                  onClick={() => {
-                    closePopup();
-                    const sessionId = sessionStorage.getItem('sessionId');
-                    if (sessionId) {
-                      fetch('/api/analytics/track', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ step: 'ab_popup_cta_click', sessionId }),
-                      }).catch(() => {});
-                    }
-                  }}
-                  className="flex items-center justify-center w-full py-3.5 font-bold text-white rounded-xl transition-all duration-200 hover:opacity-90 text-sm"
-                  style={{ backgroundColor: CORAL, boxShadow: `0 8px 20px ${CORAL}40` }}
-                >
-                  Kom igång nu — innan det är försent →
-                </Link>
-                <button
-                  onClick={closePopup}
-                  className="w-full py-2.5 text-slate-400 hover:text-slate-600 transition-colors text-xs"
-                >
-                  Jag deklarerar själv
-                </button>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
     </>
   );
 }
