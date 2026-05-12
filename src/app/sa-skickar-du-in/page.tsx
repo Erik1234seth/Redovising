@@ -268,6 +268,21 @@ export default function SaSkickarDuInPage() {
           </div>
         </div>
 
+        {/* Double-entry warning */}
+        <div className="rounded-2xl p-6 sm:p-8 bg-amber-50" style={{ border: '1px solid #FCD34D' }}>
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <p className="font-bold text-sm mb-1 text-amber-800">Använder du Shopify eller Zettle?</p>
+              <p className="text-sm text-amber-700 leading-relaxed">
+                Om du skickar in en export från ett kassasystem som Shopify eller Zettle — lägg inte in samma transaktioner i kalkylarket också. Då bokförs de dubbelt. Välj ett sätt: antingen export från kassasystemet, eller kalkylarket — inte båda för samma transaktioner.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Why structured data = low price */}
         <div className="rounded-2xl p-8 sm:p-10" style={{ backgroundColor: NAV_BG }}>
           <div className="flex gap-4 items-start">

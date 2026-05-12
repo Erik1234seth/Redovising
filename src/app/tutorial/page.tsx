@@ -81,17 +81,29 @@ export default function TutorialPage() {
               Varje månad (eller kvartal om du föredrar det) fyller du i dina transaktioner i kalkylarket och delar det med oss. Det tar vanligtvis bara några minuter.
             </p>
             <div className="rounded-xl p-5 mb-4" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
-              <p className="text-sm font-semibold mb-4" style={{ color: NAV_BG }}>Varje rad är en transaktion med fyra kolumner:</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
-                {['Datum', 'Beskrivning', 'Belopp', 'Momsprocent'].map((col) => (
+              <p className="text-sm font-semibold mb-4" style={{ color: NAV_BG }}>Varje rad är en transaktion med fem kolumner:</p>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-center text-xs">
+                {['Datum', 'Beskrivning', 'Belopp', 'Momsprocent', 'Transaktionstyp'].map((col) => (
                   <div key={col} className="rounded-lg py-2.5 px-2 font-semibold text-white" style={{ backgroundColor: NAV_BG }}>
                     {col}
                   </div>
                 ))}
               </div>
               <p className="text-xs text-slate-400 mt-3">
-                Exempel: <span className="font-mono">2025-03-01 | Faktura kund A | 15 000 | 25%</span>
+                Exempel: <span className="font-mono">2025-03-01 | Faktura kund A | 15 000 | 25% | Sverige</span>
               </p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                {[
+                  { label: 'Sverige', desc: 'Inrikes köp/försäljning' },
+                  { label: 'EU', desc: 'Handel inom EU' },
+                  { label: 'Utanför EU', desc: 'Import/export utanför EU' },
+                ].map(({ label, desc }) => (
+                  <div key={label} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" style={{ backgroundColor: `${NAV_BG}10`, border: `1px solid ${NAV_BG}20` }}>
+                    <span className="font-semibold" style={{ color: NAV_BG }}>{label}</span>
+                    <span className="text-slate-400">— {desc}</span>
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="rounded-xl p-4" style={{ backgroundColor: `${CORAL}08`, border: `1px solid ${CORAL}25` }}>
               <p className="text-sm text-slate-700">

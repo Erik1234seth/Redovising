@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from 'react';
 
 const navLinks = [
   { href: '/', label: 'Hem' },
-  { href: '/om-oss', label: 'Om oss' },
+  { href: '/valja-paket', label: 'Priser' },
 ];
 
 const guides = [
@@ -159,13 +159,13 @@ export default function Navigation() {
           {/* ── Right: utility + CTA (desktop) ── */}
           <div className="hidden md:flex items-center gap-5">
             <Link
-              href="/valja-paket"
+              href="/om-oss"
               className="text-[14px] font-medium transition-colors"
               style={{ color: 'rgba(255,255,255,0.72)' }}
               onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
               onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.72)')}
             >
-              Priser
+              Om oss
             </Link>
             <Link
               href="/kontakt"
@@ -249,12 +249,12 @@ export default function Navigation() {
 
           <div className="pt-3 border-t border-white/10 space-y-2">
             <Link
-              href="/valja-paket"
+              href="/om-oss"
               onClick={() => setMobileOpen(false)}
               className="block px-4 py-3 text-[15px] font-medium rounded-xl transition-colors"
               style={{ color: 'rgba(255,255,255,0.75)' }}
             >
-              Priser
+              Om oss
             </Link>
             <Link
               href="/kontakt"
