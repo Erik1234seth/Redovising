@@ -6,7 +6,8 @@ export function middleware(request: NextRequest) {
 
   const isApp =
     hostname === 'app.enklabokslut.se' ||
-    hostname.startsWith('app.localhost');
+    hostname.startsWith('app.localhost') ||
+    hostname === '192.168.68.111:3000';
 
   if (!isApp) return NextResponse.next();
 
