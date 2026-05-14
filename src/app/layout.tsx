@@ -5,6 +5,7 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Script from "next/script";
+import { headers } from "next/headers";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "700", "800"], variable: "--font-plus-jakarta" });
@@ -72,11 +73,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const headersList = await headers();
+  const isApp = headersList.get('x-is-app') === 'true';
+
   return (
     <html lang="sv">
       <head>
@@ -90,11 +94,11 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} ${plusJakarta.variable} ${plusJakarta.className}`}>
         <AuthProvider>
-          <Navigation />
+          {!isApp && <Navigation />}
           <main className="min-h-screen">
             {children}
           </main>
-          <Footer />
+          {!isApp && <Footer />}
         </AuthProvider>
       </body>
     </html>

@@ -19,7 +19,22 @@
       "Bash(node:*)",
       "Bash(/c/Users/erijo/Redovising/public/favicon/favicon.svg:*)",
       "Bash(npm install:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "WebSearch",
+      "WebFetch(domain:resend.com)",
+      "Bash(curl *)",
+      "Bash(npx tsc *)",
+      "Bash(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\erijo\\\\Redovising\\\\src\\\\app\\\\kassasystem\\\\shopify\")",
+      "Bash(Out-Null)",
+      "PowerShell(New-Item *)",
+      "PowerShell(git *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\erijo\\\\Redovising\" -Recurse -Directory)",
+      "Bash(Select-Object -First 20)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\erijo\\\\Redovising\\\\src\\\\app\" -Recurse -Force)",
+      "Bash(Select-Object -Property FullName, PSIsContainer)",
+      "Bash(Sort-Object FullName)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(findstr \"dev\\\\|start\\\\|scripts\" /A)"
     ]
   },
   "enableAllProjectMcpServers": true,

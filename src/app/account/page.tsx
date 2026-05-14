@@ -1,114 +1,270 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 
+const NAV_BG = '#173b57';
+const ACCENT = '#d04a52';
+const ACCENT_LIGHT = '#FDEAEA';
+
+type Tab = 'bokforing' | 'ne-bilaga' | 'moms';
+
+const tabs: { id: Tab; label: string }[] = [
+  { id: 'bokforing', label: 'Bokföring' },
+  { id: 'ne-bilaga', label: 'NE-bilaga' },
+  { id: 'moms', label: 'Moms' },
+];
+
+function getInitials(fullName: string | null | undefined, email: string) {
+  if (fullName) {
+    const parts = fullName.trim().split(' ');
+    return parts.length >= 2
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : parts[0][0].toUpperCase();
+  }
+  return email[0].toUpperCase();
+}
+
 export default function AccountPage() {
-  const { user, profile, signOut, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<Tab>('bokforing');
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/auth/login');
-    }
+    if (!loading && !user) router.push('/auth/login');
   }, [user, loading, router]);
 
-  const handleLogout = async () => {
-    await signOut();
-    router.push('/');
-  };
-
-  if (loading || !user || !profile) {
+  if (loading || !user) {
     return (
-      <div className="min-h-screen bg-navy-900 flex items-center justify-center">
-        <div className="text-warm-300">Laddar...</div>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#EEF5FF' }}>
+        <div className="w-6 h-6 border-2 border-blue-200 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-navy-900 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Mitt konto</h1>
-          <p className="text-sm sm:text-base text-warm-300">Inloggad som {user.email}</p>
-        </div>
+  const firstName = profile?.full_name?.split(' ')[0] ?? user.email?.split('@')[0];
+  const userInitials = getInitials(profile?.full_name, user.email ?? '?');
 
-        {/* My Accounting */}
-        <Link
-          href="/account/redovisning"
-          className="block bg-[#E95C63]/10 hover:bg-[#E95C63]/20 border border-[#E95C63]/30 hover:border-[#E95C63]/50 rounded-xl sm:rounded-2xl shadow-xl p-6 sm:p-8 mb-4 sm:mb-6 transition-all duration-200 group"
-        >
-          <div className="flex items-center justify-between">
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: '#EEF5FF' }}>
+
+      {/* Header — fortsätter navyfärgen från navigationen */}
+      <div style={{ background: `linear-gradient(160deg, ${NAV_BG} 0%, #1d5070 100%)` }}>
+        <div className="max-w-7xl mx-auto px-6 pt-6 pb-0">
+
+          <div className="flex items-center justify-between pb-5">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[#E95C63]/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                <svg className="w-6 h-6 sm:w-7 sm:h-7 text-[#E95C63]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-lg"
+                style={{ backgroundColor: ACCENT }}
+              >
+                {userInitials}
               </div>
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">Min redovisning</h2>
-                <p className="text-sm sm:text-base text-warm-300">Se dina färdiga bokslut och NE-bilagor</p>
-              </div>
-            </div>
-            <svg className="w-6 h-6 text-[#E95C63] group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </div>
-        </Link>
-
-        {/* Order Statistics */}
-        <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl shadow-xl p-6 sm:p-8 mb-4 sm:mb-6">
-          <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">Orderstatistik</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div className="bg-[#E95C63]/10 border border-[#E95C63]/30 rounded-lg sm:rounded-xl p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-warm-300 text-xs sm:text-sm mb-1">Totalt antal beställningar</p>
-                  <p className="text-3xl sm:text-4xl font-bold text-[#E95C63]">{profile.order_count}</p>
-                </div>
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-[#E95C63]/20 rounded-full flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6 sm:w-8 sm:h-8 text-[#E95C63]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
+                <h1 className="text-white font-bold text-lg leading-tight">
+                  Välkommen, {firstName}
+                </h1>
+                <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                  {profile?.company_name ?? 'Enskild firma'}
+                </p>
               </div>
             </div>
 
-            <div className="bg-navy-800/50 border border-navy-600 rounded-lg sm:rounded-xl p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-warm-300 text-xs sm:text-sm mb-1">Medlem sedan</p>
-                  <p className="text-lg sm:text-xl font-bold text-white">
-                    {new Date(profile.created_at).toLocaleDateString('sv-SE', {
-                      year: 'numeric',
-                      month: 'long',
-                    })}
-                  </p>
-                </div>
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-navy-600/50 rounded-full flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6 sm:w-8 sm:h-8 text-warm-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-              </div>
+            <div
+              className="px-3 py-1.5 rounded-lg text-sm font-medium"
+              style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.75)' }}
+            >
+              Räkenskapsår {new Date().getFullYear()}
             </div>
           </div>
-        </div>
 
-        {/* Actions */}
-        <div className="bg-navy-700/50 backdrop-blur-sm border border-navy-600 rounded-xl sm:rounded-2xl shadow-xl p-6 sm:p-8">
-          <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">Kontoåtgärder</h2>
-          <button
-            onClick={handleLogout}
-            className="w-full px-6 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/50 hover:border-red-500 text-red-400 hover:text-red-300 rounded-xl font-semibold transition-all duration-200"
-          >
-            Logga ut
-          </button>
+          {/* Flikar */}
+          <div className="flex gap-1">
+            {tabs.map(tab => {
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className="px-5 py-2.5 text-sm font-medium rounded-t-xl transition-all duration-150 border-b-2"
+                  style={{
+                    color: active ? '#fff' : 'rgba(255,255,255,0.45)',
+                    backgroundColor: active ? 'rgba(255,255,255,0.12)' : 'transparent',
+                    borderBottomColor: active ? '#fff' : 'transparent',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
+
+      {/* Innehåll */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        {activeTab === 'bokforing' && <BokforingTab />}
+        {activeTab === 'ne-bilaga' && <NEBilagaTab />}
+        {activeTab === 'moms' && <MomsTab />}
+      </div>
+    </div>
+  );
+}
+
+function BokforingTab() {
+  const [chatMessage, setChatMessage] = useState('');
+
+  return (
+    <div className="flex gap-5" style={{ height: 'calc(100vh - 205px)' }}>
+
+      {/* Transaktionspanel */}
+      <div className="flex-1 bg-white rounded-2xl shadow-sm flex flex-col overflow-hidden min-w-0" style={{ border: '1px solid #D6E8FF' }}>
+        <div className="px-6 py-4 border-b flex items-center justify-between flex-shrink-0" style={{ backgroundColor: '#F4F9FF', borderBottomColor: '#D6E8FF' }}>
+          <div>
+            <h2 className="font-semibold text-slate-800">Transaktioner</h2>
+            <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>Lägg till och kontera dina transaktioner</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="px-3 py-2 text-sm font-medium border rounded-lg transition-colors bg-white" style={{ color: '#64748B', borderColor: '#D6E8FF' }}>
+              Ladda upp fil
+            </button>
+            <button
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-sm transition-all hover:opacity-90"
+              style={{ backgroundColor: ACCENT }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              Lägg till
+            </button>
+          </div>
+        </div>
+
+        {/* Kolumnhuvud */}
+        <div
+          className="grid px-6 py-2.5 border-b text-xs font-semibold uppercase tracking-wide flex-shrink-0"
+          style={{ gridTemplateColumns: '110px 1fr 100px 140px 70px', color: '#94A3B8', borderBottomColor: '#F1F5F9' }}
+        >
+          <span>Datum</span>
+          <span>Beskrivning</span>
+          <span className="text-right">Belopp</span>
+          <span>Konto</span>
+          <span>Moms</span>
+        </div>
+
+        {/* Tom vy */}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: ACCENT_LIGHT }}>
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: ACCENT }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+              </svg>
+            </div>
+            <p className="font-semibold text-slate-700 mb-1">Inga transaktioner än</p>
+            <p className="text-sm text-slate-400 max-w-xs">
+              Lägg till din första transaktion manuellt eller ladda upp en bankfil
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* AI-chatt */}
+      <div className="w-[300px] flex-shrink-0 rounded-2xl shadow-sm flex flex-col overflow-hidden" style={{ border: '1px solid #D6E8FF' }}>
+
+        {/* Chattens header — gradient */}
+        <div
+          className="px-5 py-4 flex-shrink-0"
+          style={{ background: `linear-gradient(135deg, ${ACCENT} 0%, #b03840 100%)` }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">AI-assistent</p>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.65)' }}>Hjälper dig kontera</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Meddelanden */}
+        <div className="flex-1 px-4 py-4 overflow-y-auto space-y-3 bg-white">
+          <div className="flex gap-2 items-start">
+            <div
+              className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+              style={{ backgroundColor: ACCENT }}
+            >
+              <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div
+              className="rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-600 leading-relaxed"
+              style={{ backgroundColor: '#F0F6FF' }}
+            >
+              Hej! Jag hjälper dig att kontera dina transaktioner mot BAS-kontoplanen. Välj en transaktion så föreslår jag rätt konto.
+            </div>
+          </div>
+        </div>
+
+        {/* Inmatning */}
+        <div className="px-4 py-3 flex-shrink-0 bg-white border-t" style={{ borderTopColor: '#EEF4FF' }}>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={chatMessage}
+              onChange={e => setChatMessage(e.target.value)}
+              placeholder="Skriv ett meddelande..."
+              className="flex-1 text-sm px-3 py-2.5 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none transition-colors"
+              style={{ border: '1px solid #D6E8FF', backgroundColor: '#F4F9FF' }}
+            />
+            <button
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-opacity"
+              style={{ backgroundColor: ACCENT, opacity: chatMessage.trim() ? 1 : 0.4 }}
+              disabled={!chatMessage.trim()}
+            >
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NEBilagaTab() {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-14 text-center" style={{ border: '1px solid #D6E8FF' }}>
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: ACCENT_LIGHT }}>
+        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: ACCENT }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      </div>
+      <p className="font-semibold text-slate-700 mb-1">NE-bilaga</p>
+      <p className="text-sm text-slate-400 max-w-sm mx-auto">
+        Uppdateras automatiskt när du kontering dina transaktioner. Ingen transaktion har konterats ännu.
+      </p>
+    </div>
+  );
+}
+
+function MomsTab() {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-14 text-center" style={{ border: '1px solid #D6E8FF' }}>
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: ACCENT_LIGHT }}>
+        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: ACCENT }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+      </div>
+      <p className="font-semibold text-slate-700 mb-1">Momsredovisning</p>
+      <p className="text-sm text-slate-400 max-w-sm mx-auto">
+        Sammanställs automatiskt baserat på dina konteringar. Ingen moms har registrerats ännu.
+      </p>
     </div>
   );
 }
