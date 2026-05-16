@@ -35,7 +35,9 @@
       "Bash(Sort-Object FullName)",
       "Bash(Format-Table -AutoSize)",
       "Bash(findstr \"dev\\\\|start\\\\|scripts\" /A)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(git pull *)",
+      "Bash(git stash *)"
     ]
   },
   "enableAllProjectMcpServers": true,
