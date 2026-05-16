@@ -28,6 +28,10 @@ export default function KontoPage() {
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [orgNr, setOrgNr] = useState('');
+  const [adress, setAdress] = useState('');
+  const [postnummer, setPostnummer] = useState('');
+  const [ort, setOrt] = useState('');
+  const [momsnr, setMomsnr] = useState('');
   const [verksamhet, setVerksamhet] = useState('');
   const [startAr, setStartAr] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -43,6 +47,10 @@ export default function KontoPage() {
       setFullName(profile.full_name ?? '');
       setCompanyName(profile.company_name ?? '');
       setOrgNr(profile.org_nr ?? '');
+      setAdress(profile.adress ?? '');
+      setPostnummer(profile.postnummer ?? '');
+      setOrt(profile.ort ?? '');
+      setMomsnr(profile.momsnr ?? '');
       setVerksamhet(profile.verksamhet ?? '');
       setStartAr(profile.start_ar ?? null);
     }
@@ -69,6 +77,10 @@ export default function KontoPage() {
           full_name: fullName || null,
           company_name: companyName || null,
           org_nr: orgNr || null,
+          adress: adress || null,
+          postnummer: postnummer || null,
+          ort: ort || null,
+          momsnr: momsnr || null,
           verksamhet: verksamhet || null,
           start_ar: startAr,
         })
@@ -164,6 +176,56 @@ export default function KontoPage() {
                   style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Adress</label>
+              <input
+                type="text"
+                value={adress}
+                onChange={e => setAdress(e.target.value)}
+                placeholder="Gatuadress"
+                className="w-full px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition"
+                style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Postnummer</label>
+                <input
+                  type="text"
+                  value={postnummer}
+                  onChange={e => setPostnummer(e.target.value)}
+                  placeholder="123 45"
+                  className="w-full px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition"
+                  style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Ort</label>
+                <input
+                  type="text"
+                  value={ort}
+                  onChange={e => setOrt(e.target.value)}
+                  placeholder="Stockholm"
+                  className="w-full px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition"
+                  style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Momsregistreringsnummer (VAT)</label>
+              <input
+                type="text"
+                value={momsnr}
+                onChange={e => setMomsnr(e.target.value)}
+                placeholder="SE556000000001"
+                className="w-full px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition"
+                style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
+              />
+              <p className="text-xs text-slate-400 mt-1">Visas på fakturor. För enskild firma: SE + personnummer + 01</p>
             </div>
           </div>
         </div>

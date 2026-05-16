@@ -194,13 +194,14 @@ export default function FakturorPage() {
                 {/* Kolumnhuvud */}
                 <div
                   className="grid px-6 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100"
-                  style={{ gridTemplateColumns: '110px 1fr 130px 130px 110px' }}
+                  style={{ gridTemplateColumns: '110px 1fr 170px 150px 120px 44px' }}
                 >
                   <span>Faktura nr</span>
                   <span>Kund</span>
                   <span className="text-right">Belopp inkl. moms</span>
-                  <span>Förfallodatum</span>
-                  <span>Status</span>
+                  <span className="pl-4">Förfallodatum</span>
+                  <span className="pl-4">Status</span>
+                  <span />
                 </div>
 
                 {fakturor.map(f => {
@@ -211,40 +212,45 @@ export default function FakturorPage() {
                     <div
                       key={f.id}
                       className="grid px-6 py-4 items-center border-b border-slate-50 hover:bg-slate-50 transition-colors group"
-                      style={{ gridTemplateColumns: '110px 1fr 130px 130px 110px' }}
+                      style={{ gridTemplateColumns: '110px 1fr 170px 150px 120px 44px' }}
                     >
                       <span className="text-sm font-semibold text-slate-700">{f.faktura_nr}</span>
                       <span className="text-sm text-slate-600 truncate">{f.kund_namn}</span>
                       <span className="text-sm font-semibold text-slate-700 text-right">
                         {Number(f.belopp_inkl_moms).toLocaleString('sv-SE')} kr
                       </span>
-                      <span className="text-sm text-slate-500">
+                      <span className="text-sm text-slate-500 pl-4">
                         {new Date(f.forfallo_datum).toLocaleDateString('sv-SE')}
                       </span>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 pl-4">
                         <span
-                          className="px-2.5 py-1 rounded-lg text-xs font-semibold"
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap"
                           style={{ backgroundColor: effectiveSt.bg, color: effectiveSt.color }}
                         >
                           {forfallen ? 'Försenad' : effectiveSt.label}
                         </span>
-                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-2 transition-all">
-                          {f.status !== 'betald' && (
-                            <button
-                              onClick={() => uppdateraStatus(f.id, 'betald')}
-                              className="text-xs text-slate-400 hover:text-green-600 transition-colors"
-                              title="Markera som betald"
-                            >
-                              ✓
-                            </button>
-                          )}
-                          <Link
-                            href={`/fakturor/${f.id}`}
-                            className="text-xs font-medium text-slate-400 hover:text-slate-700 transition-colors"
+                        {f.status !== 'betald' && (
+                          <button
+                            onClick={() => uppdateraStatus(f.id, 'betald')}
+                            className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded-full flex items-center justify-center text-slate-300 hover:text-green-600 hover:bg-green-50 transition-all"
+                            title="Markera som betald"
                           >
-                            Öppna →
-                          </Link>
-                        </div>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-center">
+                        <Link
+                          href={`/fakturor/${f.id}`}
+                          className="opacity-0 group-hover:opacity-100 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all"
+                          title="Öppna faktura"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
                       </div>
                     </div>
                   );

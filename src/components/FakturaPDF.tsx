@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Svg, Path } from '@react-pdf/renderer';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -13,11 +13,17 @@ interface FakturaRad {
 export interface FakturaPDFData {
   faktura_nr: string;
   faktura_datum: string;
+  leverans_datum: string | null;
   forfallo_datum: string;
+  status?: string;
   // Säljare
   säljar_namn: string;
   säljar_foretag: string | null;
   säljar_org_nr: string | null;
+  säljar_adress: string | null;
+  säljar_postnummer: string | null;
+  säljar_ort: string | null;
+  säljar_momsnr: string | null;
   betalningsinfo: string | null;
   meddelande: string | null;
   // Kund
@@ -82,7 +88,7 @@ const s = StyleSheet.create({
 
   // Summering
   sumRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 },
-  sumBox: { width: 220 },
+  sumBox: { width: 260 },
   sumLine: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   sumLabel: { fontSize: 8.5, color: '#64748b' },
   sumVal: { fontSize: 8.5, color: '#1e293b', fontFamily: 'Helvetica-Bold' },
@@ -124,6 +130,7 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
   const totalInkl = radSummor.reduce((s, r) => s + r.inkl, 0);
   const momsByRate = [25, 12, 6].map(sats => ({
     sats,
+    netto: radSummor.filter(r => r.momssats === sats).reduce((acc, r) => acc + r.exkl, 0),
     belopp: radSummor.filter(r => r.momssats === sats).reduce((acc, r) => acc + r.moms, 0),
   })).filter(m => m.belopp > 0);
 
@@ -135,7 +142,9 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
         <View style={s.header}>
           <View style={s.logo}>
             <View style={s.logoBox}>
-              <Text style={{ fontSize: 9, color: 'white', fontFamily: 'Helvetica-Bold' }}>✓</Text>
+              <Svg width="12" height="12" viewBox="0 0 24 24">
+                <Path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </Svg>
             </View>
             <Text style={s.logoText}>
               <Text style={s.logoMuted}>Enkla </Text>Bokslut
@@ -144,7 +153,9 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
           <View style={s.headerRight}>
             <Text style={s.fakturaNr}>FAKTURA</Text>
             <Text style={{ fontSize: 9, color: '#64748b', marginBottom: 6 }}>Nr {data.faktura_nr}</Text>
-            <View style={s.badge}><Text>OBETALD</Text></View>
+            <View style={[s.badge, data.status === 'betald' ? { backgroundColor: '#DCFCE7', color: '#166534' } : {}]}>
+              <Text>{data.status === 'betald' ? 'BETALD' : 'OBETALD'}</Text>
+            </View>
           </View>
         </View>
 
@@ -155,6 +166,11 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
             <Text style={s.partNamn}>{data.säljar_foretag ?? data.säljar_namn}</Text>
             {data.säljar_foretag && <Text style={s.partRad}>{data.säljar_namn}</Text>}
             {data.säljar_org_nr && <Text style={s.partRad}>Org-nr: {data.säljar_org_nr}</Text>}
+            {data.säljar_adress && <Text style={s.partRad}>{data.säljar_adress}</Text>}
+            {(data.säljar_postnummer || data.säljar_ort) && (
+              <Text style={s.partRad}>{[data.säljar_postnummer, data.säljar_ort].filter(Boolean).join(' ')}</Text>
+            )}
+            {data.säljar_momsnr && <Text style={s.partRad}>Moms-nr: {data.säljar_momsnr}</Text>}
           </View>
           <View style={s.partBox}>
             <Text style={s.partLabel}>Till</Text>
@@ -175,6 +191,12 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
             <Text style={s.datumLabel}>Fakturadatum</Text>
             <Text style={s.datumVärde}>{fmtDatum(data.faktura_datum)}</Text>
           </View>
+          {data.leverans_datum && (
+            <View style={s.datumBox}>
+              <Text style={s.datumLabel}>Leveransdatum</Text>
+              <Text style={s.datumVärde}>{fmtDatum(data.leverans_datum)}</Text>
+            </View>
+          )}
           <View style={s.datumBox}>
             <Text style={s.datumLabel}>Förfallodatum</Text>
             <Text style={s.datumVärde}>{fmtDatum(data.forfallo_datum)}</Text>
@@ -219,16 +241,22 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
         {/* Summering */}
         <View style={s.sumRow}>
           <View style={s.sumBox}>
-            <View style={s.sumLine}>
-              <Text style={s.sumLabel}>Belopp exkl. moms</Text>
-              <Text style={s.sumVal}>{fmt(totalExkl)}</Text>
-            </View>
             {momsByRate.map(m => (
-              <View key={m.sats} style={s.sumLine}>
-                <Text style={s.sumLabel}>Moms {m.sats}%</Text>
-                <Text style={s.sumVal}>{fmt(m.belopp)}</Text>
+              <View key={m.sats}>
+                <View style={s.sumLine}>
+                  <Text style={s.sumLabel}>Beskattningsunderlag {m.sats}%</Text>
+                  <Text style={s.sumVal}>{fmt(m.netto)}</Text>
+                </View>
+                <View style={s.sumLine}>
+                  <Text style={s.sumLabel}>Moms {m.sats}%</Text>
+                  <Text style={s.sumVal}>{fmt(m.belopp)}</Text>
+                </View>
               </View>
             ))}
+            <View style={[s.sumLine, { borderTopWidth: 1, borderTopColor: '#E2E8F0', marginTop: 3, paddingTop: 5 }]}>
+              <Text style={s.sumLabel}>Totalt exkl. moms</Text>
+              <Text style={s.sumVal}>{fmt(totalExkl)}</Text>
+            </View>
             <View style={s.sumDivider} />
             <View style={s.sumLine}>
               <Text style={s.sumTotalLabel}>Totalt att betala</Text>

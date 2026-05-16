@@ -20,6 +20,7 @@ interface Faktura {
   id: string;
   faktura_nr: string;
   faktura_datum: string;
+  leverans_datum: string | null;
   forfallo_datum: string;
   kund_namn: string;
   kund_email: string | null;
@@ -87,6 +88,7 @@ export default function FakturaVyPage() {
   const totalExkl = rader.reduce((s, r) => s + r.antal * r.apris, 0);
   const momsByRate = [25, 12, 6].map(sats => ({
     sats,
+    netto: rader.filter(r => r.momssats === sats).reduce((acc, r) => acc + r.antal * r.apris, 0),
     belopp: rader.filter(r => r.momssats === sats).reduce((acc, r) => acc + r.antal * r.apris * (sats / 100), 0),
   })).filter(m => m.belopp > 0);
   const totalInkl = totalExkl + momsByRate.reduce((s, m) => s + m.belopp, 0);
@@ -112,17 +114,43 @@ export default function FakturaVyPage() {
           </button>
           <button
             onClick={async () => {
-              const el = document.getElementById('faktura-innehall');
-              if (!el) return;
-              const { default: html2canvas } = await import('html2canvas');
-              const { default: jsPDF } = await import('jspdf');
-              const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-              const imgData = canvas.toDataURL('image/png');
-              const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-              const pdfW = pdf.internal.pageSize.getWidth();
-              const pdfH = (canvas.height * pdfW) / canvas.width;
-              pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
-              pdf.save(`Faktura-${faktura.faktura_nr}.pdf`);
+              const { pdf } = await import('@react-pdf/renderer');
+              const { FakturaPDF } = await import('@/components/FakturaPDF');
+              const { createElement } = await import('react');
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const blob = await pdf(createElement(FakturaPDF, {
+                data: {
+                  faktura_nr: faktura.faktura_nr,
+                  faktura_datum: faktura.faktura_datum,
+                  leverans_datum: faktura.leverans_datum,
+                  forfallo_datum: faktura.forfallo_datum,
+                  status: faktura.status,
+                  säljar_namn: profile?.full_name ?? '',
+                  säljar_foretag: profile?.company_name ?? null,
+                  säljar_org_nr: profile?.org_nr ?? null,
+                  säljar_adress: profile?.adress ?? null,
+                  säljar_postnummer: profile?.postnummer ?? null,
+                  säljar_ort: profile?.ort ?? null,
+                  säljar_momsnr: profile?.momsnr ?? null,
+                  betalningsinfo: faktura.betalningsinfo,
+                  meddelande: faktura.meddelande,
+                  kund_namn: faktura.kund_namn,
+                  kund_email: faktura.kund_email,
+                  kund_adress: faktura.kund_adress,
+                  kund_postnummer: faktura.kund_postnummer,
+                  kund_ort: faktura.kund_ort,
+                  kund_land: faktura.kund_land,
+                  kund_org_nr: faktura.kund_org_nr,
+                  rader: faktura.rader,
+                },
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              }) as any).toBlob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `Faktura-${faktura.faktura_nr}.pdf`;
+              a.click();
+              URL.revokeObjectURL(url);
             }}
             className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white rounded-xl hover:opacity-90 transition-opacity"
             style={{ backgroundColor: NAV_BG }}
@@ -159,10 +187,10 @@ function FakturaInnehall({
   faktura: Faktura;
   rader: FakturaRad[];
   totalExkl: number;
-  momsByRate: { sats: number; belopp: number }[];
+  momsByRate: { sats: number; netto: number; belopp: number }[];
   totalInkl: number;
   betalningsDagar: number;
-  profile: { full_name: string | null; company_name: string | null; org_nr: string | null } | null;
+  profile: { full_name: string | null; company_name: string | null; org_nr: string | null; adress: string | null; postnummer: string | null; ort: string | null; momsnr: string | null } | null;
 }) {
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', color: '#1e293b' }}>
@@ -197,7 +225,14 @@ function FakturaInnehall({
           <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Från</div>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{profile?.company_name ?? profile?.full_name ?? ''}</div>
           {profile?.company_name && <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>{profile.full_name}</div>}
-          {profile?.org_nr && <div style={{ fontSize: 12, color: '#64748b' }}>Org-nr: {profile.org_nr}</div>}
+          {profile?.org_nr && <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>Org-nr: {profile.org_nr}</div>}
+          {profile?.adress && <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>{profile.adress}</div>}
+          {(profile?.postnummer || profile?.ort) && (
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>
+              {[profile.postnummer, profile.ort].filter(Boolean).join(' ')}
+            </div>
+          )}
+          {profile?.momsnr && <div style={{ fontSize: 12, color: '#64748b' }}>Moms-nr: {profile.momsnr}</div>}
         </div>
         <div style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 16 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Till</div>
@@ -214,13 +249,14 @@ function FakturaInnehall({
       </div>
 
       {/* Datumrad */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, marginBottom: 28, borderTop: `2px solid ${NAV_BG}`, paddingTop: 12 }}>
-        {[
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${faktura.leverans_datum ? 5 : 4}, 1fr)`, gap: 0, marginBottom: 28, borderTop: `2px solid ${NAV_BG}`, paddingTop: 12 }}>
+        {([
           ['Fakturadatum', fmtDatum(faktura.faktura_datum)],
+          faktura.leverans_datum ? ['Leveransdatum', fmtDatum(faktura.leverans_datum)] : null,
           ['Förfallodatum', fmtDatum(faktura.forfallo_datum)],
           ['Fakturanummer', faktura.faktura_nr],
           ['Betalningsvillkor', `${betalningsDagar} dagar`],
-        ].map(([label, val]) => (
+        ].filter(Boolean) as [string, string][]).map(([label, val]) => (
           <div key={label}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>{label}</div>
             <div style={{ fontSize: 13, fontWeight: 700 }}>{val}</div>
@@ -256,15 +292,20 @@ function FakturaInnehall({
 
       {/* Summering */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 32 }}>
-        <div style={{ width: 240 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 12, color: '#64748b' }}>
-            <span>Belopp exkl. moms</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{fmt(totalExkl)}</span>
-          </div>
+        <div style={{ width: 280 }}>
           {momsByRate.map(m => (
-            <div key={m.sats} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 12, color: '#64748b' }}>
-              <span>Moms {m.sats}%</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{fmt(m.belopp)}</span>
+            <div key={m.sats}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12, color: '#64748b' }}>
+                <span>Beskattningsunderlag {m.sats}%</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{fmt(m.netto)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12, color: '#64748b' }}>
+                <span>Moms {m.sats}%</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{fmt(m.belopp)}</span>
+              </div>
             </div>
           ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 12, color: '#64748b', borderTop: '1px solid #E2E8F0', marginTop: 4, paddingTop: 6 }}>
+            <span>Totalt exkl. moms</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{fmt(totalExkl)}</span>
+          </div>
           <div style={{ borderTop: `2px solid ${NAV_BG}`, marginTop: 6, paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 14, fontWeight: 800, color: NAV_BG }}>Totalt att betala</span>
             <span style={{ fontSize: 14, fontWeight: 800, color: NAV_BG }}>{fmt(totalInkl)}</span>

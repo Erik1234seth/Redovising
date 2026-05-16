@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import AppSidebar from './AppSidebar';
+import HjalpChat from './HjalpChat';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -15,6 +16,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-auto">
         {children}
       </main>
+      <HjalpChat />
     </div>
   );
 }

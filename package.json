@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
     "@tailwindcss/typography": "^0.5.19",
@@ -28,6 +29,7 @@
     "openai": "^6.34.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-markdown": "^10.1.0",
     "resend": "^6.9.1",
     "xlsx": "^0.18.5"
   },

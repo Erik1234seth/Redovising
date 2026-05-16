@@ -5,6 +5,10 @@ export interface Profile {
   phone: string | null;
   company_name: string | null;
   org_nr: string | null;
+  adress: string | null;
+  postnummer: string | null;
+  ort: string | null;
+  momsnr: string | null;
   created_at: string;
   last_login: string | null;
   order_count: number;

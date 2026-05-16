@@ -62,6 +62,7 @@ export default function NyFakturaPage() {
 
   const [fakturaNr, setFakturaNr] = useState('');
   const [fakturaDatum, setFakturaDatum] = useState(datePlus(0));
+  const [leveransDatum, setLeveransDatum] = useState(datePlus(0));
   const [forfalloTyp, setForfalloTyp] = useState<'30' | '15' | '10' | 'custom'>('30');
   const [forfalloDatum, setForfalloDatum] = useState(datePlus(30));
 
@@ -143,7 +144,7 @@ export default function NyFakturaPage() {
     setError(null);
     try {
       const supabase = createClient();
-      const { error: dbErr } = await supabase.from('fakturor').insert({
+      const { data: inserted, error: dbErr } = await supabase.from('fakturor').insert({
         user_id: user.id,
         faktura_nr: fakturaNr,
         kund_id: valdKundId || null,
@@ -155,6 +156,7 @@ export default function NyFakturaPage() {
         kund_land: kund.land || 'Sverige',
         kund_org_nr: kund.org_nr || null,
         faktura_datum: fakturaDatum,
+        leverans_datum: leveransDatum || null,
         forfallo_datum: forfalloDatum,
         rader: rader.map(r => ({ beskrivning: r.beskrivning, antal: parseFloat(r.antal) || 0, enhet: r.enhet, apris: parseFloat(r.apris) || 0, momssats: r.momssats })),
         belopp_exkl_moms: totalExkl,
@@ -163,9 +165,9 @@ export default function NyFakturaPage() {
         betalningsinfo: betalningsinfo || null,
         meddelande: meddelande || null,
         status: 'obetald',
-      });
+      }).select('id').single();
       if (dbErr) throw dbErr;
-      router.push('/fakturor');
+      router.push(`/fakturor/${inserted.id}`);
     } catch {
       setError('Något gick fel. Försök igen.');
     } finally {
@@ -261,6 +263,11 @@ export default function NyFakturaPage() {
             <div>
               <label className={labelCls}>Fakturadatum</label>
               <input type="date" value={fakturaDatum} onChange={e => setFakturaDatum(e.target.value)}
+                className={inputCls} style={ringStyle} />
+            </div>
+            <div>
+              <label className={labelCls}>Leveransdatum</label>
+              <input type="date" value={leveransDatum} onChange={e => setLeveransDatum(e.target.value)}
                 className={inputCls} style={ringStyle} />
             </div>
             <div>
