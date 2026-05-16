@@ -25,6 +25,10 @@ const rapporterChildren = [
   { label: 'Preliminär skatt', href: '/rapporter/preliminar-skatt' },
 ];
 
+const ovrigtChildren = [
+  { label: 'Hjälp', href: '/hjalp' },
+];
+
 export default function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -32,9 +36,13 @@ export default function AppSidebar() {
   const [rapporterOpen, setRapporterOpen] = useState(
     rapporterChildren.some(c => pathname === c.href)
   );
+  const [ovrigtOpen, setOvrigtOpen] = useState(
+    ovrigtChildren.some(c => pathname === c.href)
+  );
 
   const isActive = (href: string) => pathname === href;
   const isRapporterActive = rapporterChildren.some(c => pathname === c.href);
+  const isOvrigtActive = ovrigtChildren.some(c => pathname === c.href);
 
   const handleSignOut = async () => {
     await signOut();
@@ -129,15 +137,15 @@ export default function AppSidebar() {
           )}
         </div>
 
-        {/* Lager & Tillgångar */}
+        {/* Kunder & produkter */}
         <Link
-          href="/lager"
-          className={`${navItemBase} ${isActive('/lager') ? navItemActive : navItemInactive}`}
+          href="/kunder-produkter"
+          className={`${navItemBase} ${pathname.startsWith('/kunder-produkter') ? navItemActive : navItemInactive}`}
         >
           <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
           </svg>
-          Lager & Tillgångar
+          Kunder & produkter
         </Link>
 
         {/* Fakturor */}
@@ -151,16 +159,46 @@ export default function AppSidebar() {
           Fakturor
         </Link>
 
-        {/* Hjälp */}
-        <Link
-          href="/hjalp"
-          className={`${navItemBase} ${isActive('/hjalp') ? navItemActive : navItemInactive}`}
-        >
-          <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Hjälp
-        </Link>
+        {/* Övrigt */}
+        <div>
+          <button
+            onClick={() => setOvrigtOpen(o => !o)}
+            className={`w-full ${navItemBase} justify-between ${isOvrigtActive ? navItemActive : navItemInactive}`}
+          >
+            <div className="flex items-center gap-3">
+              <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+              </svg>
+              Övrigt
+            </div>
+            <svg
+              className="w-3.5 h-3.5 transition-transform duration-200 flex-shrink-0"
+              style={{ transform: ovrigtOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {ovrigtOpen && (
+            <div className="mt-0.5 space-y-0.5">
+              {ovrigtChildren.map(child => (
+                <Link
+                  key={child.href}
+                  href={child.href}
+                  className={`flex items-center gap-2 pl-11 pr-4 py-2 mx-2 rounded-lg text-sm transition-all duration-150 ${
+                    isActive(child.href)
+                      ? 'bg-white/10 text-white font-medium'
+                      : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+                  }`}
+                >
+                  <span className="w-1 h-1 rounded-full bg-current flex-shrink-0" />
+                  {child.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* Användare */}
