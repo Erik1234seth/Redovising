@@ -6,7 +6,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
 
 const NAV_BG = '#173b57';
-const CORAL = '#E95C63';
 
 interface FakturaRad {
   beskrivning: string;
@@ -196,27 +195,9 @@ function FakturaInnehall({
     <div style={{ fontFamily: 'system-ui, sans-serif', color: '#1e293b' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 40 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 32, height: 32, backgroundColor: CORAL, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>✓</span>
-          </div>
-          <span style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>
-            <span style={{ color: '#94a3b8', fontWeight: 500 }}>Enkla </span>Bokslut
-          </span>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 28, fontWeight: 800, color: NAV_BG, letterSpacing: '-0.5px' }}>FAKTURA</div>
-          <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>Nr {faktura.faktura_nr}</div>
-          <div style={{
-            display: 'inline-block', marginTop: 8,
-            backgroundColor: faktura.status === 'betald' ? '#DCFCE7' : '#FEF9C3',
-            color: faktura.status === 'betald' ? '#166534' : '#A16207',
-            padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-          }}>
-            {faktura.status === 'betald' ? 'BETALD' : 'OBETALD'}
-          </div>
-        </div>
+      <div style={{ marginBottom: 40 }}>
+        <div style={{ fontSize: 28, fontWeight: 800, color: NAV_BG, letterSpacing: '-0.5px' }}>FAKTURA</div>
+        <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>Nr {faktura.faktura_nr}</div>
       </div>
 
       {/* Parter */}
@@ -249,14 +230,13 @@ function FakturaInnehall({
       </div>
 
       {/* Datumrad */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${faktura.leverans_datum ? 5 : 4}, 1fr)`, gap: 0, marginBottom: 28, borderTop: `2px solid ${NAV_BG}`, paddingTop: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, marginBottom: 28, borderTop: `2px solid ${NAV_BG}`, paddingTop: 12 }}>
         {([
           ['Fakturadatum', fmtDatum(faktura.faktura_datum)],
-          faktura.leverans_datum ? ['Leveransdatum', fmtDatum(faktura.leverans_datum)] : null,
           ['Förfallodatum', fmtDatum(faktura.forfallo_datum)],
           ['Fakturanummer', faktura.faktura_nr],
           ['Betalningsvillkor', `${betalningsDagar} dagar`],
-        ].filter(Boolean) as [string, string][]).map(([label, val]) => (
+        ] as [string, string][]).map(([label, val]) => (
           <div key={label}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>{label}</div>
             <div style={{ fontSize: 13, fontWeight: 700 }}>{val}</div>
@@ -332,8 +312,7 @@ function FakturaInnehall({
       )}
 
       {/* Sidfot */}
-      <div style={{ marginTop: 48, paddingTop: 16, borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#CBD5E1' }}>
-        <span>Enkla Bokslut · enklabokslut.se</span>
+      <div style={{ marginTop: 48, paddingTop: 16, borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'flex-end', fontSize: 10, color: '#CBD5E1' }}>
         <span>Faktura {faktura.faktura_nr}</span>
       </div>
     </div>
