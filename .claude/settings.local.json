@@ -34,7 +34,8 @@
       "Bash(Select-Object -Property FullName, PSIsContainer)",
       "Bash(Sort-Object FullName)",
       "Bash(Format-Table -AutoSize)",
-      "Bash(findstr \"dev\\\\|start\\\\|scripts\" /A)"
+      "Bash(findstr \"dev\\\\|start\\\\|scripts\" /A)",
+      "Bash(npm uninstall:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

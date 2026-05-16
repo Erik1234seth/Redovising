@@ -8,6 +8,9 @@ export interface Profile {
   created_at: string;
   last_login: string | null;
   order_count: number;
+  verksamhet: string | null;
+  start_ar: number | null;
+  onboarding_done: boolean;
 }
 
 export interface Order {

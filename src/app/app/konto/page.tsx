@@ -1,0 +1,245 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import { createClient } from '@/lib/supabase';
+
+const NAV_BG = '#173b57';
+const CORAL = '#E95C63';
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: CURRENT_YEAR - 1989 }, (_, i) => CURRENT_YEAR - i);
+
+function getInitials(fullName: string | null | undefined, email: string) {
+  if (fullName) {
+    const parts = fullName.trim().split(' ');
+    return parts.length >= 2
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : parts[0][0].toUpperCase();
+  }
+  return email[0].toUpperCase();
+}
+
+export default function KontoPage() {
+  const { user, profile, loading, signOut, refreshProfile } = useAuth();
+  const router = useRouter();
+
+  const [fullName, setFullName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [orgNr, setOrgNr] = useState('');
+  const [verksamhet, setVerksamhet] = useState('');
+  const [startAr, setStartAr] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!loading && !user) router.push('/auth/login');
+  }, [user, loading, router]);
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name ?? '');
+      setCompanyName(profile.company_name ?? '');
+      setOrgNr(profile.org_nr ?? '');
+      setVerksamhet(profile.verksamhet ?? '');
+      setStartAr(profile.start_ar ?? null);
+    }
+  }, [profile]);
+
+  if (loading || !user) {
+    return (
+      <div className="flex-1 flex items-center justify-center h-screen bg-slate-50">
+        <div className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  async function handleSave() {
+    if (!user) return;
+    setSaving(true);
+    setSaved(false);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { error: dbError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName || null,
+          company_name: companyName || null,
+          org_nr: orgNr || null,
+          verksamhet: verksamhet || null,
+          start_ar: startAr,
+        })
+        .eq('id', user.id);
+
+      if (dbError) throw dbError;
+      await refreshProfile();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      setError('Något gick fel. Försök igen.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSignOut() {
+    await signOut();
+    router.push('/auth/login');
+  }
+
+  const initials = getInitials(profile?.full_name, user.email ?? '?');
+
+  return (
+    <div className="flex flex-col min-h-full bg-slate-50">
+
+      {/* Header */}
+      <div className="px-8 pt-12 pb-6">
+        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Mitt konto</h1>
+        <p className="text-slate-400 text-sm mt-2">Hantera din profil och inställningar</p>
+      </div>
+
+      <div className="px-8 pb-12 max-w-2xl flex flex-col gap-5">
+
+        {/* Profilkort */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
+              style={{ backgroundColor: CORAL }}
+            >
+              {initials}
+            </div>
+            <div>
+              <p className="font-bold text-slate-800 text-lg leading-tight">{profile?.full_name ?? user.email?.split('@')[0]}</p>
+              <p className="text-slate-400 text-sm">{user.email}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Namn</label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                placeholder="Ditt namn"
+                className="w-full px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition"
+                style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">E-post</label>
+              <input
+                type="email"
+                value={user.email ?? ''}
+                disabled
+                className="w-full px-4 py-2.5 text-sm text-slate-400 bg-slate-100 border border-slate-200 rounded-xl cursor-not-allowed"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Företagsnamn</label>
+                <input
+                  type="text"
+                  value={companyName}
+                  onChange={e => setCompanyName(e.target.value)}
+                  placeholder="Din enskilda firma"
+                  className="w-full px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition"
+                  style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Organisationsnummer</label>
+                <input
+                  type="text"
+                  value={orgNr}
+                  onChange={e => setOrgNr(e.target.value)}
+                  placeholder="XXXXXXXX-XXXX"
+                  className="w-full px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition"
+                  style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Verksamhetskort */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <h2 className="font-bold text-slate-800 mb-1">Din verksamhet</h2>
+          <p className="text-xs text-slate-400 mb-4">Används för att bokföra rätt och ge bättre förslag</p>
+
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Beskrivning</label>
+              <textarea
+                rows={3}
+                value={verksamhet}
+                onChange={e => setVerksamhet(e.target.value)}
+                placeholder="Beskriv kort vad du säljer eller utför..."
+                className="w-full px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:bg-white resize-none transition"
+                style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Startår för enskilda firman</label>
+              <div className="grid grid-cols-5 gap-1.5 max-h-44 overflow-y-auto pr-1">
+                {YEARS.map(year => (
+                  <button
+                    key={year}
+                    type="button"
+                    onClick={() => setStartAr(year)}
+                    className="py-2 rounded-lg text-xs font-semibold border-2 transition-all duration-100"
+                    style={{
+                      borderColor: startAr === year ? NAV_BG : '#e2e8f0',
+                      backgroundColor: startAr === year ? NAV_BG : 'transparent',
+                      color: startAr === year ? 'white' : '#475569',
+                    }}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Spara + fel */}
+        {error && (
+          <p className="text-xs text-red-500 text-center">{error}</p>
+        )}
+
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full py-3 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-60"
+          style={{ backgroundColor: NAV_BG }}
+        >
+          {saving ? 'Sparar...' : saved ? 'Sparat!' : 'Spara ändringar'}
+        </button>
+
+        {/* Logga ut */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-slate-700 text-sm">Logga ut</p>
+            <p className="text-xs text-slate-400 mt-0.5">Du loggas ut från alla enheter</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="px-4 py-2 text-sm font-semibold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            Logga ut
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}

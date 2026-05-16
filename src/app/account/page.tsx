@@ -184,7 +184,7 @@ function BokforingTab() {
               </svg>
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">AI-assistent</p>
+              <p className="text-sm font-semibold text-white">Assistent</p>
               <p className="text-xs" style={{ color: 'rgba(255,255,255,0.65)' }}>Hjälper dig kontera</p>
             </div>
           </div>

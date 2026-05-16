@@ -47,28 +47,28 @@ const eventTypes = [
     bg: '#EFF6FF',
   },
   {
-    id: 'satt-in-privat',
-    label: 'Jag satte in privata pengar',
-    description: 'Du lade in egna pengar i företaget för att täcka kostnader',
+    id: 'privata-pengar',
+    label: 'Privata pengar in eller ut',
+    description: 'Du satte in egna pengar i företaget, eller tog ut för privat bruk',
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 4v16m8-8H4" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
       </svg>
     ),
     color: '#7C3AED',
     bg: '#F5F3FF',
   },
   {
-    id: 'tagit-ut-privat',
-    label: 'Jag tog ut privata pengar',
-    description: 'Du tog ut pengar från företaget för privat bruk',
+    id: 'ladda-upp',
+    label: 'Ladda upp transaktionslista',
+    description: 'Har du ett kontoutdrag från banken? Ladda upp det så hanterar vi resten',
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M20 12H4" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
       </svg>
     ),
-    color: '#D97706',
-    bg: '#FFFBEB',
+    color: '#0891B2',
+    bg: '#ECFEFF',
   },
   {
     id: 'skatt-moms',
@@ -84,8 +84,8 @@ const eventTypes = [
   },
   {
     id: 'lan-bidrag',
-    label: 'Jag fick lån eller bidrag',
-    description: 'Lån från banken eller bidrag från t.ex. Almi eller Tillväxtverket',
+    label: 'Övrigt',
+    description: 'Något som inte passar in i de andra kategorierna',
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -178,6 +178,18 @@ export default function BokforingPage() {
             );
           }
 
+          if (ev.id === 'kopt-nagot') {
+            return (
+              <Link
+                key={ev.id}
+                href="/bokforing/kopt-nagot"
+                className="group flex items-start gap-4 text-left bg-white rounded-2xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-md transition-all duration-150"
+              >
+                {cardContent}
+              </Link>
+            );
+          }
+
           return (
             <button
               key={ev.id}
@@ -256,7 +268,7 @@ export default function BokforingPage() {
               </svg>
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">AI-assistent</p>
+              <p className="text-sm font-semibold text-white">Assistent</p>
               <p className="text-xs text-white/60">Här för att hjälpa dig</p>
             </div>
           </div>

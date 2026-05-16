@@ -13,9 +13,8 @@ const TODAY = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
 interface FormData {
   vad: string;
-  kundLand: string;
+  saljarLand: string;
   betalningssatt: string;
-  kundTyp: string;
   datum: string;
   belopp: string;
   moms: string;
@@ -114,14 +113,13 @@ function DateInput({ value, onChange }: { value: string; onChange: (v: string) =
 
 // ─── Main wizard ──────────────────────────────────────────────────────────────
 
-export default function KundBetalatPage() {
+export default function KoptNagotPage() {
   const router = useRouter();
 
   const [form, setForm] = useState<FormData>({
     vad: '',
-    kundLand: '',
+    saljarLand: '',
     betalningssatt: '',
-    kundTyp: '',
     datum: TODAY,
     belopp: '',
     moms: '',
@@ -137,9 +135,8 @@ export default function KundBetalatPage() {
 
   const allSteps = [
     'vad',
-    'kundLand',
+    'saljarLand',
     'betalningssatt',
-    ...(form.kundLand !== 'Sverige' ? ['kundTyp'] : []),
     'datum',
     'belopp',
     'moms',
@@ -153,9 +150,8 @@ export default function KundBetalatPage() {
   function isCurrentStepValid(): boolean {
     switch (activeStepKey) {
       case 'vad': return form.vad.trim().length > 0;
-      case 'kundLand': return form.kundLand.length > 0;
+      case 'saljarLand': return form.saljarLand.length > 0;
       case 'betalningssatt': return form.betalningssatt.length > 0;
-      case 'kundTyp': return form.kundTyp.length > 0;
       case 'datum': return /^\d{4}-\d{2}-\d{2}$/.test(form.datum);
       case 'belopp': return form.belopp.trim().length > 0 && !isNaN(Number(form.belopp));
       case 'moms': return form.moms.trim().length > 0 && !isNaN(Number(form.moms));
@@ -183,14 +179,13 @@ export default function KundBetalatPage() {
     setError(null);
     try {
       // 1. Analyze with AI
-      const res = await fetch('/api/bokforing/analyze', {
+      const res = await fetch('/api/bokforing/analyze-inkop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vad: data.vad,
-          kundLand: data.kundLand,
+          saljarLand: data.saljarLand,
           betalningssatt: data.betalningssatt,
-          kundTyp: data.kundTyp || undefined,
           datum: data.datum,
           belopp: Number(data.belopp),
           moms: Number(data.moms),
@@ -212,14 +207,14 @@ export default function KundBetalatPage() {
 
       const { error: dbError } = await supabase.from('bokforing_transaktioner').insert({
         user_id: user.id,
-        haendelse_typ: 'kund-betalat',
+        haendelse_typ: 'kopt-nagot',
         datum: data.datum,
         beskrivning: data.vad,
         belopp: Number(data.belopp),
         moms: Number(data.moms),
-        kund_land: data.kundLand,
+        kund_land: data.saljarLand,
         betalningssatt: data.betalningssatt,
-        kund_typ: data.kundTyp || null,
+        kund_typ: null,
         ovrigt: data.ovrigt || null,
         ai_kategori: result.kategori,
         ai_vara_eller_tjanst: result.varaEllerTjanst,
@@ -250,7 +245,7 @@ export default function KundBetalatPage() {
       // 1. Analyze receipt with vision
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('haendelse', 'kund-betalat');
+      fd.append('haendelse', 'kopt-nagot');
 
       const receiptRes = await fetch('/api/bokforing/analyze-receipt', {
         method: 'POST',
@@ -270,9 +265,8 @@ export default function KundBetalatPage() {
         datum: receipt.datum ?? TODAY,
         belopp: String(receipt.belopp ?? ''),
         moms: String(receipt.moms ?? '0'),
-        kundLand: receipt.land ?? 'Sverige',
-        betalningssatt: receipt.betalningssatt ?? 'Till företagskonto',
-        kundTyp: '',
+        saljarLand: receipt.land ?? 'Sverige',
+        betalningssatt: receipt.betalningssatt ?? 'Från företagskonto',
         ovrigt: receipt.avsandare ? `Utfärdare: ${receipt.avsandare}` : '',
       };
 
@@ -334,7 +328,7 @@ export default function KundBetalatPage() {
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Sammanfattning</p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               <div>
-                <p className="text-xs text-slate-400 mb-0.5">Vad såldes</p>
+                <p className="text-xs text-slate-400 mb-0.5">Vad köptes</p>
                 <p className="text-sm font-semibold text-slate-700">{form.vad}</p>
               </div>
               <div>
@@ -350,8 +344,8 @@ export default function KundBetalatPage() {
                 <p className="text-sm font-semibold text-slate-700">{Number(form.moms).toLocaleString('sv-SE')} kr</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400 mb-0.5">Kund</p>
-                <p className="text-sm font-semibold text-slate-700">{form.kundLand}</p>
+                <p className="text-xs text-slate-400 mb-0.5">Säljare</p>
+                <p className="text-sm font-semibold text-slate-700">{form.saljarLand}</p>
               </div>
               <div>
                 <p className="text-xs text-slate-400 mb-0.5">Betalningssätt</p>
@@ -366,7 +360,7 @@ export default function KundBetalatPage() {
               onClick={() => {
                 setDone(false);
                 setCurrentStep(0);
-                setForm({ vad: '', kundLand: '', betalningssatt: '', kundTyp: '', datum: TODAY, belopp: '', moms: '', ovrigt: '' });
+                setForm({ vad: '', saljarLand: '', betalningssatt: '', datum: TODAY, belopp: '', moms: '', ovrigt: '' });
               }}
               className="flex-1 px-6 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
             >
@@ -493,8 +487,8 @@ function StepContent({
     case 'vad':
       return (
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Vad sålde du?</h1>
-          <p className="text-slate-400 text-sm mt-2 mb-5">Beskriv kort vad du sålde eller utförde, eller ladda upp kvitto/faktura</p>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Vad köpte du?</h1>
+          <p className="text-slate-400 text-sm mt-2 mb-5">Beskriv kort vad du köpte, eller ladda upp kvitto/faktura</p>
 
           {/* Info-ruta */}
           <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5 mb-5" style={{ backgroundColor: '#EFF6FF' }}>
@@ -504,7 +498,7 @@ function StepContent({
             <div>
               <p className="text-xs font-semibold text-blue-700 mb-0.5">Beskriv så tydligt du kan</p>
               <p className="text-xs text-blue-600 leading-relaxed">
-                Vi behöver förstå vad du säljer för att bokföra rätt. Skriv t.ex. <span className="font-semibold">"konsultjänster inom hälsa"</span> eller <span className="font-semibold">"hårgele till frisörer"</span> — inte bara "tjänst" eller "produkt".
+                Vi behöver förstå vad du köpte för att bokföra rätt. Skriv t.ex. <span className="font-semibold">"kontorsmaterial till hemmakontoret"</span> eller <span className="font-semibold">"verktyg för hantverket"</span>
               </p>
             </div>
           </div>
@@ -514,7 +508,7 @@ function StepContent({
             rows={3}
             value={form.vad}
             onChange={e => { setForm(f => ({ ...f, vad: e.target.value })); clearError?.(); }}
-            placeholder="T.ex. konsultjänster inom marknadsföring, handgjorda smycken, webbdesign..."
+            placeholder="T.ex. bärbar dator, kontorsstol, råmaterial..."
             className="w-full px-4 py-3 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl placeholder-slate-400 focus:outline-none focus:ring-2 resize-none transition-shadow"
             style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
           />
@@ -556,14 +550,14 @@ function StepContent({
         </div>
       );
 
-    case 'kundLand':
+    case 'saljarLand':
       return (
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Var finns kunden?</h1>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Var befinner sig säljaren?</h1>
           <p className="text-slate-400 text-sm mt-2 mb-6">Det påverkar vilka momsregler som gäller</p>
           <div className="flex flex-col gap-3">
             {['Sverige', 'EU', 'Utanför EU'].map(option => (
-              <RadioCard key={option} label={option} selected={form.kundLand === option} onClick={() => setForm(f => ({ ...f, kundLand: option, kundTyp: '' }))} />
+              <RadioCard key={option} label={option} selected={form.saljarLand === option} onClick={() => setForm(f => ({ ...f, saljarLand: option }))} />
             ))}
           </div>
         </div>
@@ -572,24 +566,11 @@ function StepContent({
     case 'betalningssatt':
       return (
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Hur fick du betalt?</h1>
-          <p className="text-slate-400 text-sm mt-2 mb-6">Välj det konto eller sätt pengarna kom in på</p>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Hur betalade du?</h1>
+          <p className="text-slate-400 text-sm mt-2 mb-6">Välj det konto eller sätt du betalade med</p>
           <div className="flex flex-col gap-3">
-            {['Till företagskonto', 'Till privatkonto', 'Kontant'].map(option => (
+            {['Från företagskonto', 'Från privatkonto', 'Kontant'].map(option => (
               <RadioCard key={option} label={option} selected={form.betalningssatt === option} onClick={() => setForm(f => ({ ...f, betalningssatt: option }))} />
-            ))}
-          </div>
-        </div>
-      );
-
-    case 'kundTyp':
-      return (
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Är kunden ett företag eller privatperson?</h1>
-          <p className="text-slate-400 text-sm mt-2 mb-6">Det avgör vilka momsregler som gäller utomlands</p>
-          <div className="flex flex-col gap-3">
-            {['Privatperson', 'Företag', 'Vet inte'].map(option => (
-              <RadioCard key={option} label={option} selected={form.kundTyp === option} onClick={() => setForm(f => ({ ...f, kundTyp: option }))} />
             ))}
           </div>
         </div>
@@ -599,7 +580,7 @@ function StepContent({
       return (
         <div>
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Datum</h1>
-          <p className="text-slate-400 text-sm mt-2 mb-6">När betalades det?</p>
+          <p className="text-slate-400 text-sm mt-2 mb-6">När betalade du?</p>
           <DateInput value={form.datum} onChange={v => setForm(f => ({ ...f, datum: v }))} />
           <p className="text-xs text-slate-400 mt-2.5">Format: år-månad-dag, t.ex. 2026-05-14</p>
         </div>
@@ -609,7 +590,7 @@ function StepContent({
       return (
         <div>
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Belopp</h1>
-          <p className="text-slate-400 text-sm mt-2 mb-6">Hur mycket betalade kunden totalt, inklusive moms?</p>
+          <p className="text-slate-400 text-sm mt-2 mb-6">Hur mycket betalade du totalt, inklusive moms?</p>
           <div className="relative">
             <input
               autoFocus
@@ -662,7 +643,7 @@ function StepContent({
             rows={4}
             value={form.ovrigt}
             onChange={e => setForm(f => ({ ...f, ovrigt: e.target.value }))}
-            placeholder="T.ex. att det är en delbetalning, eller att kunden är en kompis..."
+            placeholder="T.ex. att det är ett arbetsverktyg eller att du delar kostnaden med någon..."
             className="w-full px-4 py-3 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl placeholder-slate-400 focus:outline-none focus:ring-2 resize-none transition-shadow"
             style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
           />

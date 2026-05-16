@@ -97,10 +97,12 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) router.push('/auth/login');
-  }, [user, loading, router]);
+    if (loading) return;
+    if (!user) { router.push('/auth/login'); return; }
+    if (profile && !profile.onboarding_done) router.push('/onboarding');
+  }, [user, loading, profile, router]);
 
-  if (loading || !user) {
+  if (loading || !user || (profile && !profile.onboarding_done)) {
     return (
       <div className="flex-1 flex items-center justify-center h-screen bg-slate-50">
         <div className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
@@ -167,7 +169,7 @@ export default function HomePage() {
           <div>
             <p className="text-white text-sm font-semibold">Osäker på något?</p>
             <p className="text-white/55 text-xs mt-0.5">
-              Vår AI-assistent finns på varje sida och hjälper dig steg för steg.
+              Vår assistent finns på varje sida och hjälper dig steg för steg.
             </p>
           </div>
         </div>
