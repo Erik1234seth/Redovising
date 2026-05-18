@@ -311,8 +311,6 @@ export default function KundBetalatPage() {
   if (done) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
-        {showSuccess && <SuccessPopup onClose={() => router.push('/bokforing')} />}
-
         <div className="px-6 pt-12 pb-6 max-w-xl mx-auto w-full">
           <div
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mb-5"

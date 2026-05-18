@@ -129,8 +129,7 @@ export async function POST(request: Request) {
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userContent },
         ],
-        temperature: 0.1,
-        max_completion_tokens: 600,
+        max_completion_tokens: 16000,
       }),
     });
 

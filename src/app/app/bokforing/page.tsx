@@ -121,6 +121,7 @@ export default function BokforingPage() {
       .gte('datum', `${selectedYear}-01-01`)
       .lte('datum', `${selectedYear}-12-31`)
       .order('datum', { ascending: false })
+      .order('created_at', { ascending: false })
       .then(({ data }) => {
         setTransaktioner(data ?? []);
         setLoadingData(false);

@@ -48,26 +48,6 @@ function DateInput({ value, onChange }: { value: string; onChange: (v: string) =
   );
 }
 
-function SuccessPopup({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4 pb-6 sm:pb-0">
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 flex flex-col items-center text-center">
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: '#FDF2F8' }}>
-          <svg className="w-8 h-8" fill="none" stroke={ACCENT} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h2 className="text-xl font-extrabold text-slate-800 mb-2">Sparat!</h2>
-        <p className="text-sm text-slate-400 leading-relaxed mb-6">Betalningen är bokförd och syns nu i listan.</p>
-        <button type="button" onClick={onClose} className="w-full py-3 text-sm font-bold text-white rounded-xl" style={{ backgroundColor: NAV_BG }}>
-          Gå till bokföringen
-        </button>
-      </div>
-    </div>
-  );
-}
-
 const STEPS = ['typ', 'belopp', 'datum', 'ovrigt'] as const;
 type Step = typeof STEPS[number];
 
@@ -80,7 +60,7 @@ export default function SkatteverketPage() {
   const [ovrigt, setOvrigt] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [done, setDone] = useState(false);
 
   const current: Step = STEPS[step];
   const total = STEPS.length;
@@ -122,7 +102,7 @@ export default function SkatteverketPage() {
         ai_kredit_konto: vald.kredit,
         ai_kredit_namn: vald.kreditNamn,
       });
-      setShowSuccess(true);
+      setDone(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Något gick fel. Försök igen.');
     } finally {
@@ -133,13 +113,72 @@ export default function SkatteverketPage() {
   const inputCls = 'w-full px-4 py-3 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 transition-shadow';
   const ringStyle = { '--tw-ring-color': ACCENT } as React.CSSProperties;
 
+  if (done) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <div className="px-6 pt-12 pb-6 max-w-xl mx-auto w-full">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mb-5" style={{ backgroundColor: '#ECFDF5', color: '#059669' }}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+            Bokfört och sparat!
+          </div>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Klart!</h1>
+          <p className="text-slate-400 text-sm mt-2 leading-relaxed">
+            Transaktionen är bokförd. Du hittar den nu i listan på bokföringssidan.
+          </p>
+        </div>
+        <div className="px-6 pb-12 max-w-xl mx-auto w-full flex flex-col gap-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Sammanfattning</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Vad</p>
+                <p className="text-sm font-semibold text-slate-700">{vald?.label}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Datum</p>
+                <p className="text-sm font-semibold text-slate-700">{datum}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Belopp</p>
+                <p className="text-sm font-semibold text-slate-700">{Number(belopp).toLocaleString('sv-SE')} kr</p>
+              </div>
+              {ovrigt && (
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Övrigt</p>
+                  <p className="text-sm font-semibold text-slate-700">{ovrigt}</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => { setDone(false); setStep(0); setTyp(''); setBelopp(''); setDatum(TODAY); setOvrigt(''); }}
+              className="flex-1 px-6 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+            >
+              Lägg till fler
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/bokforing')}
+              className="flex-1 px-6 py-3 text-sm font-bold text-white rounded-xl"
+              style={{ backgroundColor: NAV_BG }}
+            >
+              Till bokföringen
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-full bg-slate-50">
       <div className="h-1 bg-slate-100 flex-shrink-0">
         <div className="h-full rounded-full transition-all duration-300" style={{ width: `${((step + 1) / total) * 100}%`, backgroundColor: ACCENT }} />
       </div>
-
-      {showSuccess && <SuccessPopup onClose={() => router.push('/bokforing')} />}
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-lg">
