@@ -134,6 +134,7 @@ export default function KundBetalatPage() {
   const [error, setError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [done, setDone] = useState(false);
+  const [receiptFilled, setReceiptFilled] = useState(false);
 
   const allSteps = [
     'vad',
@@ -277,14 +278,46 @@ export default function KundBetalatPage() {
       };
 
       setForm(resolvedForm);
-
-      // 3. Get BAS accounts and save to DB
-      await handleSubmitAndSave(resolvedForm);
+      setReceiptFilled(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Kunde inte läsa kvittot. Försök igen.');
     } finally {
       setUploadProcessing(false);
     }
+  }
+
+  // ── Receipt betalningssätt ──────────────────────────────────────────────────
+
+  if (receiptFilled && !loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <div className="flex-1 px-6 py-12 max-w-xl mx-auto w-full flex flex-col justify-center">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mb-5 w-fit" style={{ backgroundColor: '#EFF6FF', color: '#2563EB' }}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Kvitto läst
+          </div>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-2">Hur fick du betalt?</h1>
+          <p className="text-slate-400 text-sm mb-6 leading-relaxed">AI:n läste av kvittot. Bekräfta hur du tog emot betalningen.</p>
+          <div className="flex flex-col gap-3 mb-6">
+            {['Till företagskonto', 'Till privatkonto', 'Kontant'].map(option => (
+              <RadioCard key={option} label={option} selected={form.betalningssatt === option} onClick={() => setForm(f => ({ ...f, betalningssatt: option }))} />
+            ))}
+          </div>
+          {error && <p className="mb-4 text-sm text-red-500 text-center">{error}</p>}
+          <button
+            type="button"
+            onClick={() => handleSubmitAndSave()}
+            disabled={!form.betalningssatt}
+            className="w-full py-3 text-sm font-bold text-white rounded-xl disabled:opacity-40 transition-opacity"
+            style={{ backgroundColor: NAV_BG }}
+          >
+            Spara transaktion
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // ── Loading ─────────────────────────────────────────────────────────────────

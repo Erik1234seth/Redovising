@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
     ],
   },
   allowedDevOrigins: ['192.168.68.109'],
-  serverExternalPackages: ['pdfjs-dist', '@napi-rs/canvas'],
+  serverExternalPackages: ['pdfjs-dist', '@napi-rs/canvas', 'xlsx'],
   turbopack: {},
 };
 
