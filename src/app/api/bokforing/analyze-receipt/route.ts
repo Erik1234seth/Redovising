@@ -95,10 +95,7 @@ export async function POST(request: Request) {
     let userContent: unknown;
 
     if (mimeType === 'application/pdf') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
-      const pdfData = await pdfParse(buffer);
-      const text = pdfData.text?.trim() ?? '';
+      const text = await extractPdfText(buffer);
 
       if (text.length > 50) {
         // Digital PDF — send as text, AI reads it more accurately
