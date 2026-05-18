@@ -252,7 +252,7 @@ export default function LaddaUppPage() {
               </div>
             ))}
           </div>
-          <p className="text-xs text-slate-400">Vi stödjer CSV- och Excel-filer (.csv, .xlsx, .xls)</p>
+          <p className="text-xs text-slate-400">Vi stödjer CSV, Excel och PDF (.csv, .xlsx, .xls, .pdf)</p>
         </div>
 
         <div
@@ -263,7 +263,7 @@ export default function LaddaUppPage() {
           className="bg-white rounded-2xl border-2 border-dashed p-10 flex flex-col items-center justify-center cursor-pointer transition-all duration-150"
           style={{ borderColor: dragging ? ACCENT : file ? '#059669' : '#E2E8F0', backgroundColor: dragging ? '#ECFEFF' : file ? '#F0FDF4' : undefined }}
         >
-          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleChange} className="hidden" />
+          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.pdf" onChange={handleChange} className="hidden" />
           {file ? (
             <>
               <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: '#DCFCE7' }}>
@@ -282,7 +282,7 @@ export default function LaddaUppPage() {
                 </svg>
               </div>
               <p className="font-semibold text-slate-700 text-sm">Dra och släpp din fil här</p>
-              <p className="text-xs text-slate-400 mt-1">eller klicka för att välja fil · CSV, XLSX, XLS</p>
+              <p className="text-xs text-slate-400 mt-1">eller klicka för att välja fil · CSV, XLSX, XLS, PDF</p>
             </>
           )}
         </div>

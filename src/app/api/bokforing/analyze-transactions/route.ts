@@ -1,6 +1,28 @@
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadPdfjs(): Promise<any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const workerPath = require('path').resolve(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
+  return pdfjsLib;
+}
+
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  const pdfjsLib = await loadPdfjs();
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    text += content.items.map((item: any) => item.str ?? '').join(' ') + '\n';
+  }
+  return text.trim();
+}
+
 const SYSTEM_PROMPT = `Du är expert på svensk bokföring. Analysera denna transaktionslista och returnera ett JSON-objekt med nyckeln "transactions" som innehåller en array. Varje transaktion ska ha exakt dessa fält:
 {
   "datum": "YYYY-MM-DD",
@@ -36,8 +58,12 @@ interface ParsedTransaction {
   kredit_namn: string;
 }
 
-function fileToText(buffer: Buffer, mimeType: string, fileName: string): string {
+async function fileToText(buffer: Buffer, mimeType: string, fileName: string): Promise<string> {
   const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+
+  if (ext === 'pdf' || mimeType === 'application/pdf') {
+    return extractPdfText(buffer);
+  }
 
   if (ext === 'csv' || mimeType === 'text/csv' || mimeType === 'text/plain') {
     return buffer.toString('utf-8');
@@ -73,7 +99,7 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     let csvText: string;
     try {
-      csvText = fileToText(buffer, file.type, file.name);
+      csvText = await fileToText(buffer, file.type, file.name);
     } catch {
       return NextResponse.json({ error: 'Kunde inte läsa filen. Kontrollera att det är en giltig CSV- eller Excel-fil.' }, { status: 400 });
     }
