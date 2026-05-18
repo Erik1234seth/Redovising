@@ -1,16 +1,33 @@
 import { NextResponse } from 'next/server';
 
-async function pdfPageToBase64(buffer: Buffer): Promise<string> {
-  const { createCanvas } = await import('@napi-rs/canvas');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadPdfjs(): Promise<any> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
-
-  // Point worker to the bundled worker file — avoids spawning a separate thread
   const workerPath = require('path').resolve(
     process.cwd(),
     'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs'
   );
   pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
+  return pdfjsLib;
+}
+
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  const pdfjsLib = await loadPdfjs();
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    text += content.items.map((item: any) => item.str ?? '').join(' ') + '\n';
+  }
+  return text.trim();
+}
+
+async function pdfPageToBase64(buffer: Buffer): Promise<string> {
+  const { createCanvas } = await import('@napi-rs/canvas');
+  const pdfjsLib = await loadPdfjs();
 
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
   const page = await pdf.getPage(1);
@@ -79,7 +96,7 @@ export async function POST(request: Request) {
 
     if (mimeType === 'application/pdf') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfParse = ((await import('pdf-parse')) as any).default ?? (await import('pdf-parse'));
+      const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
       const pdfData = await pdfParse(buffer);
       const text = pdfData.text?.trim() ?? '';
 
