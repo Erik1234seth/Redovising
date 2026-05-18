@@ -100,12 +100,12 @@ export default function FakturaVyPage() {
     (new Date(faktura.forfallo_datum).getTime() - new Date(faktura.faktura_datum).getTime()) / 86400000
   );
 
-  async function buildPdfBlob() {
+  async function buildPdfBlob(): Promise<Blob> {
     const { pdf } = await import('@react-pdf/renderer');
     const { FakturaPDF } = await import('@/components/FakturaPDF');
     const { createElement } = await import('react');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (await (pdf(createElement(FakturaPDF, {
+    const pdfDoc = pdf(createElement(FakturaPDF, {
       data: {
         faktura_nr: faktura!.faktura_nr,
         faktura_datum: faktura!.faktura_datum,
@@ -131,7 +131,8 @@ export default function FakturaVyPage() {
         rader: faktura!.rader,
       },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any)).toBlob() as Blob;
+    }) as any);
+    return pdfDoc.toBlob();
   }
 
   async function handleDownload() {
