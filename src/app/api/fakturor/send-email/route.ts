@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     const { error } = await resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
       to,
-      subject: `Faktura ${fakturaName} från ${säljarNamn}`,
+      subject: `${fakturaName} från ${säljarNamn}`,
       html,
       attachments: [
         {
