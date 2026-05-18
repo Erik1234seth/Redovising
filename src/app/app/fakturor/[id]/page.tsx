@@ -51,6 +51,10 @@ export default function FakturaVyPage() {
   const { user, profile, loading } = useAuth();
   const [faktura, setFaktura] = useState<Faktura | null>(null);
   const [fetching, setFetching] = useState(true);
+  const [sendEmail, setSendEmail] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendStatus, setSendStatus] = useState<'idle' | 'sent' | 'error'>('idle');
+  const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login');
@@ -96,69 +100,145 @@ export default function FakturaVyPage() {
     (new Date(faktura.forfallo_datum).getTime() - new Date(faktura.faktura_datum).getTime()) / 86400000
   );
 
+  async function buildPdfBlob() {
+    const { pdf } = await import('@react-pdf/renderer');
+    const { FakturaPDF } = await import('@/components/FakturaPDF');
+    const { createElement } = await import('react');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (await (pdf(createElement(FakturaPDF, {
+      data: {
+        faktura_nr: faktura!.faktura_nr,
+        faktura_datum: faktura!.faktura_datum,
+        leverans_datum: faktura!.leverans_datum,
+        forfallo_datum: faktura!.forfallo_datum,
+        status: faktura!.status,
+        säljar_namn: profile?.full_name ?? '',
+        säljar_foretag: profile?.company_name ?? null,
+        säljar_org_nr: profile?.org_nr ?? null,
+        säljar_adress: profile?.adress ?? null,
+        säljar_postnummer: profile?.postnummer ?? null,
+        säljar_ort: profile?.ort ?? null,
+        säljar_momsnr: profile?.momsnr ?? null,
+        betalningsinfo: faktura!.betalningsinfo,
+        meddelande: faktura!.meddelande,
+        kund_namn: faktura!.kund_namn,
+        kund_email: faktura!.kund_email,
+        kund_adress: faktura!.kund_adress,
+        kund_postnummer: faktura!.kund_postnummer,
+        kund_ort: faktura!.kund_ort,
+        kund_land: faktura!.kund_land,
+        kund_org_nr: faktura!.kund_org_nr,
+        rader: faktura!.rader,
+      },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any)).toBlob() as Blob;
+  }
+
+  async function handleDownload() {
+    const blob = await buildPdfBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Faktura-${faktura!.faktura_nr}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleSendEmail() {
+    if (!sendEmail.trim()) return;
+    setSending(true);
+    setSendStatus('idle');
+    setSendError(null);
+    try {
+      const blob = await buildPdfBlob();
+      const arrayBuffer = await blob.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const res = await fetch('/api/fakturor/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: sendEmail.trim(),
+          pdfBase64: base64,
+          fakturaName: `Faktura-${faktura!.faktura_nr}`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Okänt fel');
+      setSendStatus('sent');
+    } catch (err: unknown) {
+      setSendError(err instanceof Error ? err.message : 'Kunde inte skicka');
+      setSendStatus('error');
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     <>
 <div className="flex flex-col min-h-full bg-slate-50">
 
         {/* Kontrollpanel */}
-        <div className="px-8 pt-8 pb-4 flex items-center justify-between">
-          <button
-            onClick={() => router.push('/fakturor')}
-            className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Tillbaka
-          </button>
-          <button
-            onClick={async () => {
-              const { pdf } = await import('@react-pdf/renderer');
-              const { FakturaPDF } = await import('@/components/FakturaPDF');
-              const { createElement } = await import('react');
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const blob = await pdf(createElement(FakturaPDF, {
-                data: {
-                  faktura_nr: faktura.faktura_nr,
-                  faktura_datum: faktura.faktura_datum,
-                  leverans_datum: faktura.leverans_datum,
-                  forfallo_datum: faktura.forfallo_datum,
-                  status: faktura.status,
-                  säljar_namn: profile?.full_name ?? '',
-                  säljar_foretag: profile?.company_name ?? null,
-                  säljar_org_nr: profile?.org_nr ?? null,
-                  säljar_adress: profile?.adress ?? null,
-                  säljar_postnummer: profile?.postnummer ?? null,
-                  säljar_ort: profile?.ort ?? null,
-                  säljar_momsnr: profile?.momsnr ?? null,
-                  betalningsinfo: faktura.betalningsinfo,
-                  meddelande: faktura.meddelande,
-                  kund_namn: faktura.kund_namn,
-                  kund_email: faktura.kund_email,
-                  kund_adress: faktura.kund_adress,
-                  kund_postnummer: faktura.kund_postnummer,
-                  kund_ort: faktura.kund_ort,
-                  kund_land: faktura.kund_land,
-                  kund_org_nr: faktura.kund_org_nr,
-                  rader: faktura.rader,
-                },
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              }) as any).toBlob();
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `Faktura-${faktura.faktura_nr}.pdf`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-            className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white rounded-xl hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: NAV_BG }}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Ladda ner PDF
-          </button>
+        <div className="px-8 pt-8 pb-4">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => router.push('/fakturor')}
+              className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Tillbaka
+            </button>
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white rounded-xl hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: NAV_BG }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Ladda ner PDF
+            </button>
+          </div>
+
+          {/* Skicka via e-post */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 max-w-3xl mx-auto">
+            <p className="text-xs font-semibold text-slate-500 mb-3">Skicka faktura via e-post <span className="font-normal text-slate-400">(valfritt)</span></p>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={sendEmail}
+                onChange={e => { setSendEmail(e.target.value); setSendStatus('idle'); setSendError(null); }}
+                placeholder={faktura.kund_email ?? 'mottagare@exempel.se'}
+                className="flex-1 px-3 py-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 transition-shadow"
+                style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
+              />
+              <button
+                onClick={handleSendEmail}
+                disabled={!sendEmail.trim() || sending}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-xl disabled:opacity-40 transition-opacity whitespace-nowrap"
+                style={{ backgroundColor: NAV_BG }}
+              >
+                {sending ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                )}
+                {sending ? 'Skickar...' : 'Skicka'}
+              </button>
+            </div>
+            {sendStatus === 'sent' && (
+              <p className="mt-2 text-xs font-semibold" style={{ color: '#059669' }}>Fakturan skickades till {sendEmail}</p>
+            )}
+            {sendStatus === 'error' && (
+              <p className="mt-2 text-xs font-semibold text-red-500">{sendError}</p>
+            )}
+          </div>
         </div>
 
         {/* Fakturavy */}
