@@ -1,8 +1,6 @@
 import OpenAI from 'openai';
 import { NextRequest } from 'next/server';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 const SYSTEM_PROMPT = `Du är en hjälpsam assistent inbyggd i appen Enkla Bokslut — en webbtjänst för svenska enskilda firmor. Du hjälper användare med frågor om appen och om bokföring/skatt.
 
 Svara alltid på svenska. Håll svaren korta och konkreta. Använd punktlistor för steg-för-steg-förklaringar. Rekommendera att kontakta Enkla Bokslut direkt om frågan kräver personlig rådgivning.
@@ -245,6 +243,7 @@ En rund "?"-knapp syns längst ner till höger på alla app-sidor (utom /hjalp).
 **Egenavgifter:** Ca 28,97% på överskottet för enskild firma (under 65 år).`;
 
 export async function POST(req: NextRequest) {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const { messages, page } = await req.json();
 
   const system = page
