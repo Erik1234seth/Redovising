@@ -161,6 +161,12 @@ export default function FakturaVyPage() {
           to: sendEmail.trim(),
           pdfBase64: base64,
           fakturaName: `Faktura-${faktura!.faktura_nr}`,
+          fakturaId: faktura!.id,
+          kundNamn: faktura!.kund_namn,
+          säljarNamn: profile?.company_name ?? profile?.full_name ?? '',
+          belopp: totalInkl.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kr',
+          forfalloDatum: new Date(faktura!.forfallo_datum).toLocaleDateString('sv-SE'),
+          betalningsinfo: faktura!.betalningsinfo,
         }),
       });
       const data = await res.json();
