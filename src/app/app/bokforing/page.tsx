@@ -166,23 +166,21 @@ export default function BokforingPage() {
             </>
           );
 
-          if (ev.id === 'kund-betalat') {
-            return (
-              <Link
-                key={ev.id}
-                href="/bokforing/kund-betalat"
-                className="group flex items-start gap-4 text-left bg-white rounded-2xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-md transition-all duration-150"
-              >
-                {cardContent}
-              </Link>
-            );
-          }
+          const hrefs: Record<string, string> = {
+            'kund-betalat': '/bokforing/kund-betalat',
+            'kopt-nagot': '/bokforing/kopt-nagot',
+            'privata-pengar': '/bokforing/privat-pengar',
+            'ladda-upp': '/bokforing/ladda-upp',
+            'skatt-moms': '/bokforing/skatteverket',
+            'lan-bidrag': '/bokforing/ovrigt',
+          };
 
-          if (ev.id === 'kopt-nagot') {
+          const href = hrefs[ev.id];
+          if (href) {
             return (
               <Link
                 key={ev.id}
-                href="/bokforing/kopt-nagot"
+                href={href}
                 className="group flex items-start gap-4 text-left bg-white rounded-2xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-md transition-all duration-150"
               >
                 {cardContent}
@@ -248,9 +246,14 @@ export default function BokforingPage() {
                   <span className="text-slate-700 truncate pr-4">{t.beskrivning}</span>
                   <span className="text-xs font-mono text-slate-500">{t.ai_debit_konto ?? '—'}</span>
                   <span className="text-xs font-mono text-slate-500">{t.ai_kredit_konto ?? '—'}</span>
-                  <span className="text-right font-medium text-emerald-600">
-                    +{Number(t.belopp).toLocaleString('sv-SE')} kr
-                  </span>
+                  {(() => {
+                    const utgift = ['kopt-nagot', 'skatteverket'].includes(t.haendelse_typ);
+                    return (
+                      <span className={`text-right font-medium ${utgift ? 'text-red-500' : 'text-emerald-600'}`}>
+                        {utgift ? '−' : '+'}{Number(t.belopp).toLocaleString('sv-SE')} kr
+                      </span>
+                    );
+                  })()}
                 </div>
               ))}
             </>

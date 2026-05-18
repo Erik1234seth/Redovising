@@ -1,5 +1,28 @@
 import { NextResponse } from 'next/server';
 
+async function pdfPageToBase64(buffer: Buffer): Promise<string> {
+  const { createCanvas } = await import('@napi-rs/canvas');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
+
+  // Point worker to the bundled worker file — avoids spawning a separate thread
+  const workerPath = require('path').resolve(
+    process.cwd(),
+    'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs'
+  );
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
+
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2.0 });
+
+  const canvas = createCanvas(viewport.width, viewport.height);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await page.render({ canvasContext: canvas.getContext('2d') as any, viewport }).promise;
+
+  return (canvas.toBuffer('image/png') as Buffer).toString('base64');
+}
+
 interface ReceiptAnalysis {
   vad: string;
   datum: string | null;
@@ -9,6 +32,17 @@ interface ReceiptAnalysis {
   avsandare: string;
   betalningssatt: string | null;
 }
+
+const SYSTEM_PROMPT = `Du är expert på svensk bokföring och kvittoanalys. Analysera kvittot/fakturan och returnera JSON med exakt dessa fält:
+{
+  "vad": "kort beskrivning av vad som köptes/såldes",
+  "datum": "YYYY-MM-DD eller null",
+  "belopp": number (totalt inkl moms),
+  "moms": number (momsbelopp, 0 om ej synligt),
+  "land": "Sverige" eller "EU" eller "Utanför EU",
+  "avsandare": "namn på utfärdaren",
+  "betalningssatt": "Kontant" eller "Till företagskonto" eller "Till privatkonto" eller null
+}`;
 
 export async function POST(request: Request) {
   try {
@@ -29,26 +63,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'OpenAI API-nyckel saknas' }, { status: 500 });
     }
 
-    const mimeType = file.type || 'image/jpeg';
-    const arrayBuffer = await file.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString('base64');
-    const imageUrl = `data:${mimeType};base64,${base64}`;
-
-    const systemPrompt = `Du är expert på svensk bokföring och kvittoanalys. Analysera kvittot/fakturan och returnera JSON med exakt dessa fält:
-{
-  "vad": "kort beskrivning av vad som köptes/såldes",
-  "datum": "YYYY-MM-DD eller null",
-  "belopp": number (totalt inkl moms),
-  "moms": number (momsbelopp, 0 om ej synligt),
-  "land": "Sverige" eller "EU" eller "Utanför EU",
-  "avsandare": "namn på utfärdaren",
-  "betalningssatt": "Kontant" eller "Till företagskonto" eller "Till privatkonto" eller null
-}`;
-
     const userMessage =
       haendelse === 'kund-betalat'
         ? 'Analysera denna faktura/betalningsbekräftelse för en försäljning vi gjort.'
         : 'Analysera detta kvitto/faktura för ett inköp vi gjort.';
+
+    const mimeType = file.type || 'image/jpeg';
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Build message content
+    // PDF: try text extraction first (more accurate for digital invoices),
+    // fall back to image render if the PDF is scanned/empty
+    let userContent: unknown;
+
+    if (mimeType === 'application/pdf') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pdfParse = ((await import('pdf-parse')) as any).default ?? (await import('pdf-parse'));
+      const pdfData = await pdfParse(buffer);
+      const text = pdfData.text?.trim() ?? '';
+
+      if (text.length > 50) {
+        // Digital PDF — send as text, AI reads it more accurately
+        userContent = `${userMessage}\n\nInnehåll från PDF:\n${text}`;
+      } else {
+        // Scanned PDF — render first page to image
+        const imageBase64 = await pdfPageToBase64(buffer);
+        userContent = [
+          { type: 'text', text: userMessage },
+          { type: 'image_url', image_url: { url: `data:image/png;base64,${imageBase64}` } },
+        ];
+      }
+    } else {
+      // Image — send as base64
+      userContent = [
+        { type: 'text', text: userMessage },
+        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${buffer.toString('base64')}` } },
+      ];
+    }
 
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -57,20 +109,14 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-5.5',
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: userMessage },
-              { type: 'image_url', image_url: { url: imageUrl } },
-            ],
-          },
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userContent },
         ],
         temperature: 0.1,
-        max_tokens: 600,
+        max_completion_tokens: 600,
       }),
     });
 

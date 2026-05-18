@@ -37,7 +37,10 @@
       "Bash(findstr \"dev\\\\|start\\\\|scripts\" /A)",
       "Bash(npm uninstall:*)",
       "Bash(git pull *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\erijo\\\\Redovising\\\\src\\\\app\\\\app\\\\bokforing\" -Recurse -Force)",
+      "Bash(Select-Object FullName, PSIsContainer)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\erijo\\\\Redovising\\\\src\\\\app\\\\app\\\\bokforing\" -Recurse -Force | Select-Object FullName | ForEach-Object { $_.FullName })"
     ]
   },
   "enableAllProjectMcpServers": true,
