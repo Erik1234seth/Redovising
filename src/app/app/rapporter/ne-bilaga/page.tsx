@@ -1,40 +1,57 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { hämtaTransaktioner, beräknaNE, fmtKr, type Transaktion } from '@/lib/rapporter';
+import { exportNEBilagaPDF } from '@/lib/pdf';
 
 const year = new Date().getFullYear();
 const yearEnded = new Date() >= new Date(`${year}-12-31`);
 
-const rows = [
-  { kod: 'R1', label: 'Nettoomsättning', value: null },
-  { kod: 'R2', label: 'Förändring av lager', value: null },
-  { kod: 'R3', label: 'Övriga rörelseintäkter', value: null },
-  { kod: 'R4', label: 'Råvaror och förnödenheter', value: null },
-  { kod: 'R5', label: 'Handelsvaror', value: null },
-  { kod: 'R6', label: 'Övriga externa kostnader', value: null },
-  { kod: 'R7', label: 'Personalkostnader', value: null },
-  { kod: 'R8', label: 'Av- och nedskrivningar', value: null },
-  { kod: 'R9', label: 'Övriga rörelsekostnader', value: null },
-  { kod: 'R10', label: 'Rörelseresultat', value: null, bold: true },
-  { kod: 'R11', label: 'Finansiella intäkter', value: null },
-  { kod: 'R12', label: 'Finansiella kostnader', value: null },
-  { kod: 'R13', label: 'Resultat efter finansiella poster', value: null, bold: true },
-];
-
 export default function NEBilagaPage() {
+  const [transaktioner, setTransaktioner] = useState<Transaktion[]>([]);
+  const [loading, setLoading] = useState(true);
   const [firstYear, setFirstYear] = useState(false);
   const [previousUploaded, setPreviousUploaded] = useState(false);
 
+  useEffect(() => {
+    hämtaTransaktioner(year).then(data => {
+      setTransaktioner(data);
+      setLoading(false);
+    });
+  }, []);
+
+  const ne = beräknaNE(transaktioner);
   const showPreviousWarning = !firstYear && !previousUploaded;
+
+  const rows: { kod: string; label: string; value: number; bold?: boolean }[] = [
+    { kod: 'R1',  label: 'Nettoomsättning',                      value: ne.R1  },
+    { kod: 'R2',  label: 'Förändring av lager',                   value: 0      },
+    { kod: 'R3',  label: 'Övriga rörelseintäkter',               value: 0      },
+    { kod: 'R4',  label: 'Råvaror och förnödenheter',            value: ne.R4  },
+    { kod: 'R5',  label: 'Handelsvaror',                          value: ne.R5  },
+    { kod: 'R6',  label: 'Övriga externa kostnader',              value: ne.R6  },
+    { kod: 'R7',  label: 'Personalkostnader',                     value: ne.R7  },
+    { kod: 'R8',  label: 'Av- och nedskrivningar',               value: ne.R8  },
+    { kod: 'R9',  label: 'Övriga rörelsekostnader',              value: ne.R9  },
+    { kod: 'R10', label: 'Rörelseresultat',                       value: ne.R10, bold: true },
+    { kod: 'R11', label: 'Finansiella intäkter',                  value: ne.R11 },
+    { kod: 'R12', label: 'Finansiella kostnader',                 value: ne.R12 },
+    { kod: 'R13', label: 'Resultat efter finansiella poster',     value: ne.R13, bold: true },
+  ];
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-8 py-5 bg-white border-b border-slate-200 flex-shrink-0">
         <div>
           <h1 className="text-xl font-bold text-slate-800">NE-bilaga</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Uppdateras automatiskt · Räkenskapsår {year}</p>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {loading ? 'Laddar...' : `Uppdateras automatiskt · Räkenskapsår ${year}`}
+          </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+        <button
+          onClick={() => exportNEBilagaPDF(rows, year)}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+        >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
@@ -45,7 +62,7 @@ export default function NEBilagaPage() {
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-2xl mx-auto space-y-4">
 
-          {/* Varning: året är inte avslutat */}
+          {/* Varning: ej avslutat år */}
           {!yearEnded && (
             <div className="flex gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
               <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -54,7 +71,7 @@ export default function NEBilagaPage() {
               <div>
                 <p className="text-sm font-semibold text-amber-800">Ej slutgiltig NE-bilaga</p>
                 <p className="text-sm text-amber-700 mt-0.5">
-                  Räkenskapsåret {year} är inte avslutat. Värdena nedan är preliminära och uppdateras löpande när du lägger till transaktioner.
+                  Räkenskapsåret {year} är inte avslutat. Värdena är preliminära och uppdateras löpande.
                 </p>
               </div>
             </div>
@@ -79,9 +96,8 @@ export default function NEBilagaPage() {
                     </p>
                     <p className={`text-sm mt-0.5 ${previousUploaded ? 'text-green-600' : 'text-slate-500'}`}>
                       {previousUploaded
-                        ? 'Ingående värden är hämtade från föregående års bokslut.'
-                        : `Behövs för att beräkna ingående värden och säkerställa att ${year} års NE-bilaga stämmer.`
-                      }
+                        ? 'Ingående värden hämtade från föregående bokslut.'
+                        : `Behövs för att ingående värden ska stämma för ${year}.`}
                     </p>
                   </div>
                 </div>
@@ -98,22 +114,18 @@ export default function NEBilagaPage() {
                   </button>
                 )}
               </div>
-
-              {/* Varning om ej uppladdad */}
               {showPreviousWarning && (
                 <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
                   <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
                   </svg>
-                  <p className="text-xs text-amber-700">
-                    NE-bilagan kan vara ofullständig utan föregående års ingående värden.
-                  </p>
+                  <p className="text-xs text-amber-700">NE-bilagan kan vara ofullständig utan föregående års ingående värden.</p>
                 </div>
               )}
             </div>
           )}
 
-          {/* Första år-toggle */}
+          {/* Första år */}
           <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-5 py-3.5">
             <div>
               <p className="text-sm font-medium text-slate-700">Det här är mitt första år som enskild firma</p>
@@ -123,35 +135,43 @@ export default function NEBilagaPage() {
               onClick={() => setFirstYear(f => !f)}
               className={`relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${firstYear ? 'bg-green-500' : 'bg-slate-200'}`}
             >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${firstYear ? 'translate-x-5' : 'translate-x-0'}`}
-              />
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${firstYear ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
           </div>
 
-          {/* Tabellen */}
+          {/* Tabell */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Resultaträkning</p>
             </div>
-            {rows.map(row => (
-              <div
-                key={row.kod}
-                className={`flex items-center justify-between px-6 py-3 border-b border-slate-100 last:border-0 ${row.bold ? 'bg-slate-50' : ''}`}
-              >
-                <div className="flex items-center gap-4">
-                  <span className="text-xs text-slate-400 w-8 font-mono">{row.kod}</span>
-                  <span className={`text-sm ${row.bold ? 'font-semibold text-slate-800' : 'text-slate-600'}`}>{row.label}</span>
-                </div>
-                <span className={`text-sm font-mono ${row.bold ? 'font-semibold text-slate-800' : 'text-slate-400'}`}>
-                  {row.value ?? '0 kr'}
-                </span>
+            {loading ? (
+              <div className="flex items-center justify-center py-10 gap-3 text-slate-400">
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                <span className="text-sm">Laddar...</span>
               </div>
-            ))}
+            ) : (
+              rows.map(row => (
+                <div
+                  key={row.kod}
+                  className={`flex items-center justify-between px-6 py-3 border-b border-slate-100 last:border-0 ${row.bold ? 'bg-slate-50' : ''}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs text-slate-400 w-8 font-mono">{row.kod}</span>
+                    <span className={`text-sm ${row.bold ? 'font-semibold text-slate-800' : 'text-slate-600'}`}>{row.label}</span>
+                  </div>
+                  <span className={`text-sm font-mono ${row.bold ? 'font-semibold' : ''} ${row.value !== 0 ? (row.bold && row.value < 0 ? 'text-red-500' : row.bold ? 'text-emerald-600' : 'text-slate-700') : 'text-slate-300'}`}>
+                    {fmtKr(row.value)}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
 
           <p className="text-xs text-slate-400 text-center">
-            Värdena uppdateras automatiskt när du kontering transaktioner i Bokföring
+            Värdena uppdateras automatiskt när du registrerar transaktioner i Bokföring
           </p>
         </div>
       </div>

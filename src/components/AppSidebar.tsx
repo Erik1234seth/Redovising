@@ -19,11 +19,6 @@ function getInitials(fullName: string | null | undefined, email: string) {
   return email[0].toUpperCase();
 }
 
-const rapporterChildren = [
-  { label: 'NE-bilaga', href: '/rapporter/ne-bilaga' },
-  { label: 'Momsrapport', href: '/rapporter/moms' },
-  { label: 'Preliminär skatt', href: '/rapporter/preliminar-skatt' },
-];
 
 const ovrigtChildren = [
   { label: 'Hjälp', href: '/hjalp' },
@@ -33,15 +28,13 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, profile, signOut } = useAuth();
-  const [rapporterOpen, setRapporterOpen] = useState(
-    rapporterChildren.some(c => pathname === c.href)
-  );
   const [ovrigtOpen, setOvrigtOpen] = useState(
     ovrigtChildren.some(c => pathname === c.href)
   );
 
   const isActive = (href: string) => pathname === href;
-  const isRapporterActive = rapporterChildren.some(c => pathname === c.href);
+  const isRapporterActive = pathname.startsWith('/rapporter');
+
   const isOvrigtActive = ovrigtChildren.some(c => pathname === c.href);
 
   const handleSignOut = async () => {
@@ -96,46 +89,16 @@ export default function AppSidebar() {
           Bokföring
         </Link>
 
-        {/* Rapporter */}
-        <div>
-          <button
-            onClick={() => setRapporterOpen(o => !o)}
-            className={`w-full ${navItemBase} justify-between ${isRapporterActive ? navItemActive : navItemInactive}`}
-          >
-            <div className="flex items-center gap-3">
-              <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              Rapporter
-            </div>
-            <svg
-              className="w-3.5 h-3.5 transition-transform duration-200 flex-shrink-0"
-              style={{ transform: rapporterOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          {rapporterOpen && (
-            <div className="mt-0.5 space-y-0.5">
-              {rapporterChildren.map(child => (
-                <Link
-                  key={child.href}
-                  href={child.href}
-                  className={`flex items-center gap-2 pl-11 pr-4 py-2 mx-2 rounded-lg text-sm transition-all duration-150 ${
-                    isActive(child.href)
-                      ? 'bg-white/10 text-white font-medium'
-                      : 'text-white/50 hover:text-white/80 hover:bg-white/5'
-                  }`}
-                >
-                  <span className="w-1 h-1 rounded-full bg-current flex-shrink-0" />
-                  {child.label}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Rapporter & Bokslut */}
+        <Link
+          href="/rapporter"
+          className={`${navItemBase} ${isRapporterActive ? navItemActive : navItemInactive}`}
+        >
+          <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Rapporter & Bokslut
+        </Link>
 
         {/* Kunder & produkter */}
         <Link
