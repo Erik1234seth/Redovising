@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const NAV_BG = '#173b57';
@@ -20,22 +19,13 @@ function getInitials(fullName: string | null | undefined, email: string) {
 }
 
 
-const ovrigtChildren = [
-  { label: 'Hjälp', href: '/hjalp' },
-];
-
 export default function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, profile, signOut } = useAuth();
-  const [ovrigtOpen, setOvrigtOpen] = useState(
-    ovrigtChildren.some(c => pathname === c.href)
-  );
 
   const isActive = (href: string) => pathname === href;
   const isRapporterActive = pathname.startsWith('/rapporter');
-
-  const isOvrigtActive = ovrigtChildren.some(c => pathname === c.href);
 
   const handleSignOut = async () => {
     await signOut();
@@ -119,49 +109,19 @@ export default function AppSidebar() {
           <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          Fakturor
+          Skapa faktura
         </Link>
 
-        {/* Övrigt */}
-        <div>
-          <button
-            onClick={() => setOvrigtOpen(o => !o)}
-            className={`w-full ${navItemBase} justify-between ${isOvrigtActive ? navItemActive : navItemInactive}`}
-          >
-            <div className="flex items-center gap-3">
-              <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-              </svg>
-              Övrigt
-            </div>
-            <svg
-              className="w-3.5 h-3.5 transition-transform duration-200 flex-shrink-0"
-              style={{ transform: ovrigtOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          {ovrigtOpen && (
-            <div className="mt-0.5 space-y-0.5">
-              {ovrigtChildren.map(child => (
-                <Link
-                  key={child.href}
-                  href={child.href}
-                  className={`flex items-center gap-2 pl-11 pr-4 py-2 mx-2 rounded-lg text-sm transition-all duration-150 ${
-                    isActive(child.href)
-                      ? 'bg-white/10 text-white font-medium'
-                      : 'text-white/50 hover:text-white/80 hover:bg-white/5'
-                  }`}
-                >
-                  <span className="w-1 h-1 rounded-full bg-current flex-shrink-0" />
-                  {child.label}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Hjälp */}
+        <Link
+          href="/hjalp"
+          className={`${navItemBase} ${isActive('/hjalp') ? navItemActive : navItemInactive}`}
+        >
+          <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Hjälp
+        </Link>
       </nav>
 
       {/* Användare */}

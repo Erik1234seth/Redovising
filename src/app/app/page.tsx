@@ -22,9 +22,9 @@ const actions = [
     bg: '#EFF6FF',
   },
   {
-    href: '/rapporter/ne-bilaga',
-    title: 'Se mina rapporter',
-    description: 'Se en sammanställning av hur det går för ditt företag — för skatten och myndigheterna',
+    href: '/rapporter',
+    title: 'Rapporter & Bokslut',
+    description: 'Sammanställning av ditt företag för skatten och myndigheterna.',
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -35,7 +35,7 @@ const actions = [
   },
   {
     href: '/fakturor',
-    title: 'Skriva en faktura',
+    title: 'Skapa faktura',
     description: 'Ska du begära betalt av en kund? Här skapar du en faktura enkelt',
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -46,12 +46,12 @@ const actions = [
     bg: '#FFFBEB',
   },
   {
-    href: '/lager',
-    title: 'Kolla lagret',
-    description: 'Håll koll på vad du äger i företaget — produkter, maskiner och utrustning',
+    href: '/kunder-produkter',
+    title: 'Kunder & produkter',
+    description: 'Hantera dina kunder och produkter på ett ställe.',
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
       </svg>
     ),
     color: '#7C3AED',
