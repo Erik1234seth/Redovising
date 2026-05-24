@@ -234,19 +234,15 @@ export default function BokforingPage() {
             </div>
           ) : (
             <>
-              <div className="grid px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100" style={{ gridTemplateColumns: '110px 1fr 90px 90px 120px' }}>
+              <div className="grid px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100" style={{ gridTemplateColumns: '110px 1fr 120px' }}>
                 <span>Datum</span>
                 <span>Beskrivning</span>
-                <span>Debet</span>
-                <span>Kredit</span>
                 <span className="text-right">Belopp</span>
               </div>
               {transaktioner.map(t => (
-                <div key={t.id} className="grid px-5 py-4 text-sm border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center" style={{ gridTemplateColumns: '110px 1fr 90px 90px 120px' }}>
+                <div key={t.id} className="grid px-5 py-4 text-sm border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors items-center" style={{ gridTemplateColumns: '110px 1fr 120px' }}>
                   <span className="text-slate-400">{new Date(t.datum).toLocaleDateString('sv-SE')}</span>
                   <span className="text-slate-700 truncate pr-4">{t.beskrivning}</span>
-                  <span className="text-xs font-mono text-slate-500">{t.ai_debit_konto ?? '—'}</span>
-                  <span className="text-xs font-mono text-slate-500">{t.ai_kredit_konto ?? '—'}</span>
                   {(() => {
                     const utgift = ['kopt-nagot', 'skatteverket'].includes(t.haendelse_typ);
                     return (

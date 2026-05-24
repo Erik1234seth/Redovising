@@ -189,8 +189,6 @@ export default function LaddaUppPage() {
                   <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
                     <span>{t.datum}</span>
                     {t.moms > 0 && <span>Moms: {t.moms.toLocaleString('sv-SE')} kr</span>}
-                    <span className="text-slate-300">|</span>
-                    <span>{t.debit_konto} → {t.kredit_konto}</span>
                   </div>
                 </div>
               </div>
