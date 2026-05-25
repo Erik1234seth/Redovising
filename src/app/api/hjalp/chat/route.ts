@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 
 const SYSTEM_PROMPT = `Du är en hjälpsam assistent inbyggd i appen Enkla Bokslut — en webbtjänst för svenska enskilda firmor. Du hjälper användare med frågor om appen och om bokföring/skatt.
 
-Svara alltid på svenska. Håll svaren korta och konkreta. Använd punktlistor för steg-för-steg-förklaringar. Rekommendera att kontakta Enkla Bokslut direkt om frågan kräver personlig rådgivning.
+Svara alltid på svenska. Håll svaren hyggligt korta och konkreta — undvik onödiga utsvävningar. Använd punktlistor för steg-för-steg-förklaringar. Rekommendera att kontakta Enkla Bokslut direkt om frågan kräver personlig rådgivning.
 
 ---
 
@@ -242,13 +242,63 @@ En rund "?"-knapp syns längst ner till höger på alla app-sidor (utom /hjalp).
 
 **Egenavgifter:** Ca 28,97% på överskottet för enskild firma (under 65 år).`;
 
+function buildUserContext(ctx: Record<string, unknown> | null): string {
+  if (!ctx) return '';
+
+  const lines: string[] = ['\n\n---\n\n## ANVÄNDARKONTEXT\n'];
+
+  const p = ctx.profile as Record<string, unknown> | null;
+  if (p) {
+    if (p.company_name) lines.push(`**Företag:** ${p.company_name}`);
+    if (p.full_name) lines.push(`**Namn:** ${p.full_name}`);
+    if (p.verksamhet) lines.push(`**Verksamhet:** ${p.verksamhet}`);
+    if (p.start_ar) lines.push(`**Startår:** ${p.start_ar}`);
+    if (p.moms_period) lines.push(`**Momsredovisning:** ${p.moms_period}`);
+  }
+
+  const txs = ctx.recentTransactions as Record<string, unknown>[] | undefined;
+  if (txs?.length) {
+    lines.push('\n**Senaste transaktioner:**');
+    for (const t of txs) {
+      const konton = (t.ai_debit_konto || t.ai_kredit_konto)
+        ? ` | ${t.ai_debit_konto ?? '?'} / ${t.ai_kredit_konto ?? '?'}`
+        : '';
+      lines.push(`- ${t.datum} | ${t.haendelse_typ} | ${t.beskrivning} | ${t.belopp} kr (moms: ${t.moms} kr)${konton}`);
+    }
+  }
+
+  const customers = ctx.customers as Record<string, unknown>[] | undefined;
+  if (customers?.length) {
+    lines.push(`\n**Kunder (${customers.length} st):**`);
+    for (const c of customers) {
+      lines.push(`- ${c.namn}${c.land ? ` (${c.land})` : ''}`);
+    }
+  }
+
+  const products = ctx.products as Record<string, unknown>[] | undefined;
+  if (products?.length) {
+    lines.push(`\n**Produkter/tjänster (${products.length} st):**`);
+    for (const p of products) {
+      lines.push(`- ${p.namn} — ${p.pris_exkl_moms} kr exkl. moms (${p.momssats}%) / ${p.enhet}`);
+    }
+  }
+
+  const inv = ctx.invoices as Record<string, unknown> | undefined;
+  if (inv) {
+    lines.push('\n**Fakturastatus:**');
+    lines.push(`- Obetalda: ${inv.unpaid} st, Försenade: ${inv.overdue} st, Totalt utestående: ${inv.unpaidTotal} kr`);
+  }
+
+  return lines.join('\n');
+}
+
 export async function POST(req: NextRequest) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const { messages, page } = await req.json();
+  const { messages, page, userContext } = await req.json();
 
-  const system = page
-    ? `${SYSTEM_PROMPT}\n\nAnvändaren befinner sig just nu på sidan: ${page}`
-    : SYSTEM_PROMPT;
+  let system = SYSTEM_PROMPT;
+  if (page) system += `\n\nAnvändaren befinner sig just nu på sidan: ${page}`;
+  system += buildUserContext(userContext);
 
   const stream = await openai.chat.completions.create({
     model: 'gpt-5.5',

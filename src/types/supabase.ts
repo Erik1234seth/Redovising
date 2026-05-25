@@ -14,6 +14,7 @@ export interface Profile {
   order_count: number;
   verksamhet: string | null;
   start_ar: number | null;
+  moms_period: 'månadsvis' | 'kvartalsvis' | 'helår' | null;
   onboarding_done: boolean;
 }
 

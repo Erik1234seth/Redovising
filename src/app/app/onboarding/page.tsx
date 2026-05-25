@@ -11,7 +11,13 @@ const CORAL = '#E95C63';
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: CURRENT_YEAR - 1989 }, (_, i) => CURRENT_YEAR - i);
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
+
+const MOMS_OPTIONS: { value: 'månadsvis' | 'kvartalsvis' | 'helår'; label: string; desc: string }[] = [
+  { value: 'månadsvis', label: 'Månadsvis', desc: 'Redovisar moms varje månad' },
+  { value: 'kvartalsvis', label: 'Kvartalsvis', desc: 'Redovisar moms var 3:e månad' },
+  { value: 'helår', label: 'En gång per år', desc: 'Redovisar moms en gång om året' },
+];
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -21,6 +27,7 @@ export default function OnboardingPage() {
   const [companyName, setCompanyName] = useState('');
   const [orgNr, setOrgNr] = useState('');
   const [verksamhet, setVerksamhet] = useState('');
+  const [momsPeriod, setMomsPeriod] = useState<'månadsvis' | 'kvartalsvis' | 'helår' | null>(null);
   const [startAr, setStartAr] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +44,7 @@ export default function OnboardingPage() {
           company_name: companyName || null,
           org_nr: orgNr || null,
           verksamhet,
+          moms_period: momsPeriod,
           start_ar: startAr,
           onboarding_done: true,
         })
@@ -192,10 +200,80 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Steg 3 — Startår */}
+        {/* Steg 3 — Momsredovisning */}
         {step === 3 && (
           <div>
             <StepBadge current={3} total={TOTAL_STEPS} />
+            <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-2">
+              Hur ofta redovisar du moms?
+            </h1>
+            <p className="text-slate-400 text-sm mb-8 leading-relaxed">
+              Välj hur ofta du lämnar in momsdeklaration till Skatteverket.
+            </p>
+
+            <div className="flex flex-col gap-3">
+              {MOMS_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setMomsPeriod(opt.value)}
+                  className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border-2 text-left transition-all duration-100"
+                  style={{
+                    borderColor: momsPeriod === opt.value ? NAV_BG : '#e2e8f0',
+                    backgroundColor: momsPeriod === opt.value ? NAV_BG : 'white',
+                  }}
+                >
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: momsPeriod === opt.value ? 'white' : '#1e293b' }}>
+                      {opt.label}
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: momsPeriod === opt.value ? 'rgba(255,255,255,0.7)' : '#94a3b8' }}>
+                      {opt.desc}
+                    </p>
+                  </div>
+                  {momsPeriod === opt.value && (
+                    <svg className="w-5 h-5 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5 mt-4" style={{ backgroundColor: '#F8FAFC' }}>
+              <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Osäker? De flesta enskilda firmor med omsättning under 40 Mkr redovisar kvartalsvis. Du kan ändra detta senare.
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="flex-1 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Tillbaka
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep(4)}
+                disabled={momsPeriod === null}
+                className="flex-1 py-3 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-40"
+                style={{ backgroundColor: NAV_BG }}
+              >
+                Nästa
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Steg 4 — Startår */}
+        {step === 4 && (
+          <div>
+            <StepBadge current={4} total={TOTAL_STEPS} />
             <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-2">
               Vilket år startade du?
             </h1>
@@ -229,7 +307,7 @@ export default function OnboardingPage() {
             <div className="flex gap-3 mt-8">
               <button
                 type="button"
-                onClick={() => setStep(2)}
+                onClick={() => setStep(3)}
                 className="flex-1 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
               >
                 Tillbaka

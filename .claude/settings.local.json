@@ -41,7 +41,12 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\erijo\\\\Redovising\\\\src\\\\app\\\\app\\\\bokforing\" -Recurse -Force)",
       "Bash(Select-Object FullName, PSIsContainer)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\erijo\\\\Redovising\\\\src\\\\app\\\\app\\\\bokforing\" -Recurse -Force | Select-Object FullName | ForEach-Object { $_.FullName })",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "PowerShell(Select-String *)",
+      "Bash(Format-Table FullName)",
+      "Bash(dir \"C:\\\\Users\\\\erijo\\\\Redovising\\\\src\\\\app\\\\app\" -Recurse -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\erijo\\\\Redovising\\\\src\\\\app\\\\app\\\\rapporter\" -Recurse)"
     ]
   },
   "enableAllProjectMcpServers": true,

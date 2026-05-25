@@ -92,6 +92,12 @@ function getGreeting() {
   return 'God kväll';
 }
 
+function getDateString() {
+  return new Date().toLocaleDateString('sv-SE', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+}
+
 export default function HomePage() {
   const { user, loading, profile } = useAuth();
   const router = useRouter();
@@ -117,62 +123,39 @@ export default function HomePage() {
 
       {/* Topplist */}
       <div className="px-8 pt-12 pb-2">
-        <p className="text-sm font-medium text-slate-400 mb-1">{getGreeting()}{firstName ? `, ${firstName}` : ''}!</p>
+        <p className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3">{getDateString()}</p>
         <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">
-          Idag vill jag&hellip;
+          {getGreeting()}{firstName ? `, ${firstName}` : ''}!
         </h1>
-        <p className="text-slate-400 text-sm mt-2">Välj vad du vill göra så tar vi dig dit.</p>
+        <p className="text-slate-400 text-sm mt-1.5">Vad vill du göra idag?</p>
       </div>
 
       {/* Kort-grid */}
-      <div className="px-8 py-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl">
+      <div className="px-8 py-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 max-w-4xl lg:max-w-5xl">
         {actions.map(action => (
           <Link
             key={action.href}
             href={action.href}
-            className="group flex items-start gap-4 bg-white rounded-2xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-md transition-all duration-150"
+            className="group flex lg:flex-col items-center lg:items-start gap-4 bg-white rounded-2xl border border-slate-200 p-5 lg:p-7 hover:border-slate-300 hover:shadow-lg transition-all duration-150"
           >
             <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-150 group-hover:scale-105"
+              className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl lg:rounded-2xl flex items-center justify-center flex-shrink-0"
               style={{ backgroundColor: action.bg, color: action.color }}
             >
               {action.icon}
             </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-slate-800 text-[15px] leading-snug">{action.title}</p>
-              <p className="text-sm text-slate-400 mt-0.5 leading-snug">{action.description}</p>
+            <div className="min-w-0 flex-1 lg:flex-none">
+              <p className="font-bold text-slate-800 text-[15px] lg:text-[17px] leading-snug lg:mt-4">{action.title}</p>
+              <p className="text-xs lg:text-sm text-slate-400 mt-0.5 leading-snug line-clamp-2">{action.description}</p>
             </div>
             <svg
-              className="w-4 h-4 text-slate-300 flex-shrink-0 mt-0.5 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all duration-150"
+              className="w-4 h-4 text-slate-300 flex-shrink-0 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-150 lg:hidden"
               fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </Link>
         ))}
-      </div>
-
-      {/* Tips-banner */}
-      <div className="px-8 pb-10 max-w-4xl">
-        <div
-          className="rounded-2xl px-6 py-4 flex items-center gap-4"
-          style={{ backgroundColor: NAV_BG }}
-        >
-          <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: CORAL }}
-          >
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-white text-sm font-semibold">Osäker på något?</p>
-            <p className="text-white/55 text-xs mt-0.5">
-              Vår assistent finns på varje sida och hjälper dig steg för steg.
-            </p>
-          </div>
-        </div>
       </div>
 
     </div>

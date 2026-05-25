@@ -3,6 +3,30 @@
 import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import MarkdownMessage from './MarkdownMessage';
+import { useAuth } from '@/contexts/AuthContext';
+import { createClient } from '@/lib/supabase';
+
+interface UserContext {
+  profile: {
+    full_name: string | null;
+    company_name: string | null;
+    verksamhet: string | null;
+    start_ar: number | null;
+    moms_period: string | null;
+  };
+  recentTransactions: {
+    datum: string;
+    beskrivning: string;
+    belopp: number;
+    moms: number;
+    haendelse_typ: string;
+    ai_debit_konto: string | null;
+    ai_kredit_konto: string | null;
+  }[];
+  customers: { namn: string; land: string | null }[];
+  products: { namn: string; pris_exkl_moms: number; momssats: number; enhet: string }[];
+  invoices: { unpaid: number; overdue: number; unpaidTotal: number };
+}
 
 const NAV_BG = '#173b57';
 const CORAL = '#E95C63';
@@ -33,6 +57,7 @@ const PAGE_LABELS: Record<string, string> = {
 export default function HjalpChat() {
   const pathname = usePathname();
   const onHjalpPage = pathname === '/hjalp';
+  const { user, profile } = useAuth();
 
   const isHome = pathname === '/';
 
@@ -40,6 +65,7 @@ export default function HjalpChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
+  const [userContext, setUserContext] = useState<UserContext | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -56,6 +82,58 @@ export default function HjalpChat() {
     if (open) setTimeout(() => inputRef.current?.focus(), 150);
   }, [open]);
 
+  useEffect(() => {
+    if (!open || !user || userContext) return;
+
+    async function fetchContext() {
+      const supabase = createClient();
+
+      const [txRes, custRes, prodRes, invRes] = await Promise.all([
+        supabase
+          .from('bokforing_transaktioner')
+          .select('datum, beskrivning, belopp, moms, haendelse_typ, ai_debit_konto, ai_kredit_konto')
+          .eq('user_id', user!.id)
+          .order('datum', { ascending: false })
+          .limit(10),
+        supabase
+          .from('kunder')
+          .select('namn, land')
+          .eq('user_id', user!.id),
+        supabase
+          .from('produkter')
+          .select('namn, pris_exkl_moms, momssats, enhet')
+          .eq('user_id', user!.id),
+        supabase
+          .from('fakturor')
+          .select('status, belopp_inkl_moms')
+          .eq('user_id', user!.id),
+      ]);
+
+      const unpaidInvoices = (invRes.data ?? []).filter(f => f.status === 'obetald');
+      const overdueInvoices = (invRes.data ?? []).filter(f => f.status === 'forsenad');
+
+      setUserContext({
+        profile: {
+          full_name: profile?.full_name ?? null,
+          company_name: profile?.company_name ?? null,
+          verksamhet: profile?.verksamhet ?? null,
+          start_ar: profile?.start_ar ?? null,
+          moms_period: profile?.moms_period ?? null,
+        },
+        recentTransactions: txRes.data ?? [],
+        customers: custRes.data ?? [],
+        products: prodRes.data ?? [],
+        invoices: {
+          unpaid: unpaidInvoices.length,
+          overdue: overdueInvoices.length,
+          unpaidTotal: [...unpaidInvoices, ...overdueInvoices].reduce((s, f) => s + f.belopp_inkl_moms, 0),
+        },
+      });
+    }
+
+    fetchContext();
+  }, [open, user]);
+
   const page = PAGE_LABELS[pathname] ?? pathname;
 
   async function send(text: string) {
@@ -71,7 +149,7 @@ export default function HjalpChat() {
       const res = await fetch('/api/hjalp/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: next, page }),
+        body: JSON.stringify({ messages: next, page, userContext }),
       });
 
       if (!res.body) throw new Error();

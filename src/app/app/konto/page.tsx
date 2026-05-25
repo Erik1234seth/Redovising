@@ -33,6 +33,7 @@ export default function KontoPage() {
   const [ort, setOrt] = useState('');
   const [momsnr, setMomsnr] = useState('');
   const [verksamhet, setVerksamhet] = useState('');
+  const [momsPeriod, setMomsPeriod] = useState<'månadsvis' | 'kvartalsvis' | 'helår' | null>(null);
   const [startAr, setStartAr] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -52,6 +53,7 @@ export default function KontoPage() {
       setOrt(profile.ort ?? '');
       setMomsnr(profile.momsnr ?? '');
       setVerksamhet(profile.verksamhet ?? '');
+      setMomsPeriod(profile.moms_period ?? null);
       setStartAr(profile.start_ar ?? null);
     }
   }, [profile]);
@@ -82,6 +84,7 @@ export default function KontoPage() {
           ort: ort || null,
           momsnr: momsnr || null,
           verksamhet: verksamhet || null,
+          moms_period: momsPeriod,
           start_ar: startAr,
         })
         .eq('id', user.id);
@@ -246,6 +249,36 @@ export default function KontoPage() {
                 className="w-full px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:bg-white resize-none transition"
                 style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Momsredovisning</label>
+              <div className="flex flex-col gap-2">
+                {(['månadsvis', 'kvartalsvis', 'helår'] as const).map(val => {
+                  const labels: Record<string, string> = { månadsvis: 'Månadsvis', kvartalsvis: 'Kvartalsvis', helår: 'En gång per år' };
+                  return (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setMomsPeriod(val)}
+                      className="flex items-center justify-between px-4 py-2.5 rounded-xl border-2 text-left transition-all duration-100"
+                      style={{
+                        borderColor: momsPeriod === val ? NAV_BG : '#e2e8f0',
+                        backgroundColor: momsPeriod === val ? NAV_BG : 'transparent',
+                      }}
+                    >
+                      <span className="text-sm font-semibold" style={{ color: momsPeriod === val ? 'white' : '#475569' }}>
+                        {labels[val]}
+                      </span>
+                      {momsPeriod === val && (
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div>
