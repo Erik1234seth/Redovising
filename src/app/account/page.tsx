@@ -8,12 +8,13 @@ const NAV_BG = '#173b57';
 const ACCENT = '#d04a52';
 const ACCENT_LIGHT = '#FDEAEA';
 
-type Tab = 'bokforing' | 'ne-bilaga' | 'moms';
+type Tab = 'bokforing' | 'ne-bilaga' | 'moms' | 'prenumeration';
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'bokforing', label: 'Bokföring' },
   { id: 'ne-bilaga', label: 'NE-bilaga' },
   { id: 'moms', label: 'Moms' },
+  { id: 'prenumeration', label: 'Prenumeration' },
 ];
 
 function getInitials(fullName: string | null | undefined, email: string) {
@@ -107,6 +108,7 @@ export default function AccountPage() {
         {activeTab === 'bokforing' && <BokforingTab />}
         {activeTab === 'ne-bilaga' && <NEBilagaTab />}
         {activeTab === 'moms' && <MomsTab />}
+        {activeTab === 'prenumeration' && <PrenumerationTab email={user.email ?? ''} />}
       </div>
     </div>
   );
@@ -265,6 +267,138 @@ function MomsTab() {
       <p className="text-sm text-slate-400 max-w-sm mx-auto">
         Sammanställs automatiskt baserat på dina konteringar. Ingen moms har registrerats ännu.
       </p>
+    </div>
+  );
+}
+
+type Subscription = {
+  status: string;
+  billing_period: string;
+  current_period_end: string | null;
+  price_id: string;
+};
+
+function PrenumerationTab({ email }: { email: string }) {
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [loadingData, setLoadingData] = useState(true);
+  const [redirecting, setRedirecting] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/stripe/subscription-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+      .then(r => r.json())
+      .then(data => { setSubscription(data.subscription ?? null); setLoadingData(false); })
+      .catch(() => setLoadingData(false));
+  }, [email]);
+
+  const handleManage = async () => {
+    setRedirecting(true);
+    const res = await fetch('/api/stripe/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const { url } = await res.json();
+    window.location.href = url;
+  };
+
+  const statusLabel: Record<string, { text: string; color: string; bg: string }> = {
+    active: { text: 'Aktiv', color: '#166534', bg: '#dcfce7' },
+    trialing: { text: 'Testperiod', color: '#92400e', bg: '#fef3c7' },
+    past_due: { text: 'Betalning förfallen', color: '#991b1b', bg: '#fee2e2' },
+    canceled: { text: 'Avslutad', color: '#4b5563', bg: '#f3f4f6' },
+  };
+
+  if (loadingData) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-6 h-6 border-2 border-blue-200 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!subscription) {
+    return (
+      <div className="bg-white rounded-2xl shadow-sm p-14 text-center" style={{ border: '1px solid #D6E8FF' }}>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: ACCENT_LIGHT }}>
+          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: ACCENT }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+          </svg>
+        </div>
+        <p className="font-semibold text-slate-700 mb-1">Ingen aktiv prenumeration</p>
+        <p className="text-sm text-slate-400 max-w-sm mx-auto mb-6">
+          Du har inte en aktiv prenumeration kopplad till detta konto.
+        </p>
+        <a
+          href="/#packages"
+          className="inline-block px-6 py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90"
+          style={{ backgroundColor: ACCENT }}
+        >
+          Se prenumerationsalternativ
+        </a>
+      </div>
+    );
+  }
+
+  const s = statusLabel[subscription.status] ?? { text: subscription.status, color: '#4b5563', bg: '#f3f4f6' };
+  const renewalDate = subscription.current_period_end
+    ? new Date(subscription.current_period_end).toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })
+    : null;
+
+  return (
+    <div className="max-w-xl">
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden" style={{ border: '1px solid #D6E8FF' }}>
+        <div className="px-6 py-4 border-b" style={{ backgroundColor: '#F4F9FF', borderBottomColor: '#D6E8FF' }}>
+          <h2 className="font-semibold text-slate-800">Din prenumeration</h2>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="flex justify-between items-center py-3 border-b" style={{ borderBottomColor: '#F1F5F9' }}>
+            <span className="text-sm text-slate-500">Status</span>
+            <span className="px-2.5 py-1 rounded-full text-xs font-semibold" style={{ color: s.color, backgroundColor: s.bg }}>
+              {s.text}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center py-3 border-b" style={{ borderBottomColor: '#F1F5F9' }}>
+            <span className="text-sm text-slate-500">Plan</span>
+            <span className="text-sm font-semibold text-slate-800">
+              Enkla Bokslut — {subscription.billing_period === 'yearly' ? '3 499 kr/år' : '299 kr/mån'}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center py-3 border-b" style={{ borderBottomColor: '#F1F5F9' }}>
+            <span className="text-sm text-slate-500">Fakturering</span>
+            <span className="text-sm text-slate-700">{subscription.billing_period === 'yearly' ? 'Årsvis' : 'Månadsvis'}</span>
+          </div>
+
+          {renewalDate && (
+            <div className="flex justify-between items-center py-3">
+              <span className="text-sm text-slate-500">
+                {subscription.status === 'canceled' ? 'Aktiv till' : 'Förnyas'}
+              </span>
+              <span className="text-sm text-slate-700">{renewalDate}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 pb-6">
+          <button
+            onClick={handleManage}
+            disabled={redirecting}
+            className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 disabled:opacity-60"
+            style={{ backgroundColor: ACCENT }}
+          >
+            {redirecting ? 'Öppnar portalen...' : 'Hantera prenumeration →'}
+          </button>
+          <p className="text-xs text-slate-400 text-center mt-2">
+            Ändra betalningsmetod, avsluta eller uppdatera din prenumeration
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
