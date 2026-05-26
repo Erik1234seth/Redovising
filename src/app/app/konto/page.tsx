@@ -39,9 +39,25 @@ export default function KontoPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [subscription, setSubscription] = useState<{ status: string; billing_period: string; current_period_end: string | null } | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login');
   }, [user, loading, router]);
+
+  useEffect(() => {
+    if (user?.email) {
+      fetch('/api/stripe/subscription-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email }),
+      })
+        .then(r => r.json())
+        .then(data => setSubscription(data.subscription ?? null))
+        .catch(() => {});
+    }
+  }, [user]);
 
   useEffect(() => {
     if (profile) {
@@ -98,6 +114,18 @@ export default function KontoPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleManageSubscription() {
+    if (!user?.email) return;
+    setPortalLoading(true);
+    const res = await fetch('/api/stripe/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: user.email }),
+    });
+    const { url } = await res.json();
+    window.location.href = url;
   }
 
   async function handleSignOut() {
@@ -318,6 +346,65 @@ export default function KontoPage() {
         >
           {saving ? 'Sparar...' : saved ? 'Sparat!' : 'Spara ändringar'}
         </button>
+
+        {/* Prenumeration */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <h2 className="font-bold text-slate-800 mb-1">Prenumeration</h2>
+          <p className="text-xs text-slate-400 mb-4">Hantera din betalning och ditt abonnemang</p>
+
+          {subscription ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                <span className="text-sm text-slate-500">Status</span>
+                <span
+                  className="px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                  style={{
+                    backgroundColor: subscription.status === 'active' ? '#dcfce7' : '#fee2e2',
+                    color: subscription.status === 'active' ? '#166534' : '#991b1b',
+                  }}
+                >
+                  {subscription.status === 'active' ? 'Aktiv' : subscription.status === 'canceled' ? 'Avslutad' : subscription.status}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                <span className="text-sm text-slate-500">Plan</span>
+                <span className="text-sm font-semibold text-slate-700">
+                  {subscription.billing_period === 'yearly' ? '3 499 kr/år' : '299 kr/mån'}
+                </span>
+              </div>
+              {subscription.current_period_end && (
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm text-slate-500">
+                    {subscription.status === 'canceled' ? 'Aktiv till' : 'Förnyas'}
+                  </span>
+                  <span className="text-sm text-slate-700">
+                    {new Date(subscription.current_period_end).toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleManageSubscription}
+                disabled={portalLoading}
+                className="w-full mt-2 py-2.5 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-60"
+                style={{ backgroundColor: CORAL }}
+              >
+                {portalLoading ? 'Öppnar portalen...' : 'Hantera prenumeration →'}
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-400">Ingen aktiv prenumeration</p>
+              <a
+                href="/#packages"
+                className="px-4 py-2 text-sm font-semibold rounded-xl text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: CORAL }}
+              >
+                Välj plan
+              </a>
+            </div>
+          )}
+        </div>
 
         {/* Logga ut */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 flex items-center justify-between">
