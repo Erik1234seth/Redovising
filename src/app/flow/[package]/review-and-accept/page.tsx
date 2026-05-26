@@ -24,7 +24,7 @@ export default function ReviewAndAcceptPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [invoiceAccepted, setInvoiceAccepted] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const packageInfo = packages.find((p) => p.id === packageType);
 
@@ -53,14 +53,14 @@ export default function ReviewAndAcceptPage() {
 
   // Protect route - require authentication
   useEffect(() => {
-    if (!loading && !user) {
+    if (!submitting && !user) {
       router.push(`/auth/login?redirect=/flow/${packageType}/review-and-accept?bank=${bank}`);
     }
   }, [user, loading, router, packageType, bank]);
 
   const handleContinue = async () => {
     if (!termsAccepted || !invoiceAccepted) return;
-    setLoading(true);
+    setSubmitting(true);
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
@@ -74,7 +74,7 @@ export default function ReviewAndAcceptPage() {
       const { url } = await res.json();
       window.location.href = url;
     } catch {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -228,14 +228,14 @@ export default function ReviewAndAcceptPage() {
         </button>
         <button
           onClick={handleContinue}
-          disabled={!termsAccepted || !invoiceAccepted || loading}
+          disabled={!termsAccepted || !invoiceAccepted || submitting}
           className={`px-8 py-3 rounded-xl font-bold transition-all duration-200 w-full sm:w-auto ${
-            termsAccepted && invoiceAccepted && !loading
+            termsAccepted && invoiceAccepted && !submitting
               ? 'bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105'
               : 'bg-navy-600 text-navy-400 cursor-not-allowed'
           }`}
         >
-          {loading ? 'Skickar till betalning...' : 'Godkänn och gå till betalning →'}
+          {submitting ? 'Skickar till betalning...' : 'Godkänn och gå till betalning →'}
         </button>
       </div>
     </FlowContainer>
