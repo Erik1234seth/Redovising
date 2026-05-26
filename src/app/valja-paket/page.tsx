@@ -11,9 +11,9 @@ export default function ValjaPaketPage() {
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
   const router = useRouter();
 
-  const handleGetStarted = (pkgId: string) => {
+  const handleGetStarted = () => {
     sessionStorage.setItem('billingPeriod', billing);
-    router.push(`/flow/${pkgId}/qualification`);
+    router.push('/bestall');
   };
 
   return (
@@ -109,7 +109,7 @@ export default function ValjaPaketPage() {
                 </ul>
 
                 <button
-                  onClick={() => handleGetStarted(pkg.id)}
+                  onClick={() => handleGetStarted()}
                   className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 hover:scale-[1.02] text-sm"
                   style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 24px ${CORAL}50` }}
                 >

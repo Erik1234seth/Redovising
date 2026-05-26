@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
     payment_method_types: ['card'],
     customer_email: email || undefined,
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/#packages`,
+    success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/success?email=${encodeURIComponent(email || '')}`,
+    cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/bestall/kontakt`,
     metadata: metadata || {},
     locale: 'sv',
   });

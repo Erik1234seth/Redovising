@@ -44,7 +44,7 @@ export default function Home() {
 
   const handleGetStarted = () => {
     sessionStorage.setItem('billingPeriod', billing);
-    router.push('/flow/komplett/qualification');
+    router.push('/bestall');
   };
 
   useEffect(() => {
