@@ -24,6 +24,7 @@ export default function ReviewAndAcceptPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [invoiceAccepted, setInvoiceAccepted] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
+  const [loading, setLoading] = useState(false);
 
   const packageInfo = packages.find((p) => p.id === packageType);
 
@@ -57,17 +58,23 @@ export default function ReviewAndAcceptPage() {
     }
   }, [user, loading, router, packageType, bank]);
 
-  const handleContinue = () => {
-    if (termsAccepted && invoiceAccepted) {
-      const queryParams = new URLSearchParams({
-        bank,
-        email,
-        name,
-        phone,
-        company,
-        orgNr,
+  const handleContinue = async () => {
+    if (!termsAccepted || !invoiceAccepted) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          billingPeriod,
+          email,
+          metadata: { name, phone, company, orgNr, bank },
+        }),
       });
-      router.push(`/flow/${packageType}/confirmation?${queryParams.toString()}`);
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch {
+      setLoading(false);
     }
   };
 
@@ -221,14 +228,14 @@ export default function ReviewAndAcceptPage() {
         </button>
         <button
           onClick={handleContinue}
-          disabled={!termsAccepted || !invoiceAccepted}
+          disabled={!termsAccepted || !invoiceAccepted || loading}
           className={`px-8 py-3 rounded-xl font-bold transition-all duration-200 w-full sm:w-auto ${
-            termsAccepted && invoiceAccepted
+            termsAccepted && invoiceAccepted && !loading
               ? 'bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:scale-105'
               : 'bg-navy-600 text-navy-400 cursor-not-allowed'
           }`}
         >
-          Godkänn och slutför beställning →
+          {loading ? 'Skickar till betalning...' : 'Godkänn och gå till betalning →'}
         </button>
       </div>
     </FlowContainer>
