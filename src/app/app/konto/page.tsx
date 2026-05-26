@@ -41,6 +41,7 @@ export default function KontoPage() {
 
   const [subscription, setSubscription] = useState<{ status: string; billing_period: string; current_period_end: string | null } | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState<'monthly' | 'yearly' | null>(null);
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login');
@@ -114,6 +115,18 @@ export default function KontoPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleStartCheckout(billingPeriod: 'monthly' | 'yearly') {
+    if (!user?.email) return;
+    setCheckoutLoading(billingPeriod);
+    const res = await fetch('/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ billingPeriod, email: user.email }),
+    });
+    const { url } = await res.json();
+    window.location.href = url;
   }
 
   async function handleManageSubscription() {
@@ -393,15 +406,37 @@ export default function KontoPage() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-400">Ingen aktiv prenumeration</p>
-              <a
-                href="/#packages"
-                className="px-4 py-2 text-sm font-semibold rounded-xl text-white transition-opacity hover:opacity-90"
-                style={{ backgroundColor: CORAL }}
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-slate-400 mb-1">Välj ett abonnemang för att komma igång.</p>
+              <button
+                type="button"
+                onClick={() => handleStartCheckout('monthly')}
+                disabled={checkoutLoading !== null}
+                className="flex items-center justify-between w-full px-4 py-3 rounded-xl border-2 border-slate-200 hover:border-slate-300 transition-all disabled:opacity-60"
               >
-                Välj plan
-              </a>
+                <div className="text-left">
+                  <p className="text-sm font-bold text-slate-700">Månadsvis</p>
+                  <p className="text-xs text-slate-400">Ingen bindningstid</p>
+                </div>
+                <span className="text-sm font-extrabold" style={{ color: CORAL }}>
+                  {checkoutLoading === 'monthly' ? '...' : '299 kr/mån'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStartCheckout('yearly')}
+                disabled={checkoutLoading !== null}
+                className="flex items-center justify-between w-full px-4 py-3 rounded-xl border-2 transition-all disabled:opacity-60"
+                style={{ borderColor: NAV_BG, backgroundColor: `${NAV_BG}08` }}
+              >
+                <div className="text-left">
+                  <p className="text-sm font-bold text-slate-700">Årsvis <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold rounded" style={{ backgroundColor: CORAL, color: 'white' }}>SPARA 89 KR</span></p>
+                  <p className="text-xs text-slate-400">Faktureras en gång per år</p>
+                </div>
+                <span className="text-sm font-extrabold" style={{ color: NAV_BG }}>
+                  {checkoutLoading === 'yearly' ? '...' : '3 499 kr/år'}
+                </span>
+              </button>
             </div>
           )}
         </div>
