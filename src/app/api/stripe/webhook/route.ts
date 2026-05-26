@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
-    const subscription = await stripe.subscriptions.retrieve(session.subscription as string) as unknown as Stripe.Subscription;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const subscription = await stripe.subscriptions.retrieve(session.subscription as string) as any;
     const price = subscription.items.data[0].price;
 
     await supabase.from('subscriptions').upsert(
@@ -34,7 +35,9 @@ export async function POST(req: NextRequest) {
         status: subscription.status,
         price_id: price.id,
         billing_period: price.recurring?.interval === 'year' ? 'yearly' : 'monthly',
-        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        current_period_end: subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : null,
         metadata: session.metadata,
       },
       { onConflict: 'stripe_subscription_id' }
@@ -42,12 +45,15 @@ export async function POST(req: NextRequest) {
   }
 
   if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
-    const subscription = event.data.object as Stripe.Subscription;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const subscription = event.data.object as any;
     await supabase
       .from('subscriptions')
       .update({
         status: subscription.status,
-        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        current_period_end: subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : null,
       })
       .eq('stripe_subscription_id', subscription.id);
   }
