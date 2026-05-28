@@ -30,6 +30,7 @@ export default function FakturorPage() {
 
   const [fakturor, setFakturor] = useState<Faktura[]>([]);
   const [fetching, setFetching] = useState(true);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login');
@@ -47,6 +48,13 @@ export default function FakturorPage() {
         setFetching(false);
       });
   }, [user]);
+
+  async function raderaFaktura(id: string) {
+    const supabase = createClient();
+    await supabase.from('fakturor').delete().eq('id', id);
+    setFakturor(prev => prev.filter(f => f.id !== id));
+    setDeleteConfirmId(null);
+  }
 
   async function uppdateraStatus(id: string, status: string) {
     const supabase = createClient();
@@ -106,7 +114,7 @@ export default function FakturorPage() {
             <>
               <div
                 className="grid px-6 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100"
-                style={{ gridTemplateColumns: '110px 1fr 170px 150px 120px 44px' }}
+                style={{ gridTemplateColumns: '110px 1fr 170px 150px 120px 80px' }}
               >
                 <span>Faktura nr</span>
                 <span>Kund</span>
@@ -124,7 +132,7 @@ export default function FakturorPage() {
                   <div
                     key={f.id}
                     className="grid px-6 py-4 items-center border-b border-slate-50 hover:bg-slate-50 transition-colors group"
-                    style={{ gridTemplateColumns: '110px 1fr 170px 150px 120px 44px' }}
+                    style={{ gridTemplateColumns: '110px 1fr 170px 150px 120px 80px' }}
                   >
                     <span className="text-sm font-semibold text-slate-700">{f.faktura_nr}</span>
                     <span className="text-sm text-slate-600 truncate">{f.kund_namn}</span>
@@ -159,7 +167,16 @@ export default function FakturorPage() {
                         </button>
                       )}
                     </div>
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => setDeleteConfirmId(f.id)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                        title="Radera faktura"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                       <Link
                         href={`/fakturor/${f.id}`}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 bg-slate-200 hover:text-slate-800 hover:bg-slate-300 transition-all"
@@ -177,6 +194,40 @@ export default function FakturorPage() {
           )}
         </div>
       </div>
+
+      {deleteConfirmId && (() => {
+        const f = fakturor.find(x => x.id === deleteConfirmId);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirmId(null)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mx-auto mb-4">
+                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-bold text-slate-800 text-center mb-1">Radera faktura?</h2>
+              <p className="text-sm text-slate-500 text-center mb-6">
+                Faktura <span className="font-semibold text-slate-700">{f?.faktura_nr}</span> till <span className="font-semibold text-slate-700">{f?.kund_namn}</span> raderas permanent och kan inte återställas.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="flex-1 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  Avbryt
+                </button>
+                <button
+                  onClick={() => raderaFaktura(deleteConfirmId)}
+                  className="flex-1 py-2.5 text-sm font-bold text-white bg-red-500 rounded-xl hover:bg-red-600 transition-colors"
+                >
+                  Radera
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

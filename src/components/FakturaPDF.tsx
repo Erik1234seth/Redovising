@@ -20,6 +20,8 @@ export interface FakturaPDFData {
   säljar_namn: string;
   säljar_foretag: string | null;
   säljar_org_nr: string | null;
+  säljar_telefon: string | null;
+  säljar_email: string | null;
   säljar_adress: string | null;
   säljar_postnummer: string | null;
   säljar_ort: string | null;
@@ -82,9 +84,9 @@ const s = StyleSheet.create({
   colBeskr: { flex: 3 },
   colAntal: { width: 36, textAlign: 'center' },
   colEnhet: { width: 28, textAlign: 'center' },
-  colApris: { width: 60, textAlign: 'right' },
+  colApris: { width: 76, textAlign: 'right' },
   colMoms: { width: 36, textAlign: 'center' },
-  colSumma: { width: 60, textAlign: 'right' },
+  colSumma: { width: 76, textAlign: 'right' },
 
   // Summering
   sumRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 },
@@ -103,8 +105,9 @@ const s = StyleSheet.create({
   footerText: { fontSize: 8.5, color: '#475569', lineHeight: 1.5 },
 
   // Sidfot
-  pageFooter: { position: 'absolute', bottom: 24, left: 44, right: 44, flexDirection: 'row', justifyContent: 'space-between' },
+  pageFooter: { position: 'absolute', bottom: 24, left: 44, right: 44, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   pageFooterText: { fontSize: 7, color: '#CBD5E1' },
+  pageFooterContact: { fontSize: 8.5, color: '#64748b' },
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -153,9 +156,6 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
           <View style={s.headerRight}>
             <Text style={s.fakturaNr}>FAKTURA</Text>
             <Text style={{ fontSize: 9, color: '#64748b', marginBottom: 6 }}>Nr {data.faktura_nr}</Text>
-            <View style={[s.badge, data.status === 'betald' ? { backgroundColor: '#DCFCE7', color: '#166534' } : {}]}>
-              <Text>{data.status === 'betald' ? 'BETALD' : 'OBETALD'}</Text>
-            </View>
           </View>
         </View>
 
@@ -165,12 +165,22 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
             <Text style={s.partLabel}>Från</Text>
             <Text style={s.partNamn}>{data.säljar_foretag ?? data.säljar_namn}</Text>
             {data.säljar_foretag && <Text style={s.partRad}>{data.säljar_namn}</Text>}
-            {data.säljar_org_nr && <Text style={s.partRad}>Org-nr: {data.säljar_org_nr}</Text>}
-            {data.säljar_adress && <Text style={s.partRad}>{data.säljar_adress}</Text>}
-            {(data.säljar_postnummer || data.säljar_ort) && (
-              <Text style={s.partRad}>{[data.säljar_postnummer, data.säljar_ort].filter(Boolean).join(' ')}</Text>
+
+            {(data.säljar_adress || data.säljar_postnummer || data.säljar_ort) && (
+              <View style={{ marginTop: 5, marginBottom: 5 }}>
+                {data.säljar_adress && <Text style={s.partRad}>{data.säljar_adress}</Text>}
+                {(data.säljar_postnummer || data.säljar_ort) && (
+                  <Text style={s.partRad}>{[data.säljar_postnummer, data.säljar_ort].filter(Boolean).join(' ')}</Text>
+                )}
+              </View>
             )}
-            {data.säljar_momsnr && <Text style={s.partRad}>Moms-nr: {data.säljar_momsnr}</Text>}
+
+            <View style={{ borderTopWidth: 0.5, borderTopColor: '#CBD5E1', paddingTop: 5 }}>
+              {data.säljar_org_nr && <Text style={s.partRad}>Org-nr: {data.säljar_org_nr}</Text>}
+              {data.säljar_momsnr && <Text style={s.partRad}>Moms-nr: {data.säljar_momsnr}</Text>}
+              {data.säljar_email && <Text style={s.partRad}>{data.säljar_email}</Text>}
+              {data.säljar_telefon && <Text style={s.partRad}>{data.säljar_telefon}</Text>}
+            </View>
           </View>
           <View style={s.partBox}>
             <Text style={s.partLabel}>Till</Text>
@@ -241,16 +251,11 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
         {/* Summering */}
         <View style={s.sumRow}>
           <View style={s.sumBox}>
+            <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>Summering</Text>
             {momsByRate.map(m => (
-              <View key={m.sats}>
-                <View style={s.sumLine}>
-                  <Text style={s.sumLabel}>Beskattningsunderlag {m.sats}%</Text>
-                  <Text style={s.sumVal}>{fmt(m.netto)}</Text>
-                </View>
-                <View style={s.sumLine}>
-                  <Text style={s.sumLabel}>Moms {m.sats}%</Text>
-                  <Text style={s.sumVal}>{fmt(m.belopp)}</Text>
-                </View>
+              <View key={m.sats} style={s.sumLine}>
+                <Text style={s.sumLabel}>Moms</Text>
+                <Text style={s.sumVal}>{fmt(m.belopp)}</Text>
               </View>
             ))}
             <View style={[s.sumLine, { borderTopWidth: 1, borderTopColor: '#E2E8F0', marginTop: 3, paddingTop: 5 }]}>
@@ -283,7 +288,10 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
 
         {/* Sidfot */}
         <View style={s.pageFooter} fixed>
-          <Text style={s.pageFooterText}>Enkla Bokslut · enklabokslut.se</Text>
+          {data.säljar_email
+            ? <Text style={s.pageFooterContact}>Frågor om fakturan? Maila till {data.säljar_email}</Text>
+            : <Text style={s.pageFooterText}>Enkla Bokslut · enklabokslut.se</Text>
+          }
           <Text style={s.pageFooterText} render={({ pageNumber, totalPages }) => `Sida ${pageNumber} av ${totalPages}`} />
         </View>
 

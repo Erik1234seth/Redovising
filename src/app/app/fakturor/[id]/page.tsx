@@ -115,6 +115,8 @@ export default function FakturaVyPage() {
         säljar_namn: profile?.full_name ?? '',
         säljar_foretag: profile?.company_name ?? null,
         säljar_org_nr: profile?.org_nr ?? null,
+        säljar_telefon: profile?.phone ?? null,
+        säljar_email: profile?.email ?? null,
         säljar_adress: profile?.adress ?? null,
         säljar_postnummer: profile?.postnummer ?? null,
         säljar_ort: profile?.ort ?? null,
@@ -276,7 +278,7 @@ function FakturaInnehall({
   momsByRate: { sats: number; netto: number; belopp: number }[];
   totalInkl: number;
   betalningsDagar: number;
-  profile: { full_name: string | null; company_name: string | null; org_nr: string | null; adress: string | null; postnummer: string | null; ort: string | null; momsnr: string | null } | null;
+  profile: { full_name: string | null; company_name: string | null; org_nr: string | null; phone: string | null; email: string; adress: string | null; postnummer: string | null; ort: string | null; momsnr: string | null } | null;
 }) {
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', color: '#1e293b' }}>
@@ -291,16 +293,26 @@ function FakturaInnehall({
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 32 }}>
         <div style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 16 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Från</div>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{profile?.company_name ?? profile?.full_name ?? ''}</div>
-          {profile?.company_name && <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>{profile.full_name}</div>}
-          {profile?.org_nr && <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>Org-nr: {profile.org_nr}</div>}
-          {profile?.adress && <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>{profile.adress}</div>}
-          {(profile?.postnummer || profile?.ort) && (
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>
-              {[profile.postnummer, profile.ort].filter(Boolean).join(' ')}
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{profile?.company_name ?? profile?.full_name ?? ''}</div>
+          {profile?.company_name && <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>{profile.full_name}</div>}
+
+          {(profile?.adress || profile?.postnummer || profile?.ort) && (
+            <div style={{ marginBottom: 8 }}>
+              {profile?.adress && <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>{profile.adress}</div>}
+              {(profile?.postnummer || profile?.ort) && (
+                <div style={{ fontSize: 12, color: '#64748b' }}>
+                  {[profile.postnummer, profile.ort].filter(Boolean).join(' ')}
+                </div>
+              )}
             </div>
           )}
-          {profile?.momsnr && <div style={{ fontSize: 12, color: '#64748b' }}>Moms-nr: {profile.momsnr}</div>}
+
+          <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: 8 }}>
+            {profile?.org_nr && <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>Org-nr: {profile.org_nr}</div>}
+            {profile?.momsnr && <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>Moms-nr: {profile.momsnr}</div>}
+            {profile?.email && <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>{profile.email}</div>}
+            {profile?.phone && <div style={{ fontSize: 12, color: '#64748b' }}>{profile.phone}</div>}
+          </div>
         </div>
         <div style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 16 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Till</div>
@@ -349,9 +361,9 @@ function FakturaInnehall({
               <td style={{ padding: '8px 10px', fontSize: 12 }}>{r.beskrivning}</td>
               <td style={{ padding: '8px 10px', fontSize: 12, textAlign: 'right' }}>{r.antal}</td>
               <td style={{ padding: '8px 10px', fontSize: 12, textAlign: 'right' }}>{r.enhet}</td>
-              <td style={{ padding: '8px 10px', fontSize: 12, textAlign: 'right' }}>{fmt(r.apris)}</td>
-              <td style={{ padding: '8px 10px', fontSize: 12, textAlign: 'right' }}>{r.momssats}%</td>
-              <td style={{ padding: '8px 10px', fontSize: 12, fontWeight: 700, textAlign: 'right' }}>{fmt(r.antal * r.apris)}</td>
+              <td style={{ padding: '8px 10px', fontSize: 12, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmt(r.apris)}</td>
+              <td style={{ padding: '8px 10px', fontSize: 12, textAlign: 'right', whiteSpace: 'nowrap' }}>{r.momssats}%</td>
+              <td style={{ padding: '8px 10px', fontSize: 12, fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmt(r.antal * r.apris)}</td>
             </tr>
           ))}
         </tbody>
@@ -360,14 +372,10 @@ function FakturaInnehall({
       {/* Summering */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 32 }}>
         <div style={{ width: 280 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Summering</div>
           {momsByRate.map(m => (
-            <div key={m.sats}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12, color: '#64748b' }}>
-                <span>Beskattningsunderlag {m.sats}%</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{fmt(m.netto)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12, color: '#64748b' }}>
-                <span>Moms {m.sats}%</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{fmt(m.belopp)}</span>
-              </div>
+            <div key={m.sats} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12, color: '#64748b' }}>
+              <span>Moms</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{fmt(m.belopp)}</span>
             </div>
           ))}
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 12, color: '#64748b', borderTop: '1px solid #E2E8F0', marginTop: 4, paddingTop: 6 }}>
@@ -386,7 +394,16 @@ function FakturaInnehall({
           {faktura.betalningsinfo && (
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>Betalningsinfo</div>
-              <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{faktura.betalningsinfo}</div>
+              {(() => {
+                const m = faktura.betalningsinfo?.match(/^([^:\n]+):\s*([\s\S]*)$/);
+                return m ? (
+                  <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.6 }}>
+                    <span style={{ fontWeight: 700, color: '#1e293b' }}>{m[1]}:</span>{' '}{m[2]}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{faktura.betalningsinfo}</div>
+                );
+              })()}
             </div>
           )}
           {faktura.meddelande && (
@@ -399,8 +416,12 @@ function FakturaInnehall({
       )}
 
       {/* Sidfot */}
-      <div style={{ marginTop: 48, paddingTop: 16, borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'flex-end', fontSize: 10, color: '#CBD5E1' }}>
-        <span>Faktura {faktura.faktura_nr}</span>
+      <div style={{ marginTop: 48, paddingTop: 16, borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {profile?.email
+          ? <span style={{ fontSize: 12, color: '#64748b' }}>Frågor om fakturan? Maila till {profile.email}</span>
+          : <span />
+        }
+        <span style={{ fontSize: 10, color: '#CBD5E1' }}>Faktura {faktura.faktura_nr}</span>
       </div>
     </div>
   );

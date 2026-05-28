@@ -97,7 +97,11 @@ export default function NyFakturaPage() {
   const [forfalloDatum, setForfalloDatum] = useState(datePlus(30));
 
   const [rader, setRader] = useState<Rad[]>([nyRad()]);
+  const [betalsatt, setBetalsatt] = useState<'bankgiro' | 'kontonummer' | 'swish' | 'anpassat'>('bankgiro');
   const [bankgiro, setBankgiro] = useState('');
+  const [kontonummer, setKontonummer] = useState('');
+  const [swish, setSwish] = useState('');
+  const [anpassatBetal, setAnpassatBetal] = useState('');
   const [meddelande, setMeddelande] = useState('');
 
   const [saving, setSaving] = useState(false);
@@ -276,12 +280,17 @@ export default function NyFakturaPage() {
         belopp_exkl_moms: totalExkl,
         moms_belopp: totalInkl - totalExkl,
         belopp_inkl_moms: totalInkl,
-        betalningsinfo: bankgiro ? `Bankgiro: ${bankgiro}` : null,
+        betalningsinfo:
+          betalsatt === 'bankgiro' && bankgiro ? `Bankgiro: ${bankgiro}` :
+          betalsatt === 'kontonummer' && kontonummer ? `Kontonummer: ${kontonummer}` :
+          betalsatt === 'swish' && swish ? `Swish: ${swish}` :
+          betalsatt === 'anpassat' && anpassatBetal ? anpassatBetal :
+          null,
         meddelande: meddelande || null,
         status: 'obetald',
       }).select('id').single();
       if (dbErr) throw dbErr;
-      if (bankgiro) {
+      if (betalsatt === 'bankgiro' && bankgiro) {
         await supabase.from('profiles').update({ bankgiro }).eq('id', user.id);
       }
       router.push(`/fakturor/${inserted.id}`);
@@ -464,7 +473,7 @@ export default function NyFakturaPage() {
                       <div className="grid gap-2 items-center" style={{ gridTemplateColumns: '1fr 60px 90px 80px 28px' }}>
 
                         {/* Produkt — read-only med dropdown-knapp */}
-                        <div className="relative">
+                        <div className="relative min-w-0">
                           <button
                             type="button"
                             onClick={() => setProduktDropdownRadId(produktDropdownRadId === rad.id ? null : rad.id)}
@@ -581,21 +590,74 @@ export default function NyFakturaPage() {
           </div>
         </Section>
 
-        {/* ── Bankgiro ── */}
+        {/* ── Betalningsinfo ── */}
         <Section title="Betalningsinfo">
-          <label className={labelCls}>Bankgiro</label>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-slate-500 whitespace-nowrap">Bankgiro:</span>
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            {([
+              { key: 'bankgiro', label: 'Bankgiro' },
+              { key: 'kontonummer', label: 'Kontonummer' },
+              { key: 'swish', label: 'Swish' },
+              { key: 'anpassat', label: 'Anpassat' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setBetalsatt(key)}
+                className="py-2 px-3 rounded-xl border-2 text-sm font-semibold transition-all"
+                style={{
+                  borderColor: betalsatt === key ? NAV_BG : '#e2e8f0',
+                  backgroundColor: betalsatt === key ? NAV_BG : 'transparent',
+                  color: betalsatt === key ? 'white' : '#475569',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {betalsatt === 'bankgiro' && (
+            <>
+              <input
+                type="text"
+                value={bankgiro}
+                onChange={e => setBankgiro(e.target.value)}
+                placeholder="123-4567"
+                className={inputCls}
+                style={ringStyle}
+              />
+              <p className="text-xs text-slate-400 mt-2">Sparas automatiskt och fylls i på nästa faktura</p>
+            </>
+          )}
+          {betalsatt === 'kontonummer' && (
             <input
               type="text"
-              value={bankgiro}
-              onChange={e => setBankgiro(e.target.value)}
-              placeholder="123-4567"
+              value={kontonummer}
+              onChange={e => setKontonummer(e.target.value)}
+              placeholder="1234-12345"
               className={inputCls}
               style={ringStyle}
             />
-          </div>
-          <p className="text-xs text-slate-400 mt-2">Sparas automatiskt och fylls i på nästa faktura</p>
+          )}
+          {betalsatt === 'swish' && (
+            <input
+              type="text"
+              value={swish}
+              onChange={e => setSwish(e.target.value)}
+              placeholder="070-000 00 00"
+              className={inputCls}
+              style={ringStyle}
+            />
+          )}
+          {betalsatt === 'anpassat' && (
+            <textarea
+              rows={3}
+              value={anpassatBetal}
+              onChange={e => setAnpassatBetal(e.target.value)}
+              placeholder="Skriv din betalningsinfo här..."
+              className="w-full px-3 py-2.5 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 resize-none transition"
+              style={ringStyle}
+            />
+          )}
         </Section>
 
         {/* ── Meddelande ── */}

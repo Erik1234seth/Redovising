@@ -28,6 +28,7 @@ export default function KontoPage() {
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [orgNr, setOrgNr] = useState('');
+  const [phone, setPhone] = useState('');
   const [adress, setAdress] = useState('');
   const [postnummer, setPostnummer] = useState('');
   const [ort, setOrt] = useState('');
@@ -35,6 +36,7 @@ export default function KontoPage() {
   const [verksamhet, setVerksamhet] = useState('');
   const [momsPeriod, setMomsPeriod] = useState<'månadsvis' | 'kvartalsvis' | 'helår' | null>(null);
   const [startAr, setStartAr] = useState<number | null>(null);
+  const [formInitialized, setFormInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,10 +63,11 @@ export default function KontoPage() {
   }, [user]);
 
   useEffect(() => {
-    if (profile) {
+    if (profile && !formInitialized) {
       setFullName(profile.full_name ?? '');
       setCompanyName(profile.company_name ?? '');
       setOrgNr(profile.org_nr ?? '');
+      setPhone(profile.phone ?? '');
       setAdress(profile.adress ?? '');
       setPostnummer(profile.postnummer ?? '');
       setOrt(profile.ort ?? '');
@@ -72,8 +75,22 @@ export default function KontoPage() {
       setVerksamhet(profile.verksamhet ?? '');
       setMomsPeriod(profile.moms_period ?? null);
       setStartAr(profile.start_ar ?? null);
+      setFormInitialized(true);
     }
-  }, [profile]);
+  }, [profile, formInitialized]);
+
+  useEffect(() => {
+    if (!formInitialized) return;
+    const digits = orgNr.replace(/\D/g, '');
+    if (digits.length > 0) {
+      const generated = `SE${digits}01`;
+      setMomsnr(prev => {
+        const prevDigits = (profile?.org_nr ?? '').replace(/\D/g, '');
+        const prevGenerated = prevDigits ? `SE${prevDigits}01` : '';
+        return prev === '' || prev === prevGenerated ? generated : prev;
+      });
+    }
+  }, [orgNr]);
 
   if (loading || !user) {
     return (
@@ -96,6 +113,7 @@ export default function KontoPage() {
           full_name: fullName || null,
           company_name: companyName || null,
           org_nr: orgNr || null,
+          phone: phone || null,
           adress: adress || null,
           postnummer: postnummer || null,
           ort: ort || null,
@@ -194,6 +212,18 @@ export default function KontoPage() {
                 value={user.email ?? ''}
                 disabled
                 className="w-full px-4 py-2.5 text-sm text-slate-400 bg-slate-100 border border-slate-200 rounded-xl cursor-not-allowed"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Telefon</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="070-000 00 00"
+                className="w-full px-4 py-2.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:bg-white transition"
+                style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
               />
             </div>
 
