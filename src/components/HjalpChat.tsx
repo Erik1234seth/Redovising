@@ -69,10 +69,6 @@ export default function HjalpChat() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Öppna automatiskt på startsidan om det finns plats: sidebar 240 + main 600 + chat 410 = 1250, med marginal → 1440
-  useEffect(() => {
-    if (isHome && window.innerWidth >= 1440) setOpen(true);
-  }, [isHome]);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
