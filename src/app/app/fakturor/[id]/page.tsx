@@ -142,7 +142,7 @@ export default function FakturaVyPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Faktura-${faktura!.faktura_nr}.pdf`;
+    a.download = `Faktura-${faktura!.faktura_nr}-${faktura!.kund_namn}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
   }

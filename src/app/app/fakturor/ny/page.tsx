@@ -313,7 +313,7 @@ export default function NyFakturaPage() {
 
       {/* Header */}
       <div className="px-8 pt-10 pb-4 flex items-center gap-4">
-        <button onClick={() => router.push('/fakturor')} className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors">
+        <button onClick={() => router.push('/fakturor')} className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
