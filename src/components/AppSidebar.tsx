@@ -113,15 +113,21 @@ export default function AppSidebar() {
         </Link>
 
         {/* Hjälp */}
-        <Link
-          href="/hjalp"
-          className={`${navItemBase} ${isActive('/hjalp') ? navItemActive : navItemInactive}`}
-        >
-          <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Hjälp
-        </Link>
+        <div className="px-2 pt-3">
+          <Link
+            href="/hjalp"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 hover:scale-[1.02]"
+            style={{ backgroundColor: CORAL, boxShadow: '0 2px 10px rgba(233,92,99,0.35)' }}
+          >
+            <svg className="w-[18px] h-[18px] flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/>
+            </svg>
+            <div>
+              <div>Behöver du hjälp?</div>
+              <div className="text-white/70 text-xs font-normal">Fråga vår AI-assistent</div>
+            </div>
+          </Link>
+        </div>
       </nav>
 
       {/* Användare */}
