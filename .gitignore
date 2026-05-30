@@ -45,5 +45,6 @@ next-env.d.ts
 kontoutdrag/
 .mcp.json
 .claude/mcp.json
+.claude/settings.local.json
 public/image.png
 "public/Skärmbild 2026-03-04 084615.png"
