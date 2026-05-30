@@ -49,7 +49,8 @@
       "Bash(Get-ChildItem \"C:\\\\Users\\\\erijo\\\\Redovising\\\\src\\\\app\\\\app\\\\rapporter\" -Recurse)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\gamla\\\\Redovising\" -Filter \"*.env*\" -Force)",
       "Bash(Select-Object Name, Length)",
-      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\gamla\\\\Redovising\" -Filter \".env*\" -Force)"
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\gamla\\\\Redovising\" -Filter \".env*\" -Force)",
+      "Bash(git config *)"
     ]
   },
   "enableAllProjectMcpServers": true,
