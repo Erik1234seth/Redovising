@@ -49,8 +49,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('[Auth] useEffect starting, getting initial session...');
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       console.log('[Auth] getSession result - session:', session?.user?.id);
+      // If "Kom ihåg mig" was unchecked and this is a new browser session, sign out
+      if (
+        session?.user &&
+        localStorage.getItem('rememberMe') === 'false' &&
+        !sessionStorage.getItem('sessionActive')
+      ) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setLoading(false);
+        return;
+      }
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
