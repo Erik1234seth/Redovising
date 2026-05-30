@@ -288,7 +288,7 @@ export default function KundBetalatPage() {
 
   // ── Receipt betalningssätt ──────────────────────────────────────────────────
 
-  if (receiptFilled && !loading) {
+  if (receiptFilled && !loading && !done) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
         <div className="flex-1 px-6 py-12 max-w-xl mx-auto w-full flex flex-col justify-center">
@@ -299,7 +299,7 @@ export default function KundBetalatPage() {
             Kvitto läst
           </div>
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-2">Hur fick du betalt?</h1>
-          <p className="text-slate-400 text-sm mb-6 leading-relaxed">AI:n läste av kvittot. Bekräfta hur du tog emot betalningen.</p>
+          <p className="text-slate-400 text-sm mb-6 leading-relaxed">Bekräfta hur du tog emot betalningen.</p>
           <div className="flex flex-col gap-3 mb-6">
             {['Till företagskonto', 'Till privatkonto', 'Kontant'].map(option => (
               <RadioCard key={option} label={option} selected={form.betalningssatt === option} onClick={() => setForm(f => ({ ...f, betalningssatt: option }))} />
