@@ -344,7 +344,20 @@ export default function NyFakturaPage() {
           ) : (
             <>
               <div className="mb-4">
-                <label className={labelCls}>Välj kund</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className={labelCls} style={{ marginBottom: 0 }}>Välj kund</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowNyKundModal(true)}
+                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg text-white hover:opacity-90 transition-opacity"
+                    style={{ backgroundColor: NAV_BG }}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Lägg till kund
+                  </button>
+                </div>
                 <select
                   value={valdKundId}
                   onChange={e => veljaKund(e.target.value)}
@@ -355,7 +368,6 @@ export default function NyFakturaPage() {
                   {sparadeKunder.map(k => (
                     <option key={k.id} value={k.id}>{k.namn}</option>
                   ))}
-                  <option value="_add">+ Lägg till kund</option>
                 </select>
               </div>
 

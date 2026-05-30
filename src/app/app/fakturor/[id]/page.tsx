@@ -65,7 +65,7 @@ export default function FakturaVyPage() {
     async function fetch() {
       const supabase = createClient();
       const { data } = await supabase.from('fakturor').select('*').eq('id', id).single();
-      if (data) setFaktura(data);
+      if (data) { setFaktura(data); setSendEmail(data.kund_email ?? ''); }
       setFetching(false);
     }
     fetch();
@@ -164,10 +164,34 @@ export default function FakturaVyPage() {
           pdfBase64: base64,
           fakturaName: `Faktura-${faktura!.faktura_nr}`,
           fakturaId: faktura!.id,
-          kundNamn: faktura!.kund_namn,
-          säljarNamn: profile?.company_name ?? profile?.full_name ?? '',
-          belopp: totalInkl.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kr',
-          forfalloDatum: new Date(faktura!.forfallo_datum).toLocaleDateString('sv-SE'),
+          fakturaInfo: {
+            faktura_nr: faktura!.faktura_nr,
+            faktura_datum: new Date(faktura!.faktura_datum).toLocaleDateString('sv-SE'),
+            forfallo_datum: new Date(faktura!.forfallo_datum).toLocaleDateString('sv-SE'),
+            betalningsdagar: betalningsDagar,
+          },
+          säljarInfo: {
+            company_name: profile?.company_name ?? '',
+            full_name: profile?.full_name ?? '',
+            adress: profile?.adress ?? '',
+            postnummer: profile?.postnummer ?? '',
+            ort: profile?.ort ?? '',
+            org_nr: profile?.org_nr ?? '',
+            momsnr: profile?.momsnr ?? '',
+            email: profile?.email ?? '',
+          },
+          kundInfo: {
+            namn: faktura!.kund_namn,
+            org_nr: faktura!.kund_org_nr ?? '',
+            adress: faktura!.kund_adress ?? '',
+            postnummer: faktura!.kund_postnummer ?? '',
+            ort: faktura!.kund_ort ?? '',
+            email: faktura!.kund_email ?? '',
+          },
+          rader: faktura!.rader,
+          momsByRate: momsByRate,
+          totalExkl,
+          totalInkl,
           betalningsinfo: faktura!.betalningsinfo,
         }),
       });
@@ -218,8 +242,8 @@ export default function FakturaVyPage() {
                 type="email"
                 value={sendEmail}
                 onChange={e => { setSendEmail(e.target.value); setSendStatus('idle'); setSendError(null); }}
-                placeholder={faktura.kund_email ?? 'mottagare@exempel.se'}
-                className="flex-1 px-3 py-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 transition-shadow"
+                placeholder="mottagare@exempel.se"
+                className="flex-1 px-3 py-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 transition-shadow cursor-text"
                 style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
               />
               <button
