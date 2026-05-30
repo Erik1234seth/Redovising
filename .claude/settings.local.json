@@ -46,7 +46,10 @@
       "Bash(Format-Table FullName)",
       "Bash(dir \"C:\\\\Users\\\\erijo\\\\Redovising\\\\src\\\\app\\\\app\" -Recurse -Directory)",
       "Bash(Select-Object FullName)",
-      "Bash(Get-ChildItem \"C:\\\\Users\\\\erijo\\\\Redovising\\\\src\\\\app\\\\app\\\\rapporter\" -Recurse)"
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\erijo\\\\Redovising\\\\src\\\\app\\\\app\\\\rapporter\" -Recurse)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\gamla\\\\Redovising\" -Filter \"*.env*\" -Force)",
+      "Bash(Select-Object Name, Length)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\gamla\\\\Redovising\" -Filter \".env*\" -Force)"
     ]
   },
   "enableAllProjectMcpServers": true,

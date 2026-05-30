@@ -8,7 +8,6 @@ import { useAuth } from '@/contexts/AuthContext';
 function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, refreshProfile } = useAuth();
@@ -32,9 +31,8 @@ function LoginForm() {
         setError('Fel e-postadress eller lösenord');
         setLoading(false);
       } else {
-        localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
-        sessionStorage.setItem('sessionActive', 'true');
         console.log('[Login] Login successful, waiting 500ms...');
+        // Wait a moment for auth state to update, then refresh profile and redirect
         await new Promise(resolve => setTimeout(resolve, 500));
         console.log('[Login] Calling refreshProfile...');
         await refreshProfile();
@@ -86,19 +84,6 @@ function LoginForm() {
             className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-[#E95C63] focus:border-[#E95C63] outline-none transition placeholder-warm-500"
             placeholder="••••••••"
           />
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <input
-            id="rememberMe"
-            type="checkbox"
-            checked={rememberMe}
-            onChange={(e) => setRememberMe(e.target.checked)}
-            className="w-4 h-4 rounded border-navy-600 bg-navy-800 text-[#E95C63] accent-[#E95C63] cursor-pointer"
-          />
-          <label htmlFor="rememberMe" className="text-sm text-warm-300 cursor-pointer select-none">
-            Kom ihåg mig
-          </label>
         </div>
 
         <button
