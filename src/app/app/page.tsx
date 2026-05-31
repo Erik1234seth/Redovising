@@ -146,7 +146,7 @@ export default function HomePage() {
             </div>
             <div className="min-w-0 flex-1 lg:flex-none">
               <p className="font-bold text-slate-800 text-[15px] lg:text-[17px] leading-snug lg:mt-4">{action.title}</p>
-              <p className="text-xs lg:text-sm text-slate-400 mt-0.5 leading-snug line-clamp-2">{action.description}</p>
+              <p className="text-xs lg:text-sm text-slate-600 mt-0.5 leading-snug line-clamp-2">{action.description}</p>
             </div>
             <svg
               className="w-4 h-4 text-slate-300 flex-shrink-0 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-150 lg:hidden"
