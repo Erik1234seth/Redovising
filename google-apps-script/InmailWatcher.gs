@@ -1,6 +1,6 @@
 // ─── Konfiguration ────────────────────────────────────────────────────────────
 // Logga in på script.google.com med ekonomi@enklabokslut.se
-// Sätt dessa i: Projekt → Inställningar → Skriptegenskaper
+// Sätt dessa i: Project Settings → Script Properties:
 // NEXT_URL  = https://app.enklabokslut.se
 // INMAIL_SECRET = (samma hemliga nyckel som i .env)
 
@@ -12,7 +12,7 @@ function getConfig() {
   };
 }
 
-// ─── Huvud-trigger: körs var 5:e minut ────────────────────────────────────────
+// ─── Huvud-trigger ────────────────────────────────────────────────────────────
 
 function checkInbox() {
   const config = getConfig();
@@ -34,13 +34,12 @@ function checkInbox() {
       continue;
     }
 
-    // Är det ett svar på en tidigare tråd?
     const isReply = messages.length > 1;
 
     if (isReply) {
-      handleReply(config, thread, lastMsg, senderEmail, threadId, messageId);
+      handleReply(config, thread, senderEmail, threadId, messageId);
     } else {
-      handleNewMail(config, lastMsg, senderEmail, threadId, messageId, attachments);
+      handleNewMail(config, thread, senderEmail, threadId, messageId, attachments);
     }
 
     lastMsg.markRead();
@@ -49,7 +48,14 @@ function checkInbox() {
 
 // ─── Nytt mail med bilaga ──────────────────────────────────────────────────────
 
-function handleNewMail(config, thread, lastMsg, senderEmail, threadId, messageId, attachments) {
+function handleNewMail(config, thread, senderEmail, threadId, messageId, attachments) {
+  // Skicka omedelbar bekräftelse
+  thread.reply(
+    'Hej!\n\n' +
+    'Vi har tagit emot ditt mail och återkommer så snabbt vi kan.\n\n' +
+    'Mvh,\nEnkla Bokslut'
+  );
+
   const payload = {
     senderEmail: senderEmail,
     gmailThreadId: threadId,
@@ -58,14 +64,12 @@ function handleNewMail(config, thread, lastMsg, senderEmail, threadId, messageId
   };
 
   const response = callApi(config, '/api/inmail', payload);
+  console.log('handleNewMail response:', JSON.stringify(response));
 
   if (!response) return;
 
   if (response.action === 'no_user') {
-    // Ingen användare — skicka felmail
-    GmailApp.sendEmail(
-      senderEmail,
-      'Vi kunde inte hitta ditt konto — Enkla Bokslut',
+    thread.reply(
       'Hej!\n\nVi kunde inte hitta något konto kopplat till den här e-postadressen.\n\n' +
       'Kontrollera att du mailar från samma adress som du registrerade dig med på Enkla Bokslut, ' +
       'eller skapa ett konto på app.enklabokslut.se\n\n// Enkla Bokslut'
@@ -74,18 +78,16 @@ function handleNewMail(config, thread, lastMsg, senderEmail, threadId, messageId
   }
 
   if (response.action === 'ok' && response.replyBody) {
-    // Svara i samma tråd
     thread.reply(response.replyBody);
   }
 }
 
 // ─── Svar i befintlig tråd ────────────────────────────────────────────────────
 
-function handleReply(config, thread, lastMsg, senderEmail, threadId, messageId) {
-  // Bygg mailhistorik som kontext till AI
+function handleReply(config, thread, senderEmail, threadId, messageId) {
   const messages = thread.getMessages();
   const history = messages.map(function(m) {
-    return 'Från: ' + m.getFrom() + '\nDatum: ' + m.getDate() + '\n\n' + m.getPlainBody();
+    return 'From: ' + m.getFrom() + '\nDate: ' + m.getDate() + '\n\n' + m.getPlainBody();
   }).join('\n\n---\n\n');
 
   const payload = {
@@ -96,6 +98,7 @@ function handleReply(config, thread, lastMsg, senderEmail, threadId, messageId) 
   };
 
   const response = callApi(config, '/api/inmail/reply', payload);
+  console.log('handleReply response:', JSON.stringify(response));
 
   if (response && response.action === 'ok' && response.replyBody) {
     thread.reply(response.replyBody);
@@ -115,14 +118,13 @@ function callApi(config, path, payload) {
     });
 
     const code = res.getResponseCode();
-    if (code !== 200) {
-      console.error('API-fel ' + code + ': ' + res.getContentText());
-      return null;
-    }
+    const text = res.getContentText();
+    console.log('callApi ' + path + ' → ' + code + ': ' + text);
 
-    return JSON.parse(res.getContentText());
+    if (code !== 200) return null;
+    return JSON.parse(text);
   } catch (e) {
-    console.error('Nätverksfel:', e.message);
+    console.error('callApi error:', e.message);
     return null;
   }
 }
