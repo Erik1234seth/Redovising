@@ -43,7 +43,7 @@ const landingFaqItems = [
   { q: 'Passar det om jag har anställda eller driver aktiebolag?', a: 'Nej, inte i dagsläget. Tjänsten är anpassad för enskilda firmor utan anställda. Driver du aktiebolag eller har personal finns det tyvärr bättre alternativ för dig.' },
   { q: 'Måste jag kunna bokföring sedan tidigare?', a: 'Nej, det är hela poängen. Du väljer vad som har hänt (köp, betalning, utgift) och resten sköts automatiskt. Rätt konton, rätt moms — du behöver inte förstå hur det fungerar i bakgrunden.' },
   { q: 'Vad händer vid årets slut?', a: 'Din NE-bilaga fylls i automatiskt under hela året baserat på vad du bokfört. När det är dags att deklarera laddar du ner den som PDF och bifogar den på Skatteverkets hemsida. Klart.' },
-  { q: 'Kan jag avsluta när jag vill?', a: 'Ja, du binder dig inte. Du kan avsluta din prenumeration när som helst, direkt i appen — inga dolda bindningstider.' },
+  { q: 'Kan jag avsluta när jag vill?', a: 'Ja, du binder dig inte. Du kan avsluta din prenumeration när som helst — inga dolda bindningstider.' },
   { q: 'Vad kostar det efter de 14 gratis dagarna?', a: 'Från 299 kr per månad, allt ingår. Inga tillval, inga extra kostnader för fakturor, bokföring eller rapporter.' },
 ];
 
@@ -361,7 +361,7 @@ export default function Home() {
               Allt ingår – från kontering<br />till färdiga bokslut
             </h2>
             <p className="text-slate-500 text-base max-w-xl mx-auto leading-relaxed">
-              Du sköter din löpande bokföring i appen och vi ser till att allt stämmer. Vid årets slut är NE-bilaga, momsredovisning och bokslut redan klara.
+              Du sköter din löpande bokföring och vi ser till att allt stämmer. Vid årets slut är NE-bilaga, momsredovisning och bokslut redan klara.
             </p>
 
             {/* Allt ingår-pills */}
