@@ -23,46 +23,96 @@ export default function LaddaUppPage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
+  const [processingFile, setProcessingFile] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<ParsedTransaction[] | null>(null);
   const [done, setDone] = useState(false);
+  const [openService, setOpenService] = useState<string | null>(null);
+  const [showServices, setShowServices] = useState(false);
 
-  function handleFile(f: File) {
-    setFile(f);
-    setTransactions(null);
+  function addFiles(newFiles: FileList | null) {
+    if (!newFiles) return;
+    setFiles(prev => {
+      const existing = new Set(prev.map(f => f.name));
+      const toAdd = Array.from(newFiles).filter(f => !existing.has(f.name));
+      return [...prev, ...toAdd];
+    });
     setError(null);
+  }
+
+  function removeFile(index: number) {
+    setFiles(prev => prev.filter((_, i) => i !== index));
   }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) handleFile(f);
+    addFiles(e.dataTransfer.files);
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (f) handleFile(f);
+    addFiles(e.target.files);
+    e.target.value = '';
   }
 
-  async function analyze() {
-    if (!file) return;
+  function getMissingFields(txns: ParsedTransaction[]): string[] {
+    if (txns.length === 0) return [];
+    const missing: string[] = [];
+    const half = txns.length * 0.5;
+
+    const emptyDatum = txns.filter(t => !t.datum || t.datum.trim() === '').length;
+    if (emptyDatum > half) missing.push('Datum');
+
+    const emptyBesk = txns.filter(t => !t.beskrivning || t.beskrivning.trim() === '').length;
+    if (emptyBesk > half) missing.push('Beskrivning');
+
+    const allZeroBelopp = txns.every(t => !t.belopp || t.belopp === 0);
+    if (allZeroBelopp) missing.push('Belopp');
+
+    const allNullMoms = txns.every(t => t.moms === null || t.moms === undefined);
+    if (allNullMoms) missing.push('Moms');
+
+    return missing;
+  }
+
+  async function analyzeAll() {
+    if (files.length === 0) return;
     setProcessing(true);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch('/api/bokforing/analyze-transactions', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Okänt fel');
-      setTransactions(data.transactions ?? []);
+      const allTransactions: ParsedTransaction[] = [];
+      for (const f of files) {
+        setProcessingFile(f.name);
+        const fd = new FormData();
+        fd.append('file', f);
+        const res = await fetch('/api/bokforing/analyze-transactions', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Okänt fel');
+        allTransactions.push(...(data.transactions ?? []));
+      }
+
+      if (allTransactions.length === 0) {
+        setError('Vi hittade inga transaktioner i filen. Kontrollera att filen innehåller rätt data och försök igen.');
+        return;
+      }
+
+      const missing = getMissingFields(allTransactions);
+      if (missing.length > 0) {
+        const fields = missing.join(', ');
+        const valutaNote = 'Obs: Valuta behöver bara anges om transaktionerna inte är i SEK.';
+        setError(`Filen saknar: ${fields}. Kontrollera att filen innehåller dessa kolumner och försök igen. ${valutaNote}`);
+        return;
+      }
+
+      setTransactions(allTransactions);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Något gick fel. Försök igen.');
     } finally {
       setProcessing(false);
+      setProcessingFile('');
     }
   }
 
@@ -134,8 +184,9 @@ export default function LaddaUppPage() {
           </svg>
         </div>
         <div className="text-center">
-          <p className="text-xl font-bold text-slate-800">Analyserar transaktioner...</p>
-          <p className="text-slate-400 text-sm mt-1.5">AI:n läser igenom filen och identifierar varje rad</p>
+          <p className="text-xl font-bold text-slate-800">Läser igenom filen...</p>
+          {processingFile && <p className="text-slate-400 text-sm mt-1.5 truncate max-w-xs">{processingFile}</p>}
+          <p className="text-slate-400 text-xs mt-1">Vi identifierar och sorterar dina transaktioner</p>
         </div>
       </div>
     );
@@ -157,7 +208,7 @@ export default function LaddaUppPage() {
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            AI hittade {transactions.length} transaktioner
+            Vi hittade {transactions.length} transaktioner
           </div>
           <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">Granska innan du bokför</h1>
           <p className="text-slate-400 text-sm mt-1 mb-6">Kontrollera att transaktionerna ser rätt ut.</p>
@@ -233,10 +284,10 @@ export default function LaddaUppPage() {
           <div className="grid grid-cols-2 gap-3 mb-4">
             {[
               { label: 'Datum', desc: 'Transaktionsdatum', required: true },
+              { label: 'Beskrivning', desc: 'Vad gäller transaktionen', required: true },
               { label: 'Belopp', desc: 'Transaktionsbelopp', required: true },
-              { label: 'Moms', desc: 'Momsbelopp', required: false },
-              { label: 'Valuta', desc: 'Krävs om inte SEK', required: false },
-              { label: 'Beskrivning', desc: 'Vad gäller transaktionen', required: false },
+              { label: 'Moms', desc: 'Momsbelopp', required: true },
+              { label: 'Valuta*', desc: 'Krav om transaktionen inte är i SEK', required: true },
               { label: 'Avgifter', desc: 'Provisioner eller avgifter', required: false },
             ].map(f => (
               <div key={f.label} className="flex items-start gap-2.5 bg-slate-50 rounded-xl p-3">
@@ -250,28 +301,117 @@ export default function LaddaUppPage() {
               </div>
             ))}
           </div>
+          <p className="text-xs text-slate-700 mb-2">* Valuta behövs bara om transaktionerna inte är i SEK — Zettle, Stripe och PayPal använder ofta USD eller EUR.</p>
           <p className="text-xs text-slate-400">Vi stödjer CSV, Excel och PDF (.csv, .xlsx, .xls, .pdf)</p>
         </div>
 
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <button
+            onClick={() => setShowServices(v => !v)}
+            className="w-full flex items-center justify-between px-6 py-5 text-left"
+          >
+            <div>
+              <p className="font-bold text-slate-800">Var hittar jag min fil?</p>
+              <p className="text-sm text-slate-400 mt-0.5">Klicka på din tjänst för att se hur du hämtar din fil.</p>
+              <p className="text-sm text-slate-400 mt-0.5">Har du en egen fil är det bara att ladda upp.*</p>
+            </div>
+            <svg
+              className={`w-5 h-5 text-slate-400 flex-shrink-0 transition-transform duration-200 ${showServices ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showServices && <div className="px-6 pb-5 divide-y divide-slate-100 border-t border-slate-100">
+            {([
+              { name: 'Shopify', desc: 'Logga in på din Shopify-butik → Ekonomi → Transaktioner → Exportera → välj CSV.', filnamn: 'transactions_export.csv' },
+              { name: 'WooCommerce', desc: 'Logga in på din WordPress-sida → WooCommerce → Rapporter → välj period och exportera som CSV.', filnamn: 'woocommerce-orders-export.csv' },
+              { name: 'Klarna', desc: 'Logga in på app.klarna.com/business → Transaktioner → Exportera som CSV.', filnamn: 'klarna_transactions.csv' },
+              { name: 'Stripe', desc: 'Logga in på dashboard.stripe.com → Rapporter → Balanshistorik → Exportera CSV.', filnamn: 'balance_history.csv' },
+              { name: 'PayPal', desc: 'Logga in på paypal.com → Aktivitet → Ladda ned aktiviteter → välj period och format CSV.', filnamn: 'Download.csv' },
+              { name: 'Swish Företag', desc: 'Kontakta din bank för kontoutdrag som inkluderar Swish-betalningar, eller exportera via bankens internetbank.', filnamn: 'Kontoutdrag (varierar per bank)' },
+              { name: 'Zettle', desc: 'Logga in på zettle.com → Rapporter → Transaktioner → Exportera som Excel eller CSV.', filnamn: 'Zettle_Transactions.xlsx / .csv' },
+              { name: 'SumUp', desc: 'Logga in på me.sumup.com → Transaktioner → Exportera som CSV.', filnamn: 'sumup_transactions.csv' },
+              { name: 'Bokadirekt', desc: 'Logga in på Bokadirekt → Ekonomi eller Rapporter → Exportera transaktioner.', filnamn: 'transactions.csv' },
+              { name: 'Apple App Store', desc: 'Logga in på App Store Connect → Finance → Payments and Financial Reports → Ladda ned rapport.', filnamn: 'financial_report.csv' },
+              { name: 'Google Play', desc: 'Logga in på Google Play Console → Rapporter → Ekonomi → Exportera månadsrapport som CSV.', filnamn: 'PlayApps_earnings_[år]_[månad].csv' },
+              { name: 'Etsy', desc: 'Logga in på etsy.com → Finanser → Betalningskonto → Ladda ned CSV.', filnamn: 'EtsyPaymentAccountCSVDownload.csv' },
+              { name: 'Amazon', desc: 'Logga in på Seller Central → Rapporter → Betalningar → Transaktionsvy → Exportera CSV.', filnamn: 'transaction-report.csv' },
+              { name: 'Annat', desc: 'Exportfunktionen finns vanligtvis under Inställningar → Rapporter, Ekonomi eller Kontoutdrag. Hittar du inte? Hör av dig till oss så hjälper vi dig.', filnamn: null },
+              { name: 'Jag har en egen fil', desc: 'Det fungerar bra! Se till att filen innehåller rätt uppgifter (datum, beskrivning, belopp och moms) och är i ett godkänt format: CSV, Excel (.xlsx, .xls) eller PDF.', filnamn: null },
+            ] as { name: string; desc: string; filnamn: string | null }[]).map(s => {
+              const isOpen = openService === s.name;
+              return (
+                <button
+                  key={s.name}
+                  onClick={() => setOpenService(isOpen ? null : s.name)}
+                  className="w-full flex items-center justify-between py-3 text-left group"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-4 h-4 rounded border-2 flex-shrink-0 transition-colors ${isOpen ? 'border-blue-500 bg-blue-500' : 'border-slate-300 bg-white'}`}>
+                      {isOpen && (
+                        <svg className="w-full h-full text-white p-px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-700">{s.name}</p>
+                      {isOpen && (
+                        <div className="mt-1 pr-4 space-y-1.5">
+                          <p className="text-xs text-slate-500 leading-relaxed">{s.desc}</p>
+                          {s.filnamn && (
+                            <p className="text-xs text-slate-400">
+                              <span className="font-semibold text-slate-600">Filen heter: </span>{s.filnamn}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <svg
+                    className={`w-4 h-4 text-slate-300 flex-shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              );
+            })}
+          </div>}
+        </div>
+
+        {/* Drop zone */}
         <div
           onDragOver={e => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           onClick={() => fileRef.current?.click()}
-          className="bg-white rounded-2xl border-2 border-dashed p-10 flex flex-col items-center justify-center cursor-pointer transition-all duration-150"
-          style={{ borderColor: dragging ? ACCENT : file ? '#059669' : '#E2E8F0', backgroundColor: dragging ? '#ECFEFF' : file ? '#F0FDF4' : undefined }}
+          className="bg-white rounded-2xl border-2 border-dashed p-8 flex flex-col items-center justify-center cursor-pointer transition-all duration-150"
+          style={{ borderColor: dragging ? ACCENT : files.length > 0 ? '#059669' : '#E2E8F0', backgroundColor: dragging ? '#ECFEFF' : undefined }}
         >
-          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.pdf" onChange={handleChange} className="hidden" />
-          {file ? (
-            <>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: '#DCFCE7' }}>
-                <svg className="w-6 h-6" fill="none" stroke="#059669" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <p className="font-semibold text-slate-700 text-sm">{file.name}</p>
-              <p className="text-xs text-slate-400 mt-1">{(file.size / 1024).toFixed(0)} KB · Klicka för att byta fil</p>
-            </>
+          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.pdf" multiple onChange={handleChange} className="hidden" />
+          {files.length > 0 ? (
+            <div className="w-full space-y-2">
+              {files.map((f, i) => (
+                <div key={i} className="flex items-center gap-3 bg-emerald-50 rounded-xl px-4 py-2.5">
+                  <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm font-medium text-slate-700 truncate flex-1">{f.name}</span>
+                  <span className="text-xs text-slate-400 flex-shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+                  <button
+                    onClick={e => { e.stopPropagation(); removeFile(i); }}
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors flex-shrink-0"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              <p className="text-xs text-slate-400 text-center pt-2">Dra hit fler filer eller klicka för att lägga till</p>
+            </div>
           ) : (
             <>
               <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: '#ECFEFF' }}>
@@ -279,22 +419,30 @@ export default function LaddaUppPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
               </div>
-              <p className="font-semibold text-slate-700 text-sm">Dra och släpp din fil här</p>
-              <p className="text-xs text-slate-400 mt-1">eller klicka för att välja fil · CSV, XLSX, XLS, PDF</p>
+              <p className="font-semibold text-slate-700 text-sm">Dra och släpp dina filer här</p>
+              <p className="text-xs text-slate-400 mt-1">eller klicka för att välja · CSV, XLSX, XLS, PDF</p>
             </>
           )}
         </div>
 
         {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
-        <button
-          onClick={analyze}
-          disabled={!file}
-          className="w-full py-3.5 text-sm font-bold text-white rounded-2xl transition-opacity disabled:opacity-40"
-          style={{ backgroundColor: ACCENT }}
-        >
-          Analysera med AI
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={analyzeAll}
+            disabled={files.length === 0}
+            className="flex-1 py-3.5 text-sm font-bold text-white rounded-2xl transition-opacity disabled:opacity-40"
+            style={{ backgroundColor: NAV_BG }}
+          >
+            Klar
+          </button>
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="flex-1 py-3.5 text-sm font-bold rounded-2xl border-2 border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            Ladda upp fler filer
+          </button>
+        </div>
       </div>
     </div>
   );
