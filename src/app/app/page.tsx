@@ -117,18 +117,104 @@ export default function HomePage() {
   }
 
   const firstName = profile?.full_name?.split(' ')[0] ?? null;
+  const activeBokforing = profile?.bokforing_metod ?? null;
 
   return (
     <div className="flex flex-col min-h-full bg-slate-50">
 
       {/* Topplist */}
-      <div className="px-8 pt-12 pb-2">
+      <div className="px-8 pt-8 pb-2">
         <p className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3">{getDateString()}</p>
         <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">
           {getGreeting()}{firstName ? `, ${firstName}` : ''}!
         </h1>
         <p className="text-slate-400 text-sm mt-1.5">Vad vill du göra idag?</p>
       </div>
+
+      {/* Personlig guide-banner */}
+      {activeBokforing === 'excel-kalkylark' && (
+        <div className="px-8 pt-2 pb-0">
+          <Link href="/skicka-in/excel" className="group block bg-white border-2 border-emerald-100 hover:border-emerald-300 hover:shadow-lg rounded-2xl px-6 py-5 transition-all duration-150">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-50">
+                  <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[15px] font-bold text-slate-800 leading-snug">Skicka in din Excel / Kalkylark-fil</p>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">Guide på vad filen ska innehålla, mall att ladda ner och uppladdning direkt här.</p>
+                </div>
+              </div>
+              <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 flex-shrink-0 mt-1 transition-all duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+            <div className="flex gap-2 mt-4 flex-wrap">
+              {['Guide', 'Mall att ladda ner',
+                profile?.skicka_in_metod === 'maila-fil' ? 'Maila in filen' : 'Ladda upp fil'
+              ].map(tag => (
+                <span key={tag} className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600">{tag}</span>
+              ))}
+            </div>
+          </Link>
+        </div>
+      )}
+      {activeBokforing === 'hemsidan' && (
+        <div className="px-8 pt-2 pb-0">
+          <Link href="/skicka-in/hemsidan" className="group block bg-white border-2 border-emerald-100 hover:border-emerald-300 hover:shadow-lg rounded-2xl px-6 py-5 transition-all duration-150">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-50">
+                  <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[15px] font-bold text-slate-800 leading-snug">Kom igång med bokföringen</p>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">Guide på hur du lägger in transaktioner direkt på hemsidan — steg för steg.</p>
+                </div>
+              </div>
+              <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 flex-shrink-0 mt-1 transition-all duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+            <div className="flex gap-2 mt-4 flex-wrap">
+              {['Steg-för-steg', 'Alla transaktionstyper', 'Snabbstart'].map(tag => (
+                <span key={tag} className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600">{tag}</span>
+              ))}
+            </div>
+          </Link>
+        </div>
+      )}
+      {activeBokforing === 'maila-underlag' && (
+        <div className="px-8 pt-2 pb-0">
+          <Link href="/skicka-in/underlag" className="group block bg-white border-2 border-emerald-100 hover:border-emerald-300 hover:shadow-lg rounded-2xl px-6 py-5 transition-all duration-150">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-50">
+                  <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[15px] font-bold text-slate-800 leading-snug">Maila in ditt underlag</p>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">Guide för hur du skickar in kvitton och fakturor — vi sköter resten.</p>
+                </div>
+              </div>
+              <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 flex-shrink-0 mt-1 transition-all duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+            <div className="flex gap-2 mt-4 flex-wrap">
+              {['Guide', 'Steg-för-steg', 'ekonomi@enklabokslut.se'].map(tag => (
+                <span key={tag} className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600">{tag}</span>
+              ))}
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* Kort-grid */}
       <div className="px-8 py-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 max-w-4xl lg:max-w-5xl">

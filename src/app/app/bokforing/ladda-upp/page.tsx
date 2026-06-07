@@ -130,7 +130,7 @@ export default function LaddaUppPage() {
         haendelse_typ: t.haendelse_typ,
         datum: t.datum,
         beskrivning: t.beskrivning,
-        belopp: t.belopp,
+        belopp: Math.abs(t.belopp),
         moms: t.moms,
         ai_kategori: t.beskrivning,
         ai_debit_konto: t.debit_konto,
@@ -234,7 +234,7 @@ export default function LaddaUppPage() {
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-semibold text-slate-700 truncate">{t.beskrivning}</p>
                     <p className="text-sm font-bold text-slate-800 whitespace-nowrap flex-shrink-0">
-                      {isIncome ? '+' : '−'}{t.belopp.toLocaleString('sv-SE')} kr
+                      {isIncome ? '+' : '−'}{Math.abs(t.belopp).toLocaleString('sv-SE')} kr
                     </p>
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">

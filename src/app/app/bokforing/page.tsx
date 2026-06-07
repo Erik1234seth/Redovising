@@ -247,7 +247,7 @@ export default function BokforingPage() {
                     const utgift = ['kopt-nagot', 'skatteverket'].includes(t.haendelse_typ);
                     return (
                       <span className={`text-right font-medium ${utgift ? 'text-red-500' : 'text-emerald-600'}`}>
-                        {utgift ? '−' : '+'}{Number(t.belopp).toLocaleString('sv-SE')} kr
+                        {utgift ? '−' : '+'}{Math.abs(Number(t.belopp)).toLocaleString('sv-SE')} kr
                       </span>
                     );
                   })()}
