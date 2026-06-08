@@ -14,7 +14,12 @@ export interface Profile {
   order_count: number;
   verksamhet: string | null;
   start_ar: number | null;
-  moms_period: 'månadsvis' | 'kvartalsvis' | 'helår' | null;
+  moms_period: 'månadsvis' | 'kvartalsvis' | 'helår' | 'ingen-moms' | null;
+  saljer_till: 'privat' | 'foretag' | null;
+  saljer_i: 'sverige' | 'eu' | 'utanfor-eu' | null;
+  koper_i: 'sverige' | 'eu' | 'import' | null;
+  bokforing_metod: 'excel-kalkylark' | 'hemsidan' | 'maila-underlag' | null;
+  skicka_in_metod: 'maila-fil' | 'ladda-upp' | null;
   onboarding_done: boolean;
 }
 

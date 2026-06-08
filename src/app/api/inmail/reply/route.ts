@@ -144,7 +144,7 @@ Om inga ändringar behövs, returnera updates: [] och ett lämpligt svar.`;
         const patch: Record<string, unknown> = {};
         if (update.changes.beskrivning !== undefined) patch.beskrivning = update.changes.beskrivning;
         if (update.changes.betalningssatt !== undefined) patch.betalningssatt = update.changes.betalningssatt;
-        if (update.changes.belopp !== undefined) patch.belopp = update.changes.belopp;
+        if (update.changes.belopp !== undefined) patch.belopp = Math.abs(update.changes.belopp);
         if (update.changes.moms !== undefined) patch.moms = update.changes.moms;
         if (update.changes.datum !== undefined) patch.datum = update.changes.datum;
         if (Object.keys(patch).length) {

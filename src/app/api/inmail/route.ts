@@ -166,7 +166,7 @@ export async function POST(request: Request) {
           haendelse_typ: 'kopt-nagot',
           datum: analysis.datum ?? today,
           beskrivning: analysis.vad,
-          belopp: analysis.belopp,
+          belopp: Math.abs(analysis.belopp),
           moms: analysis.moms,
           kund_land: analysis.land,
           betalningssatt: analysis.betalningssatt ?? 'Från företagskonto',
