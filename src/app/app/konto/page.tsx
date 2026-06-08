@@ -34,7 +34,7 @@ export default function KontoPage() {
   const [ort, setOrt] = useState('');
   const [momsnr, setMomsnr] = useState('');
   const [verksamhet, setVerksamhet] = useState('');
-  const [momsPeriod, setMomsPeriod] = useState<'månadsvis' | 'kvartalsvis' | 'helår' | null>(null);
+  const [momsPeriod, setMomsPeriod] = useState<'månadsvis' | 'kvartalsvis' | 'helår' | 'ingen-moms' | null>(null);
   const [startAr, setStartAr] = useState<number | null>(null);
   const [formInitialized, setFormInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
