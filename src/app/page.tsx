@@ -39,12 +39,12 @@ function useFakeCountdown(): Countdown | null {
 type AppTab = 'bokforing' | 'fakturor' | 'rapporter' | 'hjalp';
 
 const landingFaqItems = [
-  { q: 'Vem passar Enkla Bokslut för?', a: 'Enkla Bokslut är byggt för dig som driver enskild firma — frilansare, konsulter, hantverkare, fotografer och andra soloföretagare. Om du inte har anställda och inte driver aktiebolag är det perfekt för dig.' },
-  { q: 'Passar det om jag har anställda eller driver aktiebolag?', a: 'Nej, inte i dagsläget. Tjänsten är anpassad för enskilda firmor utan anställda. Driver du aktiebolag eller har personal finns det tyvärr bättre alternativ för dig.' },
+  { q: 'Vem passar Enkla Bokslut för?', a: 'Enkla Bokslut är byggt för Sveriges småföretagare. Vi riktar oss till enskilda firmor utan anställd personal och med en årsomsättning på upp till 3 miljoner kronor.\n\nTyvärr passar Enkla Bokslut inte alla verksamheter. I dagsläget kan vi inte hjälpa företag som har anställd personal, bedriver skogs- eller lantbruksverksamhet, driver taxiverksamhet, använder vinstmarginalbeskattning (VMB) eller har annan verksamhet med särskilt komplexa skatte- och momsregler.' },
   { q: 'Måste jag kunna bokföring sedan tidigare?', a: 'Nej, det är hela poängen. Du väljer vad som har hänt (köp, betalning, utgift) och resten sköts automatiskt. Rätt konton, rätt moms — du behöver inte förstå hur det fungerar i bakgrunden.' },
-  { q: 'Vad händer vid årets slut?', a: 'Din NE-bilaga fylls i automatiskt under hela året baserat på vad du bokfört. När det är dags att deklarera laddar du ner den som PDF och bifogar den på Skatteverkets hemsida. Klart.' },
+  { q: 'Hur kan Enkla Bokslut vara så billigt?', a: 'Enkla Bokslut är utvecklat specifikt för enskilda firmor med en omsättning på upp till 3 miljoner kronor. Genom att fokusera på denna typ av verksamheter kan vi arbeta utifrån ett förenklat regelverk och undvika många av de komplexa moment som finns i större företag.\n\nSamtidigt har vi automatiserat delar av processen som traditionellt görs manuellt av redovisningskonsulter. Det innebär mindre administration, lägre kostnader och ett lägre pris för dig – utan att tumma på kvaliteten.' },
+  { q: 'Följer Enkla Bokslut reglerna?', a: 'Ja. Enkla Bokslut är utvecklat för att följa K1-regelverket, som är Skatteverkets och Bokföringsnämndens förenklade regler för mindre enskilda firmor.\n\nEftersom vi enbart arbetar med enskilda firmor som omfattas av K1 har vi specialiserat oss på just dessa regler. Det innebär att vi inte bara följer regelverket – vi är experter på det.' },
+  { q: 'Vad händer vid årets slut?', a: 'När året är slut guidar vi dig genom några enkla steg för att samla in de uppgifter som behövs för bokslutet. Därefter sammanställer vi din bokföring, upprättar din NE-bilaga och momsredovisning samt lämnar in uppgifterna till Skatteverket. Enkelt, smidigt och klart.' },
   { q: 'Kan jag avsluta när jag vill?', a: 'Ja, du binder dig inte. Du kan avsluta din prenumeration när som helst — inga dolda bindningstider.' },
-  { q: 'Vad kostar det efter de 14 gratis dagarna?', a: 'Från 299 kr per månad, allt ingår. Inga tillval, inga extra kostnader för fakturor, bokföring eller rapporter.' },
 ];
 
 function SectionDivider({ dark }: { dark?: boolean }) {
@@ -93,7 +93,7 @@ function LandingFaq() {
           </button>
           {open === i && (
             <div className="px-6 pb-5 pt-1">
-              <div className="pl-4 border-l-2 text-sm leading-relaxed" style={{ borderColor: CORAL, color: 'rgba(255,255,255,0.55)' }}>
+              <div className="pl-4 border-l-2 text-sm leading-relaxed whitespace-pre-line" style={{ borderColor: CORAL, color: 'rgba(255,255,255,0.55)' }}>
                 {item.a}
               </div>
             </div>
@@ -186,27 +186,23 @@ export default function Home() {
                   style={{ backgroundColor: `${CORAL}15`, color: CORAL }}
                 >
                   <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: CORAL }} />
-                  Specialiserade på enskilda firmor
+                  Bokslut för enskilda firmor
                 </div>
               </div>
 
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-[1.1] mb-6" style={{ color: NAV_BG }}>
-                Bokslut gjort{' '}
+                Enkelt,{' '}
                 <span className="relative inline-block">
                   rätt
                   <svg className="absolute -bottom-1 left-0 w-full" viewBox="0 0 120 8" fill="none" preserveAspectRatio="none">
                     <path d="M2 6 Q60 2 118 6" stroke={CORAL} strokeWidth="3" strokeLinecap="round" fill="none" />
                   </svg>
                 </span>
-                <br />
-                <span className="text-3xl sm:text-4xl md:text-5xl font-bold" style={{ color: '#64748b' }}>
-                  utan krångel
-                </span>
+                {' '}och till lågt fast pris!
               </h1>
 
               <p className="text-slate-500 text-base sm:text-lg leading-relaxed mb-8 max-w-md mx-auto lg:mx-0">
-                Förenklat årsbokslut och NE-bilaga för enskilda firmor –
-                fast pris, snabb leverans och ingen onödig byrå&shy;kostnad.
+                Förenklat årsbokslut, momsredovisning och NE-bilaga för enskilda firmor – fast pris, snabb leverans och ingen onödig byrå&shy;kostnad.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
@@ -286,63 +282,154 @@ export default function Home() {
         </div>
       </section>
 
+
+      <SectionDivider />
+
       {/* ══════════════════════════════════════════
-          TESTIMONIALS
+          PACKAGES
       ══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-24" style={{ backgroundColor: NAV_BG }}>
+      <section id="packages" className="py-20 sm:py-24 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-14">
-            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Kundrecensioner</p>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">
-              Vad våra kunder säger
-            </h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                name: 'Anna Lindgren',
-                role: 'Frilansfotograf',
-                avatar: '/annalindgren.png',
-                quote: 'Äntligen ett ställe som verkligen förstår hur det fungerar att driva enskild firma. Snabbt, tydligt och till ett pris jag faktiskt har råd med.',
-              },
-              {
-                name: 'Marcus Eriksson',
-                role: 'Webbutvecklare',
-                avatar: '/markus.png',
-                quote: 'Jag hade aldrig gjort bokslut själv och var lite nervös. Men det var superenkelt — de skötte allt och jag visste exakt vad det kostade från start.',
-              },
-              {
-                name: 'Sara Berg',
-                role: 'Kostrådgivare',
-                avatar: '/sofia.png',
-                quote: 'Rekommenderar varmt! Tok bara några dagar och NE-bilagan var klar. Slipper oroa mig inför deklarationen nu.',
-              },
-            ].map(({ name, role, avatar, quote }) => (
-              <div
-                key={name}
-                className="rounded-2xl p-7 flex flex-col"
-                style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
-              >
-                <div className="flex gap-0.5 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <svg key={i} className="w-4 h-4 text-amber-400 fill-amber-400" viewBox="0 0 24 24">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                    </svg>
-                  ))}
-                </div>
-                <p className="text-sm leading-relaxed flex-1 mb-6" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                  &ldquo;{quote}&rdquo;
-                </p>
-                <div className="flex items-center gap-3">
-                  <Image src={avatar} alt={name} width={56} height={56} className="rounded-full object-cover ring-2 ring-white/20" />
-                  <div>
-                    <p className="text-sm font-bold text-white">{name}</p>
-                    <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{role}</p>
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+
+            {/* Left: value proposition */}
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Pris</p>
+              <h2 className="text-3xl sm:text-4xl font-extrabold mb-5 leading-tight" style={{ color: NAV_BG }}>
+                Ett pris.<br />Allt inkluderat.
+              </h2>
+              <p className="text-slate-500 text-base leading-relaxed mb-8">
+                Vi erbjuder ett enda abonnemang — för att hålla det enkelt. Du behöver inte välja rätt paket eller oroa dig för att du köper fel. Allt ingår.
+              </p>
+
+              <div className="space-y-4 mb-10">
+                {[
+                  { title: 'Ingen bindningstid', desc: 'Avsluta abonnemanget när du vill, utan förklaring.' },
+                  { title: 'Inga andra program behövs', desc: 'Allt du behöver för bokslut, moms och deklaration — inget dyrt program att köpa eller lära sig.' },
+                  { title: 'Fast månadsavgift', desc: 'Inga timarvoden, inga tilläggsavgifter. Du vet alltid vad det kostar.' },
+                  { title: '100% fokus på enskilda firmor', desc: 'Vi specialiserar oss på en sak — och gör den bra.' },
+                ].map((item) => (
+                  <div key={item.title} className="flex gap-4">
+                    <div className="w-6 h-6 rounded-full flex-shrink-0 mt-0.5 flex items-center justify-center" style={{ backgroundColor: `${NAV_BG}12` }}>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: NAV_BG }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm" style={{ color: NAV_BG }}>{item.title}</p>
+                      <p className="text-slate-500 text-sm">{item.desc}</p>
+                    </div>
                   </div>
+                ))}
+              </div>
+
+              <Link
+                href="/boka-mote"
+                className="inline-flex items-center gap-2 text-sm font-semibold transition-colors"
+                style={{ color: NAV_BG }}
+              >
+                Har du frågor? Boka ett gratis möte →
+              </Link>
+            </div>
+
+            {/* Right: pricing card */}
+            {packages.map((pkg) => (
+              <div key={pkg.id} className="relative rounded-2xl overflow-hidden" style={{ backgroundColor: NAV_BG, boxShadow: `0 24px 64px ${NAV_BG}40` }}>
+                <div className="px-8 pt-6 pb-0 flex justify-between items-center">
+                  <span className="px-3 py-1 text-xs font-bold rounded-full" style={{ backgroundColor: CORAL, color: 'white' }}>
+                    ALLT INKLUDERAT
+                  </span>
+                  <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>Löpande abonnemang</span>
+                </div>
+
+                <div className="p-7 sm:p-9">
+                  {/* Billing toggle */}
+                  <div className="flex items-center gap-1 p-1 rounded-xl mb-6" style={{ backgroundColor: 'rgba(255,255,255,0.07)' }}>
+                    <button
+                      onClick={() => setBilling('monthly')}
+                      className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-200"
+                      style={billing === 'monthly'
+                        ? { backgroundColor: 'white', color: NAV_BG }
+                        : { color: 'rgba(255,255,255,0.5)' }
+                      }
+                    >
+                      Månadsvis
+                    </button>
+                    <button
+                      onClick={() => setBilling('yearly')}
+                      className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5"
+                      style={billing === 'yearly'
+                        ? { backgroundColor: 'white', color: NAV_BG }
+                        : { color: 'rgba(255,255,255,0.5)' }
+                      }
+                    >
+                      Årsvis
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: billing === 'yearly' ? `${CORAL}20` : `${CORAL}40`, color: billing === 'yearly' ? CORAL : 'rgba(233,92,99,0.8)' }}>
+                        Spara 89 kr
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="mb-7 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+                    <h3 className="text-xl font-bold mb-1 text-white">{pkg.name}</h3>
+                    <p className="text-sm mb-6 text-white/55">Du skickar in dina transaktioner löpande — vi sköter resten. I slutet av året är NE-bilaga och momsredovisning redo.</p>
+                    <div className="flex items-end gap-1.5">
+                      <span className="text-6xl font-extrabold text-white leading-none">
+                        {billing === 'monthly' ? pkg.price.toLocaleString('sv') : pkg.yearlyPrice.toLocaleString('sv')}
+                      </span>
+                      <div className="mb-1">
+                        <p className="text-lg font-light text-white/50">kr</p>
+                        <p className="text-sm font-semibold" style={{ color: CORAL }}>
+                          {billing === 'monthly' ? 'per månad' : 'per år'}
+                        </p>
+                      </div>
+                    </div>
+                    {billing === 'yearly' && (
+                      <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>≈ 292 kr/mån — du faktureras en gång per år</p>
+                    )}
+                  </div>
+
+                  <ul className="space-y-3 mb-8">
+                    {pkg.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-3">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: `${CORAL}30` }}>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <span className="text-sm leading-relaxed text-white/80">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    onClick={handleGetStarted}
+                    className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 hover:scale-[1.02] text-sm"
+                    style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 20px ${CORAL}40` }}
+                  >
+                    Kom igång →
+                  </button>
                 </div>
               </div>
             ))}
+
           </div>
+        </div>
+      </section>
+
+      <SectionDivider />
+
+      {/* ══════════════════════════════════════════
+          FAQ
+      ══════════════════════════════════════════ */}
+      <section className="py-20 sm:py-24" style={{ backgroundColor: NAV_BG }}>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Vanliga frågor</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Enklare bokföring börjar här</h2>
+            <p className="text-white/50 mt-3 text-base">Få svar på de vanligaste frågorna om bokföring, bokslut och deklaration för enskild firma.</p>
+          </div>
+          <LandingFaq />
         </div>
       </section>
 
@@ -668,60 +755,6 @@ export default function Home() {
       <SectionDivider />
 
       {/* ══════════════════════════════════════════
-          SÅ HÄR FUNGERAR DET
-      ══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-24" style={{ backgroundColor: NAV_BG }}>
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-14">
-            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Enkelt från start till slut</p>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Så här fungerar det</h2>
-            <p className="text-white/50 mt-3 text-base max-w-xl mx-auto">Tre steg — det är allt som krävs för att hålla bokföringen i ordning och ha NE-bilagan klar vid årets slut.</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8 relative">
-            <div className="hidden md:block absolute top-10 left-[calc(16.67%+1rem)] right-[calc(16.67%+1rem)] h-px" style={{ background: `linear-gradient(90deg, ${CORAL}40, ${CORAL}80, ${CORAL}40)` }} />
-            {[
-              {
-                step: '1',
-                title: 'Bokför löpande',
-                desc: 'Varje gång pengar rör sig — ett köp, en betalning från kund, en utgift — lägger du in det på några sekunder. Ladda upp kvitto så fylls uppgifterna i åt dig.',
-                icon: 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z',
-                color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',
-              },
-              {
-                step: '2',
-                title: 'Vi sammanställer allt',
-                desc: 'Bakom kulisserna sätts rätt konton, momsbelopp beräknas och rapporten byggs upp automatiskt. Du behöver inte förstå bokföring — det sköts åt dig.',
-                icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
-                color: CORAL, bg: `${CORAL}20`,
-              },
-              {
-                step: '3',
-                title: 'Rapporter & bokslut klara',
-                desc: 'Vid årets slut är alla rapporter och ditt bokslut redan klara. Ladda ner som PDF och bifoga till deklarationen — ingen revisor behövs.',
-                icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
-                color: '#34d399', bg: 'rgba(52,211,153,0.12)',
-              },
-            ].map(s => (
-              <div key={s.step} className="flex flex-col items-center text-center">
-                <div className="relative mb-6">
-                  <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ backgroundColor: s.bg }}>
-                    <svg className="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: s.color }}>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d={s.icon} />
-                    </svg>
-                  </div>
-                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full text-white text-xs font-extrabold flex items-center justify-center" style={{ backgroundColor: s.color }}>{s.step}</div>
-                </div>
-                <h3 className="text-lg font-extrabold text-white mb-2">{s.title}</h3>
-                <p className="text-sm text-white/55 leading-relaxed">{s.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <SectionDivider dark />
-
-      {/* ══════════════════════════════════════════
           JÄMFÖRELSETABELL
       ══════════════════════════════════════════ */}
       <section className="py-20 sm:py-24 bg-slate-50">
@@ -774,153 +807,6 @@ export default function Home() {
         </div>
       </section>
 
-      <SectionDivider />
-
-      {/* ══════════════════════════════════════════
-          FAQ
-      ══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-24" style={{ backgroundColor: NAV_BG }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-14">
-            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Vanliga frågor</p>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Passar det dig?</h2>
-            <p className="text-white/50 mt-3 text-base">Här är svaren på det de flesta undrar innan de sätter igång.</p>
-          </div>
-          <LandingFaq />
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          PACKAGES
-      ══════════════════════════════════════════ */}
-      <section id="packages" className="py-20 sm:py-24 bg-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-
-            {/* Left: value proposition */}
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Pris</p>
-              <h2 className="text-3xl sm:text-4xl font-extrabold mb-5 leading-tight" style={{ color: NAV_BG }}>
-                Ett pris.<br />Allt inkluderat.
-              </h2>
-              <p className="text-slate-500 text-base leading-relaxed mb-8">
-                Vi erbjuder ett enda abonnemang — för att hålla det enkelt. Du behöver inte välja rätt paket eller oroa dig för att du köper fel. Allt ingår.
-              </p>
-
-              <div className="space-y-4 mb-10">
-                {[
-                  { title: 'Ingen bindningstid', desc: 'Avsluta abonnemanget när du vill, utan förklaring.' },
-                  { title: 'Inget bokföringsprogram', desc: 'Vi jobbar i ett delat kalkylark — inget dyrt program att köpa eller lära sig.' },
-                  { title: 'Fast månadsavgift', desc: 'Inga timarvoden, inga tilläggsavgifter. Du vet alltid vad det kostar.' },
-                  { title: '100% fokus på enskilda firmor', desc: 'Vi specialiserar oss på en sak — och gör den bra.' },
-                ].map((item) => (
-                  <div key={item.title} className="flex gap-4">
-                    <div className="w-6 h-6 rounded-full flex-shrink-0 mt-0.5 flex items-center justify-center" style={{ backgroundColor: `${NAV_BG}12` }}>
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: NAV_BG }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm" style={{ color: NAV_BG }}>{item.title}</p>
-                      <p className="text-slate-500 text-sm">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <Link
-                href="/boka-mote"
-                className="inline-flex items-center gap-2 text-sm font-semibold transition-colors"
-                style={{ color: NAV_BG }}
-              >
-                Har du frågor? Boka ett gratis möte →
-              </Link>
-            </div>
-
-            {/* Right: pricing card */}
-            {packages.map((pkg) => (
-              <div key={pkg.id} className="relative rounded-2xl overflow-hidden" style={{ backgroundColor: NAV_BG, boxShadow: `0 24px 64px ${NAV_BG}40` }}>
-                <div className="px-8 pt-6 pb-0 flex justify-between items-center">
-                  <span className="px-3 py-1 text-xs font-bold rounded-full" style={{ backgroundColor: CORAL, color: 'white' }}>
-                    ALLT INKLUDERAT
-                  </span>
-                  <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>Löpande abonnemang</span>
-                </div>
-
-                <div className="p-7 sm:p-9">
-                  {/* Billing toggle */}
-                  <div className="flex items-center gap-1 p-1 rounded-xl mb-6" style={{ backgroundColor: 'rgba(255,255,255,0.07)' }}>
-                    <button
-                      onClick={() => setBilling('monthly')}
-                      className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-200"
-                      style={billing === 'monthly'
-                        ? { backgroundColor: 'white', color: NAV_BG }
-                        : { color: 'rgba(255,255,255,0.5)' }
-                      }
-                    >
-                      Månadsvis
-                    </button>
-                    <button
-                      onClick={() => setBilling('yearly')}
-                      className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5"
-                      style={billing === 'yearly'
-                        ? { backgroundColor: 'white', color: NAV_BG }
-                        : { color: 'rgba(255,255,255,0.5)' }
-                      }
-                    >
-                      Årsvis
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: billing === 'yearly' ? `${CORAL}20` : `${CORAL}40`, color: billing === 'yearly' ? CORAL : 'rgba(233,92,99,0.8)' }}>
-                        Spara 89 kr
-                      </span>
-                    </button>
-                  </div>
-
-                  <div className="mb-7 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-                    <h3 className="text-xl font-bold mb-1 text-white">{pkg.name}</h3>
-                    <p className="text-sm mb-6 text-white/55">Du skickar in dina transaktioner löpande — vi sköter resten. I slutet av året är NE-bilaga och momsredovisning redo.</p>
-                    <div className="flex items-end gap-1.5">
-                      <span className="text-6xl font-extrabold text-white leading-none">
-                        {billing === 'monthly' ? pkg.price.toLocaleString('sv') : pkg.yearlyPrice.toLocaleString('sv')}
-                      </span>
-                      <div className="mb-1">
-                        <p className="text-lg font-light text-white/50">kr</p>
-                        <p className="text-sm font-semibold" style={{ color: CORAL }}>
-                          {billing === 'monthly' ? 'per månad' : 'per år'}
-                        </p>
-                      </div>
-                    </div>
-                    {billing === 'yearly' && (
-                      <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>≈ 292 kr/mån — du faktureras en gång per år</p>
-                    )}
-                  </div>
-
-                  <ul className="space-y-3 mb-8">
-                    {pkg.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-3">
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: `${CORAL}30` }}>
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <span className="text-sm leading-relaxed text-white/80">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    onClick={handleGetStarted}
-                    className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 hover:scale-[1.02] text-sm"
-                    style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 20px ${CORAL}40` }}
-                  >
-                    Kom igång →
-                  </button>
-                </div>
-              </div>
-            ))}
-
-          </div>
-        </div>
-      </section>
 
       {/* ══════════════════════════════════════════
           TRUST BELT
@@ -1012,6 +898,66 @@ export default function Home() {
             >
               Kontakta oss
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          TESTIMONIALS
+      ══════════════════════════════════════════ */}
+      <section className="py-20 sm:py-24" style={{ backgroundColor: NAV_BG }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Kundrecensioner</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">
+              Vad våra kunder säger
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                name: 'Anna Lindgren',
+                role: 'Frilansfotograf',
+                avatar: '/annalindgren.png',
+                quote: 'Äntligen ett ställe som verkligen förstår hur det fungerar att driva enskild firma. Snabbt, tydligt och till ett pris jag faktiskt har råd med.',
+              },
+              {
+                name: 'Marcus Eriksson',
+                role: 'Webbutvecklare',
+                avatar: '/markus.png',
+                quote: 'Jag hade aldrig gjort bokslut själv och var lite nervös. Men det var superenkelt — de skötte allt och jag visste exakt vad det kostade från start.',
+              },
+              {
+                name: 'Sara Berg',
+                role: 'Kostrådgivare',
+                avatar: '/sofia.png',
+                quote: 'Rekommenderar varmt! Tok bara några dagar och NE-bilagan var klar. Slipper oroa mig inför deklarationen nu.',
+              },
+            ].map(({ name, role, avatar, quote }) => (
+              <div
+                key={name}
+                className="rounded-2xl p-7 flex flex-col"
+                style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <div className="flex gap-0.5 mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <svg key={i} className="w-4 h-4 text-amber-400 fill-amber-400" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                  ))}
+                </div>
+                <p className="text-sm leading-relaxed flex-1 mb-6" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  &ldquo;{quote}&rdquo;
+                </p>
+                <div className="flex items-center gap-3">
+                  <Image src={avatar} alt={name} width={56} height={56} className="rounded-full object-cover ring-2 ring-white/20" />
+                  <div>
+                    <p className="text-sm font-bold text-white">{name}</p>
+                    <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{role}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
