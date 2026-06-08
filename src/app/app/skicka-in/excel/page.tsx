@@ -510,7 +510,7 @@ interface UploadSectionProps {
   dragging: boolean;
   files: File[];
   error: string | null;
-  fileRef: React.RefObject<HTMLInputElement>;
+  fileRef: React.RefObject<HTMLInputElement | null>;
   setDragging: (v: boolean) => void;
   handleDrop: (e: React.DragEvent) => void;
   handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
