@@ -134,7 +134,10 @@ export default function HomePage() {
       {/* Personlig guide-banner */}
       {activeBokforing === 'excel-kalkylark' && (
         <div className="px-8 pt-2 pb-0">
-          <Link href="/skicka-in/excel" className="group block bg-white border-2 border-emerald-100 hover:border-emerald-300 hover:shadow-lg rounded-2xl px-6 py-5 transition-all duration-150">
+          <Link
+            href={profile?.skicka_in_metod === 'maila-fil' ? '/skicka-in/excel-mail' : '/skicka-in/excel'}
+            className="group block bg-white border-2 border-emerald-100 hover:border-emerald-300 hover:shadow-lg rounded-2xl px-6 py-5 transition-all duration-150"
+          >
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-4">
                 <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-50">
@@ -144,7 +147,11 @@ export default function HomePage() {
                 </div>
                 <div>
                   <p className="text-[15px] font-bold text-slate-800 leading-snug">Skicka in din Excel / Kalkylark-fil</p>
-                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">Guide på vad filen ska innehålla, mall att ladda ner och uppladdning direkt här.</p>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    {profile?.skicka_in_metod === 'maila-fil'
+                      ? 'Guide på vad filen ska innehålla, mall att ladda ner och instruktioner för att maila in.'
+                      : 'Guide på vad filen ska innehålla, mall att ladda ner och uppladdning direkt här.'}
+                  </p>
                 </div>
               </div>
               <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 flex-shrink-0 mt-1 transition-all duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">

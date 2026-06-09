@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { PAYMENTS_ENABLED } from '@/lib/config';
 
 const NAV_BG = '#173b57';
 const CORAL = '#E95C63';
@@ -25,6 +26,34 @@ export default function BestallPage() {
       router.push('/bestall/kontakt');
     }
   };
+
+  if (!PAYMENTS_ENABLED) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
+        <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200 p-10 text-center shadow-sm">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ backgroundColor: `${NAV_BG}10` }}>
+            <svg className="w-7 h-7" fill="none" stroke={NAV_BG} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-extrabold mb-2" style={{ color: NAV_BG }}>Betalning inte tillgänglig just nu</h1>
+          <p className="text-slate-500 text-sm leading-relaxed mb-6">
+            Vi håller på att förbereda betalningsfunktionen. Återkom snart eller kontakta oss direkt.
+          </p>
+          <a
+            href="mailto:hej@enklabokslut.se"
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
+            style={{ backgroundColor: NAV_BG }}
+          >
+            Kontakta oss
+          </a>
+          <button onClick={() => router.back()} className="block w-full mt-4 text-sm text-slate-400 hover:text-slate-600 transition-colors">
+            ← Tillbaka
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 py-16">
