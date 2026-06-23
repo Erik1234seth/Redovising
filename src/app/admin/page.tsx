@@ -207,8 +207,12 @@ export default function AdminPage() {
   const [stepCounts, setStepCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'orders' | 'funnel' | 'ab'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'funnel' | 'ab' | 'inmail'>('orders');
   const [abStats, setAbStats] = useState<{ shown: number; hidden: number; clicks: number; conversionRate: string; orderedWithPopup: number; orderedWithoutPopup: number; orderConversionWithPopup: string; orderConversionWithoutPopup: string; bookedWithPopup: number; bookedWithoutPopup: number; recentEvents: { step: string; session_id: string; created_at: string }[] } | null>(null);
+  const [inmailData, setInmailData] = useState<{
+    threads: { id: string; gmail_thread_id: string; user_id: string | null; state: string | null; transaction_ids: string[]; created_at: string; updated_at: string; profiles: { email: string; full_name: string | null } | null }[];
+    prospects: { id: string; email: string; source: string | null; created_at: string; expires_at: string; used_at: string | null }[];
+  } | null>(null);
 
   // Edit/create/delete state
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -253,6 +257,11 @@ export default function AdminPage() {
     fetch('/api/admin/ab-stats')
       .then(r => r.json())
       .then(d => { if (!d.error) setAbStats(d); })
+      .catch(() => {});
+
+    fetch('/api/admin/inmail')
+      .then(r => r.json())
+      .then(d => { if (!d.error) setInmailData(d); })
       .catch(() => {});
   }, [unlocked]);
 
@@ -536,6 +545,16 @@ export default function AdminPage() {
             }`}
           >
             A/B Popup
+          </button>
+          <button
+            onClick={() => setActiveTab('inmail')}
+            className={`px-5 py-2 rounded-lg font-semibold text-sm transition-all ${
+              activeTab === 'inmail'
+                ? 'bg-gold-500 text-navy-900'
+                : 'bg-navy-700 text-warm-300 hover:text-white'
+            }`}
+          >
+            Inmail
           </button>
         </div>
 
@@ -863,6 +882,137 @@ export default function AdminPage() {
                         )}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Inmail tab */}
+        {!loading && activeTab === 'inmail' && (
+          <div className="space-y-8">
+            {!inmailData ? (
+              <div className="text-center py-20 text-warm-400">Laddar inmail-data...</div>
+            ) : (
+              <>
+                {/* Prospects */}
+                <div>
+                  <h2 className="text-lg font-bold text-white mb-4">
+                    Prospekts
+                    <span className="ml-2 text-sm font-normal text-warm-400">({inmailData.prospects.filter(p => !p.used_at).length} aktiva)</span>
+                  </h2>
+                  <div className="bg-navy-700/50 border border-navy-600 rounded-xl overflow-hidden">
+                    {inmailData.prospects.length === 0 ? (
+                      <div className="text-center py-12 text-warm-400">Inga prospekts ännu</div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-navy-600 text-warm-400 text-left">
+                              <th className="px-4 py-3 font-medium">Email</th>
+                              <th className="px-4 py-3 font-medium">Källa</th>
+                              <th className="px-4 py-3 font-medium">Skapat</th>
+                              <th className="px-4 py-3 font-medium">Utgår</th>
+                              <th className="px-4 py-3 font-medium">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {inmailData.prospects.map((p) => {
+                              const expired = new Date(p.expires_at) < new Date();
+                              return (
+                                <tr key={p.id} className="border-b border-navy-600/50 hover:bg-navy-700/20 transition-colors">
+                                  <td className="px-4 py-3 text-white font-medium">{p.email}</td>
+                                  <td className="px-4 py-3 text-warm-400">{p.source || '—'}</td>
+                                  <td className="px-4 py-3 text-warm-400 whitespace-nowrap">
+                                    {new Date(p.created_at).toLocaleDateString('sv-SE')}
+                                  </td>
+                                  <td className="px-4 py-3 text-warm-400 whitespace-nowrap">
+                                    {new Date(p.expires_at).toLocaleDateString('sv-SE')}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {p.used_at ? (
+                                      <span className="px-2 py-1 rounded-md text-xs font-semibold bg-green-500/20 text-green-400">Registrerad</span>
+                                    ) : expired ? (
+                                      <span className="px-2 py-1 rounded-md text-xs font-semibold bg-red-500/20 text-red-400">Utgången</span>
+                                    ) : (
+                                      <span className="px-2 py-1 rounded-md text-xs font-semibold bg-blue-500/20 text-blue-400">Aktiv länk</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Email threads */}
+                <div>
+                  <h2 className="text-lg font-bold text-white mb-4">
+                    E-postkonversationer
+                    <span className="ml-2 text-sm font-normal text-warm-400">({inmailData.threads.length} trådar)</span>
+                  </h2>
+                  <div className="bg-navy-700/50 border border-navy-600 rounded-xl overflow-hidden">
+                    {inmailData.threads.length === 0 ? (
+                      <div className="text-center py-12 text-warm-400">Inga konversationer ännu</div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-navy-600 text-warm-400 text-left">
+                              <th className="px-4 py-3 font-medium">Användare</th>
+                              <th className="px-4 py-3 font-medium">State</th>
+                              <th className="px-4 py-3 font-medium">Transaktioner</th>
+                              <th className="px-4 py-3 font-medium">Senast aktiv</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {inmailData.threads.map((t) => {
+                              const isProspect = t.state?.startsWith('prospect:');
+                              const isPendingDelete = t.state?.startsWith('pending_delete:');
+                              return (
+                                <tr key={t.id} className="border-b border-navy-600/50 hover:bg-navy-700/20 transition-colors">
+                                  <td className="px-4 py-3">
+                                    {t.profiles ? (
+                                      <>
+                                        <div className="text-white font-medium">{t.profiles.full_name || t.profiles.email}</div>
+                                        {t.profiles.full_name && <div className="text-xs text-warm-500">{t.profiles.email}</div>}
+                                      </>
+                                    ) : isProspect ? (
+                                      <div className="text-warm-400 italic">{t.state?.replace('prospect:', '')}</div>
+                                    ) : (
+                                      <div className="text-warm-500">—</div>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {t.state ? (
+                                      <span className={`px-2 py-1 rounded-md text-xs font-semibold ${
+                                        isProspect ? 'bg-purple-500/20 text-purple-400' :
+                                        isPendingDelete ? 'bg-red-500/20 text-red-400' :
+                                        'bg-navy-600 text-warm-300'
+                                      }`}>
+                                        {isProspect ? 'Prospekt' : isPendingDelete ? 'Väntar radering' : t.state}
+                                      </span>
+                                    ) : (
+                                      <span className="text-warm-500">—</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-warm-300">
+                                    {t.transaction_ids?.length ?? 0} st
+                                  </td>
+                                  <td className="px-4 py-3 text-warm-400 whitespace-nowrap">
+                                    {new Date(t.updated_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 </div>
               </>

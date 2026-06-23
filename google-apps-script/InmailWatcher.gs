@@ -92,6 +92,17 @@ function handleReply(config, thread, senderEmail, threadId, messageId, subject, 
   }
 }
 
+// ─── Web App trigger (för testning via terminal) ──────────────────────────────
+
+function doGet(e) {
+  const secret = e.parameter.secret;
+  if (secret !== PropertiesService.getScriptProperties().getProperty('INMAIL_SECRET')) {
+    return ContentService.createTextOutput('Unauthorized');
+  }
+  checkInbox();
+  return ContentService.createTextOutput('OK');
+}
+
 // ─── Hjälpfunktioner ──────────────────────────────────────────────────────────
 
 function callApi(config, path, payload) {
