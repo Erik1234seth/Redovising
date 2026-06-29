@@ -181,13 +181,6 @@ export default function Home() {
             {/* Left – text */}
             <div className="flex-1 lg:max-w-[520px] text-center lg:text-left">
               <div className="flex flex-wrap gap-2 justify-center lg:justify-start mb-6">
-                <div
-                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold"
-                  style={{ backgroundColor: `${CORAL}15`, color: CORAL }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: CORAL }} />
-                  Bokslut för enskilda firmor
-                </div>
               </div>
 
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-[1.1] mb-6" style={{ color: NAV_BG }}>
@@ -202,16 +195,16 @@ export default function Home() {
               </h1>
 
               <p className="text-slate-500 text-base sm:text-lg leading-relaxed mb-8 max-w-md mx-auto lg:mx-0">
-                Förenklat årsbokslut, momsredovisning och NE-bilaga för enskilda firmor – fast pris, snabb leverans och ingen onödig byrå&shy;kostnad.
+                Mejla in dina underlag. Vi sköter bokföring, årsbokslut och deklaration. Allt ingår!
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
                 <a
-                  href="#packages"
+                  href="#faq"
                   className="px-7 py-3.5 font-bold text-white rounded-xl shadow-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.02] text-sm sm:text-base"
                   style={{ backgroundColor: NAV_BG, boxShadow: `0 8px 24px ${NAV_BG}30` }}
                 >
-                  Se priset
+                  Jag vill veta mer
                 </a>
                 <Link
                   href="/boka-mote"
@@ -225,7 +218,7 @@ export default function Home() {
               <div className="flex items-center gap-5 lg:gap-7 mt-8 justify-center lg:justify-start">
                 {[
                   { value: '299 kr/mån', label: 'allt inkluderat' },
-                  { value: 'Trygg', label: 'bokföring' },
+                  { value: 'Trygg och säker', label: 'bokföring' },
                   { value: '100%', label: 'fokus på enskilda firmor' },
                 ].map(({ value, label }) => (
                   <div key={label} className="text-center lg:text-left">
@@ -242,7 +235,7 @@ export default function Home() {
                 {/* Photo */}
                 <div className="relative w-full h-[340px] sm:h-[420px] lg:h-full lg:min-h-[580px] rounded-2xl lg:rounded-[32px] overflow-hidden">
                   <Image
-                    src="/hero-enkla-bokslut.png"
+                    src="/landning1.png"
                     alt="Glada småföretagare som fått hjälp med bokslut"
                     fill
                     className="object-cover object-center"
@@ -283,31 +276,30 @@ export default function Home() {
       </section>
 
 
-      <SectionDivider />
+      <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
 
       {/* ══════════════════════════════════════════
           PACKAGES
       ══════════════════════════════════════════ */}
       <section id="packages" className="py-20 sm:py-24 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-start">
 
             {/* Left: value proposition */}
             <div>
-              <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Pris</p>
               <h2 className="text-3xl sm:text-4xl font-extrabold mb-5 leading-tight" style={{ color: NAV_BG }}>
-                Ett pris.<br />Allt inkluderat.
+                Ett abonnemang. Allt ingår.
               </h2>
               <p className="text-slate-500 text-base leading-relaxed mb-8">
-                Vi erbjuder ett enda abonnemang — för att hålla det enkelt. Du behöver inte välja rätt paket eller oroa dig för att du köper fel. Allt ingår.
+                Vi tror att bokföring ska vara enkelt. Därför har vi bara ett abonnemang – utan paket, tillval eller dolda kostnader.<br />Du mejlar in dina underlag, vi sköter resten.
               </p>
 
               <div className="space-y-4 mb-10">
                 {[
-                  { title: 'Ingen bindningstid', desc: 'Avsluta abonnemanget när du vill, utan förklaring.' },
-                  { title: 'Inga andra program behövs', desc: 'Allt du behöver för bokslut, moms och deklaration — inget dyrt program att köpa eller lära sig.' },
-                  { title: 'Fast månadsavgift', desc: 'Inga timarvoden, inga tilläggsavgifter. Du vet alltid vad det kostar.' },
-                  { title: '100% fokus på enskilda firmor', desc: 'Vi specialiserar oss på en sak — och gör den bra.' },
+                  { title: 'Mejla bara in dina underlag', desc: 'Inga krångliga program eller avancerade bokföringskunskaper. Skicka underlagen via e-post – vi sköter resten.' },
+                  { title: 'Fast pris', desc: 'Allt ingår. Löpande bokföring, moms, årsbokslut och deklaration till en fast månadsavgift.' },
+                  { title: 'Ingen bindningstid', desc: 'Du bestämmer själv hur länge du vill vara kund.' },
+                  { title: 'Byggt för enskilda firmor', desc: 'Vi gör en sak – och vi gör den riktigt bra.' },
                 ].map((item) => (
                   <div key={item.title} className="flex gap-4">
                     <div className="w-6 h-6 rounded-full flex-shrink-0 mt-0.5 flex items-center justify-center" style={{ backgroundColor: `${NAV_BG}12` }}>
@@ -339,7 +331,6 @@ export default function Home() {
                   <span className="px-3 py-1 text-xs font-bold rounded-full" style={{ backgroundColor: CORAL, color: 'white' }}>
                     ALLT INKLUDERAT
                   </span>
-                  <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>Löpande abonnemang</span>
                 </div>
 
                 <div className="p-7 sm:p-9">
@@ -371,8 +362,8 @@ export default function Home() {
                   </div>
 
                   <div className="mb-7 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-                    <h3 className="text-xl font-bold mb-1 text-white">{pkg.name}</h3>
-                    <p className="text-sm mb-6 text-white/55">Du skickar in dina transaktioner löpande — vi sköter resten. I slutet av året är NE-bilaga och momsredovisning redo.</p>
+                    <h3 className="text-xl font-bold mb-1 text-white">Komplett tjänst</h3>
+                    <p className="text-sm mb-6 text-white/55">Du mejlar in dina underlag när det passar dig. Vi sköter den löpande bokföringen, momsredovisningen, årsbokslutet och deklarationen.</p>
                     <div className="flex items-end gap-1.5">
                       <span className="text-6xl font-extrabold text-white leading-none">
                         {billing === 'monthly' ? pkg.price.toLocaleString('sv') : pkg.yearlyPrice.toLocaleString('sv')}
@@ -384,8 +375,11 @@ export default function Home() {
                         </p>
                       </div>
                     </div>
+                    {billing === 'monthly' && (
+                      <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>Sprid din kostnad över året</p>
+                    )}
                     {billing === 'yearly' && (
-                      <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>≈ 292 kr/mån — du faktureras en gång per år</p>
+                      <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>Faktureras årsvis efter inlämnad deklaration</p>
                     )}
                   </div>
 
@@ -422,7 +416,7 @@ export default function Home() {
       {/* ══════════════════════════════════════════
           FAQ
       ══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-24" style={{ backgroundColor: NAV_BG }}>
+      <section id="faq" className="py-20 sm:py-24" style={{ backgroundColor: NAV_BG }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Vanliga frågor</p>
@@ -462,293 +456,11 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Tabs + Mockup */}
-          <div className="rounded-3xl overflow-hidden shadow-2xl border border-slate-200" style={{ backgroundColor: '#fff' }}>
-
-            {/* Webbläsar-chrome */}
-            <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-200" style={{ backgroundColor: '#f1f3f5' }}>
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-400" />
-                <div className="w-3 h-3 rounded-full bg-yellow-400" />
-                <div className="w-3 h-3 rounded-full bg-green-400" />
-              </div>
-              <div className="flex-1 mx-3 bg-white rounded-md px-3 py-1.5 text-[11px] text-slate-400 border border-slate-200 font-mono">
-                app.enklabokslut.se
-              </div>
-            </div>
-
-            {/* Tab-rad */}
-            <div className="flex border-b border-slate-200 bg-slate-50">
-              {([
-                { id: 'bokforing', label: 'Bokföring' },
-                { id: 'rapporter', label: 'Rapporter & Bokslut' },
-                { id: 'fakturor', label: 'Fakturor' },
-                { id: 'hjalp', label: 'Hjälp & Support' },
-              ] as { id: AppTab; label: string }[]).map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabClick(tab.id)}
-                  className="flex-1 px-4 py-3.5 text-sm font-semibold transition-all duration-150 border-b-2 hover:bg-white cursor-pointer"
-                  style={{
-                    borderBottomColor: activeTab === tab.id ? CORAL : 'transparent',
-                    color: activeTab === tab.id ? CORAL : '#64748b',
-                    backgroundColor: activeTab === tab.id ? '#fff' : 'transparent',
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Mockup-innehåll */}
-            <style>{`
-              @keyframes tabFadeIn {
-                from { opacity: 0; transform: translateY(8px); }
-                to   { opacity: 1; transform: translateY(0); }
-              }
-              .tab-content { animation: tabFadeIn 0.3s ease forwards; }
-              @keyframes tabProgress {
-                from { width: 0%; }
-                to   { width: 100%; }
-              }
-              .tab-progress { animation: tabProgress 2.5s linear forwards; }
-            `}</style>
-            <div className="flex flex-col lg:flex-row min-h-[420px]">
-
-              {/* Vänster: UI-mockup */}
-              <div className="flex-1 p-6 lg:p-8 bg-slate-50 border-b lg:border-b-0 lg:border-r border-slate-200 overflow-hidden">
-                <div key={activeTab} className="tab-content">
-
-                {activeTab === 'bokforing' && (
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-semibold text-slate-400 mb-1">Bokföring</p>
-                    <p className="text-base font-extrabold text-slate-800 tracking-tight mb-3">Vad har hänt?</p>
-                    {[
-                      { label: 'Jag fick betalt av en kund', icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z', color: '#ECFDF5', iconColor: '#059669' },
-                      { label: 'Jag köpte något till företaget', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z', color: '#EFF6FF', iconColor: '#2563EB' },
-                      { label: 'Privata pengar in eller ut', icon: 'M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4', color: '#F5F3FF', iconColor: '#7C3AED' },
-                      { label: 'Ladda upp transaktionslista', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12', color: '#ECFEFF', iconColor: '#0891B2' },
-                    ].map(c => (
-                      <div key={c.label} className="flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 border border-slate-200">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: c.color }}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: c.iconColor }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={c.icon} /></svg>
-                        </div>
-                        <span className="text-xs font-medium text-slate-700">{c.label}</span>
-                        <svg className="w-3.5 h-3.5 text-slate-300 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                      </div>
-                    ))}
-                    <div className="mt-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
-                      <div className="grid px-4 py-2 bg-slate-50 border-b border-slate-100 text-[10px] font-semibold text-slate-400 uppercase tracking-wide" style={{ gridTemplateColumns: '80px 1fr 80px' }}>
-                        <span>Datum</span><span>Beskrivning</span><span className="text-right">Belopp</span>
-                      </div>
-                      {[
-                        { desc: 'Kontorsmaterial', belopp: '−450 kr', date: '2026-05-28', neg: true },
-                        { desc: 'Kund AB – faktura #42', belopp: '+12 500 kr', date: '2026-05-26', neg: false },
-                        { desc: 'Mobilabonnemang', belopp: '−299 kr', date: '2026-05-25', neg: true },
-                      ].map(t => (
-                        <div key={t.desc} className="grid px-4 py-2 border-b border-slate-50 last:border-0 text-[11px]" style={{ gridTemplateColumns: '80px 1fr 80px' }}>
-                          <span className="text-slate-400">{t.date}</span>
-                          <span className="text-slate-700 truncate">{t.desc}</span>
-                          <span className="text-right font-medium" style={{ color: t.neg ? '#ef4444' : '#059669' }}>{t.belopp}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'fakturor' && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <p className="text-base font-extrabold text-slate-800 tracking-tight">Fakturor</p>
-                        <p className="text-[10px] text-slate-400">Skapa och hantera dina kundfakturor</p>
-                      </div>
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white" style={{ backgroundColor: NAV_BG }}>
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-                        Ny faktura
-                      </div>
-                    </div>
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                      <div className="grid px-4 py-2 bg-slate-50 border-b border-slate-100 text-[10px] font-semibold text-slate-400 uppercase tracking-wide" style={{ gridTemplateColumns: '70px 1fr 90px 70px' }}>
-                        <span>Faktura nr</span><span>Kund</span><span className="text-right">Belopp</span><span className="text-right">Status</span>
-                      </div>
-                      {[
-                        { nr: '2026-014', kund: 'Kund AB', belopp: '12 500 kr', status: 'Obetald', stBg: '#FEF9C3', stColor: '#A16207' },
-                        { nr: '2026-013', kund: 'Design Studio', belopp: '8 750 kr', status: 'Betald', stBg: '#DCFCE7', stColor: '#166534' },
-                        { nr: '2026-012', kund: 'Företag AB', belopp: '4 250 kr', status: 'Betald', stBg: '#DCFCE7', stColor: '#166534' },
-                        { nr: '2026-011', kund: 'Konsult & Co', belopp: '21 875 kr', status: 'Försenad', stBg: '#FEE2E2', stColor: '#991B1B' },
-                      ].map(f => (
-                        <div key={f.nr} className="grid px-4 py-2.5 border-b border-slate-50 last:border-0 items-center text-[11px]" style={{ gridTemplateColumns: '70px 1fr 90px 70px' }}>
-                          <span className="font-semibold text-slate-700">{f.nr}</span>
-                          <span className="text-slate-600 truncate">{f.kund}</span>
-                          <span className="text-right font-semibold text-slate-700">{f.belopp}</span>
-                          <span className="text-right">
-                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold" style={{ backgroundColor: f.stBg, color: f.stColor }}>{f.status}</span>
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'rapporter' && (
-                  <div className="space-y-2">
-                    <p className="text-base font-extrabold text-slate-800 tracking-tight mb-3">Rapporter & Bokslut</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {/* Rapporter-kort */}
-                      <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col">
-                        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mb-3">
-                          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                        </div>
-                        <p className="text-sm font-extrabold text-slate-800 mb-1">Rapporter</p>
-                        <p className="text-[10px] text-slate-500 leading-relaxed mb-3">Alltid uppdaterat.</p>
-                        <div className="space-y-1.5">
-                          {[{ label: 'Resultatrapport', color: '#059669' }, { label: 'Balansrapport', color: '#2563EB' }, { label: 'Momsredovisning', color: '#D97706' }, { label: 'Transaktionslista', color: '#0891B2' }].map(r => (
-                            <div key={r.label} className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />{r.label}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-auto pt-3 text-[10px] font-semibold text-blue-600 flex items-center gap-1">Öppna rapporter <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg></div>
-                      </div>
-                      {/* Bokslut-kort */}
-                      <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mb-3">
-                          <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-                        </div>
-                        <p className="text-sm font-extrabold text-slate-800 mb-1">Bokslut</p>
-                        <p className="text-[10px] text-slate-500 leading-relaxed mb-3">Steg-för-steg till inlämnad deklaration.</p>
-                        <div className="space-y-1.5">
-                          {['Stäm av transaktioner', 'Kontrollera moms', 'Ladda ned NE-bilaga', 'Lämna in deklaration'].map((r, i) => (
-                            <div key={r} className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                              <div className="w-4 h-4 rounded-full border border-emerald-300 flex items-center justify-center text-emerald-600 flex-shrink-0" style={{ fontSize: 8 }}>{i + 1}</div>{r}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-auto pt-3 text-[10px] font-semibold text-emerald-600 flex items-center gap-1">Starta bokslut <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'hjalp' && (
-                  <div className="space-y-3">
-                    {/* Hero-sektion */}
-                    <div className="rounded-xl px-4 py-4 relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${NAV_BG} 0%, #1e5278 100%)` }}>
-                      <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-10" style={{ background: CORAL }} />
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold mb-2" style={{ backgroundColor: `${CORAL}28`, color: CORAL, border: `1px solid ${CORAL}30` }}>
-                        Hjälp & support
-                      </div>
-                      <p className="text-lg font-extrabold text-white mb-1">Vi hjälper dig</p>
-                      <p className="text-[10px] text-white/55 mb-3">Alltid någon att fråga, guider och svar.</p>
-                      <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)' }}>
-                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'rgba(255,255,255,0.35)' }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg>
-                        <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Sök bland guider och frågor...</span>
-                      </div>
-                    </div>
-                    {/* Guider */}
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { title: 'Kom igång med bokföring', color: '#2563EB', bg: '#EFF6FF', icon: 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z' },
-                        { title: 'Skapa din första faktura', color: '#D97706', bg: '#FFFBEB', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-                        { title: 'Förstå dina rapporter', color: '#059669', bg: '#ECFDF5', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-                        { title: 'Lager & Inventarier', color: '#7C3AED', bg: '#F5F3FF', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
-                      ].map(g => (
-                        <div key={g.title} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                          <div className="h-0.5 w-full" style={{ background: g.color }} />
-                          <div className="p-3 flex items-start gap-2">
-                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: g.bg }}>
-                              <svg style={{ color: g.color, width: 14, height: 14 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={g.icon} /></svg>
-                            </div>
-                            <p className="text-[10px] font-bold text-slate-800 leading-snug">{g.title}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {/* FAQ preview */}
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                      {['Hur bokför jag ett köp?', 'Hur skapar jag en faktura?', 'Vad är en NE-bilaga?'].map((q, i) => (
-                        <div key={q} className={`flex items-center justify-between px-4 py-2.5 text-[11px] ${i > 0 ? 'border-t border-slate-100' : ''}`}>
-                          <span className="text-slate-700 font-medium">{q}</span>
-                          <svg className="w-3 h-3 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                </div>
-              </div>
-
-              {/* Höger: beskrivning */}
-              <div className="w-full lg:w-72 xl:w-80 flex-shrink-0 p-6 lg:p-8 flex flex-col justify-between">
-                <div key={activeTab} className="tab-content">
-                  {activeTab === 'bokforing' && <>
-                    <h3 className="text-lg font-extrabold mb-3" style={{ color: NAV_BG }}>Enkel löpande bokföring</h3>
-                    <ul className="space-y-2.5">
-                      {['Lägg in köp och intäkter på sekunder', 'Ladda upp kvitto – rätt uppgifter fylls i automatiskt', 'Rätt konton sätts automatiskt', 'Full historik och sökbar transaktionslista'].map(f => (
-                        <li key={f} className="flex items-start gap-2.5 text-sm text-slate-600">
-                          <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </>}
-                  {activeTab === 'fakturor' && <>
-                    <h3 className="text-lg font-extrabold mb-3" style={{ color: NAV_BG }}>Proffsiga fakturor</h3>
-                    <ul className="space-y-2.5">
-                      {['Skapa och skicka faktura direkt via mail', 'Spara kunder och produkter', 'PDF med din logotyp och info', 'Automatisk bokföring när fakturan skapas'].map(f => (
-                        <li key={f} className="flex items-start gap-2.5 text-sm text-slate-600">
-                          <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </>}
-                  {activeTab === 'rapporter' && <>
-                    <h3 className="text-lg font-extrabold mb-3" style={{ color: NAV_BG }}>Rapporter & Bokslut</h3>
-                    <ul className="space-y-2.5">
-                      {['Resultat- och balansrapport alltid uppdaterad', 'NE-bilaga redo att lämna in till Skatteverket', 'Momsredovisning per period', 'Exportera allt som PDF'].map(f => (
-                        <li key={f} className="flex items-start gap-2.5 text-sm text-slate-600">
-                          <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </>}
-                  {activeTab === 'hjalp' && <>
-                    <h3 className="text-lg font-extrabold mb-3" style={{ color: NAV_BG }}>Hjälp när du behöver</h3>
-                    <ul className="space-y-2.5">
-                      {['Alltid någon att fråga – dygnet runt, direkt svar', 'Guidar dig rätt i varje steg', 'Förklarar momsregler och kontoplanen på enkelt sätt', 'FAQ med vanliga frågor för enskilda firmor'].map(f => (
-                        <li key={f} className="flex items-start gap-2.5 text-sm text-slate-600">
-                          <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </>}
-                </div>
-
-                {/* CTAs */}
-                <div className="mt-8 space-y-3">
-                  <button
-                    onClick={handleGetStarted}
-                    className="w-full py-3 text-sm font-bold text-white rounded-xl hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: CORAL, boxShadow: `0 4px 14px ${CORAL}40` }}
-                  >
-                    Testa 14 dagar gratis →
-                  </button>
-                  <Link
-                    href="/boka-mote"
-                    className="w-full py-3 text-sm font-semibold rounded-xl border-2 flex items-center justify-center transition-colors hover:bg-slate-50"
-                    style={{ borderColor: NAV_BG, color: NAV_BG }}
-                  >
-                    Boka gratis demo
-                  </Link>
-                </div>
-              </div>
-
-            </div>
-          </div>
+          <img
+            src="/processbild2.png"
+            alt="Så här fungerar det"
+            className="w-full rounded-3xl shadow-2xl border border-slate-200"
+          />
         </div>
       </section>
 

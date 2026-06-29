@@ -9,13 +9,12 @@ export const packages: PackageInfo[] = [
     period: '/mån',
     description: 'Allt inkluderat. Löpande abonnemang utan bindningstid.',
     features: [
+      'Mejla bara in dina underlag',
       'Löpande bokföring',
-      'Förenklat årsbokslut',
-      'Vi upprättar din NE-bilaga',
-      'Momsdeklaration till Skatteverket',
-      'Vi sköter inlämningen till Skatteverket',
+      'Årsbokslut, moms och deklaration',
+      'Vi lämnar in till Skatteverket',
       'Inget bokföringsprogram behövs',
-      'Avsluta när du vill – ingen bindningstid',
+      'Ingen bindningstid',
     ]
   }
 ];
