@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { packages } from '@/data/packages';
 import { useAuth } from '@/contexts/AuthContext';
+import { PAYMENTS_ENABLED } from '@/lib/config';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
@@ -36,7 +37,6 @@ function useFakeCountdown(): Countdown | null {
   return value;
 }
 
-type AppTab = 'bokforing' | 'fakturor' | 'rapporter' | 'hjalp';
 
 const landingFaqItems = [
   { q: 'Vem passar Enkla Bokslut för?', a: 'Enkla Bokslut är byggt för Sveriges småföretagare. Vi riktar oss till enskilda firmor utan anställd personal och med en årsomsättning på upp till 3 miljoner kronor.\n\nTyvärr passar Enkla Bokslut inte alla verksamheter. I dagsläget kan vi inte hjälpa företag som har anställd personal, bedriver skogs- eller lantbruksverksamhet, driver taxiverksamhet, använder vinstmarginalbeskattning (VMB) eller har annan verksamhet med särskilt komplexa skatte- och momsregler.' },
@@ -107,29 +107,11 @@ function LandingFaq() {
 export default function Home() {
   const { user, loading } = useAuth();
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
-  const [activeTab, setActiveTab] = useState<AppTab>('bokforing');
-  const [tabPaused, setTabPaused] = useState(false);
   const fakeCountdown = useFakeCountdown();
   const router = useRouter();
 
-  const tabs: AppTab[] = ['bokforing', 'rapporter', 'fakturor', 'hjalp'];
-  useEffect(() => {
-    if (tabPaused) return;
-    const id = setInterval(() => {
-      setActiveTab(prev => {
-        const i = tabs.indexOf(prev);
-        return tabs[(i + 1) % tabs.length];
-      });
-    }, 4000);
-    return () => clearInterval(id);
-  }, [tabPaused]);
-
-  const handleTabClick = (tab: AppTab) => {
-    setActiveTab(tab);
-    setTabPaused(true);
-  };
-
   const handleGetStarted = () => {
+    if (!PAYMENTS_ENABLED) return;
     sessionStorage.setItem('billingPeriod', billing);
     router.push('/bestall');
   };
@@ -398,10 +380,11 @@ export default function Home() {
 
                   <button
                     onClick={handleGetStarted}
-                    className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 hover:scale-[1.02] text-sm"
-                    style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 20px ${CORAL}40` }}
+                    disabled={!PAYMENTS_ENABLED}
+                    className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: CORAL, color: 'white', boxShadow: PAYMENTS_ENABLED ? `0 8px 20px ${CORAL}40` : 'none' }}
                   >
-                    Kom igång →
+                    {PAYMENTS_ENABLED ? 'Kom igång →' : 'Kommer snart'}
                   </button>
                 </div>
               </div>
@@ -430,30 +413,124 @@ export default function Home() {
       <SectionDivider dark />
 
       {/* ══════════════════════════════════════════
-          APP PREVIEW
+          TRE ALTERNATIV
       ══════════════════════════════════════════ */}
       <section className="py-20 sm:py-28 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-
-          {/* Rubrik */}
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Hur det ser ut</p>
+            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Du väljer hur du jobbar</p>
             <h2 className="text-3xl sm:text-4xl font-extrabold mb-4 leading-tight" style={{ color: NAV_BG }}>
-              Allt ingår – från kontering<br />till färdiga bokslut
+              Inget nytt system att lära sig<br />— om du inte vill
             </h2>
-            <p className="text-slate-500 text-base max-w-xl mx-auto leading-relaxed">
-              Du sköter din löpande bokföring och vi ser till att allt stämmer. Vid årets slut är NE-bilaga, momsredovisning och bokslut redan klara.
+            <p className="text-slate-500 text-base max-w-lg mx-auto leading-relaxed">
+              Oavsett om du föredrar Excel, att maila in ditt underlag eller att ha full koll i webappen — vi tar hand om resten.
             </p>
+          </div>
 
-            {/* Allt ingår-pills */}
-            <div className="flex flex-wrap justify-center gap-2 mt-6">
-              {['Bokföring', 'Fakturor', 'Momsredovisning', 'NE-bilaga', 'Rapporter'].map(f => (
-                <span key={f} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: `${NAV_BG}10`, color: NAV_BG }}>
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                  {f}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+            {/* Alternativ 1: Maila in */}
+            <div className="relative flex flex-col rounded-3xl overflow-hidden border-2 bg-white" style={{ borderColor: `${NAV_BG}18` }}>
+              <div className="absolute top-4 right-4">
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: '#ECFDF5', color: '#059669' }}>
+                  Enklast
                 </span>
-              ))}
+              </div>
+              <div className="p-7 flex flex-col flex-1">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style={{ backgroundColor: '#EFF6FF' }}>
+                  <svg className="w-6 h-6" fill="none" stroke="#2563EB" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-extrabold mb-1" style={{ color: NAV_BG }}>Maila in</h3>
+                <p className="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wide">Noll ny teknik</p>
+                <p className="text-sm text-slate-600 leading-relaxed mb-5">
+                  Fota kvittot, bifoga fakturan — skicka ett mail till oss. Vi bokför och återkommer om vi har frågor.
+                </p>
+                <ul className="flex flex-col gap-2 mb-6">
+                  {['Inga inloggningar att hålla reda på', 'Fungerar från din vanliga inkorg', 'Vi sköter kontering och moms'].map(f => (
+                    <li key={f} className="flex items-start gap-2 text-xs text-slate-600">
+                      <svg className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-auto pt-3 border-t border-slate-100">
+                  <p className="text-[11px] text-slate-400">Passar dig som vill lägga noll tid på administration.</p>
+                </div>
+              </div>
             </div>
+
+            {/* Alternativ 2: Excel */}
+            <div className="relative flex flex-col rounded-3xl overflow-hidden border-2 bg-white" style={{ borderColor: `${NAV_BG}18` }}>
+              <div className="absolute top-4 right-4">
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: '#FFFBEB', color: '#D97706' }}>
+                  Populärt
+                </span>
+              </div>
+              <div className="p-7 flex flex-col flex-1">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style={{ backgroundColor: '#ECFDF5' }}>
+                  <svg className="w-6 h-6" fill="none" stroke="#059669" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-extrabold mb-1" style={{ color: NAV_BG }}>Excel / Kalkylark</h3>
+                <p className="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wide">Fortsätt som vanligt</p>
+                <p className="text-sm text-slate-600 leading-relaxed mb-5">
+                  Håller du redan koll i ett kalkylark? Skicka filen till oss — eller ladda upp den direkt så tolkar vi den automatiskt.
+                </p>
+                <ul className="flex flex-col gap-2 mb-6">
+                  {['Behåll ditt eget kalkylark', 'Ladda upp eller maila filen', 'AI tolkar och bokför automatiskt'].map(f => (
+                    <li key={f} className="flex items-start gap-2 text-xs text-slate-600">
+                      <svg className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-auto pt-3 border-t border-slate-100">
+                  <p className="text-[11px] text-slate-400">Passar dig som redan spårar i Excel eller Google Kalkylark.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Alternativ 3: Webappen */}
+            <div className="relative flex flex-col rounded-3xl overflow-hidden border-2" style={{ borderColor: NAV_BG, backgroundColor: NAV_BG }}>
+              <div className="absolute top-4 right-4">
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.8)' }}>
+                  Full kontroll
+                </span>
+              </div>
+              <div className="p-7 flex flex-col flex-1">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-extrabold mb-1 text-white">Webappen</h3>
+                <p className="text-xs font-semibold mb-3 uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.5)' }}>Realtid & överblick</p>
+                <p className="text-sm leading-relaxed mb-5" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  Bokför direkt, se rapporter live, skapa fakturor och håll full koll på ekonomin — allt på ett ställe.
+                </p>
+                <ul className="flex flex-col gap-2 mb-6">
+                  {['Bokföring på sekunder', 'Fakturor, rapporter och moms', 'Alltid uppdaterat i realtid'].map(f => (
+                    <li key={f} className="flex items-start gap-2 text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                      <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke={CORAL} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-auto pt-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
+                  <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Passar dig som vill ha full kontroll och överblick.</p>
+                </div>
+              </div>
+            </div>
+
           </div>
 
           <img

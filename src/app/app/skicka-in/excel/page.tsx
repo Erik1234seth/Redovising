@@ -3,7 +3,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
 
 const NAV_BG = '#173b57';
@@ -30,10 +29,6 @@ interface ParsedTransaction {
 
 export default function ExcelGuidePage() {
   const router = useRouter();
-  const { profile } = useAuth();
-  const isDev = process.env.NODE_ENV === 'development';
-  const [devViaMail, setDevViaMail] = useState<boolean | null>(null);
-  const viaMail = isDev && devViaMail !== null ? devViaMail : profile?.skicka_in_metod === 'maila-fil';
 
   const [hasVisited, setHasVisited] = useState(false);
 
@@ -249,52 +244,53 @@ export default function ExcelGuidePage() {
 
   return (
     <div className="flex flex-col min-h-full bg-slate-50">
-      {isDev && (
-        <div className="mx-8 mt-6 flex flex-wrap gap-2 items-center p-3 rounded-xl border border-dashed border-orange-300 bg-orange-50">
-          <span className="text-[11px] font-bold text-orange-400 uppercase tracking-wide mr-1">Dev</span>
-          {[{ label: 'Ladda upp', value: false }, { label: 'Maila in', value: true }].map(opt => (
-            <button
-              key={opt.label}
-              onClick={() => setDevViaMail(devViaMail === opt.value ? null : opt.value)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-              style={{
-                backgroundColor: (devViaMail === null ? profile?.skicka_in_metod === 'maila-fil' === opt.value : devViaMail === opt.value) ? '#f97316' : 'white',
-                color: (devViaMail === null ? profile?.skicka_in_metod === 'maila-fil' === opt.value : devViaMail === opt.value) ? 'white' : '#9a3412',
-                border: '1px solid #fed7aa',
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
 
-      <div className="px-8 pt-8 pb-0 max-w-2xl">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors mb-7">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Tillbaka
-        </Link>
-        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Din bokföringsfil</h1>
-        <p className="text-slate-400 text-sm mt-2 mb-8">
-          Se hur filen ska se ut, ladda ner mallen och{' '}
-          {viaMail ? 'maila in den när den är klar.' : 'ladda upp den direkt.'}
-        </p>
+      {/* Hero */}
+      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0d2236 0%, #173b57 100%)' }}>
+        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+        <div className="relative px-8 pt-10 pb-10">
+          <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-white/50 hover:text-white/80 transition-colors mb-8">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Tillbaka
+          </Link>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <span className="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest" style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.55)' }}>
+              Excel &amp; CSV
+            </span>
+          </div>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">Din bokföringsfil</h1>
+          <p className="text-white/55 text-sm mt-2 leading-relaxed max-w-xs">
+            Se hur filen ska se ut, ladda ner mallen och ladda upp den direkt.
+          </p>
+          <div className="flex gap-3 mt-7 flex-wrap">
+            {[{ value: '5', label: 'kolumner' }, { value: '3', label: 'filformat' }, { value: 'AI', label: 'tolkar filen' }].map(s => (
+              <div key={s.label} className="rounded-xl px-4 py-2.5" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+                <p className="text-white font-extrabold text-base leading-none">{s.value}</p>
+                <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <div className="px-8 pb-12 max-w-2xl flex flex-col gap-6">
+      <div className="px-6 pb-12 max-w-2xl flex flex-col gap-5 mt-6">
 
-        {/* Återbesök + ladda-upp-variant: visa upload först */}
-        {!viaMail && hasVisited && <UploadSection
+        {/* Återbesök: visa upload först */}
+        {hasVisited && <UploadSection
           dragging={dragging} files={files} error={error}
           fileRef={fileRef} setDragging={setDragging}
           handleDrop={handleDrop} handleChange={handleChange}
           removeFile={removeFile} analyzeAll={analyzeAll}
         />}
 
-        {/* Divider — visas alltid utom vid mail */}
-        {!viaMail && hasVisited && (
+        {hasVisited && (
           <div className="flex items-center gap-3">
             <div className="flex-1 h-px bg-slate-200" />
             <span className="text-xs text-slate-400 font-medium">Guide och mall nedan</span>
@@ -303,8 +299,7 @@ export default function ExcelGuidePage() {
         )}
 
         {/* Mac-stil Excel-visualisering */}
-        <div className="rounded-2xl overflow-hidden shadow-lg border border-slate-200">
-          {/* Title bar */}
+        <div className="rounded-2xl overflow-hidden shadow-md border border-slate-200">
           <div className="flex items-center gap-2 px-4 py-3" style={{ backgroundColor: '#1e2d3d' }}>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-full bg-red-400" />
@@ -320,8 +315,6 @@ export default function ExcelGuidePage() {
               </div>
             </div>
           </div>
-
-          {/* Toolbar */}
           <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-200" style={{ backgroundColor: '#f0f4f8' }}>
             {['B', 'I', 'U'].map(l => (
               <span key={l} className="w-6 h-6 flex items-center justify-center text-xs font-bold text-slate-500 bg-white rounded border border-slate-200 cursor-default select-none">{l}</span>
@@ -332,11 +325,8 @@ export default function ExcelGuidePage() {
               <span className="text-xs text-slate-500 font-mono">Datum</span>
             </div>
           </div>
-
-          {/* Spreadsheet */}
           <div className="overflow-x-auto bg-white">
             <table className="w-full text-xs border-collapse" style={{ minWidth: 520 }}>
-              {/* Column letters */}
               <thead>
                 <tr>
                   <th className="w-8 border-r border-b border-slate-200 bg-slate-50 text-slate-400 font-medium py-1.5 text-center sticky left-0" />
@@ -344,7 +334,6 @@ export default function ExcelGuidePage() {
                     <th key={l} className="border-r border-b border-slate-200 bg-slate-50 text-slate-400 font-medium py-1.5 px-2 text-center w-28">{l}</th>
                   ))}
                 </tr>
-                {/* Row 1 — column headers (Excel-green style) */}
                 <tr>
                   <td className="border-r border-b border-slate-200 bg-slate-50 text-slate-400 font-medium text-center py-1.5 text-[11px] sticky left-0">1</td>
                   {SHEET_COLS.map((col, i) => (
@@ -359,20 +348,13 @@ export default function ExcelGuidePage() {
                   <tr key={ri} style={{ backgroundColor: ri % 2 === 0 ? 'white' : '#f7faf8' }}>
                     <td className="border-r border-b border-slate-200 bg-slate-50 text-slate-400 font-medium text-center py-1.5 text-[11px] sticky left-0">{ri + 2}</td>
                     {row.map((cell, ci) => (
-                      <td
-                        key={ci}
-                        className="border-r border-b border-slate-100 px-2 py-2 text-[11px]"
-                        style={{
-                          color: cell === 'Utgift' ? '#dc2626' : cell === 'Inkomst' ? '#16a34a' : '#374151',
-                          fontWeight: (cell === 'Utgift' || cell === 'Inkomst') ? 600 : 400,
-                        }}
-                      >
+                      <td key={ci} className="border-r border-b border-slate-100 px-2 py-2 text-[11px]"
+                        style={{ color: cell === 'Utgift' ? '#dc2626' : cell === 'Inkomst' ? '#16a34a' : '#374151', fontWeight: (cell === 'Utgift' || cell === 'Inkomst') ? 600 : 400 }}>
                         {cell}
                       </td>
                     ))}
                   </tr>
                 ))}
-                {/* Empty rows to make it look more realistic */}
                 {[4, 5].map(n => (
                   <tr key={n} style={{ backgroundColor: n % 2 === 0 ? 'white' : '#f7faf8' }}>
                     <td className="border-r border-b border-slate-200 bg-slate-50 text-slate-300 font-medium text-center py-1.5 text-[11px] sticky left-0">{n + 1}</td>
@@ -388,15 +370,15 @@ export default function ExcelGuidePage() {
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="px-6 pt-5 pb-4 border-b border-slate-100">
             <h2 className="font-bold text-slate-800">Vad ska filen innehålla?</h2>
-            <p className="text-sm text-slate-400 mt-1">Varje rad i filen är en transaktion. Kolumnerna behöver inte heta exakt så — vi tolkar dem automatiskt.</p>
+            <p className="text-xs text-slate-400 mt-1">Varje rad är en transaktion. Kolumnerna behöver inte heta exakt så — vi tolkar dem automatiskt.</p>
           </div>
           <div className="divide-y divide-slate-50">
             {[
-              { col: 'Datum', badge: 'Krav', color: 'rose', desc: 'Transaktionens datum. Format ÅÅÅÅ-MM-DD, t.ex. 2025-03-15.' },
+              { col: 'Datum', badge: 'Krav', color: 'rose', desc: 'Format ÅÅÅÅ-MM-DD, t.ex. 2025-03-15.' },
               { col: 'Beskrivning', badge: 'Krav', color: 'rose', desc: 'Vad transaktionen gäller, t.ex. "Faktura 101 – Kund AB".' },
               { col: 'Belopp', badge: 'Krav', color: 'rose', desc: 'Hela beloppet inklusive moms, i kronor.' },
               { col: 'Moms', badge: 'Krav', color: 'rose', desc: 'Momsbeloppet i kronor. Skriv 0 om ingen moms.' },
-              { col: 'Typ', badge: 'Krav', color: 'rose', desc: 'Skriv "Inkomst" för pengar in och "Utgift" för pengar ut.' },
+              { col: 'Typ', badge: 'Krav', color: 'rose', desc: '"Inkomst" för pengar in och "Utgift" för pengar ut.' },
               { col: 'Valuta', badge: 'Valfritt', color: 'slate', desc: 'Behövs bara om transaktionen inte är i SEK.' },
             ].map(item => (
               <div key={item.col} className="flex items-start gap-3 px-6 py-3.5">
@@ -415,11 +397,11 @@ export default function ExcelGuidePage() {
           </div>
         </div>
 
-        {/* Mall-nedladdning */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 flex items-center justify-between gap-4">
+        {/* Mall */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex items-center justify-between gap-4">
           <div>
             <h2 className="font-bold text-slate-800 mb-0.5">Ladda ner mall</h2>
-            <p className="text-sm text-slate-400">Färdig fil med rätt kolumner — fyll i dina transaktioner och skicka in.</p>
+            <p className="text-xs text-slate-400">Färdig fil med rätt kolumner — fyll i dina transaktioner och ladda upp.</p>
           </div>
           <a
             href="/templates/bokforing-mall.csv"
@@ -434,65 +416,28 @@ export default function ExcelGuidePage() {
           </a>
         </div>
 
-        {/* Divider med pilindikator — visas bara vid första besök eller mail */}
-        {(viaMail || !hasVisited) && (
+        {/* Första besök: upload nedan */}
+        {!hasVisited && (
           <div className="flex items-center gap-3">
             <div className="flex-1 h-px bg-slate-200" />
             <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
-              {viaMail ? 'Instruktioner för att maila in nedan' : 'Ladda upp din fil nedan'}
+              Ladda upp din fil nedan
             </div>
             <div className="flex-1 h-px bg-slate-200" />
           </div>
         )}
 
-        {/* Skicka in — mail eller upload (visas här bara vid första besök eller mail) */}
-        {(viaMail || !hasVisited) && (viaMail ? (
-          <div className="rounded-2xl overflow-hidden border-2 border-blue-100" style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)' }}>
-            <div className="px-6 pt-6 pb-5">
-              <div className="flex items-start gap-4">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-blue-600">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h2 className="font-bold text-slate-800 text-[15px]">Maila in din fil</h2>
-                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                    Spara din fil som <span className="font-semibold text-slate-700">.xlsx</span> och skicka den till oss på mailadressen nedan. Vi bokför och återkommer om vi har frågor.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 bg-white rounded-xl border border-blue-200 px-5 py-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">Mailadress</p>
-                  <p className="text-sm font-bold text-slate-800 tracking-tight">ekonomi@enklabokslut.se</p>
-                </div>
-                <a
-                  href="mailto:ekonomi@enklabokslut.se?subject=Bokföringsfil"
-                  className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: '#2563EB' }}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Öppna mail
-                </a>
-              </div>
-            </div>
-          </div>
-        ) : <UploadSection
+        {!hasVisited && <UploadSection
           dragging={dragging} files={files} error={error}
           fileRef={fileRef} setDragging={setDragging}
           handleDrop={handleDrop} handleChange={handleChange}
           removeFile={removeFile} analyzeAll={analyzeAll}
-        />)}
+        />}
 
-        {/* Info */}
-        <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5 bg-slate-100">
+        <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}18` }}>
           <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -510,7 +455,7 @@ interface UploadSectionProps {
   dragging: boolean;
   files: File[];
   error: string | null;
-  fileRef: React.RefObject<HTMLInputElement>;
+  fileRef: React.RefObject<HTMLInputElement | null>;
   setDragging: (v: boolean) => void;
   handleDrop: (e: React.DragEvent) => void;
   handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -521,16 +466,25 @@ interface UploadSectionProps {
 function UploadSection({ dragging, files, error, fileRef, setDragging, handleDrop, handleChange, removeFile, analyzeAll }: UploadSectionProps) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
-      <h2 className="font-bold text-slate-800 mb-1">Ladda upp din fil</h2>
-      <p className="text-sm text-slate-400 mb-5">Har du fyllt i mallen? Ladda upp direkt — vi analyserar och bokför transaktionerna åt dig.</p>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#ECFEFF' }}>
+          <svg className="w-5 h-5" fill="none" stroke={ACCENT} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+        </div>
+        <div>
+          <h2 className="font-bold text-slate-800 text-sm">Ladda upp din fil</h2>
+          <p className="text-xs text-slate-400">CSV, Excel eller PDF — vi analyserar åt dig</p>
+        </div>
+      </div>
 
       <div
         onDragOver={e => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
         onClick={() => fileRef.current?.click()}
-        className="rounded-2xl border-2 border-dashed p-8 flex flex-col items-center justify-center cursor-pointer transition-all duration-150"
-        style={{ borderColor: dragging ? ACCENT : files.length > 0 ? '#059669' : '#E2E8F0', backgroundColor: dragging ? '#ECFEFF' : '#F8FAFC' }}
+        className="rounded-xl border-2 border-dashed p-6 flex flex-col items-center justify-center cursor-pointer transition-all duration-150"
+        style={{ borderColor: dragging ? ACCENT : files.length > 0 ? '#059669' : '#CBD5E1', backgroundColor: dragging ? '#ECFEFF' : '#F8FAFC' }}
       >
         <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.pdf" multiple onChange={handleChange} className="hidden" />
         {files.length > 0 ? (
@@ -552,17 +506,17 @@ function UploadSection({ dragging, files, error, fileRef, setDragging, handleDro
                 </button>
               </div>
             ))}
-            <p className="text-xs text-slate-400 text-center pt-2">Dra hit fler filer eller klicka för att lägga till</p>
+            <p className="text-xs text-slate-400 text-center pt-1">Dra hit fler filer eller klicka för att lägga till</p>
           </div>
         ) : (
           <>
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: '#ECFEFF' }}>
-              <svg className="w-6 h-6" fill="none" stroke={ACCENT} viewBox="0 0 24 24">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: '#ECFEFF' }}>
+              <svg className="w-5 h-5" fill="none" stroke={ACCENT} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
             </div>
             <p className="text-sm font-semibold text-slate-700">Dra hit din fil eller klicka för att välja</p>
-            <p className="text-xs text-slate-400 mt-1">CSV, Excel eller PDF</p>
+            <p className="text-xs text-slate-400 mt-1">CSV, Excel eller PDF — max 20 MB</p>
           </>
         )}
       </div>
@@ -572,8 +526,8 @@ function UploadSection({ dragging, files, error, fileRef, setDragging, handleDro
       {files.length > 0 && (
         <button
           onClick={analyzeAll}
-          className="mt-4 w-full py-3.5 text-sm font-bold text-white rounded-2xl transition-opacity hover:opacity-90"
-          style={{ backgroundColor: NAV_BG }}
+          className="mt-4 w-full py-3.5 text-sm font-bold text-white rounded-xl transition-all hover:opacity-90 hover:-translate-y-0.5"
+          style={{ backgroundColor: NAV_BG, boxShadow: `0 6px 20px ${NAV_BG}35` }}
         >
           Analysera {files.length === 1 ? 'filen' : `${files.length} filer`}
         </button>

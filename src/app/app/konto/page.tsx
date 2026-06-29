@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
+import { PAYMENTS_ENABLED } from '@/lib/config';
 
 const NAV_BG = '#173b57';
 const CORAL = '#E95C63';
@@ -34,8 +35,9 @@ export default function KontoPage() {
   const [ort, setOrt] = useState('');
   const [momsnr, setMomsnr] = useState('');
   const [verksamhet, setVerksamhet] = useState('');
-  const [momsPeriod, setMomsPeriod] = useState<'månadsvis' | 'kvartalsvis' | 'helår' | null>(null);
+  const [momsPeriod, setMomsPeriod] = useState<'månadsvis' | 'kvartalsvis' | 'helår' | 'ingen-moms' | null>(null);
   const [startAr, setStartAr] = useState<number | null>(null);
+  const [bokforingMetod, setBokforingMetod] = useState<'excel-kalkylark' | 'hemsidan' | 'maila-underlag' | null>(null);
   const [formInitialized, setFormInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -75,6 +77,7 @@ export default function KontoPage() {
       setVerksamhet(profile.verksamhet ?? '');
       setMomsPeriod(profile.moms_period ?? null);
       setStartAr(profile.start_ar ?? null);
+      setBokforingMetod(profile.bokforing_metod ?? null);
       setFormInitialized(true);
     }
   }, [profile, formInitialized]);
@@ -121,6 +124,7 @@ export default function KontoPage() {
           verksamhet: verksamhet || null,
           moms_period: momsPeriod,
           start_ar: startAr,
+          bokforing_metod: bokforingMetod,
         })
         .eq('id', user.id);
 
@@ -375,6 +379,40 @@ export default function KontoPage() {
           </div>
         </div>
 
+        {/* Bokföringsmetod */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <h2 className="font-bold text-slate-800 mb-1">Hur vill du bokföra?</h2>
+          <p className="text-xs text-slate-400 mb-4">Styr vilken genväg som visas på startsidan</p>
+          <div className="flex flex-col gap-2">
+            {([
+              { val: 'excel-kalkylark', label: 'Excel / Kalkylark', desc: 'Jag skickar in en fil' },
+              { val: 'hemsidan', label: 'Via hemsidan', desc: 'Jag bokför själv' },
+              { val: 'maila-underlag', label: 'Maila underlag', desc: 'Jag mailar in mitt underlag' },
+            ] as const).map(({ val, label, desc }) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setBokforingMetod(val)}
+                className="flex items-center justify-between px-4 py-3 rounded-xl border-2 text-left transition-all duration-100"
+                style={{
+                  borderColor: bokforingMetod === val ? NAV_BG : '#e2e8f0',
+                  backgroundColor: bokforingMetod === val ? NAV_BG : 'transparent',
+                }}
+              >
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: bokforingMetod === val ? 'white' : '#334155' }}>{label}</p>
+                  <p className="text-xs mt-0.5" style={{ color: bokforingMetod === val ? 'rgba(255,255,255,0.7)' : '#94a3b8' }}>{desc}</p>
+                </div>
+                {bokforingMetod === val && (
+                  <svg className="w-4 h-4 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Spara + fel */}
         {error && (
           <p className="text-xs text-red-500 text-center">{error}</p>
@@ -441,7 +479,7 @@ export default function KontoPage() {
               <button
                 type="button"
                 onClick={() => handleStartCheckout('monthly')}
-                disabled={checkoutLoading !== null}
+                disabled={!PAYMENTS_ENABLED || checkoutLoading !== null}
                 className="flex items-center justify-between w-full px-4 py-3 rounded-xl border-2 border-slate-200 hover:border-slate-300 transition-all disabled:opacity-60"
               >
                 <div className="text-left">
@@ -455,7 +493,7 @@ export default function KontoPage() {
               <button
                 type="button"
                 onClick={() => handleStartCheckout('yearly')}
-                disabled={checkoutLoading !== null}
+                disabled={!PAYMENTS_ENABLED || checkoutLoading !== null}
                 className="flex items-center justify-between w-full px-4 py-3 rounded-xl border-2 transition-all disabled:opacity-60"
                 style={{ borderColor: NAV_BG, backgroundColor: `${NAV_BG}08` }}
               >
