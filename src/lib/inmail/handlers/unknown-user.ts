@@ -50,7 +50,17 @@ export async function handleUnknownUser(params: {
 }): Promise<{ action: string; replyBody: string }> {
   const { supabase, senderEmail, subject, body, gmailThreadId, messageId } = params;
 
-  const reply = await generateInitialReply(body, subject);
+  let reply: InitialReply;
+  try {
+    reply = await generateInitialReply(body, subject);
+  } catch (err) {
+    console.error('[unknown-user] generateInitialReply failed:', err);
+    reply = {
+      isInterested: true,
+      isExistingCustomer: false,
+      message: 'Hej!\n\nKul att du hör av dig! Vi behöver ditt fullständiga namn för att kunna upprätta NE-bilagan korrekt — vad heter du?\n\n// Enkla Bokslut',
+    };
+  }
 
   if (reply.isExistingCustomer) {
     return {

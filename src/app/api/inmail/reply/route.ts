@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const emailBody = body.emailBody ?? '';
     const attachments = body.attachments ?? [];
 
-    if (!senderEmail || !gmailThreadId || !messageId || !emailHistory) {
+    if (!senderEmail || !gmailThreadId || !messageId) {
       return NextResponse.json({ error: 'Saknar obligatoriska fält' }, { status: 400 });
     }
 
