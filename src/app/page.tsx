@@ -534,7 +534,7 @@ export default function Home() {
           </div>
 
           <img
-            src="/processbild2.png"
+            src="/Processbild2.png"
             alt="Så här fungerar det"
             className="w-full rounded-3xl shadow-2xl border border-slate-200"
           />
