@@ -60,9 +60,15 @@ function handleNewMail(config, thread, senderEmail, threadId, messageId, subject
 
   if (!response) return;
 
-  // Skicka AI-svaret om det finns
+  // Spara AI-svaret som utkast istället för att skicka direkt
   if (response.replyBody) {
-    thread.reply(response.replyBody);
+    const lastMsg = thread.getMessages()[thread.getMessages().length - 1];
+    GmailApp.createDraft(
+      lastMsg.getFrom(),
+      'Re: ' + lastMsg.getSubject(),
+      response.replyBody,
+      { threadId: thread.getId() }
+    );
   }
 }
 
@@ -88,7 +94,13 @@ function handleReply(config, thread, senderEmail, threadId, messageId, subject, 
   console.log('handleReply response:', JSON.stringify(response));
 
   if (response && response.replyBody) {
-    thread.reply(response.replyBody);
+    const lastMsg = thread.getMessages()[thread.getMessages().length - 1];
+    GmailApp.createDraft(
+      lastMsg.getFrom(),
+      'Re: ' + lastMsg.getSubject(),
+      response.replyBody,
+      { threadId: thread.getId() }
+    );
   }
 }
 

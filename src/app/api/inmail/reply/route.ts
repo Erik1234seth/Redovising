@@ -6,6 +6,7 @@ import { handleEditTransaction } from '@/lib/inmail/handlers/edit-transaction';
 import { handleDeleteRequest, handleDeleteConfirm, handleDeleteCancel } from '@/lib/inmail/handlers/delete-transaction';
 import { handleViewTransactions } from '@/lib/inmail/handlers/view-transactions';
 import { handleGeneralQuestion } from '@/lib/inmail/handlers/general-question';
+import { handleOnboarding } from '@/lib/inmail/handlers/onboarding';
 
 function getSupabase() {
   return createClient(
@@ -43,7 +44,24 @@ export async function POST(request: Request) {
 
     const supabase = getSupabase();
 
-    // Require known user for replies
+    // Check thread state first — onboarding users don't have a profile yet
+    const { data: thread } = await supabase
+      .from('email_threads')
+      .select('id, state, transaction_ids')
+      .eq('gmail_thread_id', gmailThreadId)
+      .single();
+
+    if (thread?.state?.startsWith('onboarding:')) {
+      return NextResponse.json(await handleOnboarding({
+        supabase,
+        senderEmail,
+        emailHistory,
+        gmailThreadId,
+        messageId,
+      }));
+    }
+
+    // Require known user for all other reply types
     const { data: profile } = await supabase
       .from('profiles')
       .select('id, full_name, email')
@@ -54,15 +72,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ action: 'no_user' });
     }
 
-    // Load thread state
-    const { data: thread } = await supabase
-      .from('email_threads')
-      .select('id, state, transaction_ids')
-      .eq('gmail_thread_id', gmailThreadId)
-      .single();
-
     const pendingState = thread?.state ?? null;
-    const threadTransactionIds = thread?.transaction_ids ?? [];
+    const threadTransactionIds: string[] = thread?.transaction_ids ?? [];
 
     // Handle pending delete confirmation
     if (pendingState?.startsWith('pending_delete:')) {
