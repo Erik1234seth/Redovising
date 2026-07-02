@@ -11,6 +11,24 @@ import { PAYMENTS_ENABLED } from '@/lib/config';
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
 
+const monthlyFeatures = [
+  'Automatisk månadsbetalning',
+  'Samma låga kostnad varje månad',
+  'Mejla in dina underlag',
+  'Bokföring, bokslut och deklaration ingår',
+  'Vi lämnar in till Skatteverket',
+  'Ingen bindningstid',
+];
+
+const yearlyFeatures = [
+  'Betala en gång för hela året',
+  'Inga fler betalningar under året',
+  'Mejla bara in dina underlag',
+  'Bokföring, bokslut och deklaration ingår',
+  'Vi lämnar in till Skatteverket',
+  'Allt klart med en enda betalning',
+];
+
 interface Countdown { days: number; hours: number; minutes: number; seconds: number; }
 
 function useFakeCountdown(): Countdown | null {
@@ -180,19 +198,20 @@ export default function Home() {
                 Mejla in dina underlag. Vi sköter bokföring, årsbokslut och deklaration. Allt ingår!
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
-                <a
-                  href="#faq"
+              <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start items-center sm:items-start">
+                <Link
+                  href="/skaffa"
                   className="px-7 py-3.5 font-bold text-white rounded-xl shadow-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.02] text-sm sm:text-base"
                   style={{ backgroundColor: NAV_BG, boxShadow: `0 8px 24px ${NAV_BG}30` }}
                 >
-                  Jag vill veta mer
-                </a>
+                  Skaffa EnklaBokslut
+                </Link>
                 <Link
                   href="/boka-mote"
-                  className="px-7 py-3.5 font-semibold text-slate-600 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm sm:text-base"
+                  className="px-7 py-2.5 font-semibold text-slate-600 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm sm:text-base flex flex-col items-center justify-center leading-tight"
                 >
-                  Boka möte
+                  <span>Boka möte</span>
+                  <span className="text-xs font-normal text-slate-400">Såklart gratis</span>
                 </Link>
               </div>
 
@@ -228,28 +247,25 @@ export default function Home() {
                 </div>
 
                 {/* Floating badge – bottom left */}
-                <div className="absolute -bottom-4 -left-4 lg:bottom-8 lg:-left-8 bg-white rounded-2xl shadow-xl p-4 lg:p-5 flex items-center gap-3 lg:gap-4 border border-gray-100">
-                  <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${NAV_BG}12` }}>
-                    <svg className="w-5 h-5 lg:w-6 lg:h-6" style={{ color: NAV_BG }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
+                <div className="absolute -bottom-4 -left-4 lg:bottom-8 lg:-left-8 rounded-2xl shadow-xl flex items-center gap-3 lg:gap-4 p-4 lg:p-5" style={{ backgroundColor: NAV_BG, fontFamily: 'var(--font-inter)' }}>
+                  <svg className="w-6 h-6 lg:w-7 lg:h-7 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
                   <div>
-                    <p className="text-xs lg:text-sm font-bold" style={{ color: NAV_BG }}>299 kr/mån</p>
-                    <p className="text-[11px] lg:text-xs text-slate-400">Allt inkluderat, ingen bindningstid</p>
+                    <p className="text-xs lg:text-sm font-bold text-white">Maila dina kvitton</p>
+                    <p className="text-[11px] lg:text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>Vi hjälper dig med resten.</p>
                   </div>
                 </div>
 
                 {/* Floating badge – top right */}
-                <div className="absolute -top-4 -right-4 lg:top-8 lg:-right-8 bg-white rounded-2xl shadow-xl p-3.5 lg:p-5 border border-gray-100">
-                  <div className="flex items-center gap-1 lg:gap-1.5 mb-0.5 lg:mb-1">
-                    {[...Array(5)].map((_, i) => (
-                      <svg key={i} className="w-3 h-3 lg:w-4 lg:h-4 text-amber-400 fill-amber-400" viewBox="0 0 24 24">
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                      </svg>
-                    ))}
+                <div className="absolute -top-4 -right-4 lg:top-8 lg:-right-8 rounded-2xl shadow-xl whitespace-nowrap flex items-center gap-3 lg:gap-4 p-4 lg:p-5" style={{ backgroundColor: NAV_BG, fontFamily: 'var(--font-inter)' }}>
+                  <svg className="w-6 h-6 lg:w-7 lg:h-7 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p className="text-xs lg:text-sm font-bold text-white">Bokföring utan krångel</p>
+                    <p className="text-[11px] lg:text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>Vi guidar dig hela vägen.</p>
                   </div>
-                  <p className="text-[11px] lg:text-sm font-semibold" style={{ color: NAV_BG }}>Nöjda kunder</p>
                 </div>
               </div>
             </div>
@@ -278,10 +294,11 @@ export default function Home() {
 
               <div className="space-y-4 mb-10">
                 {[
-                  { title: 'Mejla bara in dina underlag', desc: 'Inga krångliga program eller avancerade bokföringskunskaper. Skicka underlagen via e-post – vi sköter resten.' },
-                  { title: 'Fast pris', desc: 'Allt ingår. Löpande bokföring, moms, årsbokslut och deklaration till en fast månadsavgift.' },
+                  { title: 'Mejla bara in dina underlag', desc: 'Inga krångliga program eller avancerade bokföringskunskaper.' },
+                  { title: 'Fast pris', desc: 'Allt ingår. Löpande bokföring, moms, årsbokslut och deklaration.' },
                   { title: 'Ingen bindningstid', desc: 'Du bestämmer själv hur länge du vill vara kund.' },
                   { title: 'Byggt för enskilda firmor', desc: 'Vi gör en sak – och vi gör den riktigt bra.' },
+                  { title: 'Lågt pris av en anledning', desc: 'Enkel process, automatisering och bara det som behövs!' },
                 ].map((item) => (
                   <div key={item.title} className="flex gap-4">
                     <div className="w-6 h-6 rounded-full flex-shrink-0 mt-0.5 flex items-center justify-center" style={{ backgroundColor: `${NAV_BG}12` }}>
@@ -344,8 +361,12 @@ export default function Home() {
                   </div>
 
                   <div className="mb-7 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-                    <h3 className="text-xl font-bold mb-1 text-white">Komplett tjänst</h3>
-                    <p className="text-sm mb-6 text-white/55">Du mejlar in dina underlag när det passar dig. Vi sköter den löpande bokföringen, momsredovisningen, årsbokslutet och deklarationen.</p>
+                    <h3 className="text-xl font-bold mb-1 text-white">{billing === 'monthly' ? 'Månadsvis' : 'Årsvis'}</h3>
+                    <p className="text-sm mb-6 text-white/55">
+                      {billing === 'monthly'
+                        ? 'Perfekt om du vill fördela kostnaden över året istället för att betala allt på en gång.'
+                        : 'Passar dig som vill betala en gång och sedan vara klar för hela året.'}
+                    </p>
                     <div className="flex items-end gap-1.5">
                       <span className="text-6xl font-extrabold text-white leading-none">
                         {billing === 'monthly' ? pkg.price.toLocaleString('sv') : pkg.yearlyPrice.toLocaleString('sv')}
@@ -366,7 +387,7 @@ export default function Home() {
                   </div>
 
                   <ul className="space-y-3 mb-8">
-                    {pkg.features.map((feature) => (
+                    {(billing === 'monthly' ? monthlyFeatures : yearlyFeatures).map((feature) => (
                       <li key={feature} className="flex items-start gap-3">
                         <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: `${CORAL}30` }}>
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}>
@@ -394,6 +415,21 @@ export default function Home() {
         </div>
       </section>
 
+      <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
+
+      {/* ══════════════════════════════════════════
+          TRE ALTERNATIV
+      ══════════════════════════════════════════ */}
+      <section className="py-20 sm:py-28 bg-gray-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <img
+            src="/Processbild2.png"
+            alt="Så här fungerar det"
+            className="w-full rounded-3xl shadow-2xl border border-slate-200"
+          />
+        </div>
+      </section>
+
       <SectionDivider />
 
       {/* ══════════════════════════════════════════
@@ -412,189 +448,6 @@ export default function Home() {
 
       <SectionDivider dark />
 
-      {/* ══════════════════════════════════════════
-          TRE ALTERNATIV
-      ══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-28 bg-gray-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Du väljer hur du jobbar</p>
-            <h2 className="text-3xl sm:text-4xl font-extrabold mb-4 leading-tight" style={{ color: NAV_BG }}>
-              Inget nytt system att lära sig<br />— om du inte vill
-            </h2>
-            <p className="text-slate-500 text-base max-w-lg mx-auto leading-relaxed">
-              Oavsett om du föredrar Excel, att maila in ditt underlag eller att ha full koll i webappen — vi tar hand om resten.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-
-            {/* Alternativ 1: Maila in */}
-            <div className="relative flex flex-col rounded-3xl overflow-hidden border-2 bg-white" style={{ borderColor: `${NAV_BG}18` }}>
-              <div className="absolute top-4 right-4">
-                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: '#ECFDF5', color: '#059669' }}>
-                  Enklast
-                </span>
-              </div>
-              <div className="p-7 flex flex-col flex-1">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style={{ backgroundColor: '#EFF6FF' }}>
-                  <svg className="w-6 h-6" fill="none" stroke="#2563EB" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-extrabold mb-1" style={{ color: NAV_BG }}>Maila in</h3>
-                <p className="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wide">Noll ny teknik</p>
-                <p className="text-sm text-slate-600 leading-relaxed mb-5">
-                  Fota kvittot, bifoga fakturan — skicka ett mail till oss. Vi bokför och återkommer om vi har frågor.
-                </p>
-                <ul className="flex flex-col gap-2 mb-6">
-                  {['Inga inloggningar att hålla reda på', 'Fungerar från din vanliga inkorg', 'Vi sköter kontering och moms'].map(f => (
-                    <li key={f} className="flex items-start gap-2 text-xs text-slate-600">
-                      <svg className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-auto pt-3 border-t border-slate-100">
-                  <p className="text-[11px] text-slate-400">Passar dig som vill lägga noll tid på administration.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Alternativ 2: Excel */}
-            <div className="relative flex flex-col rounded-3xl overflow-hidden border-2 bg-white" style={{ borderColor: `${NAV_BG}18` }}>
-              <div className="absolute top-4 right-4">
-                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: '#FFFBEB', color: '#D97706' }}>
-                  Populärt
-                </span>
-              </div>
-              <div className="p-7 flex flex-col flex-1">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style={{ backgroundColor: '#ECFDF5' }}>
-                  <svg className="w-6 h-6" fill="none" stroke="#059669" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-extrabold mb-1" style={{ color: NAV_BG }}>Excel / Kalkylark</h3>
-                <p className="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wide">Fortsätt som vanligt</p>
-                <p className="text-sm text-slate-600 leading-relaxed mb-5">
-                  Håller du redan koll i ett kalkylark? Skicka filen till oss — eller ladda upp den direkt så tolkar vi den automatiskt.
-                </p>
-                <ul className="flex flex-col gap-2 mb-6">
-                  {['Behåll ditt eget kalkylark', 'Ladda upp eller maila filen', 'AI tolkar och bokför automatiskt'].map(f => (
-                    <li key={f} className="flex items-start gap-2 text-xs text-slate-600">
-                      <svg className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-auto pt-3 border-t border-slate-100">
-                  <p className="text-[11px] text-slate-400">Passar dig som redan spårar i Excel eller Google Kalkylark.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Alternativ 3: Webappen */}
-            <div className="relative flex flex-col rounded-3xl overflow-hidden border-2" style={{ borderColor: NAV_BG, backgroundColor: NAV_BG }}>
-              <div className="absolute top-4 right-4">
-                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.8)' }}>
-                  Full kontroll
-                </span>
-              </div>
-              <div className="p-7 flex flex-col flex-1">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-extrabold mb-1 text-white">Webappen</h3>
-                <p className="text-xs font-semibold mb-3 uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.5)' }}>Realtid & överblick</p>
-                <p className="text-sm leading-relaxed mb-5" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                  Bokför direkt, se rapporter live, skapa fakturor och håll full koll på ekonomin — allt på ett ställe.
-                </p>
-                <ul className="flex flex-col gap-2 mb-6">
-                  {['Bokföring på sekunder', 'Fakturor, rapporter och moms', 'Alltid uppdaterat i realtid'].map(f => (
-                    <li key={f} className="flex items-start gap-2 text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>
-                      <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke={CORAL} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-auto pt-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
-                  <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Passar dig som vill ha full kontroll och överblick.</p>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          <img
-            src="/Processbild2.png"
-            alt="Så här fungerar det"
-            className="w-full rounded-3xl shadow-2xl border border-slate-200"
-          />
-        </div>
-      </section>
-
-      <SectionDivider />
-
-      {/* ══════════════════════════════════════════
-          JÄMFÖRELSETABELL
-      ══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-24 bg-slate-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-14">
-            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Varför Enkla Bokslut?</p>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-800 tracking-tight">Se vad du sparar</h2>
-          </div>
-          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-            {/* Header */}
-            <div className="grid grid-cols-3 border-b border-slate-200">
-              <div className="px-6 py-5" />
-              <div className="px-6 py-5 border-l border-slate-200 text-center">
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Traditionell byrå</p>
-                <p className="text-2xl font-extrabold text-slate-700">5 000–15 000 kr</p>
-                <p className="text-xs text-slate-400 mt-0.5">per år, exkl. moms</p>
-              </div>
-              <div className="px-6 py-5 border-l border-slate-200 text-center relative" style={{ backgroundColor: `${NAV_BG}08` }}>
-                <div className="absolute top-0 left-0 right-0 h-1 rounded-tr-none" style={{ backgroundColor: CORAL }} />
-                <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: CORAL }}>Enkla Bokslut</p>
-                <p className="text-2xl font-extrabold" style={{ color: NAV_BG }}>Från 299 kr</p>
-                <p className="text-xs text-slate-400 mt-0.5">per månad, allt ingår</p>
-              </div>
-            </div>
-            {[
-              { label: 'Löpande bokföring', byrå: false, vi: true },
-              { label: 'Fakturahantering', byrå: false, vi: true },
-              { label: 'Momsredovisning', byrå: true, vi: true },
-              { label: 'NE-bilaga', byrå: true, vi: true },
-              { label: 'Resultat- & balansrapport', byrå: false, vi: true },
-              { label: 'Tillgänglig dygnet runt', byrå: false, vi: true },
-              { label: 'Direkt svar på frågor', byrå: false, vi: true },
-              { label: 'Fast pris utan fakturerings­överraskningar', byrå: false, vi: true },
-            ].map((row, i) => (
-              <div key={row.label} className={`grid grid-cols-3 border-b border-slate-100 last:border-0 ${i % 2 === 1 ? 'bg-slate-50/50' : ''}`}>
-                <div className="px-6 py-4 flex items-center">
-                  <span className="text-sm font-medium text-slate-700">{row.label}</span>
-                </div>
-                <div className="px-6 py-4 border-l border-slate-100 flex items-center justify-center">
-                  {row.byrå
-                    ? <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                    : <svg className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>}
-                </div>
-                <div className="px-6 py-4 border-l border-slate-100 flex items-center justify-center" style={{ backgroundColor: `${NAV_BG}04` }}>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
 
       {/* ══════════════════════════════════════════
