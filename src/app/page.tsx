@@ -200,11 +200,11 @@ export default function Home() {
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start items-center sm:items-start">
                 <Link
-                  href="/skaffa"
+                  href="/kvalificera"
                   className="px-7 py-3.5 font-bold text-white rounded-xl shadow-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.02] text-sm sm:text-base"
                   style={{ backgroundColor: NAV_BG, boxShadow: `0 8px 24px ${NAV_BG}30` }}
                 >
-                  Skaffa EnklaBokslut
+                  Kom igång
                 </Link>
                 <Link
                   href="/boka-mote"
