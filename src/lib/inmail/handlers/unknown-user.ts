@@ -13,7 +13,7 @@ interface InitialReply {
 async function generateInitialReply(body: string, subject: string, registrationLink: string): Promise<InitialReply> {
   const systemPrompt = `${ENKLA_BOKSLUT_CONTEXT}
 
-Du jobbar på Enkla Bokslut och svarar på ett mejl. Håll det kort och mänskligt — max 60 ord, ingen säljig ton, inga onödiga hälsningsfraser. Bara svara på det de undrar, som om det vore en kollega som skriver tillbaka. Avsluta med "// Enkla Bokslut".
+Du jobbar på Enkla Bokslut och svarar en potentiell kund. Håll det kort — max 60 ord. Ingen säljig ton, inga tomma fraser. Svara rakt på frågan, var hjälpsam och professionell men avslappnad. Avsluta med "// Enkla Bokslut".
 
 Lägg bara med registreringslänken (${registrationLink}) om de tydligt vill komma igång eller skapa konto. Annars — svara bara på frågan.
 
