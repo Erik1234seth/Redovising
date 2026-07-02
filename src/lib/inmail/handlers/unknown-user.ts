@@ -6,25 +6,24 @@ import crypto from 'crypto';
 interface InitialReply {
   isInterested: boolean;
   isExistingCustomer: boolean;
+  includeLink: boolean;
   message: string;
 }
 
 async function generateInitialReply(body: string, subject: string, registrationLink: string): Promise<InitialReply> {
   const systemPrompt = `${ENKLA_BOKSLUT_CONTEXT}
 
-Du är en person som jobbar på Enkla Bokslut. Någon har mejlat och verkar intresserad av tjänsten.
+Du är en person som jobbar på Enkla Bokslut. Någon har mejlat angående tjänsten.
 
-Skriv ett kort, personligt svar (max 120 ord) som:
-- Besvarar deras specifika fråga kortfattat
-- Presenterar tjänsten kort om det är relevant
-- Avslutar med att bjuda in dem att skapa konto via länken: ${registrationLink}
+Skriv ett kort, personligt svar (max 120 ord) som besvarar deras fråga naturligt. Skriv som en riktig person — inte som ett system. Avsluta med "// Enkla Bokslut".
 
-Gör det naturligt — skriv som en riktig person, inte som ett system. Avsluta med "// Enkla Bokslut".
+Inkludera registreringslänken (${registrationLink}) i svaret ENDAST om personen verkar vilja gå vidare och skapa konto — t.ex. frågar om hur man kommer igång, säger att de vill anmäla sig, eller tydligt är redo att köpa. Om de bara ställer en allmän fråga om priser, tjänsten eller bokföring — svara bara på frågan utan länk.
 
 Returnera JSON:
 {
   "isInterested": boolean,
   "isExistingCustomer": boolean,
+  "includeLink": boolean (true om du inkluderar länken i meddelandet, annars false),
   "message": "..."
 }`;
 
@@ -75,36 +74,30 @@ export async function handleUnknownUser(params: {
     };
   }
 
-  // Spara registreringslänk
-  try {
-    await supabase.from('pending_registrations').insert({
-      email: senderEmail,
-      token,
-      expires_at: expiresAt,
-      gmail_thread_id: gmailThreadId,
-      source: 'email_inquiry',
-    });
-  } catch { /* non-blocking */ }
+  // Spara registreringslänk och tråd bara om länken faktiskt skickades
+  if (reply.includeLink) {
+    try {
+      await supabase.from('pending_registrations').insert({
+        email: senderEmail,
+        token,
+        expires_at: expiresAt,
+        gmail_thread_id: gmailThreadId,
+        source: 'email_inquiry',
+      });
+    } catch { /* non-blocking */ }
 
-  // Spara tråden
-  try {
-    await supabase.from('email_threads').insert({
-      gmail_thread_id: gmailThreadId,
-      last_message_id: messageId,
-      transaction_ids: [],
-      state: `prospect:${senderEmail}`,
-    });
-  } catch { /* non-blocking */ }
-
-  if (!reply.isInterested) {
-    return {
-      action: 'unknown_user_not_interested',
-      replyBody: `Hej!\n\nTack för ditt mejl! Vi är Enkla Bokslut — en bokföringstjänst för enskilda firmor till 299 kr/mån.\n\nVill du komma igång? Skapa konto här:\n${registrationLink}\n\n// Enkla Bokslut`,
-    };
+    try {
+      await supabase.from('email_threads').insert({
+        gmail_thread_id: gmailThreadId,
+        last_message_id: messageId,
+        transaction_ids: [],
+        state: `prospect:${senderEmail}`,
+      });
+    } catch { /* non-blocking */ }
   }
 
   return {
-    action: 'unknown_user_prospect',
+    action: reply.includeLink ? 'unknown_user_prospect' : 'unknown_user_general',
     replyBody: reply.message,
   };
 }
