@@ -63,6 +63,7 @@ export async function handleUnknownUser(params: {
     reply = {
       isInterested: true,
       isExistingCustomer: false,
+      includeLink: true,
       message: `Hej!\n\nTack för ditt mejl! Du kan komma igång direkt här:\n${registrationLink}\n\n// Enkla Bokslut`,
     };
   }
