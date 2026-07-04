@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { packages } from '@/data/packages';
 
 const CORAL = '#E95C63';
@@ -9,11 +8,10 @@ const NAV_BG = '#173b57';
 
 export default function ValjaPaketPage() {
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
-  const router = useRouter();
 
   const handleGetStarted = () => {
     sessionStorage.setItem('billingPeriod', billing);
-    router.push('/bestall');
+    window.location.href = 'https://app.enklabokslut.se/auth/signup';
   };
 
   return (

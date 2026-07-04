@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { packages } from '@/data/packages';
 import { useAuth } from '@/contexts/AuthContext';
 import { PAYMENTS_ENABLED } from '@/lib/config';
@@ -126,12 +125,10 @@ export default function Home() {
   const { user, loading } = useAuth();
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
   const fakeCountdown = useFakeCountdown();
-  const router = useRouter();
 
   const handleGetStarted = () => {
-    if (!PAYMENTS_ENABLED) return;
     sessionStorage.setItem('billingPeriod', billing);
-    router.push('/bestall');
+    window.location.href = 'https://app.enklabokslut.se/auth/signup';
   };
 
   useEffect(() => {
@@ -401,11 +398,10 @@ export default function Home() {
 
                   <button
                     onClick={handleGetStarted}
-                    disabled={!PAYMENTS_ENABLED}
-                    className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: CORAL, color: 'white', boxShadow: PAYMENTS_ENABLED ? `0 8px 20px ${CORAL}40` : 'none' }}
+                    className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 text-sm"
+                    style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 20px ${CORAL}40` }}
                   >
-                    {PAYMENTS_ENABLED ? 'Kom igång →' : 'Kommer snart'}
+                    {PAYMENTS_ENABLED ? 'Kom igång →' : 'Skapa konto'}
                   </button>
                 </div>
               </div>

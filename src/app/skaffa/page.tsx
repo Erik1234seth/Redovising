@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { packages } from '@/data/packages';
 import { PAYMENTS_ENABLED } from '@/lib/config';
 
@@ -27,13 +26,11 @@ const yearlyFeatures = [
 ];
 
 export default function SkaffaPage() {
-  const router = useRouter();
   const pkg = packages[0];
 
   const handleGetStarted = (billing: 'monthly' | 'yearly') => {
-    if (!PAYMENTS_ENABLED) return;
     sessionStorage.setItem('billingPeriod', billing);
-    router.push('/bestall');
+    window.location.href = 'https://app.enklabokslut.se/auth/signup';
   };
 
   return (
@@ -85,11 +82,10 @@ export default function SkaffaPage() {
 
               <button
                 onClick={() => handleGetStarted('monthly')}
-                disabled={!PAYMENTS_ENABLED}
-                className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: CORAL, color: 'white', boxShadow: PAYMENTS_ENABLED ? `0 8px 20px ${CORAL}40` : 'none' }}
+                className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 text-sm"
+                style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 20px ${CORAL}40` }}
               >
-                {PAYMENTS_ENABLED ? 'Kom igång →' : 'Kommer snart'}
+                {PAYMENTS_ENABLED ? 'Kom igång →' : 'Skapa konto'}
               </button>
             </div>
           </div>
@@ -136,11 +132,10 @@ export default function SkaffaPage() {
 
               <button
                 onClick={() => handleGetStarted('yearly')}
-                disabled={!PAYMENTS_ENABLED}
-                className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: CORAL, color: 'white', boxShadow: PAYMENTS_ENABLED ? `0 8px 20px ${CORAL}40` : 'none' }}
+                className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 text-sm"
+                style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 20px ${CORAL}40` }}
               >
-                {PAYMENTS_ENABLED ? 'Kom igång →' : 'Kommer snart'}
+                {PAYMENTS_ENABLED ? 'Kom igång →' : 'Skapa konto'}
               </button>
             </div>
           </div>
