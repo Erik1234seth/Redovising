@@ -112,9 +112,9 @@ export default function OnboardingPage() {
         </span>
       </div>
 
-      {/* Checkpoints — visar hela resan: uppgifter → betalning → klart */}
+      {/* Checkpoints — visar hela resan: skapa konto → uppgifter → betalning */}
       <div className="px-6 pt-8 pb-2 w-full max-w-lg mx-auto">
-        <FlowCheckpoints current={1} />
+        <FlowCheckpoints current={2} />
       </div>
 
       {/* Content */}

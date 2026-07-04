@@ -6,12 +6,13 @@ const NAV_BG = '#173b57';
 const CORAL = '#E95C63';
 
 const STEPS = [
-  { n: 1, label: 'Dina uppgifter' },
-  { n: 2, label: 'Betalning' },
-  { n: 3, label: 'Klart' },
+  { n: 1, label: 'Skapa konto' },
+  { n: 2, label: 'Dina uppgifter' },
+  { n: 3, label: 'Betalning' },
 ] as const;
 
-export default function FlowCheckpoints({ current }: { current: 1 | 2 | 3 }) {
+// current 1–3 = aktivt steg, 4 = allt klart (alla bockade)
+export default function FlowCheckpoints({ current }: { current: 1 | 2 | 3 | 4 }) {
   return (
     <div className="flex items-start justify-center max-w-sm mx-auto w-full select-none">
       {STEPS.map((s, i) => {

@@ -4,6 +4,7 @@ import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import FlowCheckpoints from '@/components/FlowCheckpoints';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
@@ -140,12 +141,13 @@ export default function AppSignupPage() {
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
 
+          <div className="mb-8">
+            <FlowCheckpoints current={1} />
+          </div>
+
           <div className="text-center mb-8">
-            <span className="inline-block px-3 py-1 text-xs font-bold rounded-full mb-4" style={{ backgroundColor: `${CORAL}15`, color: CORAL }}>
-              ALLT INKLUDERAT
-            </span>
             <h1 className="text-3xl font-extrabold mb-2" style={{ color: NAV_BG }}>Skapa ditt konto</h1>
-            <p className="text-slate-500 text-sm">Sista steget innan du är igång. Det tar under en minut.</p>
+            <p className="text-slate-500 text-sm">Det tar under en minut att komma igång.</p>
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 p-8" style={{ boxShadow: `0 24px 64px ${NAV_BG}12` }}>

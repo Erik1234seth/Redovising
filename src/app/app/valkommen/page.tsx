@@ -28,7 +28,7 @@ export default function ValkommenPage() {
       <div className="w-full max-w-md text-center">
 
         <div className="mb-10">
-          <FlowCheckpoints current={3} />
+          <FlowCheckpoints current={4} />
         </div>
 
         <div

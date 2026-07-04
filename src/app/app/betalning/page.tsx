@@ -82,7 +82,7 @@ export default function BetalningPage() {
         <div className="w-full max-w-md">
 
           <div className="mb-8">
-            <FlowCheckpoints current={2} />
+            <FlowCheckpoints current={3} />
           </div>
 
           <div className="text-center mb-8">
