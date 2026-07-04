@@ -8,17 +8,17 @@ const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
 
 const monthlyFeatures = [
-  'Automatisk månadsbetalning',
   'Samma låga kostnad varje månad',
   'Mejla in dina underlag',
   'Bokföring, bokslut och deklaration ingår',
   'Vi lämnar in till Skatteverket',
+  'Automatisk månadsbetalning',
   'Ingen bindningstid',
 ];
 
 const yearlyFeatures = [
   'Betala en gång för hela året',
-  'Inga fler betalningar under året',
+  'Slipp månadsfakturor',
   'Mejla bara in dina underlag',
   'Bokföring, bokslut och deklaration ingår',
   'Vi lämnar in till Skatteverket',

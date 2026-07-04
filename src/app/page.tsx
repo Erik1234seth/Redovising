@@ -11,17 +11,17 @@ const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
 
 const monthlyFeatures = [
-  'Automatisk månadsbetalning',
   'Samma låga kostnad varje månad',
   'Mejla in dina underlag',
   'Bokföring, bokslut och deklaration ingår',
   'Vi lämnar in till Skatteverket',
+  'Automatisk månadsbetalning',
   'Ingen bindningstid',
 ];
 
 const yearlyFeatures = [
   'Betala en gång för hela året',
-  'Inga fler betalningar under året',
+  'Slipp månadsfakturor',
   'Mejla bara in dina underlag',
   'Bokföring, bokslut och deklaration ingår',
   'Vi lämnar in till Skatteverket',
@@ -59,7 +59,7 @@ const landingFaqItems = [
   { q: 'Vem passar Enkla Bokslut för?', a: 'Enkla Bokslut är byggt för Sveriges småföretagare. Vi riktar oss till enskilda firmor utan anställd personal och med en årsomsättning på upp till 3 miljoner kronor.\n\nTyvärr passar Enkla Bokslut inte alla verksamheter. I dagsläget kan vi inte hjälpa företag som har anställd personal, bedriver skogs- eller lantbruksverksamhet, driver taxiverksamhet, använder vinstmarginalbeskattning (VMB) eller har annan verksamhet med särskilt komplexa skatte- och momsregler.' },
   { q: 'Måste jag kunna bokföring sedan tidigare?', a: 'Nej, det är hela poängen. Du väljer vad som har hänt (köp, betalning, utgift) och resten sköts automatiskt. Rätt konton, rätt moms — du behöver inte förstå hur det fungerar i bakgrunden.' },
   { q: 'Hur kan Enkla Bokslut vara så billigt?', a: 'Enkla Bokslut är utvecklat specifikt för enskilda firmor med en omsättning på upp till 3 miljoner kronor. Genom att fokusera på denna typ av verksamheter kan vi arbeta utifrån ett förenklat regelverk och undvika många av de komplexa moment som finns i större företag.\n\nSamtidigt har vi automatiserat delar av processen som traditionellt görs manuellt av redovisningskonsulter. Det innebär mindre administration, lägre kostnader och ett lägre pris för dig – utan att tumma på kvaliteten.' },
-  { q: 'Följer Enkla Bokslut reglerna?', a: 'Ja. Enkla Bokslut är utvecklat för att följa K1-regelverket, som är Skatteverkets och Bokföringsnämndens förenklade regler för mindre enskilda firmor.\n\nEftersom vi enbart arbetar med enskilda firmor som omfattas av K1 har vi specialiserat oss på just dessa regler. Det innebär att vi inte bara följer regelverket – vi är experter på det.' },
+  { q: 'Följer Enkla Bokslut reglerna?', a: <>Ja. Enkla Bokslut är utvecklat för att följa K1-regelverket, som är Skatteverkets och Bokföringsnämndens förenklade regler för mindre enskilda firmor (<a href="https://www4.skatteverket.se/rattsligvagledning/edition/2025.3/3213.html" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: CORAL }}>skatteverket</a>).{'\n\n'}Eftersom vi enbart arbetar med enskilda firmor som omfattas av K1 har vi specialiserat oss på just dessa regler. Det innebär att vi inte bara följer regelverket – vi är experter på det.</> },
   { q: 'Vad händer vid årets slut?', a: 'När året är slut guidar vi dig genom några enkla steg för att samla in de uppgifter som behövs för bokslutet. Därefter sammanställer vi din bokföring, upprättar din NE-bilaga och momsredovisning samt lämnar in uppgifterna till Skatteverket. Enkelt, smidigt och klart.' },
   { q: 'Kan jag avsluta när jag vill?', a: 'Ja, du binder dig inte. Du kan avsluta din prenumeration när som helst — inga dolda bindningstider.' },
 ];
@@ -414,9 +414,69 @@ export default function Home() {
       <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
 
       {/* ══════════════════════════════════════════
+          VARFÖR SÅ BILLIGT
+      ══════════════════════════════════════════ */}
+      <section id="billigt" className="py-20 sm:py-24 bg-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-sm font-semibold uppercase tracking-widest mb-3 text-center" style={{ color: CORAL }}>Prisvärt av en anledning</p>
+          <div className="mb-14 sm:ml-16 lg:ml-32 lg:pl-[38px]">
+            <h2 className="text-3xl sm:text-4xl font-extrabold mb-4 leading-tight" style={{ color: NAV_BG }}>
+              Hur kan EnklaBokslut vara så billiga?
+            </h2>
+            <p className="text-slate-500 text-base max-w-2xl leading-relaxed">
+              Lägre pris betyder inte lägre kvalitet. Hos EnklaBokslut granskas all bokföring och varje deklaration av en redovisningskonsult innan något skickas till Skatteverket. Det lägre priset beror inte på att vi gör mindre eller inte följer regler – utan på att vi arbetar smartare. Genom modern teknik, standardiserade processer och ett tydligt fokus på en specifik målgrupp kan vi erbjuda professionell redovisning till ett betydligt lägre pris.
+            </p>
+          </div>
+
+          <div className="space-y-5">
+            {[
+              {
+                title: 'Förenklade regler ger lägre pris',
+                paragraphs: [
+                  <>Enskilda firmor med en omsättning på högst 3 miljoner kronor har rätt att upprätta ett förenklat årsbokslut (<a href="https://www4.skatteverket.se/rattsligvagledning/edition/2025.3/3213.html" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: CORAL }}>skatteverket</a>). Det innebär att de får använda enklare redovisningsregler och flera praktiska förenklingar jämfört med företag som måste upprätta ett vanligt årsbokslut eller en årsredovisning.</>,
+                  'EnklaBokslut är utvecklat specifikt för dessa företag. Genom att anpassa våra arbetssätt efter de förenklade reglerna kan vi arbeta mer effektivt och erbjuda professionell redovisning till ett betydligt lägre pris.',
+                ],
+              },
+              {
+                title: 'Smart teknik och standardiserade arbetssätt',
+                paragraphs: [
+                  'Vi använder modern teknik och standardiserade arbetssätt där det är möjligt. Genom att automatisera återkommande moment och arbeta enligt väl genomtänkta processer kan vi lägga mindre tid på administration och mer tid på att säkerställa att din redovisning blir korrekt. Det gör att vi kan erbjuda ett lägre pris utan att kompromissa med kvaliteten.',
+                ],
+              },
+              {
+                title: 'Specialiserade på en tydlig målgrupp',
+                paragraphs: [
+                  'EnklaBokslut är utvecklat för enskilda firmor med ett redovisningsflöde som går att standardisera. Vi hjälper därför inte verksamheter med mer komplex redovisning, till exempel företag med anställda, omfattande lagerhantering eller andra behov som kräver mer individuell hantering.',
+                  'Genom att fokusera på företag med liknande förutsättningar kan vi arbeta enligt tydliga och effektiva processer. Det gör att vi kan erbjuda professionell redovisning till ett lägre pris.',
+                ],
+              },
+            ].map((item) => (
+              <div key={item.title} className="rounded-2xl p-7 sm:p-8 border border-slate-200 bg-slate-50 flex gap-5">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${CORAL}18` }}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold mb-2" style={{ color: NAV_BG }}>{item.title}</h3>
+                  <div className="space-y-3">
+                    {item.paragraphs.map((p, i) => (
+                      <p key={i} className="text-slate-500 text-sm leading-relaxed">{p}</p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
+
+      {/* ══════════════════════════════════════════
           TRE ALTERNATIV
       ══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-28 bg-gray-50">
+      <section id="hur-det-fungerar" className="py-20 sm:py-28 bg-gray-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <img
             src="/Processbild2.png"

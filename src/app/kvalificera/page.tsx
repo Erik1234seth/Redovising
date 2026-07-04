@@ -77,16 +77,12 @@ export default function KvalificeraPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16" style={{ background: `linear-gradient(180deg, ${NAV_BG}10, #f8fafc 55%)` }}>
         <div className="w-full max-w-lg bg-white rounded-3xl border border-slate-200 p-12 sm:p-14 text-center shadow-xl relative overflow-hidden">
-          <div className="absolute -top-6 -left-6 text-4xl rotate-[-15deg]">🎉</div>
-          <div className="absolute -top-4 -right-4 text-4xl rotate-[15deg]">🎊</div>
-          <div className="absolute top-1/3 -right-6 text-2xl rotate-[10deg]">✨</div>
-
           <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6" style={{ backgroundColor: '#ECFDF5' }}>
             <svg className="w-12 h-12 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold mb-4" style={{ color: NAV_BG }}>Grattis! 🎉</h1>
+          <h1 className="text-4xl sm:text-5xl font-extrabold mb-4" style={{ color: NAV_BG }}>Grattis!</h1>
           <p className="text-slate-500 text-base sm:text-lg leading-relaxed mb-10">Enkla Bokslut passar dig perfekt. Nu kan du välja hur du vill betala.</p>
           <button
             onClick={() => router.push('/skaffa')}

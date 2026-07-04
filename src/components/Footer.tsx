@@ -8,7 +8,7 @@ export default function Footer() {
     <footer style={{ backgroundColor: NAV_BG }} className="border-t border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
 
           {/* Brand */}
           <div>
@@ -38,35 +38,54 @@ export default function Footer() {
             </a>
           </div>
 
-          {/* Services */}
+          {/* Kom igång */}
           <div>
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5">Våra tjänster</h3>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5">Kom igång</h3>
             <ul className="space-y-3">
               {[
-                { href: '/flow/ne-bilaga/qualification', label: 'NE-Bilaga', price: '1 999 kr' },
-                { href: '/flow/komplett/qualification', label: 'Komplett redovisning', price: '3 499 kr' },
-              ].map(({ href, label, price }) => (
+                { href: '/skaffa', label: 'Priser' },
+                { href: '/#hur-det-fungerar', label: 'Så fungerar det' },
+                { href: '/kvalificera', label: 'Skapa konto' },
+                { href: '/kontakt', label: 'Kontakt' },
+              ].map(({ href, label }) => (
                 <li key={href}>
-                  <Link href={href} className="group flex items-center justify-between text-sm text-white/55 hover:text-white transition-colors">
-                    <span className="flex items-center gap-2">
-                      <span className="w-1 h-1 rounded-full bg-white/30 group-hover:bg-white transition-colors" />
-                      {label}
-                    </span>
-                    <span className="text-white/35 group-hover:text-white/60 transition-colors">{price}</span>
+                  <Link href={href} className="group flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
+                    <span className="w-1 h-1 rounded-full bg-white/30 group-hover:bg-white transition-colors" />
+                    {label}
                   </Link>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Quick links */}
+          {/* Kunskap */}
           <div>
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5">Snabblänkar</h3>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5">Kunskap</h3>
             <ul className="space-y-3">
               {[
+                { href: '/#faq', label: 'Vanliga frågor' },
                 { href: '/tutorial', label: 'Guider' },
-                { href: '/om-oss', label: 'Om oss' },
-                { href: '/kontakt', label: 'Kontakt' },
+                { href: '/artiklar', label: 'Blogg' },
+                { href: '/ordlista', label: 'Ordlista' },
+              ].map(({ href, label }) => (
+                <li key={href}>
+                  <Link href={href} className="group flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
+                    <span className="w-1 h-1 rounded-full bg-white/30 group-hover:bg-white transition-colors" />
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Juridiskt */}
+          <div>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5">Juridiskt</h3>
+            <ul className="space-y-3">
+              {[
+                { href: '/integritetspolicy', label: 'Integritetspolicy' },
+                { href: '/cookiepolicy', label: 'Cookiepolicy' },
+                { href: '/anvandarvillkor', label: 'Användarvillkor' },
               ].map(({ href, label }) => (
                 <li key={href}>
                   <Link href={href} className="group flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">

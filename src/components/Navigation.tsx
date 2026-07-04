@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const navLinks = [
   { href: '/', label: 'Hem' },
-  { href: '/valja-paket', label: 'Fler svar' },
+  { href: '/#packages', label: 'Priser' },
   { href: '/om-oss', label: 'Om oss' },
 ];
 
@@ -20,7 +20,29 @@ export default function Navigation() {
   const { user, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const isActive = (path: string) => pathname === path;
+  const matchNavHref = () => {
+    const current = pathname + (typeof window !== 'undefined' ? window.location.hash : '');
+    const exact = navLinks.find(l => l.href === current);
+    if (exact) return exact.href;
+    const pathOnly = navLinks.find(l => l.href === pathname);
+    return pathOnly ? pathOnly.href : pathname;
+  };
+
+  const [activeHref, setActiveHref] = useState(pathname);
+
+  useEffect(() => {
+    setActiveHref(matchNavHref());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  useEffect(() => {
+    const onHashChange = () => setActiveHref(matchNavHref());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  const isActive = (href: string) => activeHref === href;
 
   return (
     <nav className="sticky top-0 z-50 shadow-lg" style={{ backgroundColor: NAV_BG }}>
@@ -49,6 +71,7 @@ export default function Navigation() {
               <Link
                 key={href}
                 href={href}
+                onClick={() => setActiveHref(href)}
                 className="relative text-[15px] font-medium transition-colors duration-150"
                 style={{ color: isActive(href) ? '#fff' : 'rgba(255,255,255,0.72)' }}
               >
@@ -110,7 +133,7 @@ export default function Navigation() {
             <Link
               key={href}
               href={href}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => { setActiveHref(href); setMobileOpen(false); }}
               className="block px-4 py-3 rounded-xl text-[15px] font-medium transition-colors"
               style={{
                 color: isActive(href) ? '#fff' : 'rgba(255,255,255,0.75)',
