@@ -11,24 +11,34 @@ export async function POST(req: NextRequest) {
 
   const priceId = PRICE_IDS[billingPeriod as 'monthly' | 'yearly'];
   if (!priceId) {
-    return NextResponse.json({ error: 'Invalid billing period' }, { status: 400 });
+    return NextResponse.json({ error: 'Ogiltig betalningsperiod' }, { status: 400 });
   }
 
-  const session = await stripe.checkout.sessions.create({
-    mode: 'subscription',
-    payment_method_types: ['card'],
-    customer_email: email || undefined,
-    client_reference_id: metadata?.userId || undefined,
-    line_items: [{ price: priceId, quantity: 1 }],
-    // Räkna och ta ut moms automatiskt (kräver Stripe Tax + svensk registrering)
-    automatic_tax: { enabled: true },
-    // Låt företagskunder ange sitt moms-/org-nr
-    tax_id_collection: { enabled: true },
-    success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/valkommen`,
-    cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/betalning`,
-    metadata: metadata || {},
-    locale: 'sv',
-  });
+  // Redirekta tillbaka till samma domän som kunden faktiskt är på (app-subdomänen),
+  // inte den globala NEXT_PUBLIC_SITE_URL (som pekar på marketing-domänen).
+  const origin = req.headers.get('origin') || req.nextUrl.origin || process.env.NEXT_PUBLIC_SITE_URL;
 
-  return NextResponse.json({ url: session.url });
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      customer_email: email || undefined,
+      client_reference_id: metadata?.userId || undefined,
+      line_items: [{ price: priceId, quantity: 1 }],
+      // Räkna och ta ut moms automatiskt (kräver Stripe Tax + svensk registrering)
+      automatic_tax: { enabled: true },
+      // Låt företagskunder ange sitt moms-/org-nr
+      tax_id_collection: { enabled: true },
+      success_url: `${origin}/valkommen`,
+      cancel_url: `${origin}/betalning`,
+      metadata: metadata || {},
+      locale: 'sv',
+    });
+
+    return NextResponse.json({ url: session.url });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Kunde inte starta betalningen';
+    console.error('[stripe/checkout] error:', message);
+    return NextResponse.json({ error: 'Kunde inte starta betalningen. Försök igen eller kontakta oss.' }, { status: 500 });
+  }
 }
