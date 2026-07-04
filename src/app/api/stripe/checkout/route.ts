@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
     customer_email: email || undefined,
     client_reference_id: metadata?.userId || undefined,
     line_items: [{ price: priceId, quantity: 1 }],
+    // Räkna och ta ut moms automatiskt (kräver Stripe Tax + svensk registrering)
+    automatic_tax: { enabled: true },
+    // Låt företagskunder ange sitt moms-/org-nr
+    tax_id_collection: { enabled: true },
     success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/valkommen`,
     cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/betalning`,
     metadata: metadata || {},
