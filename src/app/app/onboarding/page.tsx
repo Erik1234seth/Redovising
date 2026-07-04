@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
+import FlowCheckpoints from '@/components/FlowCheckpoints';
 
 const NAV_BG = '#173b57';
 const CORAL = '#E95C63';
@@ -77,7 +78,7 @@ export default function OnboardingPage() {
 
       if (dbError) throw dbError;
       await refreshProfile();
-      router.push('/');
+      router.push('/betalning');
     } catch {
       setError('Något gick fel. Försök igen.');
     } finally {
@@ -111,8 +112,13 @@ export default function OnboardingPage() {
         </span>
       </div>
 
+      {/* Checkpoints — visar hela resan: uppgifter → betalning → klart */}
+      <div className="px-6 pt-8 pb-2 w-full max-w-lg mx-auto">
+        <FlowCheckpoints current={1} />
+      </div>
+
       {/* Content */}
-      <div className="flex-1 flex flex-col justify-center px-6 py-10 max-w-lg mx-auto w-full">
+      <div className="flex-1 flex flex-col justify-start px-6 pt-6 pb-10 max-w-lg mx-auto w-full">
 
         {/* Steg 1 — Företagsnamn & org-nr */}
         {step === 1 && (
@@ -439,7 +445,7 @@ export default function OnboardingPage() {
                 className="flex-1 py-3 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-40"
                 style={{ backgroundColor: NAV_BG }}
               >
-                {bokforingMetod === 'excel-kalkylark' ? 'Nästa' : (saving ? 'Sparar...' : 'Kom igång!')}
+                {bokforingMetod === 'excel-kalkylark' ? 'Nästa' : (saving ? 'Sparar...' : 'Till betalning →')}
               </button>
             </div>
           </div>
@@ -513,7 +519,7 @@ export default function OnboardingPage() {
                 className="flex-1 py-3 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-40"
                 style={{ backgroundColor: NAV_BG }}
               >
-                {saving ? 'Sparar...' : 'Kom igång!'}
+                {saving ? 'Sparar...' : 'Till betalning →'}
               </button>
             </div>
           </div>

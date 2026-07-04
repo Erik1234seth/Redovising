@@ -47,6 +47,19 @@ export async function POST(req: NextRequest) {
       { onConflict: 'stripe_subscription_id' }
     );
 
+    // Koppla prenumerationen till användarens profil så app-låsningen släpper
+    const userId = session.metadata?.userId || session.client_reference_id;
+    if (userId) {
+      await supabase
+        .from('profiles')
+        .update({
+          subscription_status: subscription.status,
+          stripe_customer_id: session.customer as string,
+          stripe_subscription_id: session.subscription as string,
+        })
+        .eq('id', userId);
+    }
+
     const email = session.customer_email;
     const name = session.metadata?.name || '';
     const contactMethod = session.metadata?.contactMethod || 'email';
@@ -167,6 +180,12 @@ export async function POST(req: NextRequest) {
           ? new Date(subscription.current_period_end * 1000).toISOString()
           : null,
       })
+      .eq('stripe_subscription_id', subscription.id);
+
+    // Spegla statusen på profilen (t.ex. canceled → låser appen igen)
+    await supabase
+      .from('profiles')
+      .update({ subscription_status: subscription.status })
       .eq('stripe_subscription_id', subscription.id);
   }
 

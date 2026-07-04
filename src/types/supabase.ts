@@ -21,6 +21,9 @@ export interface Profile {
   bokforing_metod: 'excel-kalkylark' | 'hemsidan' | 'maila-underlag' | null;
   skicka_in_metod: 'maila-fil' | 'ladda-upp' | null;
   onboarding_done: boolean;
+  subscription_status: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
 }
 
 export interface Order {

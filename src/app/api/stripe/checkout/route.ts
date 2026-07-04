@@ -18,9 +18,10 @@ export async function POST(req: NextRequest) {
     mode: 'subscription',
     payment_method_types: ['card'],
     customer_email: email || undefined,
+    client_reference_id: metadata?.userId || undefined,
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/success?email=${encodeURIComponent(email || '')}`,
-    cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/bestall/kontakt`,
+    success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/valkommen`,
+    cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/betalning`,
     metadata: metadata || {},
     locale: 'sv',
   });
