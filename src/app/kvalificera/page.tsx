@@ -61,7 +61,7 @@ export default function KvalificeraPage() {
           <button
             onClick={() => setStarted(true)}
             className="w-full py-4 rounded-2xl font-bold text-sm text-white transition-all duration-200 hover:scale-[1.01]"
-            style={{ backgroundColor: CORAL, boxShadow: `0 8px 20px ${CORAL}40` }}
+            style={{ backgroundColor: NAV_BG, boxShadow: `0 8px 20px ${NAV_BG}40` }}
           >
             Starta →
           </button>
