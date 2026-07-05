@@ -57,6 +57,16 @@ const TESTS = {
     emailBody: 'Hur funkar momsen om jag köpt något i Tyskland?',
     attachments: [],
   }),
+
+  // Känd användare ställer en K1-fråga → ska trigga RAG-sökning i K1-vägledningen
+  k1_question: () => callApi('/api/inmail', {
+    senderEmail: 'erijoh05@gmail.com',
+    gmailThreadId: 'test-thread-004',
+    messageId: 'test-msg-004',
+    subject: 'Avskrivning',
+    emailBody: 'Hur ska jag hantera avskrivning på inventarier i mitt förenklade årsbokslut? Finns det något gränsvärde för direktavdrag?',
+    attachments: [],
+  }),
 };
 
 // Triggar GAS checkInbox — kör detta efter att du skickat ett riktigt mejl

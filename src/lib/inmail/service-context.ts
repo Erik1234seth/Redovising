@@ -1,4 +1,6 @@
-export const ENKLA_BOKSLUT_CONTEXT = `
+import { loadKnowledge } from './knowledge';
+
+const BASE_CONTEXT = `
 Du är en AI-assistent för Enkla Bokslut — en bokföringstjänst för enskilda firmor i Sverige.
 
 TJÄNST:
@@ -50,3 +52,6 @@ KONTAKT:
 - E-post: ekonomi@enklabokslut.se
 - Boka gratis möte: enklabokslut.se/boka-mote
 `;
+
+// Bas-kontexten + allt innehåll från knowledge-mappen (interna dokument).
+export const ENKLA_BOKSLUT_CONTEXT = BASE_CONTEXT + loadKnowledge();
