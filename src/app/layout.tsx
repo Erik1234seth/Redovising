@@ -4,7 +4,7 @@ import "./globals.css";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { AuthProvider } from "@/contexts/AuthContext";
-import Script from "next/script";
+import CookieConsent from "@/components/CookieConsent";
 import { headers } from "next/headers";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -83,15 +83,6 @@ export default async function RootLayout({
 
   return (
     <html lang="sv">
-      <head>
-        <Script async src="https://www.googletagmanager.com/gtag/js?id=G-8XZDRG1PSH" strategy="afterInteractive" />
-        <Script id="google-analytics" strategy="afterInteractive">{`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-8XZDRG1PSH');
-        `}</Script>
-      </head>
       <body className={`${inter.variable} ${plusJakarta.variable} ${plusJakarta.className}`}>
         <AuthProvider>
           {!isApp && <Navigation />}
@@ -99,6 +90,7 @@ export default async function RootLayout({
             {children}
           </main>
           {!isApp && <Footer />}
+          {!isApp && <CookieConsent />}
         </AuthProvider>
       </body>
     </html>
