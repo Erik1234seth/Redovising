@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
 import FlowCheckpoints from '@/components/FlowCheckpoints';
+import { useMainSiteUrl } from '@/lib/useMainSiteUrl';
 
 const NAV_BG = '#173b57';
 const CORAL = '#E95C63';
@@ -13,9 +14,9 @@ const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: CURRENT_YEAR - 1989 }, (_, i) => CURRENT_YEAR - i);
 
 const MOMS_OPTIONS: { value: 'månadsvis' | 'kvartalsvis' | 'helår' | 'ingen-moms'; label: string; desc: string }[] = [
-  { value: 'månadsvis', label: 'Månadsvis', desc: 'Redovisar moms varje månad' },
-  { value: 'kvartalsvis', label: 'Kvartalsvis', desc: 'Redovisar moms var 3:e månad' },
   { value: 'helår', label: 'En gång per år', desc: 'Redovisar moms en gång om året' },
+  { value: 'kvartalsvis', label: 'Kvartalsvis', desc: 'Redovisar moms var 3:e månad' },
+  { value: 'månadsvis', label: 'Månadsvis', desc: 'Redovisar moms varje månad' },
   { value: 'ingen-moms', label: 'Betalar inte moms', desc: 'Verksamheten är inte momspliktig' },
 ];
 
@@ -33,9 +34,62 @@ const SKICKA_OPTIONS: { value: SkickaInMetod; label: string; desc: string }[] = 
   { value: 'ladda-upp', label: 'Ladda upp på hemsidan', desc: 'Jag laddar upp filen direkt på Enkla Bokslut' },
 ];
 
+// Hjälptexter som visas när man klickar på frågetecknet vid ett momsalternativ
+const MOMS_HELP: Record<string, { title: string; body: string }> = {
+  kvartalsvis: {
+    title: 'Kvartalsvis moms',
+    body: 'Kvartalsvis moms innebär att du redovisar moms fyra gånger per år. Det är vanligt för företag som har högre omsättning än 1 miljon kronor men högst 40 miljoner kronor per år.',
+  },
+  helår: {
+    title: 'Årsvis moms',
+    body: 'Du kan normalt redovisa moms en gång per år om företagets beskattningsunderlag är högst 1 miljon kronor per år.',
+  },
+  månadsvis: {
+    title: 'Månadsvis moms',
+    body: 'Månadsvis moms innebär att du redovisar moms varje månad. Det är obligatoriskt om företagets beskattningsunderlag är högre än 40 miljoner kronor per år, men mindre företag kan också välja månadsvis redovisning om de vill ha tätare kontroll.',
+  },
+  'ingen-moms': {
+    title: 'Ingen moms',
+    body: 'Välj detta om företaget inte är momsregistrerat, till exempel om du omfattas av reglerna för momsbefrielse vid låg årsomsättning. Företag med årsomsättning i Sverige på högst 120 000 kronor kan i vissa fall vara undantagna från momsplikt. Det kräver bland annat att gränsen inte har överskridits under det aktuella kalenderåret eller något av de två föregående kalenderåren.',
+  },
+};
+
+// Formaterar org-/personnummer och lägger automatiskt in bindestreck före de fyra sista siffrorna
+function formatOrgNr(input: string): string {
+  const digits = input.replace(/\D/g, '').slice(0, 12);
+  // 12 siffror (personnummer med sekel): bindestreck efter 8 siffror
+  if (digits.length > 10) return `${digits.slice(0, 8)}-${digits.slice(8)}`;
+  // 10 siffror (org-/personnummer): bindestreck efter 6 siffror
+  if (digits.length > 6) return `${digits.slice(0, 6)}-${digits.slice(6)}`;
+  return digits;
+}
+
+// Luhn-kontroll på 10 siffror (sista siffran är kontrollsiffra)
+function luhnValid(digits: string): boolean {
+  if (!/^\d{10}$/.test(digits)) return false;
+  let sum = 0;
+  for (let i = 0; i < 10; i++) {
+    let d = Number(digits[i]);
+    if (i % 2 === 0) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    sum += d;
+  }
+  return sum % 10 === 0;
+}
+
+// Giltigt om 10 siffror (org-/personnummer) eller 12 siffror (personnummer med sekel) och Luhn stämmer
+function isValidOrgNr(input: string): boolean {
+  const digits = input.replace(/\D/g, '');
+  const ten = digits.length === 12 ? digits.slice(2) : digits;
+  return ten.length === 10 && luhnValid(ten);
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
+  const mainSiteUrl = useMainSiteUrl();
 
   const [step, setStep] = useState(1);
   const [companyName, setCompanyName] = useState('');
@@ -50,6 +104,23 @@ export default function OnboardingPage() {
   const [skickaInMetod, setSkickaInMetod] = useState<SkickaInMetod | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Förfyll formuläret med redan sparade uppgifter så man kan gå tillbaka och ändra
+  useEffect(() => {
+    if (hydrated || !profile) return;
+    if (profile.company_name) setCompanyName(profile.company_name);
+    if (profile.org_nr) setOrgNr(profile.org_nr);
+    if (profile.verksamhet) setVerksamhet(profile.verksamhet);
+    if (profile.moms_period) setMomsPeriod(profile.moms_period);
+    if (profile.start_ar) setStartAr(profile.start_ar);
+    if (profile.saljer_till) setSaljerTill(profile.saljer_till);
+    if (profile.saljer_i) setSaljerI(profile.saljer_i);
+    if (profile.koper_i) setKoperI(profile.koper_i);
+    if (profile.bokforing_metod) setBokforingMetod(profile.bokforing_metod);
+    if (profile.skicka_in_metod) setSkickaInMetod(profile.skicka_in_metod);
+    setHydrated(true);
+  }, [profile, hydrated]);
 
   const totalSteps = bokforingMetod === 'excel-kalkylark' ? 6 : 5;
 
@@ -100,16 +171,18 @@ export default function OnboardingPage() {
       </div>
 
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-6 pt-8 pb-0">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: CORAL }}>
-          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <span className="text-[15px] leading-none tracking-tight select-none">
-          <span className="font-medium" style={{ color: '#94a3b8' }}>Enkla </span>
-          <span className="font-extrabold text-slate-800">Bokslut</span>
-        </span>
+      <div className="px-6 pt-8 pb-0">
+        <a href={mainSiteUrl} className="flex items-center gap-2.5 w-fit transition-opacity hover:opacity-80">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: CORAL }}>
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <span className="text-[15px] leading-none tracking-tight select-none">
+            <span className="font-medium" style={{ color: '#94a3b8' }}>Enkla </span>
+            <span className="font-extrabold text-slate-800">Bokslut</span>
+          </span>
+        </a>
       </div>
 
       {/* Checkpoints — visar hela resan: skapa konto → uppgifter → betalning */}
@@ -156,27 +229,46 @@ export default function OnboardingPage() {
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   value={orgNr}
-                  onChange={e => setOrgNr(e.target.value)}
+                  onChange={e => setOrgNr(formatOrgNr(e.target.value))}
                   placeholder="ÅÅMMDD-XXXX"
-                  className="w-full px-4 py-3 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl placeholder-slate-400 focus:outline-none focus:ring-2 transition-shadow"
-                  style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
+                  className="w-full px-4 py-3 text-sm text-slate-700 bg-white border rounded-xl placeholder-slate-400 focus:outline-none focus:ring-2 transition-shadow"
+                  style={{
+                    borderColor: orgNr.replace(/\D/g, '').length >= 10 && !isValidOrgNr(orgNr) ? '#ef4444' : '#e2e8f0',
+                    '--tw-ring-color': NAV_BG,
+                  } as React.CSSProperties}
                 />
-                <p className="text-xs text-slate-400 mt-1.5">
-                  För enskild firma är org-numret ditt personnummer
-                </p>
+                {orgNr.replace(/\D/g, '').length >= 10 && !isValidOrgNr(orgNr) ? (
+                  <p className="text-xs text-red-500 mt-1.5">
+                    Ogiltigt organisationsnummer – kontrollera siffrorna.
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-400 mt-1.5">
+                    För enskild firma är org-numret ditt personnummer
+                  </p>
+                )}
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              disabled={companyName.trim().length < 2 || orgNr.trim().length < 6}
-              className="w-full mt-8 py-3 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-40"
-              style={{ backgroundColor: NAV_BG }}
-            >
-              Nästa
-            </button>
+            <div className="flex gap-3 mt-8">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="flex-1 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Tillbaka
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                disabled={companyName.trim().length < 2 || !isValidOrgNr(orgNr)}
+                className="flex-1 py-3 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-40"
+                style={{ backgroundColor: NAV_BG }}
+              >
+                Nästa
+              </button>
+            </div>
           </div>
         )}
 
@@ -277,9 +369,34 @@ export default function OnboardingPage() {
                   }}
                 >
                   <div>
-                    <p className="text-sm font-bold" style={{ color: momsPeriod === opt.value ? 'white' : '#1e293b' }}>
-                      {opt.label}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-bold" style={{ color: momsPeriod === opt.value ? 'white' : '#1e293b' }}>
+                        {opt.label}
+                      </p>
+                      {MOMS_HELP[opt.value] && (
+                        <span className="relative inline-flex group">
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Mer information om ${MOMS_HELP[opt.value].title}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold border cursor-help"
+                            style={{
+                              borderColor: momsPeriod === opt.value ? 'rgba(255,255,255,0.6)' : '#94a3b8',
+                              color: momsPeriod === opt.value ? 'white' : '#64748b',
+                            }}
+                          >
+                            ?
+                          </span>
+                          <span
+                            className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 scale-95 rounded-xl bg-white p-3 text-left opacity-0 shadow-xl border border-slate-200 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100"
+                          >
+                            <span className="block text-xs font-bold text-slate-800 mb-1">{MOMS_HELP[opt.value].title}</span>
+                            <span className="block text-xs leading-relaxed text-slate-500">{MOMS_HELP[opt.value].body}</span>
+                          </span>
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs mt-0.5" style={{ color: momsPeriod === opt.value ? 'rgba(255,255,255,0.7)' : '#94a3b8' }}>
                       {opt.desc}
                     </p>
@@ -298,7 +415,17 @@ export default function OnboardingPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Osäker? De flesta enskilda firmor med omsättning under 40 Mkr redovisar kvartalsvis. Du kan ändra detta senare.
+                Är du osäker? Logga in med BankID på{' '}
+                <a
+                  href="https://www7.skatteverket.se/portal/minasidor/moms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium underline"
+                  style={{ color: NAV_BG }}
+                >
+                  Skatteverkets Mina sidor
+                </a>{' '}
+                och öppna fliken moms. Där ser du &quot;Redovisningsperiod&quot; År–Kvartal–Månad. Vill du ändra period så kontaktar du oss så hjälper vi dig.
               </p>
             </div>
 

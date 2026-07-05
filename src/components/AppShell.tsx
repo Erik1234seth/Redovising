@@ -40,8 +40,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       return;
     }
     if (!hasActiveSubscription(profile.subscription_status)) {
-      // Låt betal- och välkomstsidan ligga kvar; allt annat skickas till betalning
-      if (pathname !== '/betalning' && pathname !== '/valkommen') router.replace('/betalning');
+      // Låt betal-, välkomst- och onboardingsidan ligga kvar (så man kan gå tillbaka
+      // och ändra sina uppgifter); allt annat skickas till betalning
+      if (pathname !== '/betalning' && pathname !== '/valkommen' && pathname !== '/onboarding') {
+        router.replace('/betalning');
+      }
     }
   }, [loading, isAuthPath, user, profile, pathname, router]);
 

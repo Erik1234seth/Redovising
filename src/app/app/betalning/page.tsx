@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { packages } from '@/data/packages';
 import FlowCheckpoints from '@/components/FlowCheckpoints';
+import { useMainSiteUrl } from '@/lib/useMainSiteUrl';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
@@ -20,6 +21,7 @@ const features = [
 export default function BetalningPage() {
   const router = useRouter();
   const { user, profile, loading } = useAuth();
+  const mainSiteUrl = useMainSiteUrl();
   const pkg = packages[0];
 
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
@@ -68,13 +70,15 @@ export default function BetalningPage() {
 
       {/* Brand bar */}
       <div className="px-6 py-4" style={{ backgroundColor: NAV_BG }}>
-        <div className="max-w-md mx-auto flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: CORAL }}>
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <span className="text-[15px] font-bold text-white tracking-tight">Enkla Bokslut</span>
+        <div className="max-w-md mx-auto">
+          <a href={mainSiteUrl} className="flex items-center gap-2.5 w-fit transition-opacity hover:opacity-80">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: CORAL }}>
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <span className="text-[15px] font-bold text-white tracking-tight">Enkla Bokslut</span>
+          </a>
         </div>
       </div>
 
@@ -163,6 +167,14 @@ export default function BetalningPage() {
             </svg>
             Säker betalning via Stripe
           </div>
+
+          <button
+            type="button"
+            onClick={() => router.push('/onboarding')}
+            className="block w-full mt-6 text-sm text-slate-400 hover:text-slate-600 transition-colors text-center"
+          >
+            ← Tillbaka
+          </button>
 
         </div>
       </div>

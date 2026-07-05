@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import FlowCheckpoints from '@/components/FlowCheckpoints';
+import { useMainSiteUrl } from '@/lib/useMainSiteUrl';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
@@ -123,18 +124,21 @@ function SignupForm() {
 }
 
 export default function AppSignupPage() {
+  const mainSiteUrl = useMainSiteUrl();
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
 
       {/* Brand bar */}
       <div className="px-6 py-4" style={{ backgroundColor: NAV_BG }}>
-        <div className="max-w-md mx-auto flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: CORAL }}>
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <span className="text-[15px] font-bold text-white tracking-tight">Enkla Bokslut</span>
+        <div className="max-w-md mx-auto">
+          <a href={mainSiteUrl} className="flex items-center gap-2.5 w-fit transition-opacity hover:opacity-80">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: CORAL }}>
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <span className="text-[15px] font-bold text-white tracking-tight">Enkla Bokslut</span>
+          </a>
         </div>
       </div>
 
