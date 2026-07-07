@@ -1,5 +1,5 @@
 // ─── Konfiguration ────────────────────────────────────────────────────────────
-// Logga in på script.google.com med ekonomi@enklabokslut.se
+// Logga in på script.google.com med erik@enklabokslut.se
 // Sätt dessa i: Project Settings → Script Properties:
 // NEXT_URL      = https://app.enklabokslut.se
 // INMAIL_SECRET = (samma hemliga nyckel som i .env)
