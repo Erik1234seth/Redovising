@@ -60,7 +60,7 @@ export default function SkaffaPage() {
                     {pkg.price.toLocaleString('sv')}
                   </span>
                   <div className="mb-1">
-                    <p className="text-lg font-light text-white/50">kr</p>
+                    <p className="text-lg font-light text-white/50">kr <span className="text-xs">(exkl. moms)</span></p>
                     <p className="text-sm font-semibold" style={{ color: CORAL }}>per månad</p>
                   </div>
                 </div>
@@ -110,7 +110,7 @@ export default function SkaffaPage() {
                     {pkg.yearlyPrice.toLocaleString('sv')}
                   </span>
                   <div className="mb-1">
-                    <p className="text-lg font-light text-white/50">kr</p>
+                    <p className="text-lg font-light text-white/50">kr <span className="text-xs">(exkl. moms)</span></p>
                     <p className="text-sm font-semibold" style={{ color: CORAL }}>per år</p>
                   </div>
                 </div>

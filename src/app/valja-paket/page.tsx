@@ -81,7 +81,7 @@ export default function ValjaPaketPage() {
                       {billing === 'monthly' ? pkg.price.toLocaleString('sv') : pkg.yearlyPrice.toLocaleString('sv')}
                     </span>
                     <div className="mb-1">
-                      <span className="text-xl font-light text-white/40">kr</span>
+                      <span className="text-xl font-light text-white/40">kr <span className="text-xs">(exkl. moms)</span></span>
                       <p className="text-sm font-semibold leading-none mt-0.5" style={{ color: CORAL }}>
                         {billing === 'monthly' ? 'per månad' : 'per år'}
                       </p>

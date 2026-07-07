@@ -369,7 +369,7 @@ export default function Home() {
                         {billing === 'monthly' ? pkg.price.toLocaleString('sv') : pkg.yearlyPrice.toLocaleString('sv')}
                       </span>
                       <div className="mb-1">
-                        <p className="text-lg font-light text-white/50">kr</p>
+                        <p className="text-lg font-light text-white/50">kr <span className="text-xs">(exkl. moms)</span></p>
                         <p className="text-sm font-semibold" style={{ color: CORAL }}>
                           {billing === 'monthly' ? 'per månad' : 'per år'}
                         </p>
