@@ -36,6 +36,9 @@ export default function Footer() {
               </svg>
               erik@enklabokslut.se
             </a>
+            <p className="text-white/35 text-xs mt-4">
+              Org.nr 559555-3586
+            </p>
           </div>
 
           {/* Kom igång */}
