@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import Link from 'next/link';
 
 const CORAL = '#E95C63';
@@ -80,20 +79,19 @@ export default function OmOssPage() {
   return (
     <div className="bg-white">
 
-      {/* ── HERO: split ── */}
-      <section className="flex flex-col lg:flex-row min-h-[460px] sm:min-h-[520px]">
-        <div
-          className="flex-1 flex items-center px-8 sm:px-12 lg:px-16 py-16"
-          style={{ backgroundColor: NAVY }}
-        >
-          <div className="max-w-lg">
+      {/* ── HERO ── */}
+      <section className="bg-white overflow-hidden">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-left py-16 lg:py-24">
             <p className="text-sm font-semibold uppercase tracking-widest mb-4" style={{ color: CORAL }}>
               Om oss
             </p>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white mb-5 leading-tight">
-              Redovisning för enskilda firmor med enklare flöden
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-[1.1] mb-6" style={{ color: NAVY }}>
+              Trygg redovisning för dig
+              <br />
+              som driver enskild firma
             </h1>
-            <div className="space-y-4 text-white/70 text-base sm:text-lg leading-relaxed">
+            <div className="space-y-4 text-slate-500 text-base sm:text-lg leading-relaxed">
               <p>
                 Enkla Bokslut är skapat för dig som driver enskild firma och vill ha hjälp med bokföring, moms och deklaration på ett tryggt och tydligt sätt.
               </p>
@@ -106,17 +104,9 @@ export default function OmOssPage() {
             </div>
           </div>
         </div>
-
-        <div className="flex-1 relative min-h-[280px] sm:min-h-[380px]">
-          <Image
-            src="/om-oss-enkla-bokslut.png"
-            alt="Småföretagare i sin butik"
-            fill
-            className="object-cover"
-            priority
-          />
-        </div>
       </section>
+
+      <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
 
       {/* ── VARFÖR VI FINNS ── */}
       <section className="py-16 sm:py-24">
@@ -157,7 +147,7 @@ export default function OmOssPage() {
                   { from: 'Osäkert', to: 'Kontrolleras och granskas av en redovisningskonsult' },
                 ].map((item) => (
                   <div key={item.from} className="flex items-start gap-3 pb-4 border-b border-white/10 last:border-0 last:pb-0">
-                    <span className="text-sm font-semibold text-white/40 line-through whitespace-nowrap mt-0.5">{item.from}</span>
+                    <span className="text-sm font-semibold text-white/40 line-through whitespace-nowrap mt-0.5 flex-shrink-0 w-20">{item.from}</span>
                     <svg className="w-4 h-4 flex-shrink-0 mt-1" style={{ color: CORAL }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                     </svg>
@@ -169,6 +159,8 @@ export default function OmOssPage() {
           </div>
         </div>
       </section>
+
+      <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
 
       {/* ── SPECIALISERING ── */}
       <section className="bg-gray-50 py-16 sm:py-20">
@@ -211,6 +203,8 @@ export default function OmOssPage() {
         </div>
       </section>
 
+      <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
+
       {/* ── SÅ ARBETAR VI ── */}
       <section className="py-16 sm:py-24">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -238,6 +232,8 @@ export default function OmOssPage() {
           </div>
         </div>
       </section>
+
+      <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
 
       {/* ── LÄGRE PRIS – UTAN GENVÄGAR ── */}
       <section className="bg-gray-50 py-16 sm:py-24">
@@ -290,6 +286,8 @@ export default function OmOssPage() {
         </div>
       </section>
 
+      <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
+
       {/* ── PASSAR / PASSAR INTE ── */}
       <section className="py-16 sm:py-24">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -304,8 +302,8 @@ export default function OmOssPage() {
 
           <div className="grid md:grid-cols-2 gap-6">
             {/* När det passar */}
-            <div className="rounded-2xl p-7 sm:p-8 border-2 bg-white" style={{ borderColor: `${CORAL}40` }}>
-              <h3 className="text-lg font-bold text-navy-900 mb-5">
+            <div className="rounded-2xl p-8 sm:p-10" style={{ backgroundColor: NAVY }}>
+              <h3 className="text-lg font-bold text-white mb-6">
                 När Enkla Bokslut passar
               </h3>
               <ul className="space-y-3">
@@ -313,13 +311,13 @@ export default function OmOssPage() {
                   <li key={point} className="flex items-start gap-3">
                     <div
                       className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5"
-                      style={{ backgroundColor: `${CORAL}18` }}
+                      style={{ backgroundColor: `${CORAL}22` }}
                     >
                       <svg className="w-3 h-3" style={{ color: CORAL }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
-                    <span className="text-slate-700 text-sm leading-relaxed">{point}</span>
+                    <span className="text-white/80 text-sm leading-relaxed">{point}</span>
                   </li>
                 ))}
               </ul>
