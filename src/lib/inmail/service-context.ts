@@ -40,7 +40,7 @@ SÅ HÄR FUNGERAR DET:
 3. Vid årets slut sammanställs bokslut, NE-bilaga och moms — vi lämnar in till Skatteverket
 
 INMATNINGSMÖJLIGHETER:
-- Maila in: fota kvittot och maila till ekonomi@enklabokslut.se
+- Maila in: fota kvittot och maila till erik@enklabokslut.se
 - Excel/kalkylark: skicka in din fil
 - Webappen: bokför direkt på app.enklabokslut.se
 
@@ -49,7 +49,7 @@ JÄMFÖRELSE MED TRADITIONELL BYRÅ:
 - Enkla Bokslut: 299 kr/mån (3 588 kr/år) eller 3 499 kr/år
 
 KONTAKT:
-- E-post: ekonomi@enklabokslut.se
+- E-post: erik@enklabokslut.se
 - Boka gratis möte: enklabokslut.se/boka-mote
 `;
 

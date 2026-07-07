@@ -210,7 +210,7 @@ export default function PeriodiseringPage() {
                   <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Alternativ B — Skicka via mail</p>
                   <p className="text-xs text-slate-400 mb-3">Beskriv vad det gäller och vilket belopp i ett mail till oss.</p>
                   <a
-                    href="mailto:hej@enklabok.se"
+                    href="mailto:erik@enklabokslut.se"
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
                     style={{ backgroundColor: CORAL, color: 'white' }}
                   >
