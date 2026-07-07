@@ -2,48 +2,78 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 const CORAL = '#E95C63';
+const NAVY = '#173b57';
 
-const values = [
+const specializationPoints = [
   {
     icon: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        d="M9 12h6m-6 4h4m3 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
     ),
-    title: 'Specialiserad expertis',
-    body: 'Vi gör bara en sak – redovisning för enskilda firmor. Det gör oss bättre på det än de som gör allt.',
+    title: 'Enskilda firmor, inte aktiebolag',
+    body: 'Vi är specialister på det regelverk som gäller enskilda firmor med förenklad redovisning – inte på alla bolagsformer.',
   },
   {
     icon: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
     ),
-    title: 'Transparent prissättning',
-    body: 'Inga dolda avgifter. Du ser priset innan du börjar och betalar exakt det – inte en krona mer.',
+    title: 'Verksamheter utan anställda',
+    body: 'Ingen lönehantering eller personaladministration. Det håller varje ärende enkelt, tydligt och lätt att kontrollera.',
   },
   {
     icon: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M13 10V3L4 14h7v7l9-11h-7z" />
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
     ),
-    title: 'Snabb leverans',
-    body: 'Din NE-bilaga levereras snabbt. Ingen väntan, ingen stress – vi vet att din tid är värdefull.',
-  },
-  {
-    icon: (
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-    ),
-    title: 'Säkerhet och integritet',
-    body: 'Dina uppgifter hanteras enligt GDPR med högsta säkerhet. Vi delar aldrig data med tredje part.',
+    title: 'Återkommande, standardiserbara flöden',
+    body: 'När uppgifterna följer samma mönster år efter år kan vi arbeta strukturerat och effektivt – utan att tumma på noggrannheten.',
   },
 ];
 
-const simplifiedPoints = [
-  'Enklare bokföringskrav jämfört med aktiebolag',
-  'Färre obligatoriska rapporter och deklarationer',
-  'Inget krav på auktoriserad revisor',
-  'Betydligt lägre administrativa kostnader',
-  'Vi hanterar processen – du fokuserar på din verksamhet',
+const workSteps = [
+  {
+    step: '1',
+    title: 'Du skickar in dina uppgifter',
+    body: 'Du lämnar in underlag och information om din verksamhet på ett tydligt och strukturerat sätt.',
+  },
+  {
+    step: '2',
+    title: 'Vi kontrollerar och tolkar',
+    body: 'En redovisningskonsult granskar informationen och kontrollerar att allt stämmer innan något går vidare.',
+  },
+  {
+    step: '3',
+    title: 'Vi frågar om något är oklart',
+    body: 'Är något otydligt hör vi av oss och ställer frågor – vi gissar aldrig oss fram i din bokföring.',
+  },
+  {
+    step: '4',
+    title: 'Bokföring, moms och deklaration klart',
+    body: 'Allt sammanställs noggrant och lämnas in korrekt och i tid till Skatteverket.',
+  },
+];
+
+const pricingPoints = [
+  'Tydligt avgränsad målgrupp – enskilda firmor utan anställda',
+  'Standardiserade arbetssätt istället för timdebiterad rådgivning',
+  'Återkommande flöden vi känner väl och kan arbeta effektivt med',
+  'Effektiv process – inte mindre kontroll av din bokföring',
+];
+
+const fitPoints = [
+  'Du driver enskild firma',
+  'Du har inga anställda',
+  'Din verksamhet har enklare, återkommande flöden',
+  'Du vill ha bokföring, moms och deklaration hanterat till ett fast, lägre pris',
+  'Du vill kunna lita på att någon granskar och frågar vid oklarheter',
+];
+
+const notFitPoints = [
+  'Du driver aktiebolag',
+  'Du har anställda eller hanterar löner',
+  'Din verksamhet har mer avancerade eller komplexa redovisningsupplägg',
+  'Du behöver löpande rådgivning utöver bokföring, moms och deklaration',
 ];
 
 export default function OmOssPage() {
@@ -52,26 +82,31 @@ export default function OmOssPage() {
 
       {/* ── HERO: split ── */}
       <section className="flex flex-col lg:flex-row min-h-[460px] sm:min-h-[520px]">
-        {/* Left: navy panel */}
         <div
           className="flex-1 flex items-center px-8 sm:px-12 lg:px-16 py-16"
-          style={{ backgroundColor: '#173b57' }}
+          style={{ backgroundColor: NAVY }}
         >
           <div className="max-w-lg">
             <p className="text-sm font-semibold uppercase tracking-widest mb-4" style={{ color: CORAL }}>
               Om oss
             </p>
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white mb-5 leading-tight">
-              Redovisning gjord för dig som driver eget
+              Redovisning för enskilda firmor med enklare flöden
             </h1>
-            <p className="text-white/70 text-base sm:text-lg leading-relaxed">
-              Vi grundades med en enkel vision: göra professionell redovisning tillgänglig
-              och prisvärd för alla som driver enskild firma i Sverige – utan krångel och utan onödiga kostnader.
-            </p>
+            <div className="space-y-4 text-white/70 text-base sm:text-lg leading-relaxed">
+              <p>
+                Enkla Bokslut är skapat för dig som driver enskild firma och vill ha hjälp med bokföring, moms och deklaration på ett tryggt och tydligt sätt.
+              </p>
+              <p>
+                Vi har valt att specialisera oss på enskilda firmor med standardiserbara flöden. Det gör att vi kan arbeta strukturerat och fokusera på det som faktiskt krävs – utan onödig administration eller krångliga upplägg.
+              </p>
+              <p>
+                Vårt mål är inte att hjälpa alla typer av företag. Vårt mål är att göra rätt saker, för rätt kunder, på ett noggrant och prisvärt sätt.
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Right: photo */}
         <div className="flex-1 relative min-h-[280px] sm:min-h-[380px]">
           <Image
             src="/om-oss-enkla-bokslut.png"
@@ -83,62 +118,160 @@ export default function OmOssPage() {
         </div>
       </section>
 
-      {/* ── STATS BELT ── */}
-      <section className="border-b border-gray-100">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <div className="grid grid-cols-3 gap-6 text-center">
-            {[
-              { value: '100%', label: 'Fokus på enskilda firmor' },
-              { value: 'Fast pris', label: 'Inga timarvoden' },
-              { value: '< 5 dagar', label: 'Genomsnittlig leveranstid' },
-            ].map((s) => (
-              <div key={s.label}>
-                <p className="text-2xl sm:text-3xl font-extrabold text-navy-800 mb-1">{s.value}</p>
-                <p className="text-xs sm:text-sm text-slate-500 font-medium">{s.label}</p>
+      {/* ── VARFÖR VI FINNS ── */}
+      <section className="py-16 sm:py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>
+                Varför vi finns
+              </p>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-navy-900 mb-6 leading-snug">
+                Bokföring ska vara begripligt – inte otryggt
+              </h2>
+              <div className="space-y-4 text-slate-600 leading-relaxed text-[15px]">
+                <p>
+                  Många som driver enskild firma upplever bokföring, moms och deklaration som krångligt,
+                  dyrt och osäkert. Man vet inte alltid om man har gjort rätt, och en traditionell
+                  redovisningsbyrå kan kännas både svårtillgänglig och för dyr för en mindre verksamhet.
+                </p>
+                <p>
+                  Samtidigt går det inte att pruta på att det blir rätt. Fel i bokföringen eller
+                  deklarationen kan bli kostsamt och skapa problem gentemot Skatteverket längre fram.
+                </p>
+                <p>
+                  Enkla Bokslut finns för att göra redovisningen begriplig och tillgänglig för rätt typ
+                  av företagare – utan att göra avkall på noggrannheten.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl p-8 sm:p-10" style={{ backgroundColor: NAVY }}>
+              <h3 className="text-lg font-bold text-white mb-6">
+                Det här vill vi ändra på
+              </h3>
+              <div className="space-y-4">
+                {[
+                  { from: 'Krångligt', to: 'Tydliga steg och ett strukturerat flöde' },
+                  { from: 'Dyrt', to: 'Fast, lägre pris utan timarvoden' },
+                  { from: 'Osäkert', to: 'Kontrolleras och granskas av en redovisningskonsult' },
+                ].map((item) => (
+                  <div key={item.from} className="flex items-start gap-3 pb-4 border-b border-white/10 last:border-0 last:pb-0">
+                    <span className="text-sm font-semibold text-white/40 line-through whitespace-nowrap mt-0.5">{item.from}</span>
+                    <svg className="w-4 h-4 flex-shrink-0 mt-1" style={{ color: CORAL }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                    <span className="text-white/85 text-sm leading-relaxed">{item.to}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SPECIALISERING ── */}
+      <section className="bg-gray-50 py-16 sm:py-20">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12 max-w-2xl mx-auto">
+            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>
+              Vår specialisering
+            </p>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-navy-900 mb-4">
+              Vi försöker inte passa alla
+            </h2>
+            <p className="text-slate-600 leading-relaxed text-[15px]">
+              Enkla Bokslut hjälper framför allt enskilda firmor utan anställda, med enklare och
+              återkommande flöden. Det är ett medvetet val – inte en begränsning vi hamnat i av misstag.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-5">
+            {specializationPoints.map((v) => (
+              <div
+                key={v.title}
+                className="bg-white rounded-2xl p-7 border border-navy-100 shadow-sm hover:shadow-md hover:border-navy-300 transition-all duration-200"
+              >
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
+                  style={{ backgroundColor: '#173b5712' }}
+                >
+                  <svg className="w-6 h-6 text-navy-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {v.icon}
+                  </svg>
+                </div>
+                <h3 className="text-base font-bold text-navy-900 mb-2">{v.title}</h3>
+                <p className="text-sm text-slate-600 leading-relaxed">{v.body}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-slate-500 text-sm mt-10 max-w-xl mx-auto leading-relaxed">
+            Den tydliga avgränsningen är anledningen till att vi kan hålla nere priset och samtidigt
+            vara noggranna.
+          </p>
+        </div>
+      </section>
+
+      {/* ── SÅ ARBETAR VI ── */}
+      <section className="py-16 sm:py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14 max-w-2xl mx-auto">
+            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>
+              Så arbetar vi
+            </p>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-navy-900">
+              En tydlig process, steg för steg
+            </h2>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6">
+            {workSteps.map((s) => (
+              <div key={s.step} className="relative">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white mb-4"
+                  style={{ backgroundColor: NAVY }}
+                >
+                  {s.step}
+                </div>
+                <h3 className="text-base font-bold text-navy-900 mb-2">{s.title}</h3>
+                <p className="text-sm text-slate-600 leading-relaxed">{s.body}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── MISSION ── */}
-      <section className="py-16 sm:py-24">
+      {/* ── LÄGRE PRIS – UTAN GENVÄGAR ── */}
+      <section className="bg-gray-50 py-16 sm:py-24">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             <div>
               <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>
-                Vår mission
+                Lägre pris – utan genvägar
               </p>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-navy-900 mb-6 leading-snug">
-                Byråkvalitet till ett rättvist pris
+                Hur kan priset vara lägre?
               </h2>
               <div className="space-y-4 text-slate-600 leading-relaxed text-[15px]">
                 <p>
-                  Traditionella redovisningsbyråer erbjuder samma tjänster till aktiebolag
-                  och enskilda firmor – och tar ut timarvoden som snabbt blir dyra. Det är inte rimligt.
+                  Ett lägre pris handlar inte om lägre kvalitet. Det handlar om hur vi arbetar.
                 </p>
                 <p>
-                  Enskilda firmor har enklare regelverk och kan utnyttja förenklad redovisning.
-                  Genom att specialisera oss enbart på detta kan vi automatisera processen och
-                  leverera professionell service till en bråkdel av det traditionella priset.
+                  Genom att hjälpa en tydligt avgränsad målgrupp – enskilda firmor utan anställda, med
+                  enklare flöden – kan vi standardisera stora delar av arbetet. Det gör processen mer
+                  effektiv, utan att en redovisningskonsult behöver granska varje ärende från grunden.
                 </p>
                 <p>
-                  Du ska kunna fokusera på din verksamhet – vi tar hand om pappersarbetet.
+                  Vi tar inga genvägar i kontrollen av din bokföring, moms eller deklaration. Det vi har
+                  effektiviserat är arbetssättet – inte noggrannheten.
                 </p>
               </div>
             </div>
 
-            {/* Highlight box */}
-            <div className="rounded-2xl p-8 sm:p-10" style={{ backgroundColor: '#173b57' }}>
+            <div className="rounded-2xl p-8 sm:p-10" style={{ backgroundColor: NAVY }}>
               <h3 className="text-lg font-bold text-white mb-6">
-                Vad är förenklad redovisning?
+                Vad gör priset lägre?
               </h3>
-              <p className="text-white/65 text-sm mb-6 leading-relaxed">
-                Enskilda firmor med omsättning under 3 mkr kan använda förenklad redovisning
-                enligt Bokföringslagen. Det innebär:
-              </p>
               <ul className="space-y-3">
-                {simplifiedPoints.map((point) => (
+                {pricingPoints.map((point) => (
                   <li key={point} className="flex items-start gap-3">
                     <div
                       className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5"
@@ -157,47 +290,76 @@ export default function OmOssPage() {
         </div>
       </section>
 
-      {/* ── VALUES ── */}
-      <section className="bg-gray-50 py-16 sm:py-20">
+      {/* ── PASSAR / PASSAR INTE ── */}
+      <section className="py-16 sm:py-24">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
+          <div className="text-center mb-12 max-w-2xl mx-auto">
             <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>
-              Varför vi
+              Är Enkla Bokslut rätt för dig?
             </p>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-navy-900">
-              Det vi lovar – och håller
+              Vi vill bara ta in kunder där vi passar
             </h2>
           </div>
-          <div className="grid sm:grid-cols-2 gap-5">
-            {values.map((v) => (
-              <div
-                key={v.title}
-                className="bg-white rounded-2xl p-7 border border-navy-100 shadow-sm hover:shadow-md hover:border-navy-300 transition-all duration-200"
-              >
-                <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
-                  style={{ backgroundColor: '#173b5712' }}
-                >
-                  <svg className="w-6 h-6 text-navy-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {v.icon}
-                  </svg>
-                </div>
-                <h3 className="text-base font-bold text-navy-900 mb-2">{v.title}</h3>
-                <p className="text-sm text-slate-600 leading-relaxed">{v.body}</p>
-              </div>
-            ))}
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* När det passar */}
+            <div className="rounded-2xl p-7 sm:p-8 border-2 bg-white" style={{ borderColor: `${CORAL}40` }}>
+              <h3 className="text-lg font-bold text-navy-900 mb-5">
+                När Enkla Bokslut passar
+              </h3>
+              <ul className="space-y-3">
+                {fitPoints.map((point) => (
+                  <li key={point} className="flex items-start gap-3">
+                    <div
+                      className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5"
+                      style={{ backgroundColor: `${CORAL}18` }}
+                    >
+                      <svg className="w-3 h-3" style={{ color: CORAL }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <span className="text-slate-700 text-sm leading-relaxed">{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* När man bör välja annat */}
+            <div className="rounded-2xl p-7 sm:p-8 border border-slate-200 bg-gray-50">
+              <h3 className="text-lg font-bold text-navy-900 mb-5">
+                När du bör välja en annan lösning
+              </h3>
+              <ul className="space-y-3">
+                {notFitPoints.map((point) => (
+                  <li key={point} className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 bg-slate-200">
+                      <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                    <span className="text-slate-700 text-sm leading-relaxed">{point}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-slate-500 text-sm leading-relaxed mt-6 pt-5 border-t border-slate-200">
+                Stämmer något av detta in på dig är det troligt att en redovisningsbyrå med bredare
+                tjänsteutbud passar dig bättre. Det säger vi hellre rakt ut, än tar in kunder där vårt
+                arbetssätt inte räcker till.
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
       {/* ── CTA ── */}
-      <section className="py-16 sm:py-20" style={{ backgroundColor: '#173b57' }}>
+      <section className="py-16 sm:py-20" style={{ backgroundColor: NAVY }}>
         <div className="max-w-3xl mx-auto px-4 text-center">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-4">
             Redo att komma igång?
           </h2>
           <p className="text-white/65 mb-8 text-base sm:text-lg">
-            Välj ditt paket och kom igång direkt – enkel process, fast pris, professionellt resultat.
+            Välj ditt paket och kom igång direkt – tydlig process, fast pris, noggrant resultat.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
