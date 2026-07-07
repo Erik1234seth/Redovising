@@ -17,7 +17,7 @@ export default function ExcelMailPage() {
   const [copied, setCopied] = useState(false);
 
   function copyEmail() {
-    navigator.clipboard.writeText('ekonomi@enklabokslut.se');
+    navigator.clipboard.writeText('erik@enklabokslut.se');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -210,7 +210,7 @@ export default function ExcelMailPage() {
             <div className="rounded-xl px-5 py-3.5 flex items-center justify-between gap-3 mb-4" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Mailadress</p>
-                <p className="text-white font-bold text-sm">ekonomi@enklabokslut.se</p>
+                <p className="text-white font-bold text-sm">erik@enklabokslut.se</p>
               </div>
               <button
                 onClick={copyEmail}
@@ -222,7 +222,7 @@ export default function ExcelMailPage() {
             </div>
 
             <a
-              href="mailto:ekonomi@enklabokslut.se?subject=Bokföringsfil"
+              href="mailto:erik@enklabokslut.se?subject=Bokföringsfil"
               className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90 mb-5"
               style={{ backgroundColor: CORAL }}
             >

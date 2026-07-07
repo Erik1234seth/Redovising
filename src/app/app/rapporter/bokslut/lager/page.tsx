@@ -141,7 +141,7 @@ export default function LagerPage() {
                   <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Alternativ B — Skicka detaljerad lista</p>
                   <p className="text-xs text-slate-400 mb-3">Sammanställ artiklar, antal och inköpspris i Excel, PDF eller ett vanligt mail.</p>
                   <a
-                    href="mailto:hej@enklabok.se"
+                    href="mailto:erik@enklabokslut.se"
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
                     style={{ backgroundColor: CORAL, color: 'white' }}
                   >

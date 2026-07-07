@@ -215,7 +215,7 @@ export default function HomePage() {
               </svg>
             </div>
             <div className="flex gap-2 mt-4 flex-wrap">
-              {['Guide', 'Steg-för-steg', 'ekonomi@enklabokslut.se'].map(tag => (
+              {['Guide', 'Steg-för-steg', 'erik@enklabokslut.se'].map(tag => (
                 <span key={tag} className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600">{tag}</span>
               ))}
             </div>

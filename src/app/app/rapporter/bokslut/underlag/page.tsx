@@ -108,7 +108,7 @@ export default function UnderlagPage() {
                 Skicka ditt underlag till oss via mail så tar vi hand om resten och återkommer till dig.
               </p>
               <a
-                href="mailto:hej@enklabok.se"
+                href="mailto:erik@enklabokslut.se"
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90"
                 style={{ backgroundColor: CORAL, color: 'white' }}
               >
