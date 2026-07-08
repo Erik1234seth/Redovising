@@ -214,13 +214,13 @@ export default function AnvandarvillkorPage() {
         <div className="rounded-2xl p-7 sm:p-8 text-center" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}15` }}>
           <h3 className="text-lg font-extrabold mb-2" style={{ color: NAV_BG }}>Frågor om villkoren?</h3>
           <p className="text-slate-500 text-sm mb-5">Hör av dig så hjälper vi dig.</p>
-          <a
-            href="mailto:erik@enklabokslut.se"
+          <Link
+            href="/kontakt"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm text-white transition-transform hover:scale-[1.02]"
             style={{ backgroundColor: CORAL, boxShadow: `0 8px 20px ${CORAL}40` }}
           >
             Kontakta oss
-          </a>
+          </Link>
         </div>
 
         <div className="pt-4 text-center">

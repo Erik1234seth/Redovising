@@ -70,6 +70,7 @@ const fitPoints = [
 
 const notFitPoints = [
   'Du driver aktiebolag',
+  'Du omsätter minst 3 miljoner kr',
   'Du har anställda eller hanterar löner',
   'Din verksamhet har mer avancerade eller komplexa redovisningsupplägg',
   'Du behöver löpande rådgivning utöver bokföring, moms och deklaration',
@@ -117,7 +118,7 @@ export default function OmOssPage() {
                 Varför vi finns
               </p>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-navy-900 mb-6 leading-snug">
-                Bokföring ska vara begripligt – inte otryggt
+                Bokföring ska kännas enkel och logisk
               </h2>
               <div className="space-y-4 text-slate-600 leading-relaxed text-[15px]">
                 <p>
@@ -244,7 +245,7 @@ export default function OmOssPage() {
                 Lägre pris – utan genvägar
               </p>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-navy-900 mb-6 leading-snug">
-                Hur kan priset vara lägre?
+                Hur kan priset vara så lågt?
               </h2>
               <div className="space-y-4 text-slate-600 leading-relaxed text-[15px]">
                 <p>
@@ -291,7 +292,7 @@ export default function OmOssPage() {
       {/* ── PASSAR / PASSAR INTE ── */}
       <section className="py-16 sm:py-24">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 max-w-2xl mx-auto">
+          <div className="text-left mb-12 max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>
               Är Enkla Bokslut rätt för dig?
             </p>
@@ -341,9 +342,9 @@ export default function OmOssPage() {
                 ))}
               </ul>
               <p className="text-slate-500 text-sm leading-relaxed mt-6 pt-5 border-t border-slate-200">
-                Stämmer något av detta in på dig är det troligt att en redovisningsbyrå med bredare
-                tjänsteutbud passar dig bättre. Det säger vi hellre rakt ut, än tar in kunder där vårt
-                arbetssätt inte räcker till.
+                Om något av detta stämmer in på dig kan en redovisningsbyrå med ett bredare
+                tjänsteutbud vara ett bättre val. Vi är hellre tydliga med det från början, än
+                lovar mer än vårt arbetssätt är byggt för att leverera.
               </p>
             </div>
           </div>
