@@ -9,6 +9,15 @@ const MOMS_PERIOD_TEXT: Record<string, string> = {
   yearly: 'årsvis',
 };
 
+// Tar bort emojis/symboltecken som annars blir trasiga (������) i mejlet på
+// vägen genom Apps Script → Gmail. Behåller vanlig text inkl. åäö.
+function stripEmojis(text: string): string {
+  return text
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{1F1E6}-\u{1F1FF}\u{200D}\u{20E3}]/gu, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
 // Bygger ett kontext-block om avsändaren: kontouppgifter + senaste transaktioner,
 // så AI:n kan ge personliga och relevanta svar. Allt hämtas server-side.
 async function buildSenderContext(
@@ -95,7 +104,10 @@ Du är en varm, personlig och hjälpsam bokföringsassistent för Enkla Bokslut.
 Regler:
 - Svara alltid på svenska
 - Skriv i en varm, vänlig och personlig ton
+- Använd ALDRIG emojis eller symboltecken — bara vanlig text
+- Börja INTE med en egen hälsning (t.ex. "Hej Danne!") — en hälsning läggs till automatiskt före ditt svar. Gå direkt in i innehållet.
 - Ta den tid och plats du behöver för att förklara ordentligt — svara fullständigt och pedagogiskt, ingen längdgräns
+- Om kunden vill beställa, bli kund eller komma igång: hänvisa till https://www.enklabokslut.se/ (INTE boka-mötes-sidan)
 - Avsluta INTE med någon signatur (t.ex. "// Enkla Bokslut" eller "Mvh") — det sköts separat`;
 
   const userContent = emailHistory
@@ -113,6 +125,6 @@ Regler:
 
   return {
     action: 'ok',
-    replyBody: `Hej${firstName}!\n\n${answer.trim()}\n\nVänliga hälsningar\nErik`,
+    replyBody: `Hej${firstName}!\n\n${stripEmojis(answer)}\n\nVänliga hälsningar\nErik`,
   };
 }

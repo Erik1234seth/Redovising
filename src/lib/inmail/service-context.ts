@@ -65,9 +65,17 @@ SÅ MEJLAR KUNDEN IN UNDERLAG:
 - Skicka Excel/kalkylark
 - Eller bokför direkt i webappen på app.enklabokslut.se
 
+LÄNKAR (använd rätt länk beroende på vad kunden vill):
+- Beställa paket / komma igång / bli kund: https://www.enklabokslut.se/
+  (Detta är länken kunden ska använda för att skaffa tjänsten. Länka ALLTID hit
+  när kunden vill beställa, teckna abonnemang eller "komma igång".)
+- Boka ett gratis möte / prata med oss först: https://www.enklabokslut.se/boka-mote
+  (Använd BARA denna när kunden uttryckligen vill boka möte eller ställa frågor
+  innan de bestämmer sig — inte för att beställa.)
+- Webappen (bokföra, se sina uppgifter): https://app.enklabokslut.se
+
 KONTAKT:
 - E-post: erik@enklabokslut.se
-- Boka gratis möte: enklabokslut.se/boka-mote
 `;
 
 // Bas-kontexten + allt innehåll från knowledge-mappen (interna dokument).
