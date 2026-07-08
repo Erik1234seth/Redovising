@@ -96,6 +96,9 @@ export default function SkaffaPage() {
               <span className="px-3 py-1 text-xs font-bold rounded-full" style={{ backgroundColor: CORAL, color: 'white' }}>
                 ALLT INKLUDERAT
               </span>
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold" style={{ backgroundColor: `${CORAL}20`, color: CORAL }}>
+                Betala efter bokslut
+              </span>
             </div>
 
             <div className="p-7 sm:p-9">

@@ -20,7 +20,7 @@ const features = [
 
 export default function BetalningPage() {
   const router = useRouter();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, refreshProfile } = useAuth();
   const mainSiteUrl = useMainSiteUrl();
   const pkg = packages[0];
 
@@ -28,9 +28,9 @@ export default function BetalningPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Redan betalat? Skicka in i appen.
+  // Redan aktiv? Skicka in i appen.
   useEffect(() => {
-    if (!loading && profile && (profile.subscription_status === 'active' || profile.subscription_status === 'trialing')) {
+    if (!loading && profile && ['active', 'trialing', 'invoice'].includes(profile.subscription_status ?? '')) {
       router.replace('/');
     }
   }, [loading, profile, router]);
@@ -39,6 +39,35 @@ export default function BetalningPage() {
     if (!user) { router.push('/auth/login'); return; }
     setSubmitting(true);
     setError('');
+
+    // Årsvis: ingen kortbetalning i förskott — ge åtkomst direkt, fakturera senare.
+    if (billing === 'yearly') {
+      try {
+        const res = await fetch('/api/yearly-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            email: user.email,
+            name: profile?.full_name || '',
+          }),
+        });
+        const { ok, error: apiError } = await res.json();
+        if (ok) {
+          await refreshProfile();
+          router.replace('/valkommen');
+        } else {
+          setError(apiError || 'Något gick fel, försök igen.');
+          setSubmitting(false);
+        }
+      } catch {
+        setError('Något gick fel, försök igen.');
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // Månadsvis: Stripe-checkout som vanligt.
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
@@ -112,6 +141,9 @@ export default function BetalningPage() {
                   style={billing === 'yearly' ? { backgroundColor: 'white', color: NAV_BG } : { color: 'rgba(255,255,255,0.5)' }}
                 >
                   Årsvis
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: billing === 'yearly' ? `${CORAL}20` : `${CORAL}40`, color: billing === 'yearly' ? CORAL : 'rgba(233,92,99,0.9)' }}>
+                    Betala efter bokslut
+                  </span>
                 </button>
               </div>
 
@@ -128,7 +160,7 @@ export default function BetalningPage() {
                   </div>
                 </div>
                 {billing === 'yearly'
-                  ? <p className="text-xs mt-2 text-white/35">Faktureras en gång per år</p>
+                  ? <p className="text-xs mt-2 text-white/35">Betala inget nu — vi fakturerar dig först när vi lämnat in ditt årsbokslut</p>
                   : <p className="text-xs mt-1 text-white/40">Ingen bindningstid — avsluta när du vill</p>}
               </div>
 
@@ -153,7 +185,9 @@ export default function BetalningPage() {
                 className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 hover:scale-[1.02] text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 24px ${CORAL}50` }}
               >
-                {submitting ? 'Öppnar betalning...' : 'Gå till betalning →'}
+                {submitting
+                  ? (billing === 'yearly' ? 'Aktiverar...' : 'Öppnar betalning...')
+                  : (billing === 'yearly' ? 'Kom igång — betala efter bokslut →' : 'Gå till betalning →')}
               </button>
             </div>
           </div>

@@ -31,9 +31,10 @@ VAD SOM INGÅR (allt i ett fast pris):
 - Support hela vägen
 - Inget bokföringsprogram behövs
 
-PRIS:
-- Månadsvis: 299 kr/mån
-- Årsvis: 3 999 kr/år
+PRIS (alla priser exkl. moms):
+- Månadsvis: 299 kr/mån — betalas löpande med kort, måste vara betald för att ha tillgång
+- Årsvis: 3 999 kr/år — kunden betalar INGET i förskott. Vi fakturerar först när vi
+  lämnat in kundens årsbokslut. Kunden får full tillgång direkt.
 - Allt inkluderat, inga tillval, inga dolda avgifter, ingen bindningstid
 - Till jämförelse: en traditionell byrå kostar ofta 5 000–15 000 kr/år exkl. moms
 

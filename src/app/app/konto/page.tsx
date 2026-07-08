@@ -151,6 +151,28 @@ export default function KontoPage() {
     window.location.href = url;
   }
 
+  // Årsvis: ingen kortbetalning — ge åtkomst direkt, fakturera i efterhand.
+  async function handleYearlySignup() {
+    if (!user?.email) return;
+    setCheckoutLoading('yearly');
+    try {
+      const res = await fetch('/api/yearly-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, email: user.email, name: profile?.full_name || '' }),
+      });
+      const { ok } = await res.json();
+      if (ok) {
+        await refreshProfile();
+        window.location.reload();
+      } else {
+        setCheckoutLoading(null);
+      }
+    } catch {
+      setCheckoutLoading(null);
+    }
+  }
+
   async function handleManageSubscription() {
     if (!user?.email) return;
     setPortalLoading(true);
@@ -440,11 +462,11 @@ export default function KontoPage() {
                 <span
                   className="px-2.5 py-0.5 rounded-full text-xs font-semibold"
                   style={{
-                    backgroundColor: subscription.status === 'active' ? '#dcfce7' : '#fee2e2',
-                    color: subscription.status === 'active' ? '#166534' : '#991b1b',
+                    backgroundColor: subscription.status === 'active' || subscription.status === 'invoice' ? '#dcfce7' : '#fee2e2',
+                    color: subscription.status === 'active' || subscription.status === 'invoice' ? '#166534' : '#991b1b',
                   }}
                 >
-                  {subscription.status === 'active' ? 'Aktiv' : subscription.status === 'canceled' ? 'Avslutad' : subscription.status}
+                  {subscription.status === 'active' || subscription.status === 'invoice' ? 'Aktiv' : subscription.status === 'canceled' ? 'Avslutad' : subscription.status}
                 </span>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-slate-100">
@@ -463,15 +485,21 @@ export default function KontoPage() {
                   </span>
                 </div>
               )}
-              <button
-                type="button"
-                onClick={handleManageSubscription}
-                disabled={portalLoading}
-                className="w-full mt-2 py-2.5 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-60"
-                style={{ backgroundColor: CORAL }}
-              >
-                {portalLoading ? 'Öppnar portalen...' : 'Hantera prenumeration →'}
-              </button>
+              {subscription.billing_period === 'yearly' ? (
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  Du betalar inget löpande. Vi skickar en faktura på 3 999 kr (exkl. moms) när vi lämnat in ditt årsbokslut.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleManageSubscription}
+                  disabled={portalLoading}
+                  className="w-full mt-2 py-2.5 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-60"
+                  style={{ backgroundColor: CORAL }}
+                >
+                  {portalLoading ? 'Öppnar portalen...' : 'Hantera prenumeration →'}
+                </button>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -492,14 +520,14 @@ export default function KontoPage() {
               </button>
               <button
                 type="button"
-                onClick={() => handleStartCheckout('yearly')}
-                disabled={!PAYMENTS_ENABLED || checkoutLoading !== null}
+                onClick={handleYearlySignup}
+                disabled={checkoutLoading !== null}
                 className="flex items-center justify-between w-full px-4 py-3 rounded-xl border-2 transition-all disabled:opacity-60"
                 style={{ borderColor: NAV_BG, backgroundColor: `${NAV_BG}08` }}
               >
                 <div className="text-left">
-                  <p className="text-sm font-bold text-slate-700">Årsvis</p>
-                  <p className="text-xs text-slate-400">Faktureras en gång per år</p>
+                  <p className="text-sm font-bold text-slate-700">Årsvis <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold rounded" style={{ backgroundColor: CORAL, color: 'white' }}>BETALA EFTER BOKSLUT</span></p>
+                  <p className="text-xs text-slate-400">Betala inget nu — faktureras efter inlämnat bokslut</p>
                 </div>
                 <span className="text-sm font-extrabold" style={{ color: NAV_BG }}>
                   {checkoutLoading === 'yearly' ? '...' : '3 999 kr/år'}

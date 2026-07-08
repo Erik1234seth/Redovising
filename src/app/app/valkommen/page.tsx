@@ -13,7 +13,7 @@ export default function ValkommenPage() {
   const { profile, refreshProfile } = useAuth();
   const [slow, setSlow] = useState(false);
 
-  const active = profile?.subscription_status === 'active' || profile?.subscription_status === 'trialing';
+  const active = profile?.subscription_status === 'active' || profile?.subscription_status === 'trialing' || profile?.subscription_status === 'invoice';
 
   // Vänta in webhooken: uppdatera profilen tills prenumerationen är aktiv.
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function ValkommenPage() {
           Välkommen ombord!
         </h1>
         <p className="text-slate-500 text-base leading-relaxed mb-8">
-          Din betalning gick igenom och din prenumeration är på plats. Vi tar hand om bokföring, moms, bokslut och deklaration.
+          Ditt konto är aktivt och allt är på plats. Vi tar hand om bokföring, moms, bokslut och deklaration.
         </p>
 
         {active ? (
