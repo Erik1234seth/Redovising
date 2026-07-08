@@ -10,7 +10,8 @@ import HjalpChat from './HjalpChat';
 const BARE_PREFIXES = ['/auth', '/onboarding', '/betalning', '/valkommen'];
 
 function hasActiveSubscription(status: string | null | undefined) {
-  return status === 'active' || status === 'trialing';
+  // 'invoice' = årskund som får tillgång direkt och faktureras i efterhand
+  return status === 'active' || status === 'trialing' || status === 'invoice';
 }
 
 function Loader() {

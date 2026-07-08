@@ -351,6 +351,9 @@ export default function Home() {
                       }
                     >
                       Årsvis
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: billing === 'yearly' ? `${CORAL}20` : `${CORAL}40`, color: billing === 'yearly' ? CORAL : 'rgba(233,92,99,0.8)' }}>
+                        Betala efter bokslut
+                      </span>
                     </button>
                   </div>
 

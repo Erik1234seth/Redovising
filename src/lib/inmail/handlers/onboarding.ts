@@ -23,7 +23,7 @@ export async function handleOnboarding(params: {
 Du behöver samla in tre saker för att kunna ta hand om deras bokföring:
 1. Fullständigt namn — behövs för att upprätta NE-bilagan i deras namn
 2. Organisationsnummer — behövs för kontakten med Skatteverket
-3. Betalning — månadsvis (299 kr/mån) eller årsvis (3 999 kr/år)
+3. Betalning — månadsvis (299 kr/mån, betalas löpande) eller årsvis (3 999 kr/år, faktureras först när vi lämnat in årsbokslutet)
 
 Läs igenom mejl-historiken och ta reda på vad som redan samlats in.
 

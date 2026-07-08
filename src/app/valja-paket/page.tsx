@@ -67,6 +67,9 @@ export default function ValjaPaketPage() {
                     }
                   >
                     Årsvis
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: billing === 'yearly' ? `${CORAL}20` : `${CORAL}40`, color: billing === 'yearly' ? CORAL : 'rgba(233,92,99,0.8)' }}>
+                      Betala efter bokslut
+                    </span>
                   </button>
                 </div>
 
@@ -85,7 +88,7 @@ export default function ValjaPaketPage() {
                     </div>
                   </div>
                   {billing === 'yearly'
-                    ? <p className="text-xs mt-2 text-white/35">Faktureras en gång per år</p>
+                    ? <p className="text-xs mt-2 text-white/35">Betala inget nu — faktureras när vi lämnat in ditt årsbokslut</p>
                     : <p className="text-xs mt-1 text-white/40">Ingen bindningstid — avsluta när du vill</p>
                   }
                 </div>
