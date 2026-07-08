@@ -67,9 +67,6 @@ export default function ValjaPaketPage() {
                     }
                   >
                     Årsvis
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: billing === 'yearly' ? `${CORAL}20` : `${CORAL}40`, color: billing === 'yearly' ? CORAL : 'rgba(233,92,99,0.8)' }}>
-                      Spara 89 kr
-                    </span>
                   </button>
                 </div>
 
@@ -81,14 +78,14 @@ export default function ValjaPaketPage() {
                       {billing === 'monthly' ? pkg.price.toLocaleString('sv') : pkg.yearlyPrice.toLocaleString('sv')}
                     </span>
                     <div className="mb-1">
-                      <span className="text-xl font-light text-white/40">kr <span className="text-xs">(exkl. moms)</span></span>
-                      <p className="text-sm font-semibold leading-none mt-0.5" style={{ color: CORAL }}>
-                        {billing === 'monthly' ? 'per månad' : 'per år'}
+                      <p className="text-sm font-semibold leading-none" style={{ color: CORAL }}>
+                        {billing === 'monthly' ? 'kr/månad' : 'kr/år'}
                       </p>
+                      <p className="text-xs text-white/40 mt-1">(exkl. moms)</p>
                     </div>
                   </div>
                   {billing === 'yearly'
-                    ? <p className="text-xs mt-2 text-white/35">≈ 292 kr/mån — faktureras en gång per år</p>
+                    ? <p className="text-xs mt-2 text-white/35">Faktureras en gång per år</p>
                     : <p className="text-xs mt-1 text-white/40">Ingen bindningstid — avsluta när du vill</p>
                   }
                 </div>

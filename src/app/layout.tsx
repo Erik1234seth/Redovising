@@ -12,7 +12,7 @@ const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500
 
 export const metadata: Metadata = {
   title: "Enkla Bokslut - Årsredovisning & Bokslut för Enskild Firma | NE-bilaga",
-  description: "Professionell årsredovisning och bokslut för enskilda firmor. Vi hjälper dig med NE-bilaga, förenklat årsbokslut och komplett redovisning från 1999kr. Snabb leverans och experthjälp för enskild näringsidkare.",
+  description: "Professionell årsredovisning och bokslut för enskilda firmor. Vi hjälper dig med NE-bilaga, förenklat årsbokslut och komplett redovisning från 299 kr/mån. Snabb leverans och experthjälp för enskild näringsidkare.",
   keywords: [
     "årsredovisning",
     "bokslut",
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     url: 'https://enklabokslut.se',
     siteName: 'Enkla Bokslut',
     title: 'Enkla Bokslut - Årsredovisning & Bokslut för Enskild Firma',
-    description: 'Professionell årsredovisning och bokslut för enskilda firmor. NE-bilaga från 1999kr, Komplett redovisning från 3499kr. Snabb leverans.',
+    description: 'Professionell årsredovisning och bokslut för enskilda firmor. NE-bilaga, förenklat årsbokslut och deklaration från 299 kr/mån. Snabb leverans.',
     images: [
       {
         url: '/loggautantext.png',
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Enkla Bokslut - Årsredovisning & Bokslut för Enskild Firma',
-    description: 'Professionell årsredovisning och bokslut för enskilda firmor. NE-bilaga från 1999kr. Snabb leverans.',
+    description: 'Professionell årsredovisning och bokslut för enskilda firmor. NE-bilaga från 299 kr/mån. Snabb leverans.',
     images: ['/loggautantext.png'],
   },
   icons: {

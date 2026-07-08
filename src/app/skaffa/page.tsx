@@ -60,8 +60,8 @@ export default function SkaffaPage() {
                     {pkg.price.toLocaleString('sv')}
                   </span>
                   <div className="mb-1">
-                    <p className="text-lg font-light text-white/50">kr <span className="text-xs">(exkl. moms)</span></p>
-                    <p className="text-sm font-semibold" style={{ color: CORAL }}>per månad</p>
+                    <p className="text-sm font-semibold" style={{ color: CORAL }}>kr/månad</p>
+                    <p className="text-xs text-white/40">(exkl. moms)</p>
                   </div>
                 </div>
                 <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>Sprid din kostnad över året</p>
@@ -96,9 +96,6 @@ export default function SkaffaPage() {
               <span className="px-3 py-1 text-xs font-bold rounded-full" style={{ backgroundColor: CORAL, color: 'white' }}>
                 ALLT INKLUDERAT
               </span>
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold" style={{ backgroundColor: `${CORAL}20`, color: CORAL }}>
-                Spara 89 kr
-              </span>
             </div>
 
             <div className="p-7 sm:p-9">
@@ -110,11 +107,11 @@ export default function SkaffaPage() {
                     {pkg.yearlyPrice.toLocaleString('sv')}
                   </span>
                   <div className="mb-1">
-                    <p className="text-lg font-light text-white/50">kr <span className="text-xs">(exkl. moms)</span></p>
-                    <p className="text-sm font-semibold" style={{ color: CORAL }}>per år</p>
+                    <p className="text-sm font-semibold" style={{ color: CORAL }}>kr/år</p>
+                    <p className="text-xs text-white/40">(exkl. moms)</p>
                   </div>
                 </div>
-                <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>Faktureras årsvis efter inlämnad deklaration</p>
+                <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>Faktureras när bokslut och deklaration är färdigställda.</p>
               </div>
 
               <ul className="space-y-3 mb-8">

@@ -366,7 +366,7 @@ function PrenumerationTab({ email }: { email: string }) {
           <div className="flex justify-between items-center py-3 border-b" style={{ borderBottomColor: '#F1F5F9' }}>
             <span className="text-sm text-slate-500">Plan</span>
             <span className="text-sm font-semibold text-slate-800">
-              Enkla Bokslut — {subscription.billing_period === 'yearly' ? '3 499 kr/år' : '299 kr/mån'}
+              Enkla Bokslut — {subscription.billing_period === 'yearly' ? '3 999 kr/år' : '299 kr/mån'}
             </span>
           </div>
 

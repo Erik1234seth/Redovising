@@ -450,7 +450,7 @@ export default function KontoPage() {
               <div className="flex items-center justify-between py-2 border-b border-slate-100">
                 <span className="text-sm text-slate-500">Plan</span>
                 <span className="text-sm font-semibold text-slate-700">
-                  {subscription.billing_period === 'yearly' ? '3 499 kr/år' : '299 kr/mån'}
+                  {subscription.billing_period === 'yearly' ? '3 999 kr/år' : '299 kr/mån'}
                 </span>
               </div>
               {subscription.current_period_end && (
@@ -498,11 +498,11 @@ export default function KontoPage() {
                 style={{ borderColor: NAV_BG, backgroundColor: `${NAV_BG}08` }}
               >
                 <div className="text-left">
-                  <p className="text-sm font-bold text-slate-700">Årsvis <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold rounded" style={{ backgroundColor: CORAL, color: 'white' }}>SPARA 89 KR</span></p>
+                  <p className="text-sm font-bold text-slate-700">Årsvis</p>
                   <p className="text-xs text-slate-400">Faktureras en gång per år</p>
                 </div>
                 <span className="text-sm font-extrabold" style={{ color: NAV_BG }}>
-                  {checkoutLoading === 'yearly' ? '...' : '3 499 kr/år'}
+                  {checkoutLoading === 'yearly' ? '...' : '3 999 kr/år'}
                 </span>
               </button>
             </div>

@@ -351,9 +351,6 @@ export default function Home() {
                       }
                     >
                       Årsvis
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: billing === 'yearly' ? `${CORAL}20` : `${CORAL}40`, color: billing === 'yearly' ? CORAL : 'rgba(233,92,99,0.8)' }}>
-                        Spara 89 kr
-                      </span>
                     </button>
                   </div>
 
@@ -369,17 +366,17 @@ export default function Home() {
                         {billing === 'monthly' ? pkg.price.toLocaleString('sv') : pkg.yearlyPrice.toLocaleString('sv')}
                       </span>
                       <div className="mb-1">
-                        <p className="text-lg font-light text-white/50">kr <span className="text-xs">(exkl. moms)</span></p>
                         <p className="text-sm font-semibold" style={{ color: CORAL }}>
-                          {billing === 'monthly' ? 'per månad' : 'per år'}
+                          {billing === 'monthly' ? 'kr/månad' : 'kr/år'}
                         </p>
+                        <p className="text-xs text-white/40">(exkl. moms)</p>
                       </div>
                     </div>
                     {billing === 'monthly' && (
                       <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>Sprid din kostnad över året</p>
                     )}
                     {billing === 'yearly' && (
-                      <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>Faktureras årsvis efter inlämnad deklaration</p>
+                      <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>Faktureras när bokslut och deklaration är färdigställda.</p>
                     )}
                   </div>
 

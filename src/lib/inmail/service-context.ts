@@ -11,7 +11,7 @@ TJÄNST:
 
 PRIS:
 - Månadsvis: 299 kr/mån
-- Årsvis: 3 499 kr/år (≈ 292 kr/mån — spara 89 kr)
+- Årsvis: 3 999 kr/år
 - Allt inkluderat, ingen bindningstid
 
 VAD SOM INGÅR:
@@ -46,7 +46,7 @@ INMATNINGSMÖJLIGHETER:
 
 JÄMFÖRELSE MED TRADITIONELL BYRÅ:
 - Traditionell byrå: 5 000–15 000 kr/år exkl. moms
-- Enkla Bokslut: 299 kr/mån (3 588 kr/år) eller 3 499 kr/år
+- Enkla Bokslut: 299 kr/mån (3 588 kr/år) eller 3 999 kr/år
 
 KONTAKT:
 - E-post: erik@enklabokslut.se

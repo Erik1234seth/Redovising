@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     const name = session.metadata?.name || '';
     const contactMethod = session.metadata?.contactMethod || 'email';
     const firstName = name.split(' ')[0];
-    const planLabel = billingPeriod === 'yearly' ? '3 499 kr/år' : '299 kr/mån';
+    const planLabel = billingPeriod === 'yearly' ? '3 999 kr/år' : '299 kr/mån';
 
     if (email) {
       const emailHeader = `
