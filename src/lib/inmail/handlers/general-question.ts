@@ -88,7 +88,6 @@ export async function handleGeneralQuestion(params: {
   emailHistory?: string;
 }): Promise<{ action: string; replyBody: string }> {
   const { supabase, profile, subject, body, emailHistory } = params;
-  const firstName = profile.full_name ? ' ' + profile.full_name.split(' ')[0] : '';
 
   // Hämta relevanta utdrag ur indexerade dokument (t.ex. K1-vägledningen)
   // samt kontext om avsändaren (kontouppgifter + transaktioner).
@@ -105,7 +104,7 @@ Regler:
 - Svara alltid på svenska
 - Skriv i en varm, vänlig och personlig ton
 - Använd ALDRIG emojis eller symboltecken — bara vanlig text
-- Börja INTE med en egen hälsning (t.ex. "Hej Danne!") — en hälsning läggs till automatiskt före ditt svar. Gå direkt in i innehållet.
+- Inled med en naturlig, vänlig hälsning med kundens förnamn, t.ex. "Hej Danne,". Kundens namn finns under OM AVSÄNDAREN. Saknas namn, skriv bara "Hej,".
 - Ta den tid och plats du behöver för att förklara ordentligt — svara fullständigt och pedagogiskt, ingen längdgräns
 - Om kunden vill beställa, bli kund eller komma igång: hänvisa till https://www.enklabokslut.se/ (INTE boka-mötes-sidan)
 - Avsluta INTE med någon signatur (t.ex. "// Enkla Bokslut" eller "Mvh") — det sköts separat`;
@@ -125,6 +124,6 @@ Regler:
 
   return {
     action: 'ok',
-    replyBody: `Hej${firstName}!\n\n${stripEmojis(answer)}\n\nVänliga hälsningar\nErik`,
+    replyBody: `${stripEmojis(answer)}\n\nVänliga hälsningar\nErik`,
   };
 }
