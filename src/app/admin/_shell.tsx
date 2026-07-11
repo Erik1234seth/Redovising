@@ -11,6 +11,7 @@ const NAV = [
   { href: '/admin/bestallningar', label: 'Beställningar' },
   { href: '/admin/inmail', label: 'Inmail' },
   { href: '/admin/funnel', label: 'Funnel' },
+  { href: '/admin/qr', label: 'QR-koder' },
   { href: '/admin/ab', label: 'A/B' },
 ];
 

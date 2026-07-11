@@ -131,6 +131,20 @@ export default function Home() {
     window.location.href = 'https://app.enklabokslut.se/auth/signup';
   };
 
+  // Log QR-code landings (?ref=brev-a). Once per browser session, per code.
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (!ref) return;
+    const key = `qrTracked_${ref}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+    fetch('/api/qr-track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref }),
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!loading && !user) {
       const hasSeenPopup = sessionStorage.getItem('hasSeenInfoPopup');
