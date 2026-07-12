@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react';
 const QR_CODES = [
   { code: 'brev-a', label: 'Brev A', url: 'enklabokslut.se/?ref=brev-a' },
   { code: 'brev-b', label: 'Brev B', url: 'enklabokslut.se/?ref=brev-b' },
+  { code: 'brev-c', label: 'Brev C', url: 'enklabokslut.se/?ref=brev-c' },
+  { code: 'brev-d', label: 'Brev D', url: 'enklabokslut.se/?ref=brev-d' },
 ];
 
 export default function QrPage() {
