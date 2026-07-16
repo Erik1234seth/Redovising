@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { packages } from '@/data/packages';
 import { useAuth } from '@/contexts/AuthContext';
-import { PAYMENTS_ENABLED } from '@/lib/config';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
@@ -124,26 +123,40 @@ function LandingFaq() {
 export default function Home() {
   const { user, loading } = useAuth();
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
+  const [showBrevPopup, setShowBrevPopup] = useState(false);
   const fakeCountdown = useFakeCountdown();
-
-  const handleGetStarted = () => {
-    sessionStorage.setItem('billingPeriod', billing);
-    window.location.href = 'https://app.enklabokslut.se/auth/signup';
-  };
 
   // Log QR-code landings (?ref=brev-a). Once per browser session, per code.
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref');
     if (!ref) return;
+
+    // Visitors coming from a physical letter (QR-code) — greet them with a
+    // popup tailored to "passar det min enskilda firma?". Shown once per browser.
+    let brevTimer: ReturnType<typeof setTimeout> | undefined;
+    // TESTLÄGE: visar alltid popupen (localStorage-kollen bortkommenterad).
+    // Återställ raden nedan innan lansering.
+    if (ref.toLowerCase().startsWith('brev-') /* && !localStorage.getItem('brevPopupDismissed') */) {
+      brevTimer = setTimeout(() => setShowBrevPopup(true), 600);
+    }
+
     const key = `qrTracked_${ref}`;
-    if (sessionStorage.getItem(key)) return;
-    sessionStorage.setItem(key, '1');
-    fetch('/api/qr-track', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ref }),
-    }).catch(() => {});
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1');
+      fetch('/api/qr-track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref }),
+      }).catch(() => {});
+    }
+
+    return () => { if (brevTimer) clearTimeout(brevTimer); };
   }, []);
+
+  const dismissBrevPopup = () => {
+    setShowBrevPopup(false);
+    try { localStorage.setItem('brevPopupDismissed', '1'); } catch {}
+  };
 
   useEffect(() => {
     if (!loading && !user) {
@@ -334,89 +347,117 @@ export default function Home() {
               </Link>
             </div>
 
-            {/* Right: pricing card */}
+            {/* Right: pricing card — matchar stilen på /skaffa */}
             {packages.map((pkg) => (
-              <div key={pkg.id} className="relative rounded-2xl overflow-hidden" style={{ backgroundColor: NAV_BG, boxShadow: `0 24px 64px ${NAV_BG}40` }}>
-                <div className="px-8 pt-6 pb-0 flex justify-between items-center">
-                  <span className="px-3 py-1 text-xs font-bold rounded-full" style={{ backgroundColor: CORAL, color: 'white' }}>
-                    ALLT INKLUDERAT
-                  </span>
-                </div>
+              <div key={pkg.id} className="w-full">
 
-                <div className="p-7 sm:p-9">
-                  {/* Billing toggle */}
-                  <div className="flex items-center gap-1 p-1 rounded-xl mb-6" style={{ backgroundColor: 'rgba(255,255,255,0.07)' }}>
-                    <button
-                      onClick={() => setBilling('monthly')}
-                      className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-200"
-                      style={billing === 'monthly'
-                        ? { backgroundColor: 'white', color: NAV_BG }
-                        : { color: 'rgba(255,255,255,0.5)' }
-                      }
-                    >
-                      Månadsvis
-                    </button>
-                    <button
-                      onClick={() => setBilling('yearly')}
-                      className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5"
-                      style={billing === 'yearly'
-                        ? { backgroundColor: 'white', color: NAV_BG }
-                        : { color: 'rgba(255,255,255,0.5)' }
-                      }
-                    >
-                      Årsvis
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: billing === 'yearly' ? `${CORAL}20` : `${CORAL}40`, color: billing === 'yearly' ? CORAL : 'rgba(233,92,99,0.8)' }}>
-                        Betala efter bokslut
-                      </span>
-                    </button>
+                {/* Card */}
+                <div className="relative rounded-3xl overflow-hidden" style={{ backgroundColor: NAV_BG, boxShadow: `0 24px 64px ${NAV_BG}40` }}>
+                  <div className="px-8 pt-6 pb-0">
+                    <span className="px-3 py-1 text-xs font-bold rounded-full" style={{ backgroundColor: CORAL, color: 'white' }}>
+                      ALLT INKLUDERAT
+                    </span>
                   </div>
 
-                  <div className="mb-7 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-                    <h3 className="text-xl font-bold mb-1 text-white">{billing === 'monthly' ? 'Månadsvis' : 'Årsvis'}</h3>
-                    <p className="text-sm mb-6 text-white/55">
-                      {billing === 'monthly'
-                        ? 'Perfekt om du vill fördela kostnaden över året istället för att betala allt på en gång.'
-                        : 'Passar dig som vill betala en gång och sedan vara klar för hela året.'}
-                    </p>
-                    <div className="flex items-end gap-1.5">
-                      <span className="text-6xl font-extrabold text-white leading-none">
-                        {billing === 'monthly' ? pkg.price.toLocaleString('sv') : pkg.yearlyPrice.toLocaleString('sv')}
-                      </span>
-                      <div className="mb-1">
-                        <p className="text-sm font-semibold" style={{ color: CORAL }}>
-                          {billing === 'monthly' ? 'kr/månad' : 'kr/år'}
-                        </p>
-                        <p className="text-xs text-white/40">(exkl. moms)</p>
+                  <div className="p-8">
+                    {/* Toggle (inuti kortet) */}
+                    <div className="relative flex p-1 rounded-full mb-7" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+                      <span
+                        className="absolute top-1 bottom-1 rounded-full transition-all duration-300 ease-out"
+                        style={{
+                          backgroundColor: '#fff',
+                          left: billing === 'yearly' ? '50%' : '0.25rem',
+                          right: billing === 'yearly' ? '0.25rem' : '50%',
+                        }}
+                      />
+                      <button
+                        onClick={() => setBilling('monthly')}
+                        className="relative z-10 flex-1 py-2 text-sm font-bold rounded-full transition-colors duration-200"
+                        style={{ color: billing === 'yearly' ? 'rgba(255,255,255,0.6)' : NAV_BG }}
+                      >
+                        Månadsvis
+                      </button>
+                      <button
+                        onClick={() => setBilling('yearly')}
+                        className="relative z-10 flex-1 py-2 text-sm font-bold rounded-full transition-colors duration-200"
+                        style={{ color: billing === 'yearly' ? NAV_BG : 'rgba(255,255,255,0.6)' }}
+                      >
+                        Årsvis
+                      </button>
+                    </div>
+
+                    {/* Price */}
+                    <div className="mb-6 pb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+                      <h3 className="text-xl font-bold mb-1 text-white">{billing === 'yearly' ? 'Årsvis' : 'Månadsvis'}</h3>
+                      <p className="text-sm mb-5 text-white/55 min-h-[2.5rem]">
+                        {billing === 'yearly'
+                          ? 'Betala en gång och var klar för hela året — helt utan kostnad förrän jobbet är gjort.'
+                          : 'Fördela kostnaden jämnt över året istället för att betala allt på en gång.'}
+                      </p>
+                      <div className="flex items-end gap-1.5">
+                        <span key={billing} className="text-6xl font-extrabold text-white leading-none animate-[priceIn_0.3s_ease-out]">
+                          {(billing === 'yearly' ? pkg.yearlyPrice : pkg.price).toLocaleString('sv')}
+                        </span>
+                        <div className="mb-1">
+                          <p className="text-sm font-semibold" style={{ color: CORAL }}>
+                            {billing === 'yearly' ? 'kr/år' : 'kr/månad'}
+                          </p>
+                          <p className="text-xs text-white/40">(exkl. moms)</p>
+                        </div>
                       </div>
                     </div>
-                    {billing === 'monthly' && (
-                      <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>Sprid din kostnad över året</p>
-                    )}
-                    {billing === 'yearly' && (
-                      <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>Faktureras när bokslut och deklaration är färdigställda.</p>
-                    )}
+
+                    {/* Billing-timing callout */}
+                    <div
+                      className="flex items-start gap-3 rounded-xl px-4 py-3.5 mb-6 transition-colors duration-300"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)' }}
+                    >
+                      <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="rgba(255,255,255,0.85)" strokeWidth={2}>
+                        {billing === 'yearly' ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        )}
+                      </svg>
+                      <div>
+                        <p className="text-sm font-bold text-white leading-snug">
+                          {billing === 'yearly' ? 'Du betalar inget nu' : 'Automatisk månadsbetalning'}
+                        </p>
+                        <p className="text-xs text-white/60 leading-snug mt-0.5">
+                          {billing === 'yearly'
+                            ? 'Faktureras först när bokslut och deklaration är färdigställda.'
+                            : 'Dras automatiskt varje månad. Ingen bindningstid.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Features */}
+                    <ul className="space-y-3 mb-8">
+                      {(billing === 'monthly' ? monthlyFeatures : yearlyFeatures).map((feature) => (
+                        <li key={feature} className="flex items-start gap-3">
+                          <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <span className="text-sm leading-relaxed text-white/80">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Link
+                      href="/kvalificera"
+                      onClick={() => { try { sessionStorage.setItem('billingPeriod', billing); } catch {} }}
+                      className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 text-sm hover:opacity-90 hover:scale-[1.01]"
+                      style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 20px ${CORAL}40` }}
+                    >
+                      Kom igång →
+                    </Link>
+
+                    <p className="text-center text-xs text-white/40 mt-4">
+                      {billing === 'yearly' ? 'Ingen betalning idag • Faktura efter färdigställt bokslut' : 'Ingen bindningstid • Avsluta när du vill'}
+                    </p>
                   </div>
-
-                  <ul className="space-y-3 mb-8">
-                    {(billing === 'monthly' ? monthlyFeatures : yearlyFeatures).map((feature) => (
-                      <li key={feature} className="flex items-start gap-3">
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: `${CORAL}30` }}>
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <span className="text-sm leading-relaxed text-white/80">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    onClick={handleGetStarted}
-                    className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 text-sm"
-                    style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 20px ${CORAL}40` }}
-                  >
-                    {PAYMENTS_ENABLED ? 'Kom igång →' : 'Skapa konto'}
-                  </button>
                 </div>
               </div>
             ))}
@@ -673,6 +714,112 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ══════════════════════════════════════════
+          BREV-POPUP — visas för besökare från utskicksbrevets QR-kod
+      ══════════════════════════════════════════ */}
+      {showBrevPopup && (
+        <div
+          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="brev-popup-title"
+        >
+          {/* Overlay */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+            onClick={dismissBrevPopup}
+          />
+
+          {/* Card */}
+          <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-[popIn_0.28s_cubic-bezier(0.16,1,0.3,1)]">
+            {/* Header band */}
+            <div className="px-6 pt-7 pb-6 text-center relative" style={{ backgroundColor: NAV_BG }}>
+              <button
+                onClick={dismissBrevPopup}
+                aria-label="Stäng"
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <span
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-4"
+                style={{ backgroundColor: CORAL, color: '#fff' }}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Du kom hit via vårt brev
+              </span>
+
+              <h2 id="brev-popup-title" className="text-2xl font-extrabold text-white leading-tight">
+                Passar Enkla Bokslut din enskilda firma?
+              </h2>
+              <p className="text-white/70 text-sm mt-2 max-w-xs mx-auto">
+                Svara på några korta frågor — så ser vi direkt om tjänsten passar din verksamhet. Tar under en minut.
+              </p>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-6">
+              <ul className="space-y-3 mb-6">
+                {[
+                  'Bokföring, bokslut & deklaration — allt ingår',
+                  'Fast, lågt pris utan bindningstid',
+                  'Byggt just för enskilda firmor',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <span
+                      className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5"
+                      style={{ backgroundColor: `${CORAL}1a` }}
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke={CORAL} strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </span>
+                    <span className="text-sm text-slate-600 leading-snug">{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <Link
+                href="/kvalificera"
+                onClick={dismissBrevPopup}
+                className="block w-full text-center px-6 py-3.5 font-bold text-white rounded-xl shadow-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.01]"
+                style={{ backgroundColor: CORAL, boxShadow: `0 8px 24px ${CORAL}40` }}
+              >
+                Se om det passar min firma
+              </Link>
+
+              <Link
+                href="/boka-mote"
+                onClick={dismissBrevPopup}
+                className="block w-full text-center mt-2.5 px-6 py-3 font-semibold text-slate-600 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm"
+              >
+                Hellre prata med någon? Boka gratis möte
+              </Link>
+
+              <p className="text-center text-xs text-slate-400 mt-4">
+                Har du frågor? Mejla{' '}
+                <a href="mailto:erik@enklabokslut.se" className="font-medium" style={{ color: NAV_BG }}>
+                  erik@enklabokslut.se
+                </a>
+              </p>
+            </div>
+          </div>
+
+          <style jsx>{`
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes popIn {
+              from { opacity: 0; transform: translateY(24px) scale(0.98); }
+              to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+          `}</style>
+        </div>
+      )}
 
     </>
   );

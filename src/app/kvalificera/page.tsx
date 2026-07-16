@@ -75,26 +75,75 @@ export default function KvalificeraPage() {
 
   if (result === 'pass') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16" style={{ background: `linear-gradient(180deg, ${NAV_BG}10, #f8fafc 55%)` }}>
-        <div className="w-full max-w-lg bg-white rounded-3xl border border-slate-200 p-12 sm:p-14 text-center shadow-xl relative overflow-hidden">
-          <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6" style={{ backgroundColor: '#ECFDF5' }}>
-            <svg className="w-12 h-12 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16" style={{ background: `linear-gradient(180deg, ${NAV_BG}12, #f8fafc 55%)` }}>
+        <div className="w-full max-w-lg bg-white rounded-3xl border border-slate-200 p-10 sm:p-12 text-center shadow-xl relative overflow-hidden animate-[cardIn_0.5s_cubic-bezier(0.16,1,0.3,1)]">
+
+          {/* Success mark with pulsing ring */}
+          <div className="relative w-24 h-24 mx-auto mb-6">
+            <span className="absolute inset-0 rounded-full animate-[ringPulse_2s_ease-out_infinite]" style={{ backgroundColor: '#10b98133' }} />
+            <div className="relative w-24 h-24 rounded-full flex items-center justify-center" style={{ backgroundColor: '#ECFDF5' }}>
+              <svg className="w-12 h-12 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path className="animate-[checkDraw_0.6s_ease-out_0.2s_both]" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" strokeDasharray="24" />
+              </svg>
+            </div>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold mb-4" style={{ color: NAV_BG }}>Grattis!</h1>
-          <p className="text-slate-500 text-base sm:text-lg leading-relaxed mb-10">Enkla Bokslut passar dig perfekt. Nu kan du välja hur du vill betala.</p>
+
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold mb-4" style={{ backgroundColor: '#ECFDF5', color: '#059669' }}>
+            ✓ Kvalificerad
+          </span>
+          <h1 className="text-4xl sm:text-5xl font-extrabold mb-3" style={{ color: NAV_BG }}>Perfekt — du passar!</h1>
+          <p className="text-slate-500 text-base leading-relaxed mb-8 max-w-sm mx-auto">
+            Din verksamhet uppfyller allt vi behöver. Enkla Bokslut sköter din bokföring, ditt bokslut och din deklaration — allt ingår.
+          </p>
+
+          {/* Så här går det till */}
+          <div className="text-left rounded-2xl border border-slate-100 bg-slate-50/60 p-5 mb-8">
+            <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: CORAL }}>Så här går det till</p>
+            <div className="space-y-3.5">
+              {[
+                { t: 'Välj hur du vill betala', d: 'Månadsvis eller årsvis — du bestämmer.' },
+                { t: 'Skapa ditt konto', d: 'Tar under en minut.' },
+                { t: 'Mejla in dina underlag', d: 'Vi sköter resten och lämnar in till Skatteverket.' },
+              ].map((s, i) => (
+                <div key={s.t} className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: NAV_BG }}>{i + 1}</div>
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: NAV_BG }}>{s.t}</p>
+                    <p className="text-xs text-slate-500 leading-snug">{s.d}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <button
             onClick={() => router.push('/skaffa')}
             className="w-full py-5 rounded-2xl font-bold text-base text-white transition-all duration-200 hover:scale-[1.02]"
             style={{ backgroundColor: CORAL, boxShadow: `0 12px 28px ${CORAL}50` }}
           >
-            Fortsätt →
+            Välj upplägg och kom igång →
           </button>
+          <p className="text-xs text-slate-400 mt-3">Ingen betalning nu · Ingen bindningstid</p>
           <Link href="/" className="block mt-5 text-sm text-slate-400 hover:text-slate-600 transition-colors">
             ← Tillbaka till startsidan
           </Link>
         </div>
+
+        <style jsx>{`
+          @keyframes cardIn {
+            from { opacity: 0; transform: translateY(16px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          @keyframes ringPulse {
+            0% { transform: scale(1); opacity: 0.6; }
+            70% { transform: scale(1.35); opacity: 0; }
+            100% { transform: scale(1.35); opacity: 0; }
+          }
+          @keyframes checkDraw {
+            from { stroke-dashoffset: 24; }
+            to { stroke-dashoffset: 0; }
+          }
+        `}</style>
       </div>
     );
   }

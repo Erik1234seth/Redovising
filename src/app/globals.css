@@ -71,6 +71,18 @@ html {
   animation: slideUp 0.3s ease-out;
 }
 
+/* Price fade-in on billing toggle (used on / and /skaffa) */
+@keyframes priceIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
