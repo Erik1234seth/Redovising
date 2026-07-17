@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react';
 
-// Labels for the QR codes you hand out. Add rows here when you print new letters.
+// Labels for the codes you hand out. Add rows here when you print new letters
+// or launch new ads.
 const QR_CODES = [
   { code: 'brev-a', label: 'Brev A', url: 'enklabokslut.se/?ref=brev-a' },
   { code: 'brev-b', label: 'Brev B', url: 'enklabokslut.se/?ref=brev-b' },
   { code: 'brev-c', label: 'Brev C', url: 'enklabokslut.se/?ref=brev-c' },
   { code: 'brev-d', label: 'Brev D', url: 'enklabokslut.se/?ref=brev-d' },
+  { code: 'fb-pris', label: 'FB — Allt ingår för 299', url: 'enklabokslut.se/?ref=fb-pris' },
 ];
 
 export default function QrPage() {

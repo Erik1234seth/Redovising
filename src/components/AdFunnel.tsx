@@ -1,0 +1,423 @@
+'use client';
+
+import { useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { questions } from '@/data/kvalificera-questions';
+
+const CORAL = '#E95C63';
+const NAV_BG = '#173b57';
+
+// White body, navy headings, slate body copy — the same language /kvalificera
+// and the brev-popup already use. Coral is spent only on the one action that
+// moves you forward each screen; everything else reads like the rest of the site.
+const TRACK = '#e2e8f0';
+const NAV_TINT = `${NAV_BG}14`;
+
+// Every stage fills this on desktop, so the card holds its size regardless of
+// how much text a given stage has — no jumping between a tall "hook" and a
+// short "how it works".
+const DESKTOP_MIN_H = 'sm:min-h-[600px]';
+
+const howItWorks = [
+  { t: 'Du mejlar in dina underlag', d: 'Kvitton och fakturor, precis som de ser ut.' },
+  { t: 'Vi sköter resten', d: 'Bokföring, moms och bokslut — allt ingår.' },
+  { t: 'Vi lämnar in till Skatteverket', d: 'Deklarationen är klar. Du gör inget mer.' },
+];
+
+function Check({ className = 'w-3 h-3' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
+/** Top-left back / top-right close controls. Dark-on-photo for the hook stage, light-on-white everywhere else. */
+function TopControl({ onClick, label, dark, children }: { onClick: () => void; label: string; dark: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      className={`pointer-events-auto w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-colors ${
+        dark ? 'bg-black/25 text-white/80 hover:text-white hover:bg-black/40' : 'bg-slate-100 text-slate-400 hover:text-slate-600 hover:bg-slate-200'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+type Stage = 'hook' | 'how' | 'questions' | 'contact' | 'done' | 'fail';
+
+export default function AdFunnel({ refCode, onClose }: { refCode: string | null; onClose?: () => void }) {
+  const [stage, setStage] = useState<Stage>('hook');
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, boolean | 'unknown'>>({});
+  const [failReason, setFailReason] = useState('');
+
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
+
+  const answer = (value: boolean) => {
+    const q = questions[step];
+    setAnswers({ ...answers, [q.id]: value });
+
+    if (value === q.disqualifyOn) {
+      setFailReason(q.reason);
+      setStage('fail');
+      return;
+    }
+    if (step + 1 >= questions.length) setStage('contact');
+    else setStep(step + 1);
+  };
+
+  // "Vet inte" never disqualifies — Erik reads these answers by hand in the
+  // lead notification, so an unsure visitor still gets through to the form.
+  const answerUnknown = () => {
+    const q = questions[step];
+    setAnswers({ ...answers, [q.id]: 'unknown' });
+    if (step + 1 >= questions.length) setStage('contact');
+    else setStep(step + 1);
+  };
+
+  const back = () => {
+    if (stage === 'how') setStage('hook');
+    else if (stage === 'questions' && step === 0) setStage('how');
+    else if (stage === 'questions') setStep(step - 1);
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSending(true);
+    setSendError('');
+    try {
+      const res = await fetch('/api/valkommen-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, phone, ref: refCode, answers }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Något gick fel');
+      setStage('done');
+    } catch (err: any) {
+      setSendError(err.message || 'Något gick fel. Försök igen.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const showBack = stage === 'how' || stage === 'questions';
+  const onPhoto = stage === 'hook';
+
+  return (
+    <div
+      className={`relative w-full rounded-3xl shadow-2xl overflow-hidden bg-white border border-slate-200 sm:flex sm:flex-col ${DESKTOP_MIN_H}`}
+    >
+      {/* Top controls float above whatever the stage renders */}
+      <div className="absolute top-3 inset-x-3 z-20 flex items-center justify-between pointer-events-none">
+        {showBack ? (
+          <TopControl onClick={back} label="Tillbaka" dark={onPhoto}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </TopControl>
+        ) : <span />}
+
+        {onClose && (
+          <TopControl onClick={onClose} label="Stäng" dark={onPhoto}>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </TopControl>
+        )}
+      </div>
+
+      {/* ── Kroken: annonsens nästa bildruta, sen vitt precis som resten av sajten ── */}
+      {stage === 'hook' && (
+        <div className="sm:flex-1 sm:flex sm:flex-col sm:min-h-0">
+          <div className="relative h-40 sm:h-48 flex-shrink-0">
+            <Image src="/vinkafacebook.png" alt="" fill priority className="object-cover object-[62%_26%]" />
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(0deg, #ffffff 0%, rgba(255,255,255,0) 22%)' }} />
+          </div>
+
+          <div className="px-6 sm:px-9 pt-5 pb-7 sm:pb-9 sm:flex-1 sm:flex sm:flex-col sm:justify-center">
+            <span
+              className="inline-flex items-center gap-1.5 self-start px-3 py-1 rounded-full text-xs font-semibold mb-4"
+              style={{ backgroundColor: NAV_BG, color: '#fff' }}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5m-1.5-9.5a2.121 2.121 0 013 3L12 12l-4 1 1-4 8.5-8.5z" />
+              </svg>
+              Du kom hit via vår annons
+            </span>
+
+            <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight mb-5" style={{ color: NAV_BG }}>
+              Allt ingår — men passar det din firma?
+            </h2>
+
+            <div className="flex items-end gap-2 mb-5">
+              <span className="text-5xl sm:text-6xl font-extrabold leading-none" style={{ color: CORAL }}>299</span>
+              <span className="text-base sm:text-lg font-bold mb-1 text-slate-500">kr/mån</span>
+            </div>
+
+            <ul className="grid grid-cols-2 gap-x-3 gap-y-2.5 sm:gap-y-3 mb-5">
+              {['Bokföring', 'Moms', 'Bokslut', 'Deklaration'].map((item) => (
+                <li key={item} className="flex items-center gap-2.5">
+                  <span
+                    className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: NAV_TINT, color: NAV_BG }}
+                  >
+                    <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                  </span>
+                  <span className="text-sm sm:text-base font-semibold" style={{ color: NAV_BG }}>{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="flex items-center gap-3 rounded-xl px-4 py-3 mb-5 bg-slate-50 border border-slate-200">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" fill={NAV_BG} viewBox="0 0 24 24">
+                <path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z" />
+              </svg>
+              <div>
+                <p className="text-sm sm:text-base font-bold leading-tight" style={{ color: NAV_BG }}>För enskilda firmor</p>
+                <p className="text-xs sm:text-sm text-slate-400">Anpassat för mindre verksamheter</p>
+              </div>
+            </div>
+
+            <div className="sm:mt-auto">
+              <button
+                onClick={() => setStage('how')}
+                className="w-full py-4 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90 hover:scale-[1.01]"
+                style={{ backgroundColor: NAV_BG, boxShadow: `0 10px 24px ${NAV_BG}40` }}
+              >
+                Ja, kolla om det passar →
+              </button>
+              <p className="text-center text-xs sm:text-sm mt-3 text-slate-400">
+                Tar under en minut · Ingen betalning
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Genomgången: kort, tre led, mail-in-historien ── */}
+      {stage === 'how' && (
+        <div className="px-6 sm:px-9 pt-14 sm:pt-16 pb-7 sm:pb-9 sm:flex-1 sm:flex sm:flex-col sm:justify-center">
+          <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.15em] mb-2" style={{ color: CORAL }}>Så funkar det</p>
+          <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight mb-6 sm:mb-8" style={{ color: NAV_BG }}>Du mejlar in. Vi gör resten.</h2>
+
+          <div className="space-y-4 sm:space-y-5 mb-7 sm:mb-9">
+            {howItWorks.map((s, i) => (
+              <div key={s.t} className="flex items-start gap-3.5">
+                <span
+                  className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold text-white"
+                  style={{ backgroundColor: NAV_BG }}
+                >
+                  {i + 1}
+                </span>
+                <div>
+                  <p className="text-[15px] sm:text-base font-bold leading-snug" style={{ color: NAV_BG }}>{s.t}</p>
+                  <p className="text-sm sm:text-base leading-relaxed mt-0.5 text-slate-500">{s.d}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="sm:mt-auto">
+            <button
+              onClick={() => setStage('questions')}
+              className="w-full py-4 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90 hover:scale-[1.01]"
+              style={{ backgroundColor: NAV_BG, boxShadow: `0 10px 24px ${NAV_BG}40` }}
+            >
+              Se om det passar min firma →
+            </button>
+            <p className="text-center text-xs sm:text-sm mt-3 text-slate-400">
+              {questions.length} korta ja/nej-frågor
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Kvalificeringen — i popupen, inte på en egen sida ── */}
+      {stage === 'questions' && (() => {
+        const q = questions[step];
+        return (
+          <div className="px-6 sm:px-9 pt-14 sm:pt-16 pb-7 sm:pb-9 sm:flex-1 sm:flex sm:flex-col">
+            <div className="flex items-center gap-1.5 mb-5 sm:mb-7">
+              {questions.map((_, i) => (
+                <div
+                  key={i}
+                  className="flex-1 h-1 sm:h-1.5 rounded-full transition-colors duration-300"
+                  style={{ backgroundColor: i <= step ? NAV_BG : TRACK }}
+                />
+              ))}
+            </div>
+
+            <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.1em] mb-4" style={{ color: NAV_BG }}>
+              Fråga {step + 1} av {questions.length}
+            </p>
+
+            <div className="sm:min-h-[120px]">
+              <h2 className="text-xl sm:text-3xl font-extrabold leading-snug mb-2.5 sm:mb-4" style={{ color: NAV_BG }}>{q.text}</h2>
+              <p className="text-sm sm:text-base leading-relaxed text-slate-500">{q.help}</p>
+            </div>
+
+            <div className="mt-6 sm:mt-auto sm:pt-8">
+              <div className="flex gap-3">
+                {[true, false].map((value) => (
+                  <button
+                    key={String(value)}
+                    onClick={() => answer(value)}
+                    className="flex-1 py-4 sm:py-5 rounded-xl border-[3px] font-bold text-base sm:text-lg transition-all duration-150 border-slate-400 bg-white hover:border-slate-500 hover:bg-slate-50"
+                    style={{ color: NAV_BG }}
+                  >
+                    {value ? 'Ja' : 'Nej'}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={answerUnknown}
+                className="w-full mt-3 py-3 rounded-xl text-sm font-semibold text-slate-500 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors"
+              >
+                Vet inte — fortsätt ändå
+              </button>
+
+              <button
+                onClick={back}
+                className="block w-full mt-4 text-sm text-slate-400 hover:text-slate-600 transition-colors text-center"
+              >
+                {step === 0 ? '← Tillbaka' : '← Föregående fråga'}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Kontaktuppgifter ── */}
+      {stage === 'contact' && (
+        <div className="px-6 sm:px-9 pt-12 sm:pt-16 pb-7 sm:pb-9 sm:flex-1 sm:flex sm:flex-col sm:justify-center">
+          <div className="flex items-center gap-3 mb-4 sm:mb-5">
+            <span
+              className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: '#ECFDF5' }}
+            >
+              <Check className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" />
+            </span>
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight" style={{ color: NAV_BG }}>Du passar!</h2>
+              <p className="text-xs sm:text-sm text-slate-400">Alla {questions.length} frågor klara</p>
+            </div>
+          </div>
+
+          <p className="text-sm sm:text-base leading-relaxed mb-5 sm:mb-7 text-slate-500">
+            Lämna dina uppgifter så hör vi av oss med hur du kommer igång — 299 kr/mån, allt inkluderat.
+          </p>
+
+          <form onSubmit={submit} className="space-y-3 sm:space-y-4">
+            {[
+              { label: 'Namn', value: name, set: setName, type: 'text', required: true, hint: '' },
+              { label: 'E-post', value: email, set: setEmail, type: 'email', required: true, hint: '' },
+              { label: 'Telefon', value: phone, set: setPhone, type: 'tel', required: false, hint: 'Frivilligt' },
+            ].map((f) => (
+              <div key={f.label}>
+                <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1.5 text-slate-600">
+                  {f.label}
+                  {f.hint && <span className="font-normal text-slate-400">· {f.hint}</span>}
+                </label>
+                <input
+                  type={f.type}
+                  value={f.value}
+                  required={f.required}
+                  onChange={(e) => f.set(e.target.value)}
+                  className="w-full px-4 py-3 sm:py-3.5 rounded-xl text-[15px] sm:text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
+                  style={{ color: NAV_BG }}
+                />
+              </div>
+            ))}
+
+            {sendError && <p className="text-sm text-center pt-1" style={{ color: CORAL }}>{sendError}</p>}
+
+            <button
+              type="submit"
+              disabled={sending}
+              className="w-full py-4 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: NAV_BG, boxShadow: `0 10px 24px ${NAV_BG}40` }}
+            >
+              {sending ? 'Skickar…' : 'Skicka — så hör vi av oss'}
+            </button>
+          </form>
+
+          <p className="text-center text-xs sm:text-sm mt-3 text-slate-400">
+            Ingen betalning nu · Ingen bindningstid
+          </p>
+        </div>
+      )}
+
+      {/* ── Klart ── */}
+      {stage === 'done' && (
+        <div className="px-6 sm:px-9 pt-14 sm:pt-16 pb-9 text-center sm:flex-1 sm:flex sm:flex-col sm:justify-center">
+          <span
+            className="inline-flex w-14 h-14 sm:w-16 sm:h-16 rounded-full items-center justify-center mb-5 mx-auto"
+            style={{ backgroundColor: '#ECFDF5' }}
+          >
+            <Check className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-500" />
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-extrabold mb-2.5" style={{ color: NAV_BG }}>Tack{name ? `, ${name.split(' ')[0]}` : ''}!</h2>
+          <p className="text-sm sm:text-base leading-relaxed mb-7 text-slate-500">
+            Vi hör av oss till <span className="font-semibold" style={{ color: NAV_BG }}>{email}</span> med hur du kommer igång.
+            Kolla gärna skräpposten om du inte ser något.
+          </p>
+          {onClose ? (
+            <button
+              onClick={onClose}
+              className="w-full py-3.5 sm:py-4 rounded-xl font-bold text-[15px] sm:text-base transition-colors border border-slate-200 hover:bg-slate-50"
+              style={{ color: NAV_BG }}
+            >
+              Stäng och titta runt
+            </button>
+          ) : (
+            <Link href="/" className="text-sm sm:text-base font-semibold text-slate-400 transition-colors hover:text-slate-600">
+              ← Till startsidan
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* ── Diskvalificerad ── */}
+      {stage === 'fail' && (
+        <div className="px-6 sm:px-9 pt-14 sm:pt-16 pb-9 text-center sm:flex-1 sm:flex sm:flex-col sm:justify-center">
+          <span
+            className="inline-flex w-14 h-14 sm:w-16 sm:h-16 rounded-2xl items-center justify-center mb-5 mx-auto"
+            style={{ backgroundColor: '#FEF2F2' }}
+          >
+            <svg className="w-7 h-7 sm:w-8 sm:h-8 text-red-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-extrabold mb-2.5" style={{ color: NAV_BG }}>Tyvärr</h2>
+          <p className="text-sm sm:text-base leading-relaxed mb-7 text-slate-500">{failReason}</p>
+
+          <Link
+            href="/kontakt"
+            onClick={onClose}
+            className="block w-full py-3.5 sm:py-4 rounded-xl font-bold text-white text-[15px] sm:text-base transition-opacity hover:opacity-90"
+            style={{ backgroundColor: NAV_BG }}
+          >
+            Kontakta oss ändå
+          </Link>
+          <button
+            onClick={() => { setStep(0); setAnswers({}); setFailReason(''); setStage('questions'); }}
+            className="mt-3.5 text-sm sm:text-base text-slate-400 transition-colors hover:text-slate-600"
+          >
+            Svara igen
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

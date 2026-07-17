@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { packages } from '@/data/packages';
 import { useAuth } from '@/contexts/AuthContext';
+import AdFunnel from '@/components/AdFunnel';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
@@ -124,21 +125,16 @@ export default function Home() {
   const { user, loading } = useAuth();
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
   const [showBrevPopup, setShowBrevPopup] = useState(false);
+  const [showFbPopup, setShowFbPopup] = useState(false);
+  const [fbRef, setFbRef] = useState<string | null>(null);
   const fakeCountdown = useFakeCountdown();
 
-  // Log QR-code landings (?ref=brev-a). Once per browser session, per code.
+  // Log QR-code and ad landings (?ref=brev-a, ?ref=fb-pris).
+  // Once per browser session, per code.
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref');
     if (!ref) return;
-
-    // Visitors coming from a physical letter (QR-code) — greet them with a
-    // popup tailored to "passar det min enskilda firma?". Shown once per browser.
-    let brevTimer: ReturnType<typeof setTimeout> | undefined;
-    // TESTLÄGE: visar alltid popupen (localStorage-kollen bortkommenterad).
-    // Återställ raden nedan innan lansering.
-    if (ref.toLowerCase().startsWith('brev-') /* && !localStorage.getItem('brevPopupDismissed') */) {
-      brevTimer = setTimeout(() => setShowBrevPopup(true), 600);
-    }
+    const code = ref.toLowerCase();
 
     const key = `qrTracked_${ref}`;
     if (!sessionStorage.getItem(key)) {
@@ -150,12 +146,46 @@ export default function Home() {
       }).catch(() => {});
     }
 
-    return () => { if (brevTimer) clearTimeout(brevTimer); };
+    // Visitors from a physical letter (QR-code) get a popup tailored to
+    // "passar det min enskilda firma?"; visitors from a Facebook ad get the
+    // ad's next frame. Each is shown once per browser.
+    //
+    // Lokalt visas de alltid, så de går att testa om och om igen utan att rensa
+    // localStorage. Gränsen går vid NODE_ENV och inte vid en bortkommenterad
+    // rad — testläget kan därför aldrig följa med till produktion.
+    const alwaysShow = process.env.NODE_ENV === 'development';
+    const wantsBrev = code.startsWith('brev-') && (alwaysShow || !localStorage.getItem('brevPopupDismissed'));
+    const wantsFb = code.startsWith('fb-') && (alwaysShow || !localStorage.getItem('fbPopupDismissed'));
+    if (!wantsBrev && !wantsFb) return;
+    if (wantsFb) setFbRef(code);
+
+    let popupTimer: ReturnType<typeof setTimeout> | undefined;
+    const show = () => {
+      popupTimer = setTimeout(() => {
+        if (wantsFb) setShowFbPopup(true);
+        else setShowBrevPopup(true);
+      }, 600);
+    };
+
+    // The cookie banner owns the bottom of the screen and would bury the popup's
+    // CTA on mobile. Let the visitor answer it first, then greet them.
+    if (localStorage.getItem('cookie-consent')) show();
+    else window.addEventListener('cookie-consent-resolved', show, { once: true });
+
+    return () => {
+      if (popupTimer) clearTimeout(popupTimer);
+      window.removeEventListener('cookie-consent-resolved', show);
+    };
   }, []);
 
   const dismissBrevPopup = () => {
     setShowBrevPopup(false);
     try { localStorage.setItem('brevPopupDismissed', '1'); } catch {}
+  };
+
+  const dismissFbPopup = () => {
+    setShowFbPopup(false);
+    try { localStorage.setItem('fbPopupDismissed', '1'); } catch {}
   };
 
   useEffect(() => {
@@ -720,7 +750,7 @@ export default function Home() {
       ══════════════════════════════════════════ */}
       {showBrevPopup && (
         <div
-          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="brev-popup-title"
@@ -809,6 +839,36 @@ export default function Home() {
                 </a>
               </p>
             </div>
+          </div>
+
+          <style jsx>{`
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes popIn {
+              from { opacity: 0; transform: translateY(24px) scale(0.98); }
+              to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+          `}</style>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          FACEBOOK-POPUP — annonsens fortsättning (?ref=fb-*).
+          Hela kvalificeringen bor här inne; besökaren skickas aldrig vidare
+          till en egen sida. Se AdFunnel för stegen.
+      ══════════════════════════════════════════ */}
+      {showFbPopup && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+            onClick={dismissFbPopup}
+          />
+
+          <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto animate-[popIn_0.28s_cubic-bezier(0.16,1,0.3,1)]">
+            <AdFunnel refCode={fbRef} onClose={dismissFbPopup} />
           </div>
 
           <style jsx>{`

@@ -50,15 +50,21 @@ export default function CookieConsent() {
     return () => window.removeEventListener('open-cookie-settings', reopen);
   }, []);
 
+  // Banners och popups slåss om nederkanten av skärmen. Landningssidan väntar
+  // in det här innan den visar sina ref-popups, så de aldrig hamnar under bannern.
+  const announceResolved = () => window.dispatchEvent(new Event('cookie-consent-resolved'));
+
   const accept = () => {
     localStorage.setItem(STORAGE_KEY, 'accepted');
     loadGoogleAnalytics();
     setVisible(false);
+    announceResolved();
   };
 
   const decline = () => {
     localStorage.setItem(STORAGE_KEY, 'declined');
     setVisible(false);
+    announceResolved();
   };
 
   if (!visible) return null;
