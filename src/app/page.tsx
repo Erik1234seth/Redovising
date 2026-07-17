@@ -126,6 +126,7 @@ export default function Home() {
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
   const [showBrevPopup, setShowBrevPopup] = useState(false);
   const [showFbPopup, setShowFbPopup] = useState(false);
+  const [brevRef, setBrevRef] = useState<string | null>(null);
   const [fbRef, setFbRef] = useState<string | null>(null);
   const fakeCountdown = useFakeCountdown();
 
@@ -157,6 +158,7 @@ export default function Home() {
     const wantsBrev = code.startsWith('brev-') && (alwaysShow || !localStorage.getItem('brevPopupDismissed'));
     const wantsFb = code.startsWith('fb-') && (alwaysShow || !localStorage.getItem('fbPopupDismissed'));
     if (!wantsBrev && !wantsFb) return;
+    if (wantsBrev) setBrevRef(code);
     if (wantsFb) setFbRef(code);
 
     let popupTimer: ReturnType<typeof setTimeout> | undefined;
@@ -746,117 +748,13 @@ export default function Home() {
       </section>
 
       {/* ══════════════════════════════════════════
-          BREV-POPUP — visas för besökare från utskicksbrevets QR-kod
+          BREV- & FACEBOOK-POPUP — samma flöde (AdFunnel) för besökare från
+          utskicksbrevets QR-kod (?ref=brev-*) och Facebook-annonsen (?ref=fb-*).
+          Bara "source" skiljer dem åt: pillens text/ikon säger brev eller annons.
+          Hela kvalificeringen bor i AdFunnel; besökaren skickas aldrig vidare
+          till en egen sida.
       ══════════════════════════════════════════ */}
-      {showBrevPopup && (
-        <div
-          className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="brev-popup-title"
-        >
-          {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
-            onClick={dismissBrevPopup}
-          />
-
-          {/* Card */}
-          <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-[popIn_0.28s_cubic-bezier(0.16,1,0.3,1)]">
-            {/* Header band */}
-            <div className="px-6 pt-7 pb-6 text-center relative" style={{ backgroundColor: NAV_BG }}>
-              <button
-                onClick={dismissBrevPopup}
-                aria-label="Stäng"
-                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-
-              <span
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-4"
-                style={{ backgroundColor: CORAL, color: '#fff' }}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                Du kom hit via vårt brev
-              </span>
-
-              <h2 id="brev-popup-title" className="text-2xl font-extrabold text-white leading-tight">
-                Passar Enkla Bokslut din enskilda firma?
-              </h2>
-              <p className="text-white/70 text-sm mt-2 max-w-xs mx-auto">
-                Svara på några korta frågor — så ser vi direkt om tjänsten passar din verksamhet. Tar under en minut.
-              </p>
-            </div>
-
-            {/* Body */}
-            <div className="px-6 py-6">
-              <ul className="space-y-3 mb-6">
-                {[
-                  'Bokföring, bokslut & deklaration — allt ingår',
-                  'Fast, lågt pris utan bindningstid',
-                  'Byggt just för enskilda firmor',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3">
-                    <span
-                      className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5"
-                      style={{ backgroundColor: `${CORAL}1a` }}
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke={CORAL} strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </span>
-                    <span className="text-sm text-slate-600 leading-snug">{item}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <Link
-                href="/kvalificera"
-                onClick={dismissBrevPopup}
-                className="block w-full text-center px-6 py-3.5 font-bold text-white rounded-xl shadow-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.01]"
-                style={{ backgroundColor: CORAL, boxShadow: `0 8px 24px ${CORAL}40` }}
-              >
-                Se om det passar min firma
-              </Link>
-
-              <Link
-                href="/boka-mote"
-                onClick={dismissBrevPopup}
-                className="block w-full text-center mt-2.5 px-6 py-3 font-semibold text-slate-600 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm"
-              >
-                Hellre prata med någon? Boka gratis möte
-              </Link>
-
-              <p className="text-center text-xs text-slate-400 mt-4">
-                Har du frågor? Mejla{' '}
-                <a href="mailto:erik@enklabokslut.se" className="font-medium" style={{ color: NAV_BG }}>
-                  erik@enklabokslut.se
-                </a>
-              </p>
-            </div>
-          </div>
-
-          <style jsx>{`
-            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-            @keyframes popIn {
-              from { opacity: 0; transform: translateY(24px) scale(0.98); }
-              to { opacity: 1; transform: translateY(0) scale(1); }
-            }
-          `}</style>
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════
-          FACEBOOK-POPUP — annonsens fortsättning (?ref=fb-*).
-          Hela kvalificeringen bor här inne; besökaren skickas aldrig vidare
-          till en egen sida. Se AdFunnel för stegen.
-      ══════════════════════════════════════════ */}
-      {showFbPopup && (
+      {(showBrevPopup || showFbPopup) && (
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center p-4"
           role="dialog"
@@ -864,11 +762,15 @@ export default function Home() {
         >
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
-            onClick={dismissFbPopup}
+            onClick={showBrevPopup ? dismissBrevPopup : dismissFbPopup}
           />
 
           <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto animate-[popIn_0.28s_cubic-bezier(0.16,1,0.3,1)]">
-            <AdFunnel refCode={fbRef} onClose={dismissFbPopup} />
+            {showBrevPopup ? (
+              <AdFunnel refCode={brevRef} onClose={dismissBrevPopup} source="brev" />
+            ) : (
+              <AdFunnel refCode={fbRef} onClose={dismissFbPopup} source="annons" />
+            )}
           </div>
 
           <style jsx>{`

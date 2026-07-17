@@ -8,11 +8,13 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
 
-// Leads from the Facebook-ad flow (/valkommen). Qualified visitors only —
-// disqualified ones are sent to /kontakt instead and never reach this route.
+// Leads from the ad/brev funnel (/valkommen, and the popups on the landing
+// page). Qualified visitors only — disqualified ones are sent to /kontakt
+// instead and never reach this route.
 export async function POST(request: NextRequest) {
   try {
     const { name, email, phone, ref, answers } = await request.json();
+    const sourceWord = typeof ref === 'string' && ref.toLowerCase().startsWith('brev-') ? 'brev' : 'annons';
 
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return NextResponse.json({ error: 'Ogiltig e-postadress' }, { status: 400 });
@@ -50,13 +52,13 @@ export async function POST(request: NextRequest) {
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
       replyTo: email,
       to: 'erik@enklabokslut.se',
-      subject: `Nytt lead från annons${ref ? ` (${ref})` : ''} – ${name || email}`,
+      subject: `Nytt lead från ${sourceWord}${ref ? ` (${ref})` : ''} – ${name || email}`,
       html: `
         <h2 style="color:${NAV_BG};">Nytt lead från /valkommen</h2>
         <p><strong>Namn:</strong> ${name || '—'}</p>
         <p><strong>E-post:</strong> ${email}</p>
         <p><strong>Telefon:</strong> ${phone || '—'}</p>
-        <p><strong>Annons:</strong> ${ref || '— (ingen ref i länken)'}</p>
+        <p><strong>Källa:</strong> ${ref || '— (ingen ref i länken)'}</p>
         <hr>
         <h3 style="color:${NAV_BG};">Kvalificeringssvar</h3>
         <table cellpadding="0" cellspacing="0">${answerRows}</table>

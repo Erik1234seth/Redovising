@@ -19,6 +19,16 @@ const NAV_TINT = `${NAV_BG}14`;
 // short "how it works".
 const DESKTOP_MIN_H = 'sm:min-h-[600px]';
 
+// Each ad variant shows a different photo as its "next frame" — same funnel,
+// same copy, just the hook image swapped so it lines up with the specific ad.
+const HOOK_IMAGES: Record<string, string> = {
+  'fb-pris': '/vinkafacebook.png',
+  'fb-b': '/popup1.png',
+  'fb-c': '/popup2.png',
+  'fb-d': '/popup3.png',
+};
+const DEFAULT_HOOK_IMAGE = '/vinkafacebook.png';
+
 const howItWorks = [
   { t: 'Du mejlar in dina underlag', d: 'Kvitton och fakturor, precis som de ser ut.' },
   { t: 'Vi sköter resten', d: 'Bokföring, moms och bokslut — allt ingår.' },
@@ -50,7 +60,7 @@ function TopControl({ onClick, label, dark, children }: { onClick: () => void; l
 
 type Stage = 'hook' | 'how' | 'questions' | 'contact' | 'done' | 'fail';
 
-export default function AdFunnel({ refCode, onClose }: { refCode: string | null; onClose?: () => void }) {
+export default function AdFunnel({ refCode, onClose, source = 'annons' }: { refCode: string | null; onClose?: () => void; source?: 'annons' | 'brev' }) {
   const [stage, setStage] = useState<Stage>('hook');
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, boolean | 'unknown'>>({});
@@ -112,6 +122,7 @@ export default function AdFunnel({ refCode, onClose }: { refCode: string | null;
 
   const showBack = stage === 'how' || stage === 'questions';
   const onPhoto = stage === 'hook';
+  const hookImage = (refCode && HOOK_IMAGES[refCode]) || DEFAULT_HOOK_IMAGE;
 
   return (
     <div
@@ -140,7 +151,7 @@ export default function AdFunnel({ refCode, onClose }: { refCode: string | null;
       {stage === 'hook' && (
         <div className="sm:flex-1 sm:flex sm:flex-col sm:min-h-0">
           <div className="relative h-40 sm:h-48 flex-shrink-0">
-            <Image src="/vinkafacebook.png" alt="" fill priority className="object-cover object-[62%_26%]" />
+            <Image src={hookImage} alt="" fill priority className="object-cover object-[62%_26%]" />
             <div className="absolute inset-0" style={{ background: 'linear-gradient(0deg, #ffffff 0%, rgba(255,255,255,0) 22%)' }} />
           </div>
 
@@ -149,10 +160,16 @@ export default function AdFunnel({ refCode, onClose }: { refCode: string | null;
               className="inline-flex items-center gap-1.5 self-start px-3 py-1 rounded-full text-xs font-semibold mb-4"
               style={{ backgroundColor: NAV_BG, color: '#fff' }}
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5m-1.5-9.5a2.121 2.121 0 013 3L12 12l-4 1 1-4 8.5-8.5z" />
-              </svg>
-              Du kom hit via vår annons
+              {source === 'brev' ? (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5m-1.5-9.5a2.121 2.121 0 013 3L12 12l-4 1 1-4 8.5-8.5z" />
+                </svg>
+              )}
+              {source === 'brev' ? 'Du kom hit via vårt brev' : 'Du kom hit via vår annons'}
             </span>
 
             <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight mb-5" style={{ color: NAV_BG }}>

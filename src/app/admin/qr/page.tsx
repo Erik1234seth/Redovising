@@ -10,6 +10,9 @@ const QR_CODES = [
   { code: 'brev-c', label: 'Brev C', url: 'enklabokslut.se/?ref=brev-c' },
   { code: 'brev-d', label: 'Brev D', url: 'enklabokslut.se/?ref=brev-d' },
   { code: 'fb-pris', label: 'FB — Allt ingår för 299', url: 'enklabokslut.se/?ref=fb-pris' },
+  { code: 'fb-b', label: 'FB B', url: 'enklabokslut.se/?ref=fb-b' },
+  { code: 'fb-c', label: 'FB C', url: 'enklabokslut.se/?ref=fb-c' },
+  { code: 'fb-d', label: 'FB D', url: 'enklabokslut.se/?ref=fb-d' },
 ];
 
 export default function QrPage() {
