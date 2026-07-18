@@ -18,7 +18,10 @@ function escapeHtml(s: string) {
 export async function POST(request: NextRequest) {
   try {
     const { name, email, phone, notes, contactMethod, ref, answers } = await request.json();
-    const sourceWord = typeof ref === 'string' && ref.toLowerCase().startsWith('brev-') ? 'brev' : 'annons';
+    const hasAnswers = !!answers && Object.keys(answers).length > 0;
+    const sourceWord =
+      typeof ref === 'string' && ref.toLowerCase().startsWith('brev-') ? 'brev' :
+      ref === 'hemsida-kontakt' ? 'hemsidan' : 'annons';
     const contactMethodLabel = contactMethod === 'phone' ? 'Ring mig' : contactMethod === 'email' ? 'Mejla mig' : '—';
 
     if (!email || typeof email !== 'string' || !email.includes('@')) {
@@ -61,13 +64,14 @@ export async function POST(request: NextRequest) {
       to: 'erik@enklabokslut.se',
       subject: `Nytt lead från ${sourceWord}${ref ? ` (${ref})` : ''} – ${name || email}`,
       html: `
-        <h2 style="color:${NAV_BG};">Nytt lead från /valkommen</h2>
+        <h2 style="color:${NAV_BG};">Nytt lead från ${sourceWord}</h2>
         <p><strong>Namn:</strong> ${name || '—'}</p>
         <p><strong>E-post:</strong> ${email}</p>
         <p><strong>Telefon:</strong> ${phone || '—'}</p>
         <p><strong>Vill bli kontaktad via:</strong> <span style="color:${NAV_BG};font-weight:700;">${contactMethodLabel}</span></p>
         <p><strong>Källa:</strong> ${ref || '— (ingen ref i länken)'}</p>
         ${notes ? `<p><strong>Anteckningar:</strong> ${escapeHtml(String(notes)).replace(/\n/g, '<br>')}</p>` : ''}
+        ${hasAnswers ? `
         <hr>
         <h3 style="color:${NAV_BG};">Kvalificeringssvar</h3>
         <table cellpadding="0" cellspacing="0">${answerRows}</table>
@@ -76,6 +80,10 @@ export async function POST(request: NextRequest) {
             ? 'Osäker på minst en fråga (se "Vet inte" ovan) — dubbelkolla innan du hör av dig.'
             : 'Personen klarade alla frågor.'
         } Svara direkt på det här mailet för att nå kunden.</p>
+        ` : `
+        <hr>
+        <p style="font-size:13px;color:#8fa3b1;">Skickat direkt via kontaktformuläret på hemsidan (ingen kvalificering). Svara direkt på det här mailet för att nå kunden.</p>
+        `}
       `,
     });
 
@@ -106,7 +114,7 @@ export async function POST(request: NextRequest) {
                 </tr>
                 <tr><td style="padding:40px;">
                   <p style="margin:0 0 8px;font-size:24px;font-weight:700;color:${NAV_BG};">Tack${firstName ? ', ' + firstName : ''}!</p>
-                  <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Vi har tagit emot dina uppgifter och utifrån dina svar passar Enkla Bokslut din verksamhet. Vi hör av oss snarast.</p>
+                  <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">${hasAnswers ? 'Vi har tagit emot dina uppgifter och utifrån dina svar passar Enkla Bokslut din verksamhet. Vi hör av oss snarast.' : 'Vi har tagit emot din förfrågan. Vi hör av oss snarast.'}</p>
                   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:24px;">
                     <tr><td style="padding:18px 20px;">
                       <table cellpadding="0" cellspacing="0"><tr>

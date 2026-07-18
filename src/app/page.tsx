@@ -121,6 +121,189 @@ function LandingFaq() {
   );
 }
 
+function HomeContactSection() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [notes, setNotes] = useState('');
+  const [contactMethod, setContactMethod] = useState<'phone' | 'email' | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
+  const [sent, setSent] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contactMethod) {
+      setSendError('Välj om vi ska ringa eller mejla dig.');
+      return;
+    }
+    setSending(true);
+    setSendError('');
+    try {
+      const res = await fetch('/api/valkommen-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, phone, notes, contactMethod, ref: 'hemsida-kontakt' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Något gick fel');
+      setSent(true);
+    } catch (err: any) {
+      setSendError(err.message || 'Något gick fel. Försök igen.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <section id="kontakta-oss" className="py-20 sm:py-24 bg-slate-50">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <p className="text-sm font-semibold uppercase tracking-widest mb-3 text-center" style={{ color: CORAL }}>Kontakta oss</p>
+        <h2 className="text-3xl sm:text-4xl font-extrabold mb-4 leading-tight text-center" style={{ color: NAV_BG }}>
+          Har du frågor eller är intresserad?
+        </h2>
+        <p className="text-slate-500 text-base leading-relaxed text-center mb-10 max-w-xl mx-auto">
+          Lämna dina uppgifter så hör vi av oss — vi svarar vanligtvis inom en arbetsdag.
+        </p>
+
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-9">
+          {sent ? (
+            <div className="text-center py-8">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#ECFDF5' }}>
+                <svg className="w-7 h-7 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-extrabold mb-2" style={{ color: NAV_BG }}>Tack{name ? `, ${name.split(' ')[0]}` : ''}!</h3>
+              <p className="text-slate-500 text-sm mb-5">
+                Vi har tagit emot din förfrågan.
+              </p>
+
+              <div className="flex items-start gap-3 text-left rounded-xl px-4 py-3.5 mb-6 bg-slate-50 border border-slate-200">
+                <span
+                  className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: `${NAV_BG}14`, color: NAV_BG }}
+                >
+                  {contactMethod === 'phone' ? (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                </span>
+                <p className="text-sm leading-relaxed" style={{ color: NAV_BG }}>
+                  {contactMethod === 'phone' ? (
+                    <>Vi ringer dig{phone ? <> på <span className="font-semibold">{phone}</span></> : ''} inom kort. Då berättar vi mer om hur allt fungerar och svarar på dina frågor.</>
+                  ) : (
+                    <>Vi mejlar dig{email ? <> på <span className="font-semibold">{email}</span></> : ''} inom kort. Då berättar vi mer om hur allt fungerar och svarar på dina frågor.</>
+                  )}
+                  {contactMethod !== 'phone' && (
+                    <span className="block text-xs mt-1.5 text-slate-400">Kolla gärna skräpposten om du inte ser något.</span>
+                  )}
+                </p>
+              </div>
+
+              <button
+                onClick={() => { setSent(false); setName(''); setEmail(''); setPhone(''); setNotes(''); setContactMethod(null); }}
+                className="text-sm font-semibold hover:underline"
+                style={{ color: CORAL }}
+              >
+                Skicka ett nytt meddelande
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={submit} className="space-y-4">
+              {[
+                { label: 'Namn', value: name, set: setName, type: 'text' },
+                { label: 'E-post', value: email, set: setEmail, type: 'email' },
+                { label: 'Telefon', value: phone, set: setPhone, type: 'tel' },
+              ].map((f) => (
+                <div key={f.label}>
+                  <label className="block text-sm font-semibold mb-1.5 text-slate-600">{f.label}</label>
+                  <input
+                    type={f.type}
+                    value={f.value}
+                    required
+                    onChange={(e) => f.set(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl text-[15px] outline-none transition-colors bg-slate-50 border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
+                    style={{ color: NAV_BG }}
+                  />
+                </div>
+              ))}
+
+              <div>
+                <label className="block text-sm font-semibold mb-1.5 text-slate-600">Hur vill du bli kontaktad?</label>
+                <div className="flex gap-3">
+                  {([
+                    { value: 'phone' as const, label: 'Ring mig', icon: (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
+                    ) },
+                    { value: 'email' as const, label: 'Mejla mig', icon: (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    ) },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setContactMethod(opt.value)}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 font-semibold text-sm transition-colors"
+                      style={
+                        contactMethod === opt.value
+                          ? { borderColor: NAV_BG, backgroundColor: `${NAV_BG}14`, color: NAV_BG }
+                          : { borderColor: '#e2e8f0', backgroundColor: '#fff', color: '#64748b' }
+                      }
+                    >
+                      {opt.icon}
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold mb-1.5 text-slate-600">
+                  Anteckningar
+                  <span className="font-normal text-slate-400">· Frivilligt</span>
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  placeholder="T.ex. något särskilt vi bör veta innan vi hör av oss"
+                  className="w-full px-4 py-3 rounded-xl text-[15px] outline-none transition-colors bg-slate-50 border border-slate-200 focus:border-slate-400 placeholder:text-slate-300 resize-none"
+                  style={{ color: NAV_BG }}
+                />
+              </div>
+
+              {sendError && <p className="text-sm text-center pt-1" style={{ color: CORAL }}>{sendError}</p>}
+
+              <button
+                type="submit"
+                disabled={sending}
+                className="w-full py-4 rounded-xl font-bold text-white text-[15px] transition-all duration-200 hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: NAV_BG, boxShadow: `0 10px 24px ${NAV_BG}40` }}
+              >
+                {sending ? 'Skickar…' : 'Skicka — så hör vi av oss'}
+              </button>
+
+              <p className="text-center text-xs text-slate-400 pt-1">
+                Ingen betalning nu · Ingen bindningstid
+              </p>
+            </form>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const { user, loading } = useAuth();
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
@@ -299,11 +482,11 @@ export default function Home() {
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start items-center sm:items-start">
                 <Link
-                  href="/kvalificera"
+                  href="#kontakta-oss"
                   className="px-7 py-3.5 font-bold text-white rounded-xl shadow-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.02] text-sm sm:text-base"
                   style={{ backgroundColor: NAV_BG, boxShadow: `0 8px 24px ${NAV_BG}30` }}
                 >
-                  Kom igång
+                  Kontakta oss
                 </Link>
                 <Link
                   href="/boka-mote"
@@ -540,6 +723,10 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
+
+      <HomeContactSection />
 
       <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
 
