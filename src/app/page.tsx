@@ -129,6 +129,7 @@ export default function Home() {
   const [showOrganicPopup, setShowOrganicPopup] = useState(false);
   const [brevRef, setBrevRef] = useState<string | null>(null);
   const [fbRef, setFbRef] = useState<string | null>(null);
+  const [popupVisitId, setPopupVisitId] = useState<number | null>(null);
   const fakeCountdown = useFakeCountdown();
 
   // Log QR-code and ad landings (?ref=brev-a, ?ref=fb-pris).
@@ -155,6 +156,16 @@ export default function Home() {
       const wantsOrganic = alwaysShow || !localStorage.getItem('organicPopupDismissed');
       if (!wantsOrganic) return;
 
+      // Log this popup impression so we can see how far organic visitors get.
+      fetch('/api/qr-track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref: 'organic', stage: 'hook' }),
+      })
+        .then((r) => r.json())
+        .then((data) => setPopupVisitId(data.id ?? null))
+        .catch(() => {});
+
       let popupTimer: ReturnType<typeof setTimeout> | undefined;
       const show = () => { popupTimer = setTimeout(() => setShowOrganicPopup(true), 600); };
       waitForConsent(show);
@@ -167,21 +178,27 @@ export default function Home() {
 
     const code = ref.toLowerCase();
 
-    const key = `qrTracked_${ref}`;
-    if (!sessionStorage.getItem(key)) {
-      sessionStorage.setItem(key, '1');
-      fetch('/api/qr-track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ref }),
-      }).catch(() => {});
-    }
-
     // Visitors from a physical letter (QR-code) get a popup tailored to
     // "passar det min enskilda firma?"; visitors from a Facebook ad get the
     // ad's next frame. Each is shown once per browser.
     const wantsBrev = code.startsWith('brev-') && (alwaysShow || !localStorage.getItem('brevPopupDismissed'));
     const wantsFb = code.startsWith('fb-') && (alwaysShow || !localStorage.getItem('fbPopupDismissed'));
+
+    const key = `qrTracked_${ref}`;
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1');
+      // Stage is only set when the popup will actually be shown — a code that
+      // was already dismissed still logs a raw landing, just without a stage.
+      fetch('/api/qr-track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref, stage: (wantsBrev || wantsFb) ? 'hook' : undefined }),
+      })
+        .then((r) => r.json())
+        .then((data) => { if (wantsBrev || wantsFb) setPopupVisitId(data.id ?? null); })
+        .catch(() => {});
+    }
+
     if (!wantsBrev && !wantsFb) return;
     if (wantsBrev) setBrevRef(code);
     if (wantsFb) setFbRef(code);
@@ -797,11 +814,11 @@ export default function Home() {
 
           <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto animate-[popIn_0.28s_cubic-bezier(0.16,1,0.3,1)]">
             {showBrevPopup ? (
-              <AdFunnel refCode={brevRef} onClose={dismissBrevPopup} source="brev" />
+              <AdFunnel refCode={brevRef} onClose={dismissBrevPopup} source="brev" visitId={popupVisitId} />
             ) : showFbPopup ? (
-              <AdFunnel refCode={fbRef} onClose={dismissFbPopup} source="annons" />
+              <AdFunnel refCode={fbRef} onClose={dismissFbPopup} source="annons" visitId={popupVisitId} />
             ) : (
-              <AdFunnel refCode={null} onClose={dismissOrganicPopup} source="organic" showDeadlineOffer />
+              <AdFunnel refCode={null} onClose={dismissOrganicPopup} source="organic" showDeadlineOffer visitId={popupVisitId} />
             )}
           </div>
 

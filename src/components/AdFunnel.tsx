@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { questions } from '@/data/kvalificera-questions';
@@ -60,11 +60,22 @@ function TopControl({ onClick, label, dark, children }: { onClick: () => void; l
 
 type Stage = 'hook' | 'how' | 'questions' | 'contact' | 'done' | 'fail';
 
-export default function AdFunnel({ refCode, onClose, source = 'annons', showDeadlineOffer = false }: { refCode: string | null; onClose?: () => void; source?: 'annons' | 'brev' | 'organic'; showDeadlineOffer?: boolean }) {
+export default function AdFunnel({ refCode, onClose, source = 'annons', showDeadlineOffer = false, visitId = null }: { refCode: string | null; onClose?: () => void; source?: 'annons' | 'brev' | 'organic'; showDeadlineOffer?: boolean; visitId?: number | null }) {
   const [stage, setStage] = useState<Stage>('hook');
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, boolean | 'unknown'>>({});
   const [failReason, setFailReason] = useState('');
+
+  // Records how far this visitor got, on the same qr_visits row logged when
+  // the popup was shown — lets us see where people drop off per code.
+  useEffect(() => {
+    if (!visitId) return;
+    fetch('/api/qr-track', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: visitId, stage }),
+    }).catch(() => {});
+  }, [stage, visitId]);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');

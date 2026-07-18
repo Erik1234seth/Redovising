@@ -15,15 +15,30 @@ const QR_CODES = [
   { code: 'fb-d', label: 'FB D', url: 'enklabokslut.se/?ref=fb-d' },
 ];
 
+// Order visitors move through the popup in — matches AdFunnel's `Stage` type.
+const STAGE_LABELS: Record<string, string> = {
+  hook: 'Öppnade',
+  how: 'Så funkar det',
+  questions: 'Frågor',
+  contact: 'Kontaktuppgifter',
+  done: 'Skickade in',
+  fail: 'Passade inte',
+};
+const STAGE_ORDER = ['hook', 'how', 'questions', 'contact', 'done', 'fail'];
+
 export default function QrPage() {
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [funnels, setFunnels] = useState<Record<string, Record<string, number>>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/admin/qr-stats')
       .then(r => r.json())
       .then(data => {
-        if (!data.error) setCounts(data.counts || {});
+        if (!data.error) {
+          setCounts(data.counts || {});
+          setFunnels(data.funnels || {});
+        }
         setLoading(false);
       });
   }, []);
@@ -59,21 +74,50 @@ export default function QrPage() {
                     style={{ width: `${pct}%` }}
                   />
                 </div>
+                <FunnelBreakdown funnel={funnels[qr.code]} />
               </div>
             );
           })}
 
-          {/* Any codes seen in the data that aren't in the list above */}
+          {/* Any codes seen in the data that aren't in the list above
+              (e.g. "organic", "valkommen" — visitors who came without a
+              printed/ad code) */}
           {Object.keys(counts)
             .filter(code => !QR_CODES.some(q => q.code === code))
             .map(code => (
-              <div key={code} className="flex items-center justify-between border-t border-navy-600 pt-3">
-                <span className="text-sm text-warm-400">{code} (okänd)</span>
-                <span className="text-sm font-bold text-white">{counts[code]}</span>
+              <div key={code} className="border-t border-navy-600 pt-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-warm-400">{code} (okänd)</span>
+                  <span className="text-sm font-bold text-white">{counts[code]}</span>
+                </div>
+                <FunnelBreakdown funnel={funnels[code]} />
               </div>
             ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Shows how many visitors for a given code reached each popup stage — a
+// mini funnel so you can see where people drop off (e.g. 40 "Öppnade" but
+// only 5 "Skickade in").
+function FunnelBreakdown({ funnel }: { funnel?: Record<string, number> }) {
+  if (!funnel) return null;
+  const stages = STAGE_ORDER.filter(s => funnel[s]);
+  if (stages.length === 0) return null;
+  const opened = funnel.hook || Math.max(...stages.map(s => funnel[s]));
+
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 pl-1">
+      {stages.map((s) => (
+        <span key={s} className="text-xs text-warm-500">
+          {STAGE_LABELS[s]}: <span className="text-warm-300 font-semibold">{funnel[s]}</span>
+          {opened > 0 && s !== 'hook' && (
+            <span className="text-warm-600"> ({Math.round((funnel[s] / opened) * 100)}%)</span>
+          )}
+        </span>
+      ))}
     </div>
   );
 }
