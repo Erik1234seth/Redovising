@@ -69,6 +69,8 @@ export default function AdFunnel({ refCode, onClose, source = 'annons' }: { refC
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [notes, setNotes] = useState('');
+  const [contactMethod, setContactMethod] = useState<'phone' | 'email' | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
 
@@ -102,13 +104,17 @@ export default function AdFunnel({ refCode, onClose, source = 'annons' }: { refC
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!contactMethod) {
+      setSendError('Välj om vi ska ringa eller mejla dig.');
+      return;
+    }
     setSending(true);
     setSendError('');
     try {
       const res = await fetch('/api/valkommen-lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone, ref: refCode, answers }),
+        body: JSON.stringify({ name, email, phone, notes, contactMethod, ref: refCode, answers }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Något gick fel');
@@ -339,7 +345,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons' }: { refC
             {[
               { label: 'Namn', value: name, set: setName, type: 'text', required: true, hint: '' },
               { label: 'E-post', value: email, set: setEmail, type: 'email', required: true, hint: '' },
-              { label: 'Telefon', value: phone, set: setPhone, type: 'tel', required: false, hint: 'Frivilligt' },
+              { label: 'Telefon', value: phone, set: setPhone, type: 'tel', required: true, hint: '' },
             ].map((f) => (
               <div key={f.label}>
                 <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1.5 text-slate-600">
@@ -356,6 +362,56 @@ export default function AdFunnel({ refCode, onClose, source = 'annons' }: { refC
                 />
               </div>
             ))}
+
+            <div>
+              <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1.5 text-slate-600">
+                Hur vill du bli kontaktad?
+              </label>
+              <div className="flex gap-3">
+                {([
+                  { value: 'phone' as const, label: 'Ring mig', icon: (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                  ) },
+                  { value: 'email' as const, label: 'Mejla mig', icon: (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  ) },
+                ]).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setContactMethod(opt.value)}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl border-2 font-semibold text-sm sm:text-base transition-colors"
+                    style={
+                      contactMethod === opt.value
+                        ? { borderColor: NAV_BG, backgroundColor: NAV_TINT, color: NAV_BG }
+                        : { borderColor: '#e2e8f0', backgroundColor: '#fff', color: '#64748b' }
+                    }
+                  >
+                    {opt.icon}
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1.5 text-slate-600">
+                Anteckningar
+                <span className="font-normal text-slate-400">· Frivilligt</span>
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                placeholder="T.ex. något särskilt vi bör veta innan vi hör av oss"
+                className="w-full px-4 py-3 sm:py-3.5 rounded-xl text-[15px] sm:text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300 resize-none"
+                style={{ color: NAV_BG }}
+              />
+            </div>
 
             {sendError && <p className="text-sm text-center pt-1" style={{ color: CORAL }}>{sendError}</p>}
 
@@ -385,10 +441,36 @@ export default function AdFunnel({ refCode, onClose, source = 'annons' }: { refC
             <Check className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-500" />
           </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold mb-2.5" style={{ color: NAV_BG }}>Tack{name ? `, ${name.split(' ')[0]}` : ''}!</h2>
-          <p className="text-sm sm:text-base leading-relaxed mb-7 text-slate-500">
-            Vi hör av oss till <span className="font-semibold" style={{ color: NAV_BG }}>{email}</span> med hur du kommer igång.
-            Kolla gärna skräpposten om du inte ser något.
+          <p className="text-sm sm:text-base leading-relaxed mb-5 text-slate-500">
+            Vi har tagit emot din förfrågan och går igenom dina svar.
           </p>
+
+          <div className="flex items-start gap-3 text-left rounded-xl px-4 py-3.5 mb-7 bg-slate-50 border border-slate-200">
+            <span
+              className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: NAV_TINT, color: NAV_BG }}
+            >
+              {contactMethod === 'phone' ? (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              )}
+            </span>
+            <p className="text-sm sm:text-base leading-relaxed" style={{ color: NAV_BG }}>
+              {contactMethod === 'phone' ? (
+                <>Vi ringer dig{phone ? <> på <span className="font-semibold">{phone}</span></> : ''} inom kort. Då går vi igenom hur allt fungerar och stämmer av om det passar din verksamhet.</>
+              ) : (
+                <>Vi mejlar dig{email ? <> på <span className="font-semibold">{email}</span></> : ''} inom kort. Då går vi igenom hur allt fungerar och stämmer av om det passar din verksamhet.</>
+              )}
+              {contactMethod !== 'phone' && (
+                <span className="block text-xs sm:text-sm mt-1.5 text-slate-400">Kolla gärna skräpposten om du inte ser något.</span>
+              )}
+            </p>
+          </div>
           {onClose ? (
             <button
               onClick={onClose}

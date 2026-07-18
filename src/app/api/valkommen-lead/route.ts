@@ -8,13 +8,18 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
 
+function escapeHtml(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // Leads from the ad/brev funnel (/valkommen, and the popups on the landing
 // page). Qualified visitors only — disqualified ones are sent to /kontakt
 // instead and never reach this route.
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, phone, ref, answers } = await request.json();
+    const { name, email, phone, notes, contactMethod, ref, answers } = await request.json();
     const sourceWord = typeof ref === 'string' && ref.toLowerCase().startsWith('brev-') ? 'brev' : 'annons';
+    const contactMethodLabel = contactMethod === 'phone' ? 'Ring mig' : contactMethod === 'email' ? 'Mejla mig' : '—';
 
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return NextResponse.json({ error: 'Ogiltig e-postadress' }, { status: 400 });
@@ -30,6 +35,8 @@ export async function POST(request: NextRequest) {
       name: name || null,
       email,
       phone: phone || null,
+      notes: notes || null,
+      contact_method: contactMethod || null,
       package_type: 'komplett',
       ref: typeof ref === 'string' ? ref.slice(0, 40) : null,
       qualification_answers: answers || null,
@@ -58,7 +65,9 @@ export async function POST(request: NextRequest) {
         <p><strong>Namn:</strong> ${name || '—'}</p>
         <p><strong>E-post:</strong> ${email}</p>
         <p><strong>Telefon:</strong> ${phone || '—'}</p>
+        <p><strong>Vill bli kontaktad via:</strong> <span style="color:${NAV_BG};font-weight:700;">${contactMethodLabel}</span></p>
         <p><strong>Källa:</strong> ${ref || '— (ingen ref i länken)'}</p>
+        ${notes ? `<p><strong>Anteckningar:</strong> ${escapeHtml(String(notes)).replace(/\n/g, '<br>')}</p>` : ''}
         <hr>
         <h3 style="color:${NAV_BG};">Kvalificeringssvar</h3>
         <table cellpadding="0" cellspacing="0">${answerRows}</table>
@@ -97,16 +106,22 @@ export async function POST(request: NextRequest) {
                 </tr>
                 <tr><td style="padding:40px;">
                   <p style="margin:0 0 8px;font-size:24px;font-weight:700;color:${NAV_BG};">Tack${firstName ? ', ' + firstName : ''}!</p>
-                  <p style="margin:0 0 20px;font-size:15px;color:#5a6a7a;line-height:1.7;">Vi har fått dina uppgifter, och utifrån dina svar passar Enkla Bokslut din verksamhet. Jag hör av mig inom kort med hur du kommer igång.</p>
+                  <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Vi har tagit emot dina uppgifter och utifrån dina svar passar Enkla Bokslut din verksamhet. Vi hör av oss snarast.</p>
                   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:24px;">
-                    <tr><td style="padding:20px;">
-                      <p style="margin:0 0 10px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#8fa3b1;">Så funkar det</p>
-                      <p style="margin:0 0 6px;font-size:14px;color:${NAV_BG};">1. Du mejlar in dina underlag</p>
-                      <p style="margin:0 0 6px;font-size:14px;color:${NAV_BG};">2. Vi sköter bokföring, moms och bokslut</p>
-                      <p style="margin:0;font-size:14px;color:${NAV_BG};">3. Vi lämnar in till Skatteverket</p>
+                    <tr><td style="padding:18px 20px;">
+                      <table cellpadding="0" cellspacing="0"><tr>
+                        <td style="background-color:${NAV_BG}1a;border-radius:8px;width:34px;height:34px;text-align:center;vertical-align:middle;">
+                          <span style="color:${NAV_BG};font-size:16px;line-height:34px;">${contactMethod === 'phone' ? '&#128222;' : '&#9993;'}</span>
+                        </td>
+                        <td style="padding-left:14px;font-size:14px;color:${NAV_BG};line-height:1.5;">
+                          ${contactMethod === 'phone'
+                            ? `Vi ringer dig${phone ? ' på <strong>' + escapeHtml(String(phone)) + '</strong>' : ''} inom kort.`
+                            : `Vi mejlar dig${email ? ' på <strong>' + escapeHtml(String(email)) + '</strong>' : ''} inom kort.`}
+                        </td>
+                      </tr></table>
                     </td></tr>
                   </table>
-                  <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Har du frågor redan nu? Svara direkt på det här mailet — det är jag som läser det.</p>
+                  <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Har du frågor redan nu? Svara direkt på det här mailet — vi läser det.</p>
                   <p style="margin:0;font-size:15px;color:${NAV_BG};">Med vänlig hälsning,<br><strong>Erik</strong><br><span style="color:#8fa3b1;">Enkla Bokslut</span></p>
                 </td></tr>
                 <tr>
