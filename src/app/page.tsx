@@ -126,6 +126,7 @@ export default function Home() {
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
   const [showBrevPopup, setShowBrevPopup] = useState(false);
   const [showFbPopup, setShowFbPopup] = useState(false);
+  const [showOrganicPopup, setShowOrganicPopup] = useState(false);
   const [brevRef, setBrevRef] = useState<string | null>(null);
   const [fbRef, setFbRef] = useState<string | null>(null);
   const fakeCountdown = useFakeCountdown();
@@ -134,7 +135,36 @@ export default function Home() {
   // Once per browser session, per code.
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref');
-    if (!ref) return;
+
+    // Lokalt visas popupen alltid, så den går att testa om och om igen utan att
+    // rensa localStorage. Gränsen går vid NODE_ENV och inte vid en bortkommenterad
+    // rad — testläget kan därför aldrig följa med till produktion.
+    const alwaysShow = process.env.NODE_ENV === 'development';
+
+    // The cookie banner owns the bottom of the screen and would bury the popup's
+    // CTA on mobile. Let the visitor answer it first, then greet them.
+    const waitForConsent = (show: () => void) => {
+      if (localStorage.getItem('cookie-consent')) show();
+      else window.addEventListener('cookie-consent-resolved', show, { once: true });
+    };
+
+    if (!ref) {
+      // No ref at all — a direct/organic visit to enklabokslut.se. Show the
+      // exact same ad funnel as ?ref=fb-pris (same hook image and copy),
+      // minus the "Du kom hit via vår annons" pill since there's no ad.
+      const wantsOrganic = alwaysShow || !localStorage.getItem('organicPopupDismissed');
+      if (!wantsOrganic) return;
+
+      let popupTimer: ReturnType<typeof setTimeout> | undefined;
+      const show = () => { popupTimer = setTimeout(() => setShowOrganicPopup(true), 600); };
+      waitForConsent(show);
+
+      return () => {
+        if (popupTimer) clearTimeout(popupTimer);
+        window.removeEventListener('cookie-consent-resolved', show);
+      };
+    }
+
     const code = ref.toLowerCase();
 
     const key = `qrTracked_${ref}`;
@@ -150,11 +180,6 @@ export default function Home() {
     // Visitors from a physical letter (QR-code) get a popup tailored to
     // "passar det min enskilda firma?"; visitors from a Facebook ad get the
     // ad's next frame. Each is shown once per browser.
-    //
-    // Lokalt visas de alltid, så de går att testa om och om igen utan att rensa
-    // localStorage. Gränsen går vid NODE_ENV och inte vid en bortkommenterad
-    // rad — testläget kan därför aldrig följa med till produktion.
-    const alwaysShow = process.env.NODE_ENV === 'development';
     const wantsBrev = code.startsWith('brev-') && (alwaysShow || !localStorage.getItem('brevPopupDismissed'));
     const wantsFb = code.startsWith('fb-') && (alwaysShow || !localStorage.getItem('fbPopupDismissed'));
     if (!wantsBrev && !wantsFb) return;
@@ -168,11 +193,7 @@ export default function Home() {
         else setShowBrevPopup(true);
       }, 600);
     };
-
-    // The cookie banner owns the bottom of the screen and would bury the popup's
-    // CTA on mobile. Let the visitor answer it first, then greet them.
-    if (localStorage.getItem('cookie-consent')) show();
-    else window.addEventListener('cookie-consent-resolved', show, { once: true });
+    waitForConsent(show);
 
     return () => {
       if (popupTimer) clearTimeout(popupTimer);
@@ -188,6 +209,11 @@ export default function Home() {
   const dismissFbPopup = () => {
     setShowFbPopup(false);
     try { localStorage.setItem('fbPopupDismissed', '1'); } catch {}
+  };
+
+  const dismissOrganicPopup = () => {
+    setShowOrganicPopup(false);
+    try { localStorage.setItem('organicPopupDismissed', '1'); } catch {}
   };
 
   useEffect(() => {
@@ -748,13 +774,17 @@ export default function Home() {
       </section>
 
       {/* ══════════════════════════════════════════
-          BREV- & FACEBOOK-POPUP — samma flöde (AdFunnel) för besökare från
-          utskicksbrevets QR-kod (?ref=brev-*) och Facebook-annonsen (?ref=fb-*).
-          Bara "source" skiljer dem åt: pillens text/ikon säger brev eller annons.
-          Hela kvalificeringen bor i AdFunnel; besökaren skickas aldrig vidare
-          till en egen sida.
+          BREV-, FACEBOOK- & ORGANISK POPUP — samma flöde (AdFunnel) för besökare
+          från utskicksbrevets QR-kod (?ref=brev-*), Facebook-annonsen (?ref=fb-*)
+          och de som bara skriver in enklabokslut.se utan någon ref alls.
+          Bara "source" skiljer dem åt: pillens text/ikon säger brev eller annons,
+          och syns inte alls för organiska besökare. Hela kvalificeringen bor i
+          AdFunnel; besökaren skickas aldrig vidare till en egen sida.
+
+          31 augusti-erbjudandet (showDeadlineOffer) testas bara på den organiska
+          popupen än så länge — lägg till på brev/fb också när det känns bra.
       ══════════════════════════════════════════ */}
-      {(showBrevPopup || showFbPopup) && (
+      {(showBrevPopup || showFbPopup || showOrganicPopup) && (
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center p-4"
           role="dialog"
@@ -762,14 +792,16 @@ export default function Home() {
         >
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
-            onClick={showBrevPopup ? dismissBrevPopup : dismissFbPopup}
+            onClick={showBrevPopup ? dismissBrevPopup : showFbPopup ? dismissFbPopup : dismissOrganicPopup}
           />
 
           <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto animate-[popIn_0.28s_cubic-bezier(0.16,1,0.3,1)]">
             {showBrevPopup ? (
               <AdFunnel refCode={brevRef} onClose={dismissBrevPopup} source="brev" />
-            ) : (
+            ) : showFbPopup ? (
               <AdFunnel refCode={fbRef} onClose={dismissFbPopup} source="annons" />
+            ) : (
+              <AdFunnel refCode={null} onClose={dismissOrganicPopup} source="organic" showDeadlineOffer />
             )}
           </div>
 

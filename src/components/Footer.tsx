@@ -27,15 +27,29 @@ export default function Footer() {
               Specialister på redovisning för enskilda firmor.
               Låga priser, professionellt resultat.
             </p>
-            <a
-              href="mailto:erik@enklabokslut.se"
-              className="inline-flex items-center gap-2 text-sm font-medium text-white/60 hover:text-white transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              erik@enklabokslut.se
-            </a>
+            <div className="flex flex-col items-start gap-2.5">
+              <a
+                href="mailto:erik@enklabokslut.se"
+                className="inline-flex items-center gap-2 text-sm font-medium text-white/60 hover:text-white transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                erik@enklabokslut.se
+              </a>
+              <a
+                href="https://www.facebook.com/people/Enkla-Bokslut/61591841676029/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Enkla Bokslut på Facebook"
+                className="inline-flex items-center gap-2 text-sm font-medium text-white/60 hover:text-white transition-colors"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5 3.66 9.15 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.5 1.49-3.89 3.77-3.89 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56v1.88h2.78l-.44 2.91h-2.34V22c4.78-.79 8.44-4.94 8.44-9.94z" />
+                </svg>
+                Facebook
+              </a>
+            </div>
             <p className="text-white/35 text-xs mt-4">
               Org.nr 559555-3586
             </p>
