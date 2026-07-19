@@ -423,7 +423,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
                   onChange={(e) => f.set(e.target.value)}
                   // Ett tomt fält som lämnas är inget framsteg — bara ifyllt räknas.
                   onBlur={() => { if (f.value.trim()) markProgress(f.progress); }}
-                  className="w-full px-4 py-2.5 sm:py-3.5 rounded-xl text-[15px] sm:text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
+                  className="w-full px-4 py-2.5 sm:py-3.5 rounded-xl text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
                   style={{ color: NAV_BG }}
                 />
               </div>
@@ -488,7 +488,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
                 autoComplete="tel"
                 onChange={(e) => setPhone(e.target.value)}
                 onBlur={() => { if (phone.trim()) markProgress('phone'); }}
-                className="w-full px-4 py-2.5 sm:py-3.5 rounded-xl text-[15px] sm:text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
+                className="w-full px-4 py-2.5 sm:py-3.5 rounded-xl text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
                 style={{ color: NAV_BG }}
               />
             </div>
@@ -504,7 +504,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
                 onBlur={() => { if (notes.trim()) markProgress('notes'); }}
                 rows={2}
                 placeholder="T.ex. något särskilt vi bör veta innan vi hör av oss"
-                className="w-full px-4 py-2.5 sm:py-3.5 rounded-xl text-[15px] sm:text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300 resize-none"
+                className="w-full px-4 py-2.5 sm:py-3.5 rounded-xl text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300 resize-none"
                 style={{ color: NAV_BG }}
               />
             </div>

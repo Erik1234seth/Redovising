@@ -183,7 +183,7 @@ export default function KontaktPage() {
                         value={formData[id as keyof typeof formData]}
                         onChange={handleChange}
                         placeholder={placeholder}
-                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 text-navy-900 rounded-xl text-[15px] outline-none focus:ring-2 focus:border-transparent placeholder-gray-400 transition"
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 text-navy-900 rounded-xl text-base outline-none focus:ring-2 focus:border-transparent placeholder-gray-400 transition"
                         style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
                         onFocus={e => e.currentTarget.style.boxShadow = `0 0 0 2px ${NAV_BG}40`}
                         onBlur={e => e.currentTarget.style.boxShadow = ''}
@@ -203,7 +203,7 @@ export default function KontaktPage() {
                       value={formData.message}
                       onChange={handleChange}
                       placeholder="Skriv ditt meddelande här..."
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 text-navy-900 rounded-xl text-[15px] outline-none resize-none placeholder-gray-400 transition"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 text-navy-900 rounded-xl text-base outline-none resize-none placeholder-gray-400 transition"
                       onFocus={e => e.currentTarget.style.boxShadow = `0 0 0 2px ${NAV_BG}40`}
                       onBlur={e => e.currentTarget.style.boxShadow = ''}
                     />

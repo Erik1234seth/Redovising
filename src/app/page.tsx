@@ -228,7 +228,7 @@ function HomeContactSection() {
                     required
                     autoComplete={f.autoComplete}
                     onChange={(e) => f.set(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl text-[15px] outline-none transition-colors bg-slate-50 border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
+                    className="w-full px-4 py-3 rounded-xl text-base outline-none transition-colors bg-slate-50 border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
                     style={{ color: NAV_BG }}
                   />
                 </div>
@@ -289,7 +289,7 @@ function HomeContactSection() {
                   required={contactMethod === 'phone'}
                   autoComplete="tel"
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl text-[15px] outline-none transition-colors bg-slate-50 border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
+                  className="w-full px-4 py-3 rounded-xl text-base outline-none transition-colors bg-slate-50 border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
                   style={{ color: NAV_BG }}
                 />
               </div>
@@ -304,7 +304,7 @@ function HomeContactSection() {
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                   placeholder="T.ex. något särskilt vi bör veta innan vi hör av oss"
-                  className="w-full px-4 py-3 rounded-xl text-[15px] outline-none transition-colors bg-slate-50 border border-slate-200 focus:border-slate-400 placeholder:text-slate-300 resize-none"
+                  className="w-full px-4 py-3 rounded-xl text-base outline-none transition-colors bg-slate-50 border border-slate-200 focus:border-slate-400 placeholder:text-slate-300 resize-none"
                   style={{ color: NAV_BG }}
                 />
               </div>
