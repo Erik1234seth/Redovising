@@ -241,7 +241,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
             )}
 
             <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight mb-5" style={{ color: NAV_BG }}>
-              Du mejlar in dina underlag. Vi sköter resten.
+              Slipp bokföringen. Vi gör allt åt dig.
             </h2>
 
             <div className="flex items-end gap-2 mb-5">
