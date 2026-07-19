@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
+import { trackEvent, slugify } from '@/lib/track';
 
 const navLinks = [
   { href: '/', label: 'Hem' },
@@ -44,6 +45,13 @@ export default function Navigation() {
 
   const isActive = (href: string) => activeHref === href;
 
+  // Loggar att hamburgaren öppnades, och vad besökaren klickar på därefter.
+  // Händelserna delar session_id och är tidsstämplade, så ordningen — och
+  // därmed "öppnade menyn men klickade aldrig vidare" — går att läsa ut.
+  const trackMenuOpen = () => trackEvent('nav_meny_oppnad');
+  const trackNavClick = (label: string, source: 'mobil' | 'desktop') =>
+    trackEvent(`nav_klick_${source}_${slugify(label)}`);
+
   return (
     <nav className="sticky top-0 z-50 shadow-lg" style={{ backgroundColor: NAV_BG }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -71,7 +79,7 @@ export default function Navigation() {
               <Link
                 key={href}
                 href={href}
-                onClick={() => setActiveHref(href)}
+                onClick={() => { trackNavClick(label, 'desktop'); setActiveHref(href); }}
                 className="relative text-[15px] font-medium transition-colors duration-150"
                 style={{ color: isActive(href) ? '#fff' : 'rgba(255,255,255,0.72)' }}
               >
@@ -90,6 +98,7 @@ export default function Navigation() {
             {!loading && (
               <Link
                 href={user ? 'https://app.enklabokslut.se' : 'https://app.enklabokslut.se/auth/login'}
+                onClick={() => trackNavClick(user ? 'Mitt konto' : 'Logga in', 'desktop')}
                 className="px-5 py-[9px] text-[14px] font-semibold rounded-full border-2 transition-all duration-200 hover:scale-[1.03]"
                 style={{ borderColor: 'rgba(255,255,255,0.35)', color: 'rgba(255,255,255,0.85)' }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = '#fff'; e.currentTarget.style.color = '#fff'; }}
@@ -100,6 +109,7 @@ export default function Navigation() {
             )}
             <Link
               href="/kontakt"
+              onClick={() => trackNavClick('Kontakta oss', 'desktop')}
               className="px-5 py-[9px] text-[14px] font-semibold text-white rounded-full transition-all duration-200 shadow-md hover:shadow-lg hover:scale-[1.03]"
               style={{ backgroundColor: CORAL }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#d04a52')}
@@ -113,7 +123,10 @@ export default function Navigation() {
           <button
             className="md:hidden p-2 rounded-lg transition-colors"
             style={{ color: 'rgba(255,255,255,0.8)' }}
-            onClick={() => setMobileOpen(!mobileOpen)}
+            onClick={() => {
+              if (!mobileOpen) trackMenuOpen();
+              setMobileOpen(!mobileOpen);
+            }}
             aria-label="Öppna meny"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -133,7 +146,7 @@ export default function Navigation() {
             <Link
               key={href}
               href={href}
-              onClick={() => { setActiveHref(href); setMobileOpen(false); }}
+              onClick={() => { trackNavClick(label, 'mobil'); setActiveHref(href); setMobileOpen(false); }}
               className="block px-4 py-3 rounded-xl text-[15px] font-medium transition-colors"
               style={{
                 color: isActive(href) ? '#fff' : 'rgba(255,255,255,0.75)',
@@ -148,7 +161,7 @@ export default function Navigation() {
             {!loading && (
               <Link
                 href={user ? 'https://app.enklabokslut.se' : 'https://app.enklabokslut.se/auth/login'}
-                onClick={() => setMobileOpen(false)}
+                onClick={() => { trackNavClick(user ? 'Mitt konto' : 'Logga in', 'mobil'); setMobileOpen(false); }}
                 className="block px-4 py-3 text-[15px] font-semibold rounded-full text-center border-2"
                 style={{ borderColor: 'rgba(255,255,255,0.35)', color: 'rgba(255,255,255,0.85)' }}
               >
@@ -157,7 +170,7 @@ export default function Navigation() {
             )}
             <Link
               href="/kontakt"
-              onClick={() => setMobileOpen(false)}
+              onClick={() => { trackNavClick('Kontakta oss', 'mobil'); setMobileOpen(false); }}
               className="block px-4 py-3 text-[15px] font-semibold text-white rounded-full text-center"
               style={{ backgroundColor: CORAL }}
             >
