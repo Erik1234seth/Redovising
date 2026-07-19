@@ -592,7 +592,7 @@ export default function Home() {
       {/* ══════════════════════════════════════════
           PACKAGES
       ══════════════════════════════════════════ */}
-      <section id="packages" className="py-20 sm:py-24 bg-white">
+      <section className="py-20 sm:py-24 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-start">
 
@@ -636,7 +636,12 @@ export default function Home() {
               </Link>
             </div>
 
-            {/* Right: pricing card — matchar stilen på /skaffa */}
+            {/* Right: pricing card — matchar stilen på /skaffa.
+                #packages sitter här och inte på hela sektionen: på mobil
+                staplas kolumnerna, så ett ankare på sektionen landade ovanför
+                säljtexten och besökaren såg aldrig prislappen. scroll-mt gör
+                plats för den sticky navigeringen (72px). */}
+            <div id="packages" className="w-full scroll-mt-24">
             {packages.map((pkg) => (
               <div key={pkg.id} className="w-full">
 
@@ -750,6 +755,7 @@ export default function Home() {
                 </div>
               </div>
             ))}
+            </div>
 
           </div>
         </div>
