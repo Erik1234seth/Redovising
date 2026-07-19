@@ -24,6 +24,12 @@ export async function POST(request: NextRequest) {
       ref === 'hemsida-kontakt' ? 'hemsidan' : 'annons';
     const contactMethodLabel = contactMethod === 'phone' ? 'Ring mig' : contactMethod === 'email' ? 'Mejla mig' : '—';
 
+    // Popupen frågar inte längre om preferens och skickar därför inget
+    // contactMethod. Den lovar "vi ringer dig" på sin bekräftelseskärm, så
+    // mailet måste säga samma sak när vi har ett nummer — annars får
+    // besökaren två olika besked.
+    const willCall = contactMethod === 'phone' || (!contactMethod && !!phone);
+
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return NextResponse.json({ error: 'Ogiltig e-postadress' }, { status: 400 });
     }
@@ -119,10 +125,10 @@ export async function POST(request: NextRequest) {
                     <tr><td style="padding:18px 20px;">
                       <table cellpadding="0" cellspacing="0"><tr>
                         <td style="background-color:${NAV_BG}1a;border-radius:8px;width:34px;height:34px;text-align:center;vertical-align:middle;">
-                          <span style="color:${NAV_BG};font-size:16px;line-height:34px;">${contactMethod === 'phone' ? '&#128222;' : '&#9993;'}</span>
+                          <span style="color:${NAV_BG};font-size:16px;line-height:34px;">${willCall ? '&#128222;' : '&#9993;'}</span>
                         </td>
                         <td style="padding-left:14px;font-size:14px;color:${NAV_BG};line-height:1.5;">
-                          ${contactMethod === 'phone'
+                          ${willCall
                             ? `Vi ringer dig${phone ? ' på <strong>' + escapeHtml(String(phone)) + '</strong>' : ''} inom kort.`
                             : `Vi mejlar dig${email ? ' på <strong>' + escapeHtml(String(email)) + '</strong>' : ''} inom kort.`}
                         </td>

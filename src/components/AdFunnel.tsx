@@ -132,7 +132,6 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
-  const [contactMethod, setContactMethod] = useState<'phone' | 'email' | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
 
@@ -166,18 +165,15 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contactMethod) {
-      setSendError('Välj om vi ska ringa eller mejla dig.');
-      markFailedSubmit();
-      return;
-    }
     setSending(true);
     setSendError('');
     try {
       const res = await fetch('/api/valkommen-lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone, notes, contactMethod, ref: refCode, answers }),
+        // Inget contactMethod: popupen frågar inte längre om preferens, och
+        // att gissa åt besökaren hade blivit fel i notismailet.
+        body: JSON.stringify({ name, email, phone, notes, ref: refCode, answers }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Något gick fel');
@@ -429,62 +425,14 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
               </div>
             ))}
 
-            {/* Valet står före telefonfältet, så det är begripligt varför numret
-                plötsligt blir obligatoriskt (eller inte). Riktiga radios — då
-                blockerar webbläsaren submit precis som för vilket tomt fält som
-                helst, istället för att avvisa en ifylld blankett efteråt. */}
-            <div>
-              <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1 sm:mb-1.5 text-slate-600">
-                Hur vill du bli kontaktad?
-              </label>
-              <div className="flex gap-3">
-                {([
-                  { value: 'phone' as const, label: 'Ring mig', icon: (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                  ) },
-                  { value: 'email' as const, label: 'Mejla mig', icon: (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  ) },
-                ]).map((opt) => (
-                  <label
-                    key={opt.value}
-                    className="relative flex-1 flex items-center justify-center gap-2 py-2.5 sm:py-3.5 rounded-xl border-2 font-semibold text-sm sm:text-base transition-colors cursor-pointer"
-                    style={
-                      contactMethod === opt.value
-                        ? { borderColor: NAV_BG, backgroundColor: NAV_TINT, color: NAV_BG }
-                        : { borderColor: '#e2e8f0', backgroundColor: '#fff', color: '#64748b' }
-                    }
-                  >
-                    <input
-                      type="radio"
-                      name="contactMethod"
-                      value={opt.value}
-                      required
-                      checked={contactMethod === opt.value}
-                      onChange={() => { setContactMethod(opt.value); setSendError(''); markProgress('method'); }}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    {opt.icon}
-                    {opt.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Bara den som vill bli uppringd måste lämna numret. */}
             <div>
               <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1 sm:mb-1.5 text-slate-600">
                 Telefon
-                {contactMethod !== 'phone' && <span className="font-normal text-slate-400">· Frivilligt</span>}
               </label>
               <input
                 type="tel"
                 value={phone}
-                required={contactMethod === 'phone'}
+                required
                 autoComplete="tel"
                 onChange={(e) => setPhone(e.target.value)}
                 onBlur={() => { if (phone.trim()) markProgress('phone'); }}
@@ -548,25 +496,12 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
               className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
               style={{ backgroundColor: NAV_TINT, color: NAV_BG }}
             >
-              {contactMethod === 'phone' ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              )}
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
             </span>
             <p className="text-sm sm:text-base leading-relaxed" style={{ color: NAV_BG }}>
-              {contactMethod === 'phone' ? (
-                <>Vi ringer dig{phone ? <> på <span className="font-semibold">{phone}</span></> : ''} inom kort. Då går vi igenom hur allt fungerar och stämmer av om det passar din verksamhet.</>
-              ) : (
-                <>Vi mejlar dig{email ? <> på <span className="font-semibold">{email}</span></> : ''} inom kort. Då går vi igenom hur allt fungerar och stämmer av om det passar din verksamhet.</>
-              )}
-              {contactMethod !== 'phone' && (
-                <span className="block text-xs sm:text-sm mt-1.5 text-slate-400">Kolla gärna skräpposten om du inte ser något.</span>
-              )}
+              Vi ringer dig{phone ? <> på <span className="font-semibold">{phone}</span></> : ''} inom kort. Då går vi igenom hur allt fungerar och stämmer av om det passar din verksamhet.
             </p>
           </div>
           {onClose ? (
