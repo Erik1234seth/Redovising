@@ -428,11 +428,11 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
             <div>
               <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1 sm:mb-1.5 text-slate-600">
                 Telefon
+                <span className="font-normal text-slate-400">· Frivilligt</span>
               </label>
               <input
                 type="tel"
                 value={phone}
-                required
                 autoComplete="tel"
                 onChange={(e) => setPhone(e.target.value)}
                 onBlur={() => { if (phone.trim()) markProgress('phone'); }}
@@ -496,12 +496,28 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
               className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
               style={{ backgroundColor: NAV_TINT, color: NAV_BG }}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
+              {/* Telefon är frivilligt — utan nummer är mejl enda vägen.
+                  Samma villkor som API:t använder för bekräftelsemailet, så
+                  skärmen och mailet aldrig lovar olika saker. */}
+              {phone ? (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              )}
             </span>
             <p className="text-sm sm:text-base leading-relaxed" style={{ color: NAV_BG }}>
-              Vi ringer dig{phone ? <> på <span className="font-semibold">{phone}</span></> : ''} inom kort. Då går vi igenom hur allt fungerar och stämmer av om det passar din verksamhet.
+              {phone ? (
+                <>Vi ringer dig på <span className="font-semibold">{phone}</span> inom kort. Då går vi igenom hur allt fungerar och stämmer av om det passar din verksamhet.</>
+              ) : (
+                <>
+                  Vi mejlar dig{email ? <> på <span className="font-semibold">{email}</span></> : ''} inom kort. Då går vi igenom hur allt fungerar och stämmer av om det passar din verksamhet.
+                  <span className="block text-xs sm:text-sm mt-1.5 text-slate-400">Kolla gärna skräpposten om du inte ser något.</span>
+                </>
+              )}
             </p>
           </div>
           {onClose ? (

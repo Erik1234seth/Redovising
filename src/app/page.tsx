@@ -126,24 +126,21 @@ function HomeContactSection() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
-  const [contactMethod, setContactMethod] = useState<'phone' | 'email' | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
   const [sent, setSent] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contactMethod) {
-      setSendError('Välj om vi ska ringa eller mejla dig.');
-      return;
-    }
     setSending(true);
     setSendError('');
     try {
       const res = await fetch('/api/valkommen-lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone, notes, contactMethod, ref: 'hemsida-kontakt' }),
+        // Inget contactMethod — samma som popupen. Finns ett nummer ringer
+        // vi, annars mejlar vi.
+        body: JSON.stringify({ name, email, phone, notes, ref: 'hemsida-kontakt' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Något gick fel');
@@ -184,7 +181,9 @@ function HomeContactSection() {
                   className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: `${NAV_BG}14`, color: NAV_BG }}
                 >
-                  {contactMethod === 'phone' ? (
+                  {/* Telefon är frivilligt — utan nummer är mejl enda vägen.
+                      Samma villkor som API:t och popupen använder. */}
+                  {phone ? (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                     </svg>
@@ -195,19 +194,19 @@ function HomeContactSection() {
                   )}
                 </span>
                 <p className="text-sm leading-relaxed" style={{ color: NAV_BG }}>
-                  {contactMethod === 'phone' ? (
-                    <>Vi ringer dig{phone ? <> på <span className="font-semibold">{phone}</span></> : ''} inom kort. Då berättar vi mer om hur allt fungerar och svarar på dina frågor.</>
+                  {phone ? (
+                    <>Vi ringer dig på <span className="font-semibold">{phone}</span> inom kort. Då berättar vi mer om hur allt fungerar och svarar på dina frågor.</>
                   ) : (
-                    <>Vi mejlar dig{email ? <> på <span className="font-semibold">{email}</span></> : ''} inom kort. Då berättar vi mer om hur allt fungerar och svarar på dina frågor.</>
-                  )}
-                  {contactMethod !== 'phone' && (
-                    <span className="block text-xs mt-1.5 text-slate-400">Kolla gärna skräpposten om du inte ser något.</span>
+                    <>
+                      Vi mejlar dig{email ? <> på <span className="font-semibold">{email}</span></> : ''} inom kort. Då berättar vi mer om hur allt fungerar och svarar på dina frågor.
+                      <span className="block text-xs mt-1.5 text-slate-400">Kolla gärna skräpposten om du inte ser något.</span>
+                    </>
                   )}
                 </p>
               </div>
 
               <button
-                onClick={() => { setSent(false); setName(''); setEmail(''); setPhone(''); setNotes(''); setContactMethod(null); }}
+                onClick={() => { setSent(false); setName(''); setEmail(''); setPhone(''); setNotes(''); }}
                 className="text-sm font-semibold hover:underline"
                 style={{ color: CORAL }}
               >
@@ -234,59 +233,14 @@ function HomeContactSection() {
                 </div>
               ))}
 
-              {/* Samma upplägg som popupens kontaktsteg: valet står före
-                  telefonfältet och är riktiga radios, så webbläsaren stoppar
-                  submit istället för att avvisa en ifylld blankett efteråt. */}
-              <div>
-                <label className="block text-sm font-semibold mb-1.5 text-slate-600">Hur vill du bli kontaktad?</label>
-                <div className="flex gap-3">
-                  {([
-                    { value: 'phone' as const, label: 'Ring mig', icon: (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                    ) },
-                    { value: 'email' as const, label: 'Mejla mig', icon: (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    ) },
-                  ]).map((opt) => (
-                    <label
-                      key={opt.value}
-                      className="relative flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 font-semibold text-sm transition-colors cursor-pointer"
-                      style={
-                        contactMethod === opt.value
-                          ? { borderColor: NAV_BG, backgroundColor: `${NAV_BG}14`, color: NAV_BG }
-                          : { borderColor: '#e2e8f0', backgroundColor: '#fff', color: '#64748b' }
-                      }
-                    >
-                      <input
-                        type="radio"
-                        name="hemsidaContactMethod"
-                        value={opt.value}
-                        required
-                        checked={contactMethod === opt.value}
-                        onChange={() => { setContactMethod(opt.value); setSendError(''); }}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      {opt.icon}
-                      {opt.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bara den som vill bli uppringd måste lämna numret. */}
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold mb-1.5 text-slate-600">
                   Telefon
-                  {contactMethod !== 'phone' && <span className="font-normal text-slate-400">· Frivilligt</span>}
+                  <span className="font-normal text-slate-400">· Frivilligt</span>
                 </label>
                 <input
                   type="tel"
                   value={phone}
-                  required={contactMethod === 'phone'}
                   autoComplete="tel"
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl text-base outline-none transition-colors bg-slate-50 border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"

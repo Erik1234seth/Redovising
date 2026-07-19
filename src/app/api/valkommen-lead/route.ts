@@ -24,11 +24,12 @@ export async function POST(request: NextRequest) {
       ref === 'hemsida-kontakt' ? 'hemsidan' : 'annons';
     const contactMethodLabel = contactMethod === 'phone' ? 'Ring mig' : contactMethod === 'email' ? 'Mejla mig' : '—';
 
-    // Popupen frågar inte längre om preferens och skickar därför inget
-    // contactMethod. Den lovar "vi ringer dig" på sin bekräftelseskärm, så
-    // mailet måste säga samma sak när vi har ett nummer — annars får
-    // besökaren två olika besked.
-    const willCall = contactMethod === 'phone' || (!contactMethod && !!phone);
+    // Telefon är frivilligt överallt, så ett nummer måste finnas för att vi
+    // ska kunna lova ett samtal — även när besökaren kryssat "Ring mig".
+    // Popupen frågar inte om preferens alls och skickar inget contactMethod;
+    // där avgör numret ensamt. Samma villkor som bekräftelseskärmarna
+    // använder, annars får besökaren två olika besked.
+    const willCall = !!phone && contactMethod !== 'email';
 
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return NextResponse.json({ error: 'Ogiltig e-postadress' }, { status: 400 });
