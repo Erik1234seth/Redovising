@@ -226,17 +226,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
               </div>
             )}
 
-            <div className="flex items-center gap-3 rounded-xl px-4 py-3 mb-5 bg-slate-50 border border-slate-200">
-              <svg className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" fill={NAV_BG} viewBox="0 0 24 24">
-                <path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z" />
-              </svg>
-              <div>
-                <p className="text-sm sm:text-base font-bold leading-tight" style={{ color: NAV_BG }}>För enskilda firmor</p>
-                <p className="text-xs sm:text-sm text-slate-400">Anpassat för mindre verksamheter</p>
-              </div>
-            </div>
-
-            <div className="sm:mt-auto">
+            <div className="sticky bottom-0 z-10 pt-3 pb-1 bg-white border-t border-slate-100 sm:static sm:pt-0 sm:pb-0 sm:bg-transparent sm:border-t-0 sm:mt-auto">
               <button
                 onClick={() => setStage('how')}
                 className="w-full py-4 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90 hover:scale-[1.01]"
@@ -275,7 +265,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
             ))}
           </div>
 
-          <div className="sm:mt-auto">
+          <div className="sticky bottom-0 z-10 pt-3 pb-1 bg-white border-t border-slate-100 sm:static sm:pt-0 sm:pb-0 sm:bg-transparent sm:border-t-0 sm:mt-auto">
             <button
               onClick={() => setStage('questions')}
               className="w-full py-4 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90 hover:scale-[1.01]"
@@ -314,7 +304,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
               <p className="text-sm sm:text-base leading-relaxed text-slate-500">{q.help}</p>
             </div>
 
-            <div className="mt-6 sm:mt-auto sm:pt-8">
+            <div className="sticky bottom-0 z-10 mt-6 pt-3 pb-1 bg-white border-t border-slate-100 sm:static sm:mt-auto sm:pt-8 sm:pb-0 sm:bg-transparent sm:border-t-0">
               <div className="flex gap-3">
                 {[true, false].map((value) => (
                   <button
@@ -348,32 +338,29 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
 
       {/* ── Kontaktuppgifter ── */}
       {stage === 'contact' && (
-        <div className="px-6 sm:px-9 pt-12 sm:pt-16 pb-7 sm:pb-9 sm:flex-1 sm:flex sm:flex-col sm:justify-center">
-          <div className="flex items-center gap-3 mb-4 sm:mb-5">
+        <div className="px-6 sm:px-9 pt-10 sm:pt-16 pb-5 sm:pb-9 sm:flex-1 sm:flex sm:flex-col sm:justify-center">
+          <div className="flex items-center gap-3 mb-3 sm:mb-5">
             <span
-              className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center"
+              className="flex-shrink-0 w-9 h-9 sm:w-12 sm:h-12 rounded-full flex items-center justify-center"
               style={{ backgroundColor: '#ECFDF5' }}
             >
-              <Check className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" />
+              <Check className="w-4 h-4 sm:w-6 sm:h-6 text-emerald-500" />
             </span>
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight" style={{ color: NAV_BG }}>Du passar!</h2>
-              <p className="text-xs sm:text-sm text-slate-400">Alla {questions.length} frågor klara</p>
-            </div>
+            <h2 className="text-xl sm:text-3xl font-extrabold leading-tight" style={{ color: NAV_BG }}>Du passar!</h2>
           </div>
 
-          <p className="text-sm sm:text-base leading-relaxed mb-5 sm:mb-7 text-slate-500">
+          <p className="text-sm sm:text-base leading-relaxed mb-3 sm:mb-7 text-slate-500">
             Lämna dina uppgifter så hör vi av oss med hur du kommer igång — 299 kr/mån, allt inkluderat.
           </p>
 
-          <form onSubmit={submit} className="space-y-3 sm:space-y-4">
+          <form onSubmit={submit} className="space-y-2.5 sm:space-y-4">
             {[
               { label: 'Namn', value: name, set: setName, type: 'text', required: true, hint: '' },
               { label: 'E-post', value: email, set: setEmail, type: 'email', required: true, hint: '' },
               { label: 'Telefon', value: phone, set: setPhone, type: 'tel', required: true, hint: '' },
             ].map((f) => (
               <div key={f.label}>
-                <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1.5 text-slate-600">
+                <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1 sm:mb-1.5 text-slate-600">
                   {f.label}
                   {f.hint && <span className="font-normal text-slate-400">· {f.hint}</span>}
                 </label>
@@ -382,14 +369,14 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
                   value={f.value}
                   required={f.required}
                   onChange={(e) => f.set(e.target.value)}
-                  className="w-full px-4 py-3 sm:py-3.5 rounded-xl text-[15px] sm:text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
+                  className="w-full px-4 py-2.5 sm:py-3.5 rounded-xl text-[15px] sm:text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
                   style={{ color: NAV_BG }}
                 />
               </div>
             ))}
 
             <div>
-              <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1.5 text-slate-600">
+              <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1 sm:mb-1.5 text-slate-600">
                 Hur vill du bli kontaktad?
               </label>
               <div className="flex gap-3">
@@ -409,7 +396,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
                     key={opt.value}
                     type="button"
                     onClick={() => setContactMethod(opt.value)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl border-2 font-semibold text-sm sm:text-base transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 sm:py-3.5 rounded-xl border-2 font-semibold text-sm sm:text-base transition-colors"
                     style={
                       contactMethod === opt.value
                         ? { borderColor: NAV_BG, backgroundColor: NAV_TINT, color: NAV_BG }
@@ -424,33 +411,35 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
             </div>
 
             <div>
-              <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1.5 text-slate-600">
+              <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1 sm:mb-1.5 text-slate-600">
                 Anteckningar
                 <span className="font-normal text-slate-400">· Frivilligt</span>
               </label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                rows={3}
+                rows={2}
                 placeholder="T.ex. något särskilt vi bör veta innan vi hör av oss"
-                className="w-full px-4 py-3 sm:py-3.5 rounded-xl text-[15px] sm:text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300 resize-none"
+                className="w-full px-4 py-2.5 sm:py-3.5 rounded-xl text-[15px] sm:text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300 resize-none"
                 style={{ color: NAV_BG }}
               />
             </div>
 
-            {sendError && <p className="text-sm text-center pt-1" style={{ color: CORAL }}>{sendError}</p>}
+            <div className="sticky bottom-0 z-10 pt-2 pb-1 space-y-2 bg-white border-t border-slate-100 sm:static sm:pt-0 sm:pb-0 sm:space-y-0 sm:bg-transparent sm:border-t-0">
+              {sendError && <p className="text-sm text-center" style={{ color: CORAL }}>{sendError}</p>}
 
-            <button
-              type="submit"
-              disabled={sending}
-              className="w-full py-4 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90 disabled:opacity-50"
-              style={{ backgroundColor: NAV_BG, boxShadow: `0 10px 24px ${NAV_BG}40` }}
-            >
-              {sending ? 'Skickar…' : 'Skicka — så hör vi av oss'}
-            </button>
+              <button
+                type="submit"
+                disabled={sending}
+                className="w-full py-3.5 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: NAV_BG, boxShadow: `0 10px 24px ${NAV_BG}40` }}
+              >
+                {sending ? 'Skickar…' : 'Skicka — så hör vi av oss'}
+              </button>
+            </div>
           </form>
 
-          <p className="text-center text-xs sm:text-sm mt-3 text-slate-400">
+          <p className="text-center text-xs sm:text-sm mt-2 sm:mt-3 text-slate-400">
             Ingen betalning nu · Ingen bindningstid
           </p>
         </div>

@@ -325,12 +325,11 @@ export default function Home() {
     // rad — testläget kan därför aldrig följa med till produktion.
     const alwaysShow = process.env.NODE_ENV === 'development';
 
-    // The cookie banner owns the bottom of the screen and would bury the popup's
-    // CTA on mobile. Let the visitor answer it first, then greet them.
-    const waitForConsent = (show: () => void) => {
-      if (localStorage.getItem('cookie-consent')) show();
-      else window.addEventListener('cookie-consent-resolved', show, { once: true });
-    };
+    // The popup owns the visitor's first impression — the cookie banner would
+    // bury its CTA on mobile if both fought for the bottom of the screen at
+    // once. So the popup shows immediately, and CookieConsent (which flags
+    // itself as pending via window.__popupPending) waits until the popup is
+    // dismissed before appearing. See CookieConsent.tsx.
 
     if (!ref) {
       // No ref at all — a direct/organic visit to enklabokslut.se. Show the
@@ -338,6 +337,8 @@ export default function Home() {
       // minus the "Du kom hit via vår annons" pill since there's no ad.
       const wantsOrganic = alwaysShow || !localStorage.getItem('organicPopupDismissed');
       if (!wantsOrganic) return;
+
+      window.__popupPending = true;
 
       // Log this popup impression so we can see how far organic visitors get.
       fetch('/api/qr-track', {
@@ -349,14 +350,8 @@ export default function Home() {
         .then((data) => setPopupVisitId(data.id ?? null))
         .catch(() => {});
 
-      let popupTimer: ReturnType<typeof setTimeout> | undefined;
-      const show = () => { popupTimer = setTimeout(() => setShowOrganicPopup(true), 600); };
-      waitForConsent(show);
-
-      return () => {
-        if (popupTimer) clearTimeout(popupTimer);
-        window.removeEventListener('cookie-consent-resolved', show);
-      };
+      const popupTimer = setTimeout(() => setShowOrganicPopup(true), 600);
+      return () => clearTimeout(popupTimer);
     }
 
     const code = ref.toLowerCase();
@@ -386,34 +381,39 @@ export default function Home() {
     if (wantsBrev) setBrevRef(code);
     if (wantsFb) setFbRef(code);
 
-    let popupTimer: ReturnType<typeof setTimeout> | undefined;
-    const show = () => {
-      popupTimer = setTimeout(() => {
-        if (wantsFb) setShowFbPopup(true);
-        else setShowBrevPopup(true);
-      }, 600);
-    };
-    waitForConsent(show);
+    window.__popupPending = true;
 
-    return () => {
-      if (popupTimer) clearTimeout(popupTimer);
-      window.removeEventListener('cookie-consent-resolved', show);
-    };
+    const popupTimer = setTimeout(() => {
+      if (wantsFb) setShowFbPopup(true);
+      else setShowBrevPopup(true);
+    }, 600);
+
+    return () => clearTimeout(popupTimer);
   }, []);
+
+  // Popup is done (closed or completed) — let the cookie banner take the
+  // bottom of the screen now.
+  const releaseCookieBanner = () => {
+    window.__popupPending = false;
+    window.dispatchEvent(new Event('popup-resolved'));
+  };
 
   const dismissBrevPopup = () => {
     setShowBrevPopup(false);
     try { localStorage.setItem('brevPopupDismissed', '1'); } catch {}
+    releaseCookieBanner();
   };
 
   const dismissFbPopup = () => {
     setShowFbPopup(false);
     try { localStorage.setItem('fbPopupDismissed', '1'); } catch {}
+    releaseCookieBanner();
   };
 
   const dismissOrganicPopup = () => {
     setShowOrganicPopup(false);
     try { localStorage.setItem('organicPopupDismissed', '1'); } catch {}
+    releaseCookieBanner();
   };
 
   useEffect(() => {

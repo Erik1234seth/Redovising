@@ -13,6 +13,7 @@ declare global {
   interface Window {
     dataLayer?: unknown[];
     __gaLoaded?: boolean;
+    __popupPending?: boolean;
   }
 }
 
@@ -41,7 +42,18 @@ export default function CookieConsent() {
     if (stored === 'accepted') {
       loadGoogleAnalytics();
     } else if (stored !== 'declined') {
-      setVisible(true);
+      // Banners och popups slåss om nederkanten av skärmen. Startsidans
+      // ref-popup sätter window.__popupPending synkront i sin egen effekt
+      // innan den visas, så en deferrad koll här (nästa tick) hinner alltid
+      // se flaggan oavsett i vilken ordning komponenternas effects kör.
+      const showIfNotBlocked = () => {
+        if (window.__popupPending) {
+          window.addEventListener('popup-resolved', () => setVisible(true), { once: true });
+        } else {
+          setVisible(true);
+        }
+      };
+      setTimeout(showIfNotBlocked, 0);
     }
 
     // Låt en "Hantera cookies"-knapp öppna bannern igen
@@ -50,21 +62,15 @@ export default function CookieConsent() {
     return () => window.removeEventListener('open-cookie-settings', reopen);
   }, []);
 
-  // Banners och popups slåss om nederkanten av skärmen. Landningssidan väntar
-  // in det här innan den visar sina ref-popups, så de aldrig hamnar under bannern.
-  const announceResolved = () => window.dispatchEvent(new Event('cookie-consent-resolved'));
-
   const accept = () => {
     localStorage.setItem(STORAGE_KEY, 'accepted');
     loadGoogleAnalytics();
     setVisible(false);
-    announceResolved();
   };
 
   const decline = () => {
     localStorage.setItem(STORAGE_KEY, 'declined');
     setVisible(false);
-    announceResolved();
   };
 
   if (!visible) return null;
