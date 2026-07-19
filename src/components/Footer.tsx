@@ -61,11 +61,13 @@ export default function Footer() {
             <ul className="space-y-3">
               {[
                 { href: '/skaffa', label: 'Priser' },
-                { href: '/#hur-det-fungerar', label: 'Så fungerar det' },
+                // Sektionen den pekar på är dold på mobil, så länken skulle
+                // inte scrolla någonstans där.
+                { href: '/#hur-det-fungerar', label: 'Så fungerar det', desktopOnly: true },
                 { href: '/kvalificera', label: 'Skapa konto' },
                 { href: '/kontakt', label: 'Kontakt' },
-              ].map(({ href, label }) => (
-                <li key={href}>
+              ].map(({ href, label, desktopOnly }) => (
+                <li key={href} className={desktopOnly ? 'hidden sm:block' : undefined}>
                   <Link href={href} className="group flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
                     <span className="w-1 h-1 rounded-full bg-white/30 group-hover:bg-white transition-colors" />
                     {label}

@@ -507,17 +507,20 @@ export default function Home() {
                 Mejla in dina underlag. Vi sköter bokföring, årsbokslut och deklaration. Allt ingår!
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start items-center sm:items-start">
+              {/* Knapparna delar raden på mobil (flex-1) och krymper till sitt
+                  eget innehåll från sm: och uppåt. items-stretch håller dem
+                  lika höga trots att "Boka möte" har en extra rad. */}
+              <div className="flex flex-row gap-2.5 sm:gap-3 justify-center lg:justify-start items-stretch">
                 <Link
                   href="#kontakta-oss"
-                  className="px-7 py-3.5 font-bold text-white rounded-xl shadow-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.02] text-sm sm:text-base"
+                  className="flex-1 sm:flex-none flex items-center justify-center text-center px-4 sm:px-7 py-3.5 font-bold text-white rounded-xl shadow-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.02] text-sm sm:text-base"
                   style={{ backgroundColor: NAV_BG, boxShadow: `0 8px 24px ${NAV_BG}30` }}
                 >
                   Kontakta oss
                 </Link>
                 <Link
                   href="/boka-mote"
-                  className="px-7 py-2.5 font-semibold text-slate-600 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm sm:text-base flex flex-col items-center justify-center leading-tight"
+                  className="flex-1 sm:flex-none px-4 sm:px-7 py-2.5 font-semibold text-slate-600 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm sm:text-base flex flex-col items-center justify-center text-center leading-tight"
                 >
                   <span>Boka möte</span>
                   <span className="text-xs font-normal text-slate-400">Såklart gratis</span>
@@ -555,25 +558,26 @@ export default function Home() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                 </div>
 
-                {/* Floating badge – bottom left */}
-                <div className="absolute -bottom-4 -left-4 lg:bottom-8 lg:-left-8 rounded-2xl shadow-xl flex items-center gap-3 lg:gap-4 p-4 lg:p-5" style={{ backgroundColor: NAV_BG, fontFamily: 'var(--font-inter)' }}>
-                  <svg className="w-6 h-6 lg:w-7 lg:h-7 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* Floating badge – bottom right. Nedskalad på mobil: i full
+                    storlek klev de in över ansiktet på bilden. */}
+                <div className="absolute -bottom-3 -right-2 sm:-bottom-4 sm:-right-4 lg:bottom-8 lg:-right-8 rounded-xl sm:rounded-2xl shadow-xl flex items-center gap-2 sm:gap-3 lg:gap-4 p-2.5 sm:p-4 lg:p-5" style={{ backgroundColor: NAV_BG, fontFamily: 'var(--font-inter)' }}>
+                  <svg className="w-4 h-4 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
                   <div>
-                    <p className="text-xs lg:text-sm font-bold text-white">Maila dina kvitton</p>
-                    <p className="text-[11px] lg:text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>Vi hjälper dig med resten.</p>
+                    <p className="text-[11px] sm:text-xs lg:text-sm font-bold text-white leading-tight">Maila dina kvitton</p>
+                    <p className="text-[10px] sm:text-[11px] lg:text-xs leading-tight" style={{ color: 'rgba(255,255,255,0.6)' }}>Vi hjälper dig med resten.</p>
                   </div>
                 </div>
 
-                {/* Floating badge – top right */}
-                <div className="absolute -top-4 -right-4 lg:top-8 lg:-right-8 rounded-2xl shadow-xl whitespace-nowrap flex items-center gap-3 lg:gap-4 p-4 lg:p-5" style={{ backgroundColor: NAV_BG, fontFamily: 'var(--font-inter)' }}>
-                  <svg className="w-6 h-6 lg:w-7 lg:h-7 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* Floating badge – top left */}
+                <div className="absolute -top-3 -left-2 sm:-top-4 sm:-left-4 lg:top-8 lg:-left-8 rounded-xl sm:rounded-2xl shadow-xl whitespace-nowrap flex items-center gap-2 sm:gap-3 lg:gap-4 p-2.5 sm:p-4 lg:p-5" style={{ backgroundColor: NAV_BG, fontFamily: 'var(--font-inter)' }}>
+                  <svg className="w-4 h-4 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
-                    <p className="text-xs lg:text-sm font-bold text-white">Bokföring utan krångel</p>
-                    <p className="text-[11px] lg:text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>Vi guidar dig hela vägen.</p>
+                    <p className="text-[11px] sm:text-xs lg:text-sm font-bold text-white leading-tight">Bokföring utan krångel</p>
+                    <p className="text-[10px] sm:text-[11px] lg:text-xs leading-tight" style={{ color: 'rgba(255,255,255,0.75)' }}>Vi guidar dig hela vägen.</p>
                   </div>
                 </div>
               </div>
@@ -753,10 +757,6 @@ export default function Home() {
 
       <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
 
-      <HomeContactSection />
-
-      <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
-
       {/* ══════════════════════════════════════════
           VARFÖR SÅ BILLIGT
       ══════════════════════════════════════════ */}
@@ -817,10 +817,17 @@ export default function Home() {
 
       <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
 
+      <HomeContactSection />
+
+      <div className="w-full h-px" style={{ backgroundColor: '#94a3b8' }} />
+
       {/* ══════════════════════════════════════════
           TRE ALTERNATIV
+          Dold på mobil: bilden är en bred processgrafik som blir oläslig
+          nedskalad till telefonbredd. Avdelaren under följer med, annars
+          hade två avdelare hamnat direkt på varandra.
       ══════════════════════════════════════════ */}
-      <section id="hur-det-fungerar" className="py-20 sm:py-28 bg-gray-50">
+      <section id="hur-det-fungerar" className="hidden sm:block py-20 sm:py-28 bg-gray-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <img
             src="/Processbild2.png"
@@ -830,7 +837,9 @@ export default function Home() {
         </div>
       </section>
 
-      <SectionDivider />
+      <div className="hidden sm:block">
+        <SectionDivider />
+      </div>
 
       {/* ══════════════════════════════════════════
           FAQ
