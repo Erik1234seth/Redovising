@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { questions } from '@/data/kvalificera-questions';
@@ -60,6 +60,12 @@ function TopControl({ onClick, label, dark, children }: { onClick: () => void; l
 
 type Stage = 'hook' | 'how' | 'questions' | 'contact' | 'done' | 'fail';
 
+// Hur långt in i kontaktformuläret besökaren hann. Ordningen är själva poängen:
+// vi sparar bara den längsta punkt de nått, så ett avhopp går att läsa som
+// "de fyllde i namn och mejl men vände vid telefonnumret".
+const CONTACT_PROGRESS = ['opened', 'name', 'email', 'method', 'phone', 'notes'] as const;
+type ContactProgress = (typeof CONTACT_PROGRESS)[number];
+
 export default function AdFunnel({ refCode, onClose, source = 'annons', showDeadlineOffer = false, visitId = null }: { refCode: string | null; onClose?: () => void; source?: 'annons' | 'brev' | 'organic'; showDeadlineOffer?: boolean; visitId?: number | null }) {
   const [stage, setStage] = useState<Stage>('hook');
   const [step, setStep] = useState(0);
@@ -68,14 +74,53 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
 
   // Records how far this visitor got, on the same qr_visits row logged when
   // the popup was shown — lets us see where people drop off per code.
+  const track = useCallback(
+    (payload: Record<string, unknown>) => {
+      if (!visitId) return;
+      fetch('/api/qr-track', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: visitId, ...payload }),
+        // Avhoppen är själva det vi mäter, så sista requesten måste överleva
+        // att fliken stängs.
+        keepalive: true,
+      }).catch(() => {});
+    },
+    [visitId]
+  );
+
   useEffect(() => {
-    if (!visitId) return;
-    fetch('/api/qr-track', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: visitId, stage }),
-    }).catch(() => {});
-  }, [stage, visitId]);
+    const payload: Record<string, unknown> = { stage };
+
+    // För 'questions' är steget där de stannade; för 'fail' är det frågan som
+    // diskvalificerade dem — det senare säger vilket kriterium som sållar bort
+    // annonsens publik.
+    if (stage === 'questions' || stage === 'fail') payload.step = step;
+
+    if (stage === 'contact') {
+      payload.contactProgress = 'opened';
+      payload.isMobile = window.matchMedia('(max-width: 640px)').matches;
+      // Testar hypotesen att tangentbordet skymmer skicka-knappen.
+      payload.viewportH = Math.round(window.innerHeight);
+    }
+
+    track(payload);
+  }, [stage, step, track]);
+
+  // Bara framsteg sparas, aldrig ett kliv bakåt — annars skulle en besökare som
+  // hoppar tillbaka till namnfältet se ut att ha kommit kortare än de gjorde.
+  const progressRef = useRef<ContactProgress>('opened');
+  const markProgress = (p: ContactProgress) => {
+    if (CONTACT_PROGRESS.indexOf(p) <= CONTACT_PROGRESS.indexOf(progressRef.current)) return;
+    progressRef.current = p;
+    track({ contactProgress: p });
+  };
+
+  const failedSubmits = useRef(0);
+  const markFailedSubmit = () => {
+    failedSubmits.current += 1;
+    track({ submitAttempts: failedSubmits.current });
+  };
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -117,6 +162,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
     e.preventDefault();
     if (!contactMethod) {
       setSendError('Välj om vi ska ringa eller mejla dig.');
+      markFailedSubmit();
       return;
     }
     setSending(true);
@@ -132,6 +178,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
       setStage('done');
     } catch (err: any) {
       setSendError(err.message || 'Något gick fel. Försök igen.');
+      markFailedSubmit();
     } finally {
       setSending(false);
     }
@@ -354,27 +401,32 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
           </p>
 
           <form onSubmit={submit} className="space-y-2.5 sm:space-y-4">
-            {[
-              { label: 'Namn', value: name, set: setName, type: 'text', required: true, hint: '' },
-              { label: 'E-post', value: email, set: setEmail, type: 'email', required: true, hint: '' },
-              { label: 'Telefon', value: phone, set: setPhone, type: 'tel', required: true, hint: '' },
-            ].map((f) => (
+            {([
+              { label: 'Namn', value: name, set: setName, type: 'text', autoComplete: 'name', progress: 'name' as const },
+              { label: 'E-post', value: email, set: setEmail, type: 'email', autoComplete: 'email', progress: 'email' as const },
+            ]).map((f) => (
               <div key={f.label}>
                 <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1 sm:mb-1.5 text-slate-600">
                   {f.label}
-                  {f.hint && <span className="font-normal text-slate-400">· {f.hint}</span>}
                 </label>
                 <input
                   type={f.type}
                   value={f.value}
-                  required={f.required}
+                  required
+                  autoComplete={f.autoComplete}
                   onChange={(e) => f.set(e.target.value)}
+                  // Ett tomt fält som lämnas är inget framsteg — bara ifyllt räknas.
+                  onBlur={() => { if (f.value.trim()) markProgress(f.progress); }}
                   className="w-full px-4 py-2.5 sm:py-3.5 rounded-xl text-[15px] sm:text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
                   style={{ color: NAV_BG }}
                 />
               </div>
             ))}
 
+            {/* Valet står före telefonfältet, så det är begripligt varför numret
+                plötsligt blir obligatoriskt (eller inte). Riktiga radios — då
+                blockerar webbläsaren submit precis som för vilket tomt fält som
+                helst, istället för att avvisa en ifylld blankett efteråt. */}
             <div>
               <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1 sm:mb-1.5 text-slate-600">
                 Hur vill du bli kontaktad?
@@ -392,22 +444,47 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
                     </svg>
                   ) },
                 ]).map((opt) => (
-                  <button
+                  <label
                     key={opt.value}
-                    type="button"
-                    onClick={() => setContactMethod(opt.value)}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 sm:py-3.5 rounded-xl border-2 font-semibold text-sm sm:text-base transition-colors"
+                    className="relative flex-1 flex items-center justify-center gap-2 py-2.5 sm:py-3.5 rounded-xl border-2 font-semibold text-sm sm:text-base transition-colors cursor-pointer"
                     style={
                       contactMethod === opt.value
                         ? { borderColor: NAV_BG, backgroundColor: NAV_TINT, color: NAV_BG }
                         : { borderColor: '#e2e8f0', backgroundColor: '#fff', color: '#64748b' }
                     }
                   >
+                    <input
+                      type="radio"
+                      name="contactMethod"
+                      value={opt.value}
+                      required
+                      checked={contactMethod === opt.value}
+                      onChange={() => { setContactMethod(opt.value); setSendError(''); markProgress('method'); }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
                     {opt.icon}
                     {opt.label}
-                  </button>
+                  </label>
                 ))}
               </div>
+            </div>
+
+            {/* Bara den som vill bli uppringd måste lämna numret. */}
+            <div>
+              <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold mb-1 sm:mb-1.5 text-slate-600">
+                Telefon
+                {contactMethod !== 'phone' && <span className="font-normal text-slate-400">· Frivilligt</span>}
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                required={contactMethod === 'phone'}
+                autoComplete="tel"
+                onChange={(e) => setPhone(e.target.value)}
+                onBlur={() => { if (phone.trim()) markProgress('phone'); }}
+                className="w-full px-4 py-2.5 sm:py-3.5 rounded-xl text-[15px] sm:text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
+                style={{ color: NAV_BG }}
+              />
             </div>
 
             <div>
@@ -418,6 +495,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                onBlur={() => { if (notes.trim()) markProgress('notes'); }}
                 rows={2}
                 placeholder="T.ex. något särskilt vi bör veta innan vi hör av oss"
                 className="w-full px-4 py-2.5 sm:py-3.5 rounded-xl text-[15px] sm:text-base outline-none transition-colors bg-white border border-slate-200 focus:border-slate-400 placeholder:text-slate-300 resize-none"

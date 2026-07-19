@@ -217,9 +217,8 @@ function HomeContactSection() {
           ) : (
             <form onSubmit={submit} className="space-y-4">
               {[
-                { label: 'Namn', value: name, set: setName, type: 'text' },
-                { label: 'E-post', value: email, set: setEmail, type: 'email' },
-                { label: 'Telefon', value: phone, set: setPhone, type: 'tel' },
+                { label: 'Namn', value: name, set: setName, type: 'text', autoComplete: 'name' },
+                { label: 'E-post', value: email, set: setEmail, type: 'email', autoComplete: 'email' },
               ].map((f) => (
                 <div key={f.label}>
                   <label className="block text-sm font-semibold mb-1.5 text-slate-600">{f.label}</label>
@@ -227,6 +226,7 @@ function HomeContactSection() {
                     type={f.type}
                     value={f.value}
                     required
+                    autoComplete={f.autoComplete}
                     onChange={(e) => f.set(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl text-[15px] outline-none transition-colors bg-slate-50 border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
                     style={{ color: NAV_BG }}
@@ -234,6 +234,9 @@ function HomeContactSection() {
                 </div>
               ))}
 
+              {/* Samma upplägg som popupens kontaktsteg: valet står före
+                  telefonfältet och är riktiga radios, så webbläsaren stoppar
+                  submit istället för att avvisa en ifylld blankett efteråt. */}
               <div>
                 <label className="block text-sm font-semibold mb-1.5 text-slate-600">Hur vill du bli kontaktad?</label>
                 <div className="flex gap-3">
@@ -249,22 +252,46 @@ function HomeContactSection() {
                       </svg>
                     ) },
                   ]).map((opt) => (
-                    <button
+                    <label
                       key={opt.value}
-                      type="button"
-                      onClick={() => setContactMethod(opt.value)}
-                      className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 font-semibold text-sm transition-colors"
+                      className="relative flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 font-semibold text-sm transition-colors cursor-pointer"
                       style={
                         contactMethod === opt.value
                           ? { borderColor: NAV_BG, backgroundColor: `${NAV_BG}14`, color: NAV_BG }
                           : { borderColor: '#e2e8f0', backgroundColor: '#fff', color: '#64748b' }
                       }
                     >
+                      <input
+                        type="radio"
+                        name="hemsidaContactMethod"
+                        value={opt.value}
+                        required
+                        checked={contactMethod === opt.value}
+                        onChange={() => { setContactMethod(opt.value); setSendError(''); }}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
                       {opt.icon}
                       {opt.label}
-                    </button>
+                    </label>
                   ))}
                 </div>
+              </div>
+
+              {/* Bara den som vill bli uppringd måste lämna numret. */}
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold mb-1.5 text-slate-600">
+                  Telefon
+                  {contactMethod !== 'phone' && <span className="font-normal text-slate-400">· Frivilligt</span>}
+                </label>
+                <input
+                  type="tel"
+                  value={phone}
+                  required={contactMethod === 'phone'}
+                  autoComplete="tel"
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl text-[15px] outline-none transition-colors bg-slate-50 border border-slate-200 focus:border-slate-400 placeholder:text-slate-300"
+                  style={{ color: NAV_BG }}
+                />
               </div>
 
               <div>
