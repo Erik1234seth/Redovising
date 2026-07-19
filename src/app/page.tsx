@@ -418,6 +418,36 @@ export default function Home() {
     return () => clearTimeout(popupTimer);
   }, []);
 
+  // Lås sidan bakom popupen. overflow:hidden på body räcker inte i iOS
+  // Safari — den scrollar vidare ändå. position:fixed gör det, men nollställer
+  // scrollpositionen, så den sparas och återställs när popupen stängs.
+  const popupOpen = showBrevPopup || showFbPopup || showOrganicPopup;
+  useEffect(() => {
+    if (!popupOpen) return;
+
+    const scrollY = window.scrollY;
+    const { body } = document;
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+
+    return () => {
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.width = prev.width;
+      body.style.overflow = prev.overflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [popupOpen]);
+
   // Popup is done (closed or completed) — let the cookie banner take the
   // bottom of the screen now.
   const releaseCookieBanner = () => {
@@ -1036,10 +1066,10 @@ export default function Home() {
           role="dialog"
           aria-modal="true"
         >
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
-            onClick={showBrevPopup ? dismissBrevPopup : showFbPopup ? dismissFbPopup : dismissOrganicPopup}
-          />
+          {/* Overlayen fångar klicken utan att stänga: ett tryck bredvid
+              popupen på mobil träffade lätt fel och sidan bakom kom fram.
+              Krysset uppe i hörnet är vägen ut. */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]" />
 
           <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto animate-[popIn_0.28s_cubic-bezier(0.16,1,0.3,1)]">
             {showBrevPopup ? (
