@@ -60,6 +60,12 @@ function TopControl({ onClick, label, dark, children }: { onClick: () => void; l
 
 type Stage = 'hook' | 'how' | 'questions' | 'contact' | 'done' | 'fail';
 
+// "Så funkar det"-steget är tillfälligt avstängt: hooken tappade sex gånger
+// fler besökare än kontaktformuläret, och ett mellansteg till innan frågorna
+// gjorde vägen längre utan att tillföra något de inte redan läst. Sätt till
+// true för att ta tillbaka det — steget självt ligger kvar orört nedan.
+const SHOW_HOW_STAGE = false;
+
 // Hur långt in i kontaktformuläret besökaren hann. Ordningen är själva poängen:
 // vi sparar bara den längsta punkt de nått, så ett avhopp går att läsa som
 // "de fyllde i namn och mejl men vände vid telefonnumret".
@@ -154,7 +160,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
 
   const back = () => {
     if (stage === 'how') setStage('hook');
-    else if (stage === 'questions' && step === 0) setStage('how');
+    else if (stage === 'questions' && step === 0) setStage(SHOW_HOW_STAGE ? 'how' : 'hook');
     else if (stage === 'questions') setStep(step - 1);
   };
 
@@ -239,7 +245,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
             )}
 
             <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight mb-5" style={{ color: NAV_BG }}>
-              Allt ingår — men passar det din firma?
+              Du mejlar in dina underlag. Vi sköter resten.
             </h2>
 
             <div className="flex items-end gap-2 mb-5">
@@ -275,14 +281,14 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
 
             <div className="sticky bottom-0 z-10 pt-3 pb-1 bg-white border-t border-slate-100 sm:static sm:pt-0 sm:pb-0 sm:bg-transparent sm:border-t-0 sm:mt-auto">
               <button
-                onClick={() => setStage('how')}
+                onClick={() => setStage(SHOW_HOW_STAGE ? 'how' : 'questions')}
                 className="w-full py-4 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90 hover:scale-[1.01]"
                 style={{ backgroundColor: NAV_BG, boxShadow: `0 10px 24px ${NAV_BG}40` }}
               >
                 Ja, kolla om det passar →
               </button>
               <p className="text-center text-xs sm:text-sm mt-3 text-slate-400">
-                Tar under en minut · Ingen betalning
+                {questions.length} snabba frågor · Tar under en minut · Ingen betalning
               </p>
             </div>
           </div>
@@ -397,7 +403,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
           </div>
 
           <p className="text-sm sm:text-base leading-relaxed mb-3 sm:mb-7 text-slate-500">
-            Lämna dina uppgifter så hör vi av oss med hur du kommer igång — 299 kr/mån, allt inkluderat.
+            Lämna dina uppgifter så hör vi av oss och berättar mer. Sen bestämmer du i lugn och ro om det känns rätt.
           </p>
 
           <form onSubmit={submit} className="space-y-2.5 sm:space-y-4">
