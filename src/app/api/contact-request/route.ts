@@ -38,10 +38,10 @@ export async function POST(request: NextRequest) {
       ? new Date(meetingDate + 'T12:00:00').toLocaleDateString('sv-SE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + ' kl. ' + meetingTime
       : null;
 
-    // Notify Erik
+    // Notify oss
     await resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
-      to: 'erik@enklabokslut.se',
+      to: 'info@enklabokslut.se',
       subject: `Ny kontaktförfrågan – ${packageName}`,
       html: `
         <h2>Ny kontaktförfrågan</h2>

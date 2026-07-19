@@ -57,11 +57,11 @@ export async function POST(request: NextRequest) {
       .join('');
     const hasUnknownAnswer = questions.some((q) => answers?.[q.id] === 'unknown');
 
-    // Notify Erik
+    // Notify oss
     await resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
       replyTo: email,
-      to: 'erik@enklabokslut.se',
+      to: 'info@enklabokslut.se',
       subject: `Nytt lead från ${sourceWord}${ref ? ` (${ref})` : ''} – ${name || email}`,
       html: `
         <h2 style="color:${NAV_BG};">Nytt lead från ${sourceWord}</h2>

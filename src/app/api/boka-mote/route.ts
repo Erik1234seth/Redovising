@@ -30,10 +30,10 @@ export async function POST(req: NextRequest) {
 
     const formattedDate = formatDate(date);
 
-    // Notify Erik
+    // Notify oss
     await resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
-      to: 'erik@enklabokslut.se',
+      to: 'info@enklabokslut.se',
       subject: `Nytt möte bokat – ${formattedDate} ${time}`,
       html: `
         <h2>Nytt möte bokat</h2>

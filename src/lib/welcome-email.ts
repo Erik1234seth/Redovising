@@ -96,7 +96,7 @@ export async function sendWelcomeEmails(params: {
   await Promise.all([
     resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
-      to: 'erik@enklabokslut.se',
+      to: 'info@enklabokslut.se',
       subject: `Ny prenumerant – ${name || email}`,
       html: `
         <h2>Ny prenumerant!</h2>
