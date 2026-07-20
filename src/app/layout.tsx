@@ -83,6 +83,26 @@ export default async function RootLayout({
 
   return (
     <html lang="sv">
+      <head>
+        {/* Google tag (gtag.js) */}
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-8XZDRG1PSH" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+
+              gtag('config', 'G-8XZDRG1PSH');
+
+              // Taggen laddas nu statiskt här. Markera GA som laddad så att
+              // CookieConsent-komponentens egen injektion inte lägger till en
+              // andra gtag.js och dubbelräknar sidvisningar.
+              window.__gaLoaded = true;
+            `,
+          }}
+        />
+      </head>
       <body className={`${inter.variable} ${plusJakarta.variable} ${plusJakarta.className}`}>
         <AuthProvider>
           {!isApp && <Navigation />}
