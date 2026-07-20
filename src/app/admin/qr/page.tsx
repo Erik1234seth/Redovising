@@ -14,6 +14,8 @@ const QR_CODES = [
   { code: 'fb-b', label: 'FB B', url: 'enklabokslut.se/?ref=fb-b' },
   { code: 'fb-c', label: 'FB C', url: 'enklabokslut.se/?ref=fb-c' },
   { code: 'fb-d', label: 'FB D', url: 'enklabokslut.se/?ref=fb-d' },
+  { code: 'fb-e', label: 'FB E', url: 'enklabokslut.se/?ref=fb-e' },
+  { code: 'fb-f', label: 'FB F', url: 'enklabokslut.se/?ref=fb-f' },
 ];
 
 // Order visitors move through the popup in — matches AdFunnel's `Stage` type.

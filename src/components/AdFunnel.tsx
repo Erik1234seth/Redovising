@@ -19,15 +19,68 @@ const NAV_TINT = `${NAV_BG}14`;
 // short "how it works".
 const DESKTOP_MIN_H = 'sm:min-h-[600px]';
 
-// Each ad variant shows a different photo as its "next frame" — same funnel,
-// same copy, just the hook image swapped so it lines up with the specific ad.
-const HOOK_IMAGES: Record<string, string> = {
-  'fb-pris': '/vinkafacebook.png',
-  'fb-b': '/popup1.png',
-  'fb-c': '/popup2.png',
-  'fb-d': '/popup3.png',
+// Varje annonsvariant har en egen "nästa bildruta". De flesta delar copy och
+// byter bara bild; en variant kan skriva över rubrik, pris och fotnot när
+// annonsen lovar något annat än 299 i månaden.
+type Variant = {
+  image: string;
+  headline: string;
+  headlineClass: string;
+  price: string;
+  priceUnit: string | null;
+  /** Liten rad under priset — används när villkoret behöver stå intill siffran. */
+  priceNote: string | null;
+  /** Annonspillen stängs av när rubriken redan säger vad besökaren klickade på. */
+  hideSourcePill: boolean;
+  /** Egen ruta som säger att reservationen inte binder besökaren vid något. */
+  notBinding: boolean;
+  /**
+   * Korall-pill högst upp i hooken, på platsen där annonspillen annars sitter.
+   * Säger varför det är läge att reservera nu. Texten är ett påstående om vår
+   * kapacitet — den måste stämma med hur många firmor vi faktiskt tar emot.
+   */
+  scarcity: string | null;
+  footnote: string;
 };
-const DEFAULT_HOOK_IMAGE = '/vinkafacebook.png';
+
+const DEFAULT_VARIANT: Variant = {
+  image: '/vinkafacebook.png',
+  headline: 'Slipp bokföringen. Vi gör allt åt dig.',
+  headlineClass: 'text-2xl sm:text-3xl',
+  price: '299',
+  priceUnit: 'kr/mån',
+  priceNote: null,
+  hideSourcePill: false,
+  notBinding: false,
+  scarcity: null,
+  footnote: `${questions.length} snabba frågor · Tar under en minut · Ingen betalning`,
+};
+
+// Reservationsannonsen: ett engångspris för hela bokslutet, och en plats som
+// bokas — därför måste "inte bindande" synas redan här, inte först i formuläret.
+const RESERVATION: Partial<Variant> = {
+  headline: 'Reservera din plats inför bokslutet 2026',
+  // Rubriken är dubbelt så lång som standardvariantens, så den får ett snäpp
+  // mindre grad för att fortfarande rymmas på tre rader i mobil.
+  headlineClass: 'text-[22px] sm:text-[28px]',
+  price: '3999',
+  priceUnit: 'kr',
+  priceNote: 'Allt ingår - inga överraskningar',
+  hideSourcePill: true,
+  notBinding: true,
+  footnote: `${questions.length} snabba frågor · Tar under en minut · Inte bindande`,
+};
+
+const VARIANTS: Record<string, Partial<Variant>> = {
+  'fb-pris': { image: '/vinkafacebook.png' },
+  'fb-b': { image: '/popup1.png' },
+  'fb-c': { image: '/popup2.png' },
+  'fb-d': { image: '/popup3.png' },
+  // Knapphetspillen sitter bara på fb-e — fb-f är i övrigt identisk, så
+  // skillnaden i utfall går att läsa som pillens egen effekt.
+  'fb-e': { ...RESERVATION, image: '/vinkafacebook.png', scarcity: 'Begränsat antal platser' },
+  'fb-f': { ...RESERVATION, image: '/popup3.png' },
+};
 
 const howItWorks = [
   { t: 'Du mejlar in dina underlag', d: 'Kvitton och fakturor, precis som de ser ut.' },
@@ -188,7 +241,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
 
   const showBack = stage === 'how' || stage === 'questions';
   const onPhoto = stage === 'hook';
-  const hookImage = (refCode && HOOK_IMAGES[refCode]) || DEFAULT_HOOK_IMAGE;
+  const variant: Variant = { ...DEFAULT_VARIANT, ...((refCode && VARIANTS[refCode]) || {}) };
 
   return (
     <div
@@ -217,12 +270,12 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
       {stage === 'hook' && (
         <div className="sm:flex-1 sm:flex sm:flex-col sm:min-h-0">
           <div className="relative h-40 sm:h-48 flex-shrink-0">
-            <Image src={hookImage} alt="" fill priority className="object-cover object-[62%_26%]" />
+            <Image src={variant.image} alt="" fill priority className="object-cover object-[62%_26%]" />
             <div className="absolute inset-0" style={{ background: 'linear-gradient(0deg, #ffffff 0%, rgba(255,255,255,0) 22%)' }} />
           </div>
 
           <div className="px-6 sm:px-9 pt-5 pb-7 sm:pb-9 sm:flex-1 sm:flex sm:flex-col sm:justify-center">
-            {source !== 'organic' && (
+            {source !== 'organic' && !variant.hideSourcePill && (
               <span
                 className="inline-flex items-center gap-1.5 self-start px-3 py-1 rounded-full text-xs font-semibold mb-4"
                 style={{ backgroundColor: NAV_BG, color: '#fff' }}
@@ -240,13 +293,29 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
               </span>
             )}
 
-            <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight mb-5" style={{ color: NAV_BG }}>
-              Slipp bokföringen. Vi gör allt åt dig.
+            <h2 className={`${variant.headlineClass} font-extrabold leading-tight mb-5`} style={{ color: NAV_BG }}>
+              {variant.headline}
             </h2>
 
-            <div className="flex items-end gap-2 mb-5">
-              <span className="text-5xl sm:text-6xl font-extrabold leading-none" style={{ color: CORAL }}>299</span>
-              <span className="text-base sm:text-lg font-bold mb-1 text-slate-500">kr/mån</span>
+            <div className="mb-5">
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex items-end gap-2">
+                  <span className="text-5xl sm:text-6xl font-extrabold leading-none" style={{ color: CORAL }}>{variant.price}</span>
+                  {variant.priceUnit && <span className="text-base sm:text-lg font-bold mb-1 text-slate-500">{variant.priceUnit}</span>}
+                </div>
+                {variant.scarcity && (
+                  <span
+                    className="inline-flex items-center gap-1.5 flex-shrink-0 px-3 py-1.5 mb-1 rounded-full text-[11px] sm:text-xs font-semibold leading-tight"
+                    style={{ backgroundColor: `${CORAL}1a`, color: CORAL, border: `1px solid ${CORAL}40` }}
+                  >
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    {variant.scarcity}
+                  </span>
+                )}
+              </div>
+              {variant.priceNote && <p className="text-sm mt-1.5 text-slate-500">{variant.priceNote}</p>}
             </div>
 
             <ul className="grid grid-cols-2 gap-x-3 gap-y-2.5 sm:gap-y-3 mb-5">
@@ -262,6 +331,23 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
                 </li>
               ))}
             </ul>
+
+            {variant.notBinding && (
+              <div className="flex items-start gap-3 rounded-xl px-4 py-3 mb-5 bg-slate-50 border border-slate-200">
+                <span
+                  className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: NAV_TINT, color: NAV_BG }}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </span>
+                <p className="text-sm sm:text-[15px] leading-snug" style={{ color: NAV_BG }}>
+                  <span className="font-bold">Att reservera är inte bindande.</span>{' '}
+                  <span className="text-slate-500">Du bestämmer dig när vi börjar med dina underlag och betalar när vi lämnat in till Skatteverket — inget nu, inget i förskott.</span>
+                </p>
+              </div>
+            )}
 
             {showDeadlineOffer && (
               <div className="flex items-center gap-3 rounded-xl px-4 py-3 mb-5" style={{ backgroundColor: `${CORAL}14`, border: `1px solid ${CORAL}40` }}>
@@ -284,7 +370,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
                 Ja, kolla om det passar →
               </button>
               <p className="text-center text-xs sm:text-sm mt-3 text-slate-400">
-                {questions.length} snabba frågor · Tar under en minut · Ingen betalning
+                {variant.footnote}
               </p>
             </div>
           </div>
@@ -349,8 +435,33 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
             </p>
 
             <div className="sm:min-h-[120px]">
-              <h2 className="text-xl sm:text-3xl font-extrabold leading-snug mb-2.5 sm:mb-4" style={{ color: NAV_BG }}>{q.text}</h2>
-              <p className="text-sm sm:text-base leading-relaxed text-slate-500">{q.help}</p>
+              <div className="flex items-start gap-2 mb-2.5 sm:mb-4">
+                <h2 className="text-xl sm:text-3xl font-extrabold leading-snug" style={{ color: NAV_BG }}>{q.text}</h2>
+                {/* Samma förklaring som /kvalificera, men bara från sm och upp:
+                    hover finns inte på touch, så på mobil står den kvar som
+                    synlig text under frågan istället. */}
+                <div className="relative group flex-shrink-0 hidden sm:block mt-1.5">
+                  <button
+                    type="button"
+                    aria-label="Förklaring"
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors hover:bg-slate-100"
+                    style={{ borderColor: NAV_BG, color: NAV_BG }}
+                  >
+                    ?
+                  </button>
+                  {/* Kortet har overflow-hidden, så tooltipen måste hålla sig
+                      innanför det: den växer åt vänster från knappens
+                      högerkant, och nedåt — uppåt kapades de längsta
+                      förklaringarna av kortets överkant. */}
+                  <div
+                    className="pointer-events-none absolute right-0 top-full z-10 mt-2 w-64 scale-95 rounded-xl p-3 text-xs leading-relaxed text-white opacity-0 shadow-xl transition-all duration-150 group-hover:scale-100 group-hover:opacity-100"
+                    style={{ backgroundColor: NAV_BG }}
+                  >
+                    {q.help}
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm leading-relaxed text-slate-500 sm:hidden">{q.help}</p>
             </div>
 
             <div className="sticky bottom-0 z-10 mt-6 pt-3 pb-1 bg-white border-t border-slate-100 sm:static sm:mt-auto sm:pt-8 sm:pb-0 sm:bg-transparent sm:border-t-0">
