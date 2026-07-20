@@ -24,6 +24,13 @@ const DESKTOP_MIN_H = 'sm:min-h-[600px]';
 // annonsen lovar något annat än 299 i månaden.
 type Variant = {
   image: string;
+  /**
+   * Beskärningspunkt för bildremsan. Remsan är ~2,7 ggr bredare än hög, så av
+   * en stående bild syns en smal våg på mitten och av en liggande bara dryga
+   * halva höjden — vilket Y-värde som håller ansiktet helt inom remsan beror
+   * alltså på bildens format och måste sättas per bild.
+   */
+  imagePosition: string;
   headline: string;
   headlineClass: string;
   price: string;
@@ -45,6 +52,7 @@ type Variant = {
 
 const DEFAULT_VARIANT: Variant = {
   image: '/vinkafacebook.png',
+  imagePosition: 'object-[62%_26%]',
   headline: 'Slipp bokföringen. Vi gör allt åt dig.',
   headlineClass: 'text-2xl sm:text-3xl',
   price: '299',
@@ -75,11 +83,14 @@ const VARIANTS: Record<string, Partial<Variant>> = {
   'fb-pris': { image: '/vinkafacebook.png' },
   'fb-b': { image: '/popup1.png' },
   'fb-c': { image: '/popup2.png' },
-  'fb-d': { image: '/popup3.png' },
+  // Samma utbytta bild som fb-f — samma beskärning krävs.
+  'fb-d': { image: '/popup3.png', imagePosition: 'object-[50%_5%]' },
   // Knapphetspillen sitter bara på fb-e — fb-f är i övrigt identisk, så
   // skillnaden i utfall går att läsa som pillens egen effekt.
   'fb-e': { ...RESERVATION, image: '/vinkafacebook.png', scarcity: 'Begränsat antal platser' },
-  'fb-f': { ...RESERVATION, image: '/popup3.png' },
+  // Liggande bild, ansiktet högt upp — remsan måste börja nära överkanten för
+  // att håret ska få plats.
+  'fb-f': { ...RESERVATION, image: '/popup4.png', imagePosition: 'object-[50%_5%]' },
 };
 
 const howItWorks = [
@@ -270,7 +281,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
       {stage === 'hook' && (
         <div className="sm:flex-1 sm:flex sm:flex-col sm:min-h-0">
           <div className="relative h-40 sm:h-48 flex-shrink-0">
-            <Image src={variant.image} alt="" fill priority className="object-cover object-[62%_26%]" />
+            <Image src={variant.image} alt="" fill priority className={`object-cover ${variant.imagePosition}`} />
             <div className="absolute inset-0" style={{ background: 'linear-gradient(0deg, #ffffff 0%, rgba(255,255,255,0) 22%)' }} />
           </div>
 
