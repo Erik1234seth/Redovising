@@ -14,6 +14,7 @@ declare global {
     dataLayer?: unknown[];
     __gaLoaded?: boolean;
     __popupPending?: boolean;
+    fbq?: (...args: unknown[]) => void;
   }
 }
 

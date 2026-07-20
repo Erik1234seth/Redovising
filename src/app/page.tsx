@@ -296,6 +296,16 @@ export default function Home() {
   const [popupVisitId, setPopupVisitId] = useState<number | null>(null);
   const fakeCountdown = useFakeCountdown();
 
+  // Meta Pixel: landningssidan räknas som en produktvisning för årspaketet.
+  // Bas-pixeln (init + PageView) laddas statiskt i layout.tsx.
+  useEffect(() => {
+    window.fbq?.('track', 'ViewContent', {
+      value: 3999,
+      currency: 'SEK',
+      content_ids: '1',
+    });
+  }, []);
+
   // Log QR-code and ad landings (?ref=brev-a, ?ref=fb-pris).
   // Once per browser session, per code.
   useEffect(() => {
