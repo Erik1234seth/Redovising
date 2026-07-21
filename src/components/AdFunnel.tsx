@@ -35,7 +35,7 @@ type Variant = {
   headlineClass: string;
   price: string;
   priceUnit: string | null;
-  /** Liten rad under priset — används när villkoret behöver stå intill siffran. */
+  /** Liten rad under priset — står intill siffran i alla popups. */
   priceNote: string | null;
   /** Annonspillen stängs av när rubriken redan säger vad besökaren klickade på. */
   hideSourcePill: boolean;
@@ -57,7 +57,7 @@ const DEFAULT_VARIANT: Variant = {
   headlineClass: 'text-2xl sm:text-3xl',
   price: '299',
   priceUnit: 'kr/mån',
-  priceNote: null,
+  priceNote: 'Allt ingår - inga överraskningar',
   hideSourcePill: false,
   notBinding: false,
   scarcity: null,
@@ -73,7 +73,6 @@ const RESERVATION: Partial<Variant> = {
   headlineClass: 'text-[22px] sm:text-[28px]',
   price: '3999',
   priceUnit: 'kr',
-  priceNote: 'Allt ingår - inga överraskningar',
   hideSourcePill: true,
   notBinding: true,
   footnote: `${questions.length} snabba frågor · Tar under en minut · Inte bindande`,
