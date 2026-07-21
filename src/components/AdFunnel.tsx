@@ -90,6 +90,9 @@ const VARIANTS: Record<string, Partial<Variant>> = {
   // Liggande bild, ansiktet högt upp — remsan måste börja nära överkanten för
   // att håret ska få plats.
   'fb-f': { ...RESERVATION, image: '/popup4.png', imagePosition: 'object-[50%_5%]' },
+  // Standardpopupen rakt av — 299 i månaden och vinkbilden. Samma innehåll som
+  // fb-pris, men en egen kod så annonsen den ligger på kan mätas för sig.
+  'fb-g': { image: '/vinkafacebook.png' },
 };
 
 const howItWorks = [
