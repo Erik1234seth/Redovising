@@ -28,10 +28,10 @@ export default function BetalningPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Redan aktiv? Skicka in i appen.
+  // Redan aktiv? Skicka till välkomstskärmen (inte in i appen).
   useEffect(() => {
     if (!loading && profile && ['active', 'trialing', 'invoice'].includes(profile.subscription_status ?? '')) {
-      router.replace('/');
+      router.replace('/valkommen');
     }
   }, [loading, profile, router]);
 

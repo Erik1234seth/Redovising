@@ -104,7 +104,8 @@ export default function Footer() {
               {[
                 { href: '/integritetspolicy', label: 'Integritetspolicy' },
                 { href: '/cookiepolicy', label: 'Cookiepolicy' },
-                { href: '/anvandarvillkor', label: 'Användarvillkor' },
+                { href: '/allmanna-villkor', label: 'Allmänna villkor' },
+                { href: '/pub', label: 'Personuppgiftsbiträdesavtal' },
               ].map(({ href, label }) => (
                 <li key={href}>
                   <Link href={href} className="group flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">

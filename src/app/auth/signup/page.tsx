@@ -9,6 +9,7 @@ function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signUp, refreshProfile } = useAuth();
@@ -19,6 +20,12 @@ function SignupForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!acceptedTerms) {
+      setError('Du måste godkänna villkoren för att skapa ett konto');
+      return;
+    }
+
     setLoading(true);
 
     if (password.length < 6) {
@@ -100,10 +107,28 @@ function SignupForm() {
           <p className="mt-1 text-xs text-warm-500">Minst 6 tecken</p>
         </div>
 
+        <label className="flex items-start gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+            className="mt-0.5 w-4 h-4 flex-shrink-0 rounded cursor-pointer"
+            style={{ accentColor: '#E95C63' }}
+          />
+          <span className="text-xs text-warm-400 leading-relaxed">
+            Jag godkänner{' '}
+            <Link href="/allmanna-villkor" target="_blank" className="text-[#E95C63] hover:opacity-80 font-semibold">Allmänna villkor</Link>
+            ,{' '}
+            <Link href="/pub" target="_blank" className="text-[#E95C63] hover:opacity-80 font-semibold">Personuppgiftsbiträdesavtal</Link>
+            {' '}och{' '}
+            <Link href="/integritetspolicy" target="_blank" className="text-[#E95C63] hover:opacity-80 font-semibold">Integritetspolicy</Link>.
+          </span>
+        </label>
+
         <button
           type="submit"
-          disabled={loading}
-          className="w-full bg-[#E95C63] hover:bg-[#d04e55] disabled:opacity-50 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02]"
+          disabled={loading || !acceptedTerms}
+          className="w-full bg-[#E95C63] hover:bg-[#d04e55] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02]"
         >
           {loading ? 'Skapar konto...' : 'Skapa konto'}
         </button>

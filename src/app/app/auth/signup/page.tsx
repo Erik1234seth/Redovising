@@ -14,16 +14,24 @@ function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signUp, refreshProfile } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const mainSiteUrl = useMainSiteUrl();
   const redirectUrl = searchParams.get('redirect') || '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!acceptedTerms) {
+      setError('Du måste godkänna villkoren för att skapa ett konto');
+      return;
+    }
+
     setLoading(true);
 
     if (password.length < 6) {
@@ -104,9 +112,35 @@ function SignupForm() {
         />
       </div>
 
+      {/* Godkänn villkoren */}
+      <label className="flex items-start gap-3 cursor-pointer select-none mt-1">
+        <input
+          type="checkbox"
+          checked={acceptedTerms}
+          onChange={e => setAcceptedTerms(e.target.checked)}
+          className="mt-0.5 w-4 h-4 flex-shrink-0 rounded border-slate-300 cursor-pointer"
+          style={{ accentColor: NAV_BG }}
+        />
+        <span className="text-xs text-slate-500 leading-relaxed">
+          Jag godkänner{' '}
+          <a href={`${mainSiteUrl}/allmanna-villkor`} target="_blank" rel="noopener noreferrer" className="font-semibold hover:opacity-80" style={{ color: NAV_BG }}>
+            Allmänna villkor
+          </a>
+          ,{' '}
+          <a href={`${mainSiteUrl}/pub`} target="_blank" rel="noopener noreferrer" className="font-semibold hover:opacity-80" style={{ color: NAV_BG }}>
+            Personuppgiftsbiträdesavtal
+          </a>
+          {' '}och{' '}
+          <a href={`${mainSiteUrl}/integritetspolicy`} target="_blank" rel="noopener noreferrer" className="font-semibold hover:opacity-80" style={{ color: NAV_BG }}>
+            Integritetspolicy
+          </a>
+          .
+        </span>
+      </label>
+
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || !acceptedTerms}
         className="w-full py-4 rounded-xl font-bold text-sm text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.01] mt-1"
         style={{ backgroundColor: CORAL, boxShadow: `0 8px 20px ${CORAL}40` }}
       >
