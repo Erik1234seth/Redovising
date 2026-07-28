@@ -52,7 +52,6 @@ PASSAR INTE FÖR (dessa kan vi tyvärr inte hjälpa i dagsläget):
 - Företag med anställd personal
 - Skogs- eller lantbruksverksamhet
 - Taxiverksamhet
-- Vinstmarginalbeskattning (VMB)
 - Verksamheter med särskilt komplexa skatte- eller momsregler
 
 SÅ HÄR FUNGERAR DET:

@@ -201,14 +201,7 @@ export default function KvalificeraPage() {
 
           {step === 5 && (
             <>
-              <p className="font-bold text-lg mb-2.5" style={{ color: NAV_BG }}>Använder din verksamhet vinstmarginalbeskattning (VMB)?</p>
-              <p className="text-slate-500 text-base leading-relaxed">Vinstmarginalbeskattning används vid handel med exempelvis begagnade bilar, konst, antikviteter och andra begagnade varor. Eftersom det innebär särskilda momsregler passar dessa verksamheter inte för Enkla Bokslut.</p>
-            </>
-          )}
-
-          {step === 6 && (
-            <>
-              <p className="font-bold text-lg mb-2.5" style={{ color: NAV_BG }}>Redovisar du moms i något annat land än Sverige, eller använder du OSS (One Stop Shop)?</p>
+              <p className="font-bold text-lg mb-2.5" style={{ color: NAV_BG }}>Redovisar du moms i något annat land än Sverige?</p>
               <p className="text-slate-500 text-base leading-relaxed">Enkla Bokslut är utvecklat för företag som endast redovisar svensk moms. Redovisning i andra länder eller via OSS innebär särskilda momsregler som inte ingår i tjänsten.</p>
             </>
           )}
