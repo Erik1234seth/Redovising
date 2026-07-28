@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, formatAmount } from '../openai-client';
 import { ENKLA_BOKSLUT_CONTEXT } from '../service-context';
-import { retrieveKnowledge } from '../retrieve';
+import { retrieveKnowledge, retrieveExamples } from '../retrieve';
 
 const MOMS_PERIOD_TEXT: Record<string, string> = {
   monthly: 'månadsvis',
@@ -89,25 +89,35 @@ export async function handleGeneralQuestion(params: {
 }): Promise<{ action: string; replyBody: string }> {
   const { supabase, profile, subject, body, emailHistory } = params;
 
-  // Hämta relevanta utdrag ur indexerade dokument (t.ex. K1-vägledningen)
-  // samt kontext om avsändaren (kontouppgifter + transaktioner).
-  const [knowledge, senderContext] = await Promise.all([
-    retrieveKnowledge({ supabase, query: `${subject}\n${body}`.trim() }),
+  // Hämta relevanta utdrag ur indexerade dokument (t.ex. K1-vägledningen),
+  // tidigare mailsvar med liknande fråga (mailbanken, som stilförebild) samt
+  // kontext om avsändaren (kontouppgifter + transaktioner).
+  const query = `${subject}\n${body}`.trim();
+  const [knowledge, examples, senderContext] = await Promise.all([
+    retrieveKnowledge({ supabase, query }),
+    retrieveExamples({ supabase, query }),
     buildSenderContext(supabase, profile.id),
   ]);
 
-  const systemPrompt = `${ENKLA_BOKSLUT_CONTEXT}${senderContext}${knowledge}
+  const systemPrompt = `${ENKLA_BOKSLUT_CONTEXT}${senderContext}${knowledge}${examples}
 
-Du är en varm, personlig och hjälpsam bokföringsassistent för Enkla Bokslut. Skriv som en trevlig, engagerad rådgivare — inte som en robot. Var genuint tillmötesgående, visa att du bryr dig om kundens situation och gör kunden trygg.
+Du ÄR Erik på Enkla Bokslut och skriver mejlet själv. Skriv som en vanlig människa skriver ett mejl till en kund: vänligt, avslappnat och rakt på sak. Inte som en assistent, inte som en säljare, inte som en robot.
 
-Regler:
+Regler för innehållet:
 - Svara alltid på svenska
-- Skriv i en varm, vänlig och personlig ton
-- Använd ALDRIG emojis eller symboltecken — bara vanlig text
-- Inled med en naturlig, vänlig hälsning med kundens förnamn, t.ex. "Hej Danne,". Kundens namn finns under OM AVSÄNDAREN. Saknas namn, skriv bara "Hej,".
-- Ta den tid och plats du behöver för att förklara ordentligt — svara fullständigt och pedagogiskt, ingen längdgräns
+- Håll det kort. Svara på det kunden faktiskt frågade och sluta där. Oftast räcker två till fyra korta stycken.
+- Förklara ordentligt när frågan kräver det, men skippa bakgrund, upprepningar och sådant kunden inte frågat om
+- Inga inledande artighetsfraser som "Tack för din fråga" och ingen sammanfattning på slutet
+- Inled med en naturlig hälsning med kundens förnamn, t.ex. "Hej Danne," Kundens namn finns under OM AVSÄNDAREN. Saknas namn, skriv bara "Hej,"
 - Om kunden vill beställa, bli kund eller komma igång: hänvisa till https://www.enklabokslut.se/ (INTE boka-mötes-sidan)
-- Avsluta INTE med någon signatur (t.ex. "// Enkla Bokslut" eller "Mvh") — det sköts separat`;
+- Avsluta INTE med någon signatur (t.ex. "// Enkla Bokslut" eller "Mvh"), det sköts separat
+
+Regler för tecken. Mejlet skickas som ren text, så använd BARA vanliga tecken:
+- Inga emojis och inga symboltecken
+- Inget tankstreck och inget långt bindestreck. Skriv om meningen eller använd komma, punkt eller vanligt bindestreck.
+- Inga typografiska citattecken, bara vanliga raka
+- Ingen markdown. Ingen fetstil med stjärnor, inga rubriker med brädgård.
+- Behöver du en punktlista, använd vanligt bindestreck och mellanslag först på raden. Använd inga andra listtecken.`;
 
   const userContent = emailHistory
     ? `Mailkonversation:\n\n${emailHistory}`

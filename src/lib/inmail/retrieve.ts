@@ -71,3 +71,79 @@ Använd utdragen nedan om de är relevanta för frågan. Är de inte relevanta �
 
 ${excerpts}`;
 }
+
+interface ExampleMatch {
+  subject: string | null;
+  question: string;
+  answer: string;
+  sent_at: string | null;
+  similarity: number;
+}
+
+/**
+ * Hämtar tidigare mailkonversationer där Erik svarat på en liknande fråga, som
+ * stilförebild för det nya svaret. Söker på FRÅGAN (så embeddas de vid import),
+ * eftersom det är en fråga som kommer in.
+ *
+ * Exemplen är stilförebilder, inte facit: gamla svar kan innehålla priser och
+ * rutiner som ändrats, och uppgifter som hör till en annan kund. Det står
+ * uttryckligen i blocket nedan.
+ *
+ * Returnerar tom sträng om inget hittas eller vid fel — mailflödet ska aldrig
+ * krascha på grund av mailbanken.
+ */
+export async function retrieveExamples(params: {
+  supabase: SupabaseClient;
+  query: string;
+  matchCount?: number;
+  threshold?: number;
+}): Promise<string> {
+  const { supabase, query, matchCount = 3, threshold = 0.35 } = params;
+
+  if (!query.trim()) return '';
+
+  const embedding = await embedQuery(query);
+  if (!embedding) return '';
+
+  const { data, error } = await supabase.rpc('match_inmail_examples', {
+    query_embedding: embedding,
+    match_count: matchCount,
+    similarity_threshold: threshold,
+  });
+
+  if (error) {
+    console.error('[inmail] match_inmail_examples fel:', error.message);
+    return '';
+  }
+
+  const matches = (data ?? []) as ExampleMatch[];
+  if (matches.length === 0) return '';
+
+  const examples = matches
+    .map((m, i) => {
+      const datum = m.sent_at ? m.sent_at.slice(0, 10) : 'okänt datum';
+      return `[Exempel ${i + 1} — ${datum}]
+Kunden skrev:
+${m.question.slice(0, 1200)}
+
+Så här svarade Erik:
+${m.answer.slice(0, 2000)}`;
+    })
+    .join('\n\n');
+
+  return `\n\nTIDIGARE SVAR PÅ LIKNANDE FRÅGOR (Eriks egna mail till andra kunder):
+Exemplen nedan finns här av ett enda skäl: så att du ska låta som Erik. Härma
+tonfall, meningsbyggnad, hur långt han skriver och hur han lägger upp ett svar.
+
+Men läs dem som stilprov, aldrig som facit:
+- Kopiera ALDRIG konkreta uppgifter ur ett exempel. Namn, belopp, datum, org.nr,
+  personnummer och företagsnamn där tillhör en ANNAN kund och får inte förekomma
+  i ditt svar. Kundens egna uppgifter finns under OM AVSÄNDAREN.
+- Nämn aldrig att tidigare mail eller andra kunder finns.
+- Priser, rutiner och regler kan ha ändrats sedan dess. Sakuppgifter tar du från
+  kontexten om tjänsten och regelverket, inte härifrån.
+- Handlar exemplen egentligen om något annat än det kunden frågar om, strunta i
+  dem och svara ändå i samma ton.
+
+${examples}`;
+}

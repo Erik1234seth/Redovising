@@ -94,6 +94,98 @@ function handleReply(config, thread, senderEmail, threadId, messageId, subject, 
   }
 }
 
+// ─── Mailbank: exportera tidigare svar ────────────────────────────────────────
+// Går igenom Skickat, parar ihop kundens mail med ditt svar och skickar upp
+// paren så AI:n kan härma din ton. Utkast räknas inte — bara mail du faktiskt
+// skickat, alltså sådant du stått bakom.
+//
+// Körs manuellt i script-editorn. Tar 50 trådar per körning och sparar var den
+// slutade i EXPORT_OFFSET, så kör den om och om igen tills den säger KLART
+// (Apps Script bryter efter 6 minuter, därför portionerna).
+//
+// Vill du börja om från början: kör resetExport() först.
+
+var EXPORT_QUERY = 'in:sent newer_than:2y';
+var EXPORT_THREADS_PER_RUN = 50;
+var EXPORT_BATCH_SIZE = 20;
+
+function exportSentEmails() {
+  const config = getConfig();
+  const props = PropertiesService.getScriptProperties();
+  const offset = Number(props.getProperty('EXPORT_OFFSET') || 0);
+  const myEmail = Session.getActiveUser().getEmail().toLowerCase();
+
+  const threads = GmailApp.search(EXPORT_QUERY, offset, EXPORT_THREADS_PER_RUN);
+
+  if (threads.length === 0) {
+    console.log('KLART. Inga fler trådar. Totalt genomgånget: ' + offset);
+    return;
+  }
+
+  let examples = [];
+  let imported = 0;
+  let skipped = 0;
+
+  for (const thread of threads) {
+    const messages = thread.getMessages();
+
+    for (let i = 1; i < messages.length; i++) {
+      const reply = messages[i];
+      const prev = messages[i - 1];
+
+      const replyFrom = extractEmail(reply.getFrom());
+      const prevFrom = extractEmail(prev.getFrom());
+
+      // Vi vill ha: kunden skrev → du svarade
+      if (replyFrom !== myEmail) continue;
+      if (prevFrom === myEmail) continue;
+      if (prevFrom.indexOf('noreply@') === 0) continue;
+
+      examples.push({
+        messageId: reply.getId(),
+        gmailThreadId: thread.getId(),
+        subject: reply.getSubject() || '',
+        question: prev.getPlainBody() || '',
+        answer: reply.getPlainBody() || '',
+        sentAt: reply.getDate().toISOString(),
+      });
+
+      if (examples.length >= EXPORT_BATCH_SIZE) {
+        const res = postExamples(config, examples);
+        imported += res.imported;
+        skipped += res.skipped;
+        examples = [];
+      }
+    }
+  }
+
+  if (examples.length > 0) {
+    const res = postExamples(config, examples);
+    imported += res.imported;
+    skipped += res.skipped;
+  }
+
+  const newOffset = offset + threads.length;
+  props.setProperty('EXPORT_OFFSET', String(newOffset));
+
+  console.log(
+    'Gick igenom trådar ' + offset + '-' + newOffset + '. ' +
+    'Sparade ' + imported + ' exempel, hoppade över ' + skipped + '. ' +
+    'Kör exportSentEmails() igen för nästa portion.'
+  );
+}
+
+function resetExport() {
+  PropertiesService.getScriptProperties().deleteProperty('EXPORT_OFFSET');
+  console.log('Nollställt. Nästa exportSentEmails() börjar om från första tråden.');
+}
+
+function postExamples(config, examples) {
+  const res = callApi(config, '/api/inmail/examples/import', { examples: examples });
+  if (!res) return { imported: 0, skipped: examples.length };
+  return { imported: res.imported || 0, skipped: res.skipped || 0 };
+}
+
 // ─── Web App trigger (för testning via terminal) ──────────────────────────────
 
 function doGet(e) {
