@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { callOpenAI, parseJSON, formatAmount } from '../openai-client';
+import { callOpenAI, parseJSON } from '../openai-client';
 
 interface ReceiptAnalysis {
   vad: string;
@@ -93,14 +93,13 @@ export async function handleNewTransaction(params: {
   gmailThreadId: string;
   messageId: string;
   attachments: Array<{ base64: string; mimeType: string; name: string }>;
-}): Promise<{ action: string; replyBody: string }> {
+}): Promise<{ action: string; replyBody?: string }> {
   const { supabase, profile, gmailThreadId, messageId, attachments } = params;
 
   if (!attachments.length) {
-    return {
-      action: 'no_attachment',
-      replyBody: `Hej${profile.full_name ? ' ' + profile.full_name.split(' ')[0] : ''}!\n\nVi fick ditt mejl men kunde inte hitta något kvitto eller faktura bifogat.\n\nBifoga gärna kvittot som PDF, JPG eller PNG så bokför vi det direkt.\n\n// Enkla Bokslut`,
-    };
+    // TILLFÄLLIGT tystad — se noteringen längst ned i funktionen.
+    // replyBody: `Hej${profile.full_name ? ' ' + profile.full_name.split(' ')[0] : ''}!\n\nVi fick ditt mejl men kunde inte hitta något kvitto eller faktura bifogat.\n\nBifoga gärna kvittot som PDF, JPG eller PNG så bokför vi det direkt.\n\n// Enkla Bokslut`
+    return { action: 'no_attachment' };
   }
 
   const results: Array<{ analysis: ReceiptAnalysis; transactionId: string }> = [];
@@ -137,10 +136,9 @@ export async function handleNewTransaction(params: {
   }
 
   if (!results.length) {
-    return {
-      action: 'analysis_failed',
-      replyBody: `Hej${profile.full_name ? ' ' + profile.full_name.split(' ')[0] : ''}!\n\nVi kunde tyvärr inte tolka ${attachments.length > 1 ? 'bilagorna' : 'bilagan'}. Kontrollera att filen är ett tydligt kvitto eller en faktura och skicka gärna igen.\n\n// Enkla Bokslut`,
-    };
+    // TILLFÄLLIGT tystad — se noteringen längst ned i funktionen.
+    // replyBody: `Hej${profile.full_name ? ' ' + profile.full_name.split(' ')[0] : ''}!\n\nVi kunde tyvärr inte tolka ${attachments.length > 1 ? 'bilagorna' : 'bilagan'}. Kontrollera att filen är ett tydligt kvitto eller en faktura och skicka gärna igen.\n\n// Enkla Bokslut`
+    return { action: 'analysis_failed' };
   }
 
   await supabase.from('email_threads').upsert({
@@ -151,13 +149,17 @@ export async function handleNewTransaction(params: {
     state: null,
   }, { onConflict: 'gmail_thread_id' });
 
-  const firstName = profile.full_name ? ' ' + profile.full_name.split(' ')[0] : '';
-  const lines = results.map((r, i) => {
-    const a = r.analysis;
-    return `${i + 1}. ${a.avsandare || 'Okänd'} — ${formatAmount(a.belopp)}\n   Vad: ${a.vad} · Datum: ${a.datum ?? 'okänt'} · Moms: ${formatAmount(a.moms)} · Betalat: ${a.betalningssatt ?? 'okänt'}`;
-  });
+  // TILLFÄLLIGT: den här handlern mejlar inte tillbaka något alls — varken vår
+  // tolkning av kvittot eller felmeddelandena ovan. Transaktionen analyseras och
+  // sparas som vanligt, bara svarsutkasten är avstängda.
+  // Sätt tillbaka replyBody här och i de två returerna ovan för att slå på igen.
+  //
+  // const firstName = profile.full_name ? ' ' + profile.full_name.split(' ')[0] : '';
+  // const lines = results.map((r, i) => {
+  //   const a = r.analysis;
+  //   return `${i + 1}. ${a.avsandare || 'Okänd'} — ${formatAmount(a.belopp)}\n   Vad: ${a.vad} · Datum: ${a.datum ?? 'okänt'} · Moms: ${formatAmount(a.moms)} · Betalat: ${a.betalningssatt ?? 'okänt'}`;
+  // });
+  // const replyBody = `Hej${firstName}!\n\nVi har bokfört ditt${results.length > 1 ? ` ${results.length} kvitton` : ' kvitto'}:\n\n${lines.join('\n\n')}\n\nStämmer det? Svara på det här mejlet om något behöver ändras.\n\n// Enkla Bokslut`;
 
-  const replyBody = `Hej${firstName}!\n\nVi har bokfört ditt${results.length > 1 ? ` ${results.length} kvitton` : ' kvitto'}:\n\n${lines.join('\n\n')}\n\nStämmer det? Svara på det här mejlet om något behöver ändras.\n\n// Enkla Bokslut`;
-
-  return { action: 'ok', replyBody };
+  return { action: 'ok' };
 }
