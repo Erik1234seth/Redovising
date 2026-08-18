@@ -10,6 +10,7 @@ const NAV = [
   { href: '/admin', label: 'Översikt', exact: true },
   { href: '/admin/bestallningar', label: 'Beställningar' },
   { href: '/admin/inmail', label: 'Inmail' },
+  { href: '/admin/sms', label: 'SMS' },
   { href: '/admin/funnel', label: 'Funnel' },
   { href: '/admin/qr', label: 'QR-koder' },
   { href: '/admin/ab', label: 'A/B' },

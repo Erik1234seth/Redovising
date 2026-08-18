@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, formatAmount } from '../openai-client';
 import { ENKLA_BOKSLUT_CONTEXT } from '../service-context';
-import { retrieveKnowledge, retrieveExamples } from '../retrieve';
+import { retrieveKnowledge, retrieveExamples, embedQuery } from '../retrieve';
 
 const MOMS_PERIOD_TEXT: Record<string, string> = {
   monthly: 'månadsvis',
@@ -92,10 +92,12 @@ export async function handleGeneralQuestion(params: {
   // Hämta relevanta utdrag ur indexerade dokument (t.ex. K1-vägledningen),
   // tidigare mailsvar med liknande fråga (mailbanken, som stilförebild) samt
   // kontext om avsändaren (kontouppgifter + transaktioner).
+  // Frågan embeddas en gång och återanvänds för båda sökningarna.
   const query = `${subject}\n${body}`.trim();
+  const queryEmbedding = query ? await embedQuery(query) : null;
   const [knowledge, examples, senderContext] = await Promise.all([
-    retrieveKnowledge({ supabase, query }),
-    retrieveExamples({ supabase, query }),
+    retrieveKnowledge({ supabase, query, queryEmbedding }),
+    retrieveExamples({ supabase, query, queryEmbedding }),
     buildSenderContext(supabase, profile.id),
   ]);
 

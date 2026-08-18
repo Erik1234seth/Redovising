@@ -2,7 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 
 const EMBED_MODEL = 'text-embedding-3-small';
 
-async function embedQuery(text: string): Promise<number[] | null> {
+export async function embedQuery(text: string): Promise<number[] | null> {
   try {
     const res = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
@@ -40,12 +40,15 @@ export async function retrieveKnowledge(params: {
   query: string;
   matchCount?: number;
   threshold?: number;
+  /** Färdig embedding av query, så anropare som gör flera sökningar på samma
+   *  fråga slipper betala för att embedda den en gång per sökning. */
+  queryEmbedding?: number[] | null;
 }): Promise<string> {
   const { supabase, query, matchCount = 5, threshold = 0.3 } = params;
 
   if (!query.trim()) return '';
 
-  const embedding = await embedQuery(query);
+  const embedding = params.queryEmbedding ?? (await embedQuery(query));
   if (!embedding) return '';
 
   const { data, error } = await supabase.rpc('match_inmail_knowledge', {
@@ -97,12 +100,14 @@ export async function retrieveExamples(params: {
   query: string;
   matchCount?: number;
   threshold?: number;
+  /** Se retrieveKnowledge — samma embedding kan återanvändas här. */
+  queryEmbedding?: number[] | null;
 }): Promise<string> {
   const { supabase, query, matchCount = 3, threshold = 0.35 } = params;
 
   if (!query.trim()) return '';
 
-  const embedding = await embedQuery(query);
+  const embedding = params.queryEmbedding ?? (await embedQuery(query));
   if (!embedding) return '';
 
   const { data, error } = await supabase.rpc('match_inmail_examples', {
