@@ -41,35 +41,18 @@ export interface LeadResult {
 }
 
 /**
- * Förnamnet hämtas ur ett namn som personen skrivit i sin Facebook-profil, så
- * det kan innehålla emoji och annat som gör SMS:et dubbelt så dyrt. Hellre
- * hälsa utan namn än att skicka skräptecken.
+ * Välkomstmeddelandet, ordagrant som Erik vill ha det. Ligger på 170 tecken och
+ * går alltså som två segment — under 160 hade räckt med ett, men signaturen är
+ * värd skillnaden. Å, Ä och Ö är gratis i SMS; emoji och tankstreck är det inte.
  */
-function firstName(raw: string | null | undefined): string {
-  if (!raw) return '';
-  const first = raw.trim().split(/\s+/)[0] ?? '';
-  const clean = first.replace(/[^\p{L}\p{M}'-]/gu, '');
-  if (clean.length < 2 || clean.length > 20) return '';
-  return clean.charAt(0).toUpperCase() + clean.slice(1);
-}
+export const WELCOME_SMS =
+  'Hej! Erik på EnklaBokslut här. Vi har precis skickat ett mejl till dig. ' +
+  'Kika gärna i inkorgen och även skräpposten om du inte hittar det.\n\n' +
+  'Hälsningar\nErik på EnklaBokslut';
 
 /**
- * Välkomstmeddelandet. Håll det under 160 tecken — då går det som ett segment.
- * Å, Ä och Ö är gratis i SMS; emoji och tankstreck halverar utrymmet.
- */
-export function buildWelcomeSms(name: string | null | undefined): string {
-  const first = firstName(name);
-  const greeting = first ? `Hej ${first}!` : 'Hej!';
-  return (
-    `${greeting} Enkla Bokslut här. Tack för att du hörde av dig via Facebook. ` +
-    'Har du en fråga om bokslut eller deklaration? Svara på det här SMS:et. STOPP avslutar.'
-  );
-}
-
-/**
- * Tar emot ett lead: sparar det, och skickar välkomst-SMS:et om numret finns,
- * personen inte avregistrerat sig och klockan tillåter. Nattetid köas det
- * istället och skickas av cronjobbet på morgonen.
+ * Tar emot ett lead: sparar det, och skickar välkomst-SMS:et om numret finns
+ * och personen inte avregistrerat sig.
  */
 export async function handleNewLead(
   supabase: SupabaseClient,
@@ -137,7 +120,7 @@ export async function handleNewLead(
     return { outcome: 'optout', phone };
   }
 
-  const body = buildWelcomeSms(lead.name);
+  const body = WELCOME_SMS;
 
   try {
     const sid = await sendSms({ to: phone, body });
