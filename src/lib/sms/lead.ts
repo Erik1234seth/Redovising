@@ -7,11 +7,10 @@ import { sendSms } from './twilio';
  * från vårt Twilio-nummer. Meddelandet är en fast mall och inte AI-genererat —
  * första intrycket ska vara förutsägbart. Svarar personen tar `/api/sms` över
  * och AI:n sköter samtalet därifrån, med utskicket nedan som historik.
+ *
+ * SMS:et går ut direkt, dygnet runt. Ett lead är som varmast de första
+ * minuterna, och det vägde tyngre än att undvika enstaka nattliga utskick.
  */
-
-/** Skickas inte mitt i natten. Lokala timmar i Sverige, gränserna inklusive/exklusive. */
-const SEND_FROM_HOUR = 8;
-const SEND_UNTIL_HOUR = 21;
 
 /** Markerar raden i sms_messages som ett lead-utskick, inte ett AI-svar. */
 const WELCOME_KIND = 'lead_welcome';
@@ -30,7 +29,6 @@ export interface IncomingLead {
 
 export type LeadOutcome =
   | 'sent'
-  | 'queued'
   | 'duplicate'
   | 'no_phone'
   | 'optout'
@@ -40,18 +38,6 @@ export interface LeadResult {
   outcome: LeadOutcome;
   phone: string | null;
   error?: string;
-}
-
-/** Är klockan utanför utskicksfönstret i svensk tid just nu? */
-export function isQuietHours(now: Date = new Date()): boolean {
-  const hour = Number(
-    new Intl.DateTimeFormat('sv-SE', {
-      timeZone: 'Europe/Stockholm',
-      hour: '2-digit',
-      hourCycle: 'h23',
-    }).format(now),
-  );
-  return hour < SEND_FROM_HOUR || hour >= SEND_UNTIL_HOUR;
 }
 
 /**
@@ -152,18 +138,6 @@ export async function handleNewLead(
   }
 
   const body = buildWelcomeSms(lead.name);
-
-  if (isQuietHours()) {
-    await supabase.from('sms_messages').insert({
-      phone,
-      direction: 'out',
-      body,
-      kind: WELCOME_KIND,
-      status: 'queued',
-    });
-    console.log(`[lead] ${phone} köat till morgonen`);
-    return { outcome: 'queued', phone };
-  }
 
   try {
     const sid = await sendSms({ to: phone, body });

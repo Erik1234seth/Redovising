@@ -169,7 +169,7 @@ export default function SmsPage() {
                         <span className="text-warm-600 text-[11px] px-1">
                           {new Date(m.created_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}
                           {m.status === 'rate_limited' && ' · stoppad av spärren'}
-                          {m.status === 'queued' && ' · köat, skickas i morgon bitti'}
+                          {m.status === 'queued' && ' · köat, inte skickat än'}
                           {m.status === 'skipped' && ' · avregistrerad innan utskick'}
                           {out && m.body.length > 160 && ` · ${Math.ceil(m.body.length / 153)} segment`}
                         </span>

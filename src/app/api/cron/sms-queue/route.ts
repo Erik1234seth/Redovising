@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendSms } from '@/lib/sms/twilio';
-import { isQuietHours } from '@/lib/sms/lead';
 
 /**
- * Skickar välkomst-SMS som köats över natten. Körs av Vercel Cron enligt
- * schemat i vercel.json (07:00 UTC = 08 på vintern, 09 på sommaren).
+ * Skyddsnät: skickar välkomst-SMS som blivit liggande med status 'queued'.
+ *
+ * Sedan nattspärren togs bort går lead-SMS ut direkt och inget nytt hamnar
+ * här, så jobbet har normalt ingenting att göra. Det finns kvar för att tömma
+ * det som redan låg i kön, och som utgång om ett utskick behöver skjutas upp.
+ * Körs av Vercel Cron enligt schemat i vercel.json.
  *
  * Vercel skickar `Authorization: Bearer $CRON_SECRET` när CRON_SECRET finns
  * bland miljövariablerna. Utan den kan vem som helst trigga körningen.
@@ -19,11 +22,6 @@ export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (secret && request.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Obehörig' }, { status: 401 });
-  }
-
-  // Skyddsnät: körs jobbet manuellt mitt i natten ska köade SMS ändå ligga kvar
-  if (isQuietHours()) {
-    return NextResponse.json({ skipped: 'utanför utskicksfönstret' });
   }
 
   const supabase = createClient(
