@@ -1,4 +1,5 @@
 import type { IncomingLead } from './lead';
+import { normalizePhone } from './phone';
 
 /**
  * Zapier skickar leadet med de fältnamn som råkar stå i Facebook-formuläret,
@@ -15,6 +16,7 @@ const FIELDS = {
   firstName: ['firstname', 'fornamn'],
   lastName: ['lastname', 'efternamn'],
   externalId: ['leadgenid', 'leadid', 'id'],
+  createdTime: ['createdtime', 'createdat', 'created', 'timestamp', 'skapad'],
   formName: ['formname', 'form', 'formularnamn', 'campaignname', 'adname'],
 } as const;
 
@@ -72,6 +74,19 @@ function pick(fields: Map<string, string>, candidates: readonly string[]): strin
   return null;
 }
 
+/**
+ * Zapiers fältmeny saknar ibland leadets id. Då byggs ett eget av tidpunkten
+ * leadet skapades plus telefonnumret: kombinationen är unik per lead, och —
+ * det viktiga — oförändrad om Zapen körs om, vilket är precis vad dedupen
+ * behöver. Saknas även tidpunkten får dygnsregeln i handleNewLead ta över.
+ */
+function syntheticId(fields: Map<string, string>, phone: string | null): string | null {
+  const created = pick(fields, FIELDS.createdTime);
+  const normalized = normalizePhone(phone);
+  if (!created || !normalized) return null;
+  return `fb:${created}:${normalized}`;
+}
+
 /** Tolkar en inkommande payload som ett lead. Returnerar även nycklarna, så att
  *  ett formulär med oväntade fältnamn går att felsöka ur svaret. */
 export function mapLeadPayload(payload: unknown): { lead: IncomingLead; keys: string[] } {
@@ -79,13 +94,14 @@ export function mapLeadPayload(payload: unknown): { lead: IncomingLead; keys: st
   const splitName = [pick(fields, FIELDS.firstName), pick(fields, FIELDS.lastName)]
     .filter(Boolean)
     .join(' ');
+  const phone = pick(fields, FIELDS.phone);
 
   return {
     lead: {
-      externalId: pick(fields, FIELDS.externalId),
+      externalId: pick(fields, FIELDS.externalId) ?? syntheticId(fields, phone),
       name: pick(fields, FIELDS.name) ?? (splitName || null),
       email: pick(fields, FIELDS.email),
-      phone: pick(fields, FIELDS.phone),
+      phone,
       formName: pick(fields, FIELDS.formName),
       ref: 'facebook',
     },
