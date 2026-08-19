@@ -148,6 +148,7 @@ export default function SmsPage() {
                 {active.messages.map((m) => {
                   const out = m.direction === 'out';
                   const broken = m.status === 'failed' || m.status === 'rate_limited';
+                  const waiting = m.status === 'queued';
                   return (
                     <div key={m.id} className={`flex ${out ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[80%] ${out ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
@@ -155,9 +156,11 @@ export default function SmsPage() {
                           className={`px-4 py-2.5 rounded-2xl text-sm whitespace-pre-wrap break-words ${
                             broken
                               ? 'bg-red-500/15 text-red-300 border border-red-500/30'
-                              : out
-                                ? 'bg-gold-500 text-navy-900 rounded-br-sm'
-                                : 'bg-navy-600 text-warm-100 rounded-bl-sm'
+                              : waiting
+                                ? 'bg-gold-500/20 text-gold-300 border border-gold-500/40 rounded-br-sm'
+                                : out
+                                  ? 'bg-gold-500 text-navy-900 rounded-br-sm'
+                                  : 'bg-navy-600 text-warm-100 rounded-bl-sm'
                           }`}
                         >
                           {m.body}
@@ -166,6 +169,8 @@ export default function SmsPage() {
                         <span className="text-warm-600 text-[11px] px-1">
                           {new Date(m.created_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}
                           {m.status === 'rate_limited' && ' · stoppad av spärren'}
+                          {m.status === 'queued' && ' · köat, skickas i morgon bitti'}
+                          {m.status === 'skipped' && ' · avregistrerad innan utskick'}
                           {out && m.body.length > 160 && ` · ${Math.ceil(m.body.length / 153)} segment`}
                         </span>
                       </div>
