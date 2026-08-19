@@ -13,6 +13,9 @@ import { sendSms } from './twilio';
 const SEND_FROM_HOUR = 8;
 const SEND_UNTIL_HOUR = 21;
 
+/** Markerar raden i sms_messages som ett lead-utskick, inte ett AI-svar. */
+const WELCOME_KIND = 'lead_welcome';
+
 export interface IncomingLead {
   /** Leadets id hos källan. Finns det används det för att stoppa dubbletter. */
   externalId?: string | null;
@@ -118,7 +121,9 @@ export async function handleNewLead(
   }
 
   // Reserv när leadet saknar id att haka upp dedupen på: har numret redan fått
-  // ett välkomst-SMS det senaste dygnet är det samma person igen.
+  // ett välkomst-SMS det senaste dygnet är det samma person igen. Filtret på
+  // kind är viktigt — utan det räknas AI:ns svar i en pågående dialog som ett
+  // tidigare utskick, och den som just chattat med oss får aldrig sitt lead-SMS.
   if (!lead.externalId) {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { count } = await supabase
@@ -126,6 +131,7 @@ export async function handleNewLead(
       .select('id', { count: 'exact', head: true })
       .eq('phone', phone)
       .eq('direction', 'out')
+      .eq('kind', WELCOME_KIND)
       .in('status', ['sent', 'queued'])
       .gte('created_at', since);
     if ((count ?? 0) > 0) {
@@ -152,6 +158,7 @@ export async function handleNewLead(
       phone,
       direction: 'out',
       body,
+      kind: WELCOME_KIND,
       status: 'queued',
     });
     console.log(`[lead] ${phone} köat till morgonen`);
@@ -164,6 +171,7 @@ export async function handleNewLead(
       phone,
       direction: 'out',
       body,
+      kind: WELCOME_KIND,
       twilio_sid: sid,
       status: 'sent',
     });
@@ -176,6 +184,7 @@ export async function handleNewLead(
       phone,
       direction: 'out',
       body,
+      kind: WELCOME_KIND,
       status: 'failed',
       error: message,
     });
