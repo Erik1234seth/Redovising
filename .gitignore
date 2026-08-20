@@ -43,6 +43,13 @@ next-env.d.ts
 
 # känsliga filer
 kontoutdrag/
+ai-test/underlag/*
+!ai-test/underlag/.gitkeep
+ai-test/resultat/
+# interna underlag — public/ serveras öppet, så inget härifrån ska committas
+public/*.xlsx
+public/*.xls
+public/*.csv
 .mcp.json
 .claude/mcp.json
 .claude/settings.local.json

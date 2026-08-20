@@ -1,0 +1,32 @@
+#FLAGGA 0
+#PROGRAM "Bokio" "1.0"
+#FORMAT PC8
+#GEN 20260315
+#SIETYP 4
+#ORGNR 556677-8899
+#FNAMN "Testbolaget èkeri AB"
+#RAR 0 20250101 20251231
+#KONTO 1930 "Fîretagskonto"
+#KONTO 2611 "UtgÜende moms 25%"
+#KONTO 2641 "IngÜende moms"
+#KONTO 3001 "FîrsÑljning tjÑnster"
+#KONTO 5400 "Fîrbrukningsinventarier"
+#DIM 1 "KostnadsstÑlle"
+#IB 0 1930 50000.00
+#VER "A" "1" 20250115 "Kundfaktura 101" 20250116
+{
+#TRANS 1930 {} 12500.00 20250115 "Betalning frÜn kund"
+#TRANS 3001 {} -10000.00
+#TRANS 2611 {} -2500.00
+}
+#VER "A" "2" 20250120 "Inkîp kontorsmaterial"
+{
+#TRANS 5400 {1 "100"} 1000.00 20250120 "Skrivbord"
+#TRANS 2641 {} 250.00
+#TRANS 1930 {} -1250.00
+}
+#VER "B" "1" 20250131 "Skev verifikation"
+{
+#TRANS 1930 {} 500.00
+#TRANS 3001 {} -400.00
+}

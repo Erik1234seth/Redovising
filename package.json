@@ -8,7 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "index-knowledge": "node --env-file=.env.local scripts/index-knowledge.mjs"
+    "index-knowledge": "node --env-file=.env.local scripts/index-knowledge.mjs",
+    "ai-test": "node --env-file=.env.local ai-test/run.mjs",
+    "index-basdokument": "node --env-file=.env.local ai-test/index-basdokument.mjs"
   },
   "keywords": [],
   "author": "",
