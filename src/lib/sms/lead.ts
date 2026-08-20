@@ -152,7 +152,7 @@ export async function handleNewLead(
   // ordningen är den enda som gör påståendet sant.
   let emailed = false;
   if (lead.email) {
-    const { subject, html } = leadWelcomeEmail({ name: lead.name, phone: lead.phone });
+    const { subject, html } = leadWelcomeEmail();
     emailed = await sendViaGmail({ to: lead.email, subject, html, kind: WELCOME_EMAIL_KIND });
   }
 
