@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { sendAndLog } from './email-log';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -106,12 +107,12 @@ export async function sendWelcomeEmails(params: {
         <p><strong>Kontaktmetod:</strong> ${contactMethod === 'meeting' ? 'Möte' : 'Mail'}</p>
       `,
     }),
-    resend.emails.send({
+    sendAndLog(resend, {
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
       replyTo: 'erik@enklabokslut.se',
       to: email,
       subject: 'Välkommen till Enkla Bokslut!',
       html: customerHtml,
-    }),
+    }, 'valkommen'),
   ]);
 }

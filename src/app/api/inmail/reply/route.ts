@@ -6,6 +6,7 @@ import { handleEditTransaction } from '@/lib/inmail/handlers/edit-transaction';
 import { handleDeleteRequest, handleDeleteConfirm, handleDeleteCancel } from '@/lib/inmail/handlers/delete-transaction';
 import { handleViewTransactions } from '@/lib/inmail/handlers/view-transactions';
 import { handleGeneralQuestion } from '@/lib/inmail/handlers/general-question';
+import { handleUnknownUser } from '@/lib/inmail/handlers/unknown-user';
 
 function getSupabase() {
   return createClient(
@@ -50,8 +51,23 @@ export async function POST(request: Request) {
       .eq('email', senderEmail)
       .single();
 
+    // Okänd avsändare i en tråd är inte samma sak som ingen avsändare. Sedan
+    // välkomstmejlet till nya leads går från vår Gmail börjar varje sådan
+    // konversation med ett meddelande från oss, så leadets första svar räknas
+    // som ett svar och hamnar här — utan profil. Förr tystnade AI:n då.
+    // Prospektflödet klarar situationen; det är samma som ett förstagångsmejl,
+    // fast med historik.
     if (!profile) {
-      return NextResponse.json({ action: 'no_user' });
+      console.log(`[inmail/reply] ${senderEmail} saknar konto — hanteras som prospekt`);
+      return NextResponse.json(await handleUnknownUser({
+        supabase,
+        senderEmail,
+        subject,
+        body: emailBody,
+        gmailThreadId,
+        messageId,
+        emailHistory,
+      }));
     }
 
     const { data: thread } = await supabase

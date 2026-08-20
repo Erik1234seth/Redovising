@@ -2,19 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 
 const ADMIN_CODE = 'Erik0511';
-
-const NAV = [
-  { href: '/admin', label: 'Översikt', exact: true },
-  { href: '/admin/bestallningar', label: 'Beställningar' },
-  { href: '/admin/inmail', label: 'Inmail' },
-  { href: '/admin/sms', label: 'SMS' },
-  { href: '/admin/funnel', label: 'Funnel' },
-  { href: '/admin/qr', label: 'QR-koder' },
-  { href: '/admin/ab', label: 'A/B' },
-];
 
 function CodeGate({ onUnlock }: { onUnlock: () => void }) {
   const [code, setCode] = useState('');
@@ -58,7 +47,6 @@ function CodeGate({ onUnlock }: { onUnlock: () => void }) {
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const [unlocked, setUnlocked] = useState(false);
   const [checked, setChecked] = useState(false);
-  const pathname = usePathname();
 
   useEffect(() => {
     if (sessionStorage.getItem('admin_unlocked') === '1') setUnlocked(true);
@@ -70,38 +58,21 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="min-h-screen bg-navy-800">
+      {/* Panelen har bara en vy, så ingen navigering behövs — logotypen leder hem */}
       <nav className="bg-navy-900/80 border-b border-navy-600 sticky top-0 z-40 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center gap-1 h-14">
-            <span className="text-white font-bold text-sm mr-3 shrink-0">Admin</span>
-            <div className="flex items-center gap-1 overflow-x-auto flex-1">
-              {NAV.map(({ href, label, exact }) => {
-                const isActive = exact ? pathname === href : pathname.startsWith(href);
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
-                      isActive ? 'bg-gold-500 text-navy-900' : 'text-warm-300 hover:text-white hover:bg-navy-700'
-                    }`}
-                  >
-                    {label}
-                  </Link>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => { sessionStorage.removeItem('admin_unlocked'); setUnlocked(false); }}
-              className="ml-2 px-3 py-1.5 text-xs text-warm-500 hover:text-warm-300 transition shrink-0"
-            >
-              Logga ut
-            </button>
-          </div>
+        <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-14">
+          <Link href="/admin" className="text-white font-bold text-sm hover:text-gold-500 transition">
+            Admin
+          </Link>
+          <button
+            onClick={() => { sessionStorage.removeItem('admin_unlocked'); setUnlocked(false); }}
+            className="px-3 py-1.5 text-xs text-warm-500 hover:text-warm-300 transition"
+          >
+            Logga ut
+          </button>
         </div>
       </nav>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">{children}</main>
     </div>
   );
 }

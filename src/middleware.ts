@@ -10,6 +10,14 @@ export function middleware(request: NextRequest) {
     hostname === '192.168.68.112:3000' ||
     hostname === '10.5.0.2:3000';
 
+  // Adminpanelen har ett eget skal och ska varken ha marknadsföringsnavigering,
+  // sidfot eller cookieruta ovanpå sig.
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    const adminHeaders = new Headers(request.headers);
+    adminHeaders.set('x-is-admin', 'true');
+    return NextResponse.next({ request: { headers: adminHeaders } });
+  }
+
   if (!isApp) return NextResponse.next();
 
   const url = request.nextUrl.clone();

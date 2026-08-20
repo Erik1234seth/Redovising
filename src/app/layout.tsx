@@ -80,6 +80,8 @@ export default async function RootLayout({
 }>) {
   const headersList = await headers();
   const isApp = headersList.get('x-is-app') === 'true';
+  // Adminpanelen bär sitt eget skal och ska inte ha marknadsföringssidans ramar
+  const bare = isApp || headersList.get('x-is-admin') === 'true';
 
   return (
     <html lang="sv">
@@ -133,12 +135,12 @@ export default async function RootLayout({
       </head>
       <body className={`${inter.variable} ${plusJakarta.variable} ${plusJakarta.className}`}>
         <AuthProvider>
-          {!isApp && <Navigation />}
+          {!bare && <Navigation />}
           <main className="min-h-screen">
             {children}
           </main>
-          {!isApp && <Footer />}
-          {!isApp && <CookieConsent />}
+          {!bare && <Footer />}
+          {!bare && <CookieConsent />}
         </AuthProvider>
       </body>
     </html>

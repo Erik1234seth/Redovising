@@ -1,19 +1,32 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { normalizePhone } from './phone';
 import { sendSms } from './twilio';
+import { sendViaGmail } from '../emails/send-via-gmail';
+import { leadWelcomeEmail } from '../emails/lead-welcome';
 
 /**
- * Nya leads utifrån (Facebooks snabbformulär via Zapier) får ett välkomst-SMS
- * från vårt Twilio-nummer. Meddelandet är en fast mall och inte AI-genererat —
- * första intrycket ska vara förutsägbart. Svarar personen tar `/api/sms` över
- * och AI:n sköter samtalet därifrån, med utskicket nedan som historik.
+ * Nya leads utifrån (Facebooks snabbformulär via Zapier) får två saker: ett
+ * välkomstmejl från Eriks Gmail och ett välkomst-SMS från vårt Twilio-nummer.
+ * Båda är fasta mallar och inte AI-genererade — första intrycket ska vara
+ * förutsägbart. Svarar personen tar AI:n över, på mejl via `/api/inmail` och
+ * på SMS via `/api/sms`, med utskicken nedan som historik.
  *
- * SMS:et går ut direkt, dygnet runt. Ett lead är som varmast de första
- * minuterna, och det vägde tyngre än att undvika enstaka nattliga utskick.
+ * Mejlet gick tidigare från Zapier, vilket gjorde det osynligt för panelen.
+ * Att det numera går via Gmail och inte Resend är avsiktligt: svaret landar då
+ * i inkorgen som mail-AI:n redan bevakar.
+ *
+ * Utskicken går direkt, dygnet runt. Ett lead är som varmast de första
+ * minuterna, och det vägde tyngre än att undvika enstaka nattliga SMS.
  */
 
 /** Markerar raden i sms_messages som ett lead-utskick, inte ett AI-svar. */
 const WELCOME_KIND = 'lead_welcome';
+
+/** Motsvarande märkning för mejlet, i email_log. */
+const WELCOME_EMAIL_KIND = 'lead_valkomst';
+
+/** Hur långt tillbaka dubblettspärren tittar när leadet saknar eget id. */
+const DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export interface IncomingLead {
   /** Leadets id hos källan. Finns det används det för att stoppa dubbletter. */
@@ -37,6 +50,8 @@ export type LeadOutcome =
 export interface LeadResult {
   outcome: LeadOutcome;
   phone: string | null;
+  /** Om välkomstmejlet gick i väg. Utfallet nedan handlar om SMS:et. */
+  emailed: boolean;
   error?: string;
 }
 
@@ -51,8 +66,48 @@ export const WELCOME_SMS =
   'Hälsningar\nErik på EnklaBokslut';
 
 /**
- * Tar emot ett lead: sparar det, och skickar välkomst-SMS:et om numret finns
- * och personen inte avregistrerat sig.
+ * Har vi redan hälsat på den här personen det senaste dygnet? Tittar på båda
+ * kanalerna: numret kan ha fått SMS:et och adressen kan ha fått mejlet, och
+ * ett lead som kommer in två gånger ska inte ge dubbelt av någotdera.
+ */
+async function alreadyWelcomed(
+  supabase: SupabaseClient,
+  phone: string | null,
+  email: string | null | undefined,
+): Promise<boolean> {
+  const since = new Date(Date.now() - DEDUPE_WINDOW_MS).toISOString();
+
+  if (phone) {
+    const { count } = await supabase
+      .from('sms_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('phone', phone)
+      .eq('direction', 'out')
+      .eq('kind', WELCOME_KIND)
+      .in('status', ['sent', 'queued'])
+      .gte('created_at', since);
+    if ((count ?? 0) > 0) return true;
+  }
+
+  if (email) {
+    const { count } = await supabase
+      .from('email_log')
+      .select('id', { count: 'exact', head: true })
+      // eq, inte ilike: understreck är vanligt i mejladresser och skulle
+      // tolkas som jokertecken i ett LIKE-mönster
+      .eq('to_email', email.trim().toLowerCase())
+      .eq('kind', WELCOME_EMAIL_KIND)
+      .eq('status', 'sent')
+      .gte('created_at', since);
+    if ((count ?? 0) > 0) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Tar emot ett lead: sparar det, mejlar välkomsthälsningen och skickar
+ * välkomst-SMS:et om numret finns och personen inte avregistrerat sig.
  */
 export async function handleNewLead(
   supabase: SupabaseClient,
@@ -77,36 +132,33 @@ export async function handleNewLead(
 
     if (error) {
       // 23505 = unique_violation, alltså samma lead en gång till
-      if (error.code === '23505') return { outcome: 'duplicate', phone };
+      if (error.code === '23505') return { outcome: 'duplicate', phone, emailed: false };
       console.error('[lead] kunde inte spara lead:', error.message);
     }
   } else {
     console.warn('[lead] lead utan e-post, sparas inte i contact_requests');
   }
 
-  if (!phone) {
-    console.warn('[lead] lead utan användbart telefonnummer, inget SMS skickas');
-    return { outcome: 'no_phone', phone: null };
+  // Reserv när leadet saknar id att haka upp dedupen på: har personen redan
+  // välkomnats det senaste dygnet är det samma lead igen. Filtret på kind är
+  // viktigt — utan det räknas AI:ns svar i en pågående dialog som ett tidigare
+  // utskick, och den som just chattat med oss får aldrig sitt lead-SMS.
+  if (!lead.externalId && (await alreadyWelcomed(supabase, phone, lead.email))) {
+    console.log('[lead] personen har redan välkomnats senaste dygnet, hoppar över');
+    return { outcome: 'duplicate', phone, emailed: false };
   }
 
-  // Reserv när leadet saknar id att haka upp dedupen på: har numret redan fått
-  // ett välkomst-SMS det senaste dygnet är det samma person igen. Filtret på
-  // kind är viktigt — utan det räknas AI:ns svar i en pågående dialog som ett
-  // tidigare utskick, och den som just chattat med oss får aldrig sitt lead-SMS.
-  if (!lead.externalId) {
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count } = await supabase
-      .from('sms_messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('phone', phone)
-      .eq('direction', 'out')
-      .eq('kind', WELCOME_KIND)
-      .in('status', ['sent', 'queued'])
-      .gte('created_at', since);
-    if ((count ?? 0) > 0) {
-      console.log(`[lead] ${phone} har redan fått SMS senaste dygnet, hoppar över`);
-      return { outcome: 'duplicate', phone };
-    }
+  // Mejlet först. SMS:et säger "vi har precis skickat ett mejl till dig", så
+  // ordningen är den enda som gör påståendet sant.
+  let emailed = false;
+  if (lead.email) {
+    const { subject, html } = leadWelcomeEmail({ name: lead.name, phone: lead.phone });
+    emailed = await sendViaGmail({ to: lead.email, subject, html, kind: WELCOME_EMAIL_KIND });
+  }
+
+  if (!phone) {
+    console.warn('[lead] lead utan användbart telefonnummer, inget SMS skickas');
+    return { outcome: 'no_phone', phone: null, emailed };
   }
 
   const { data: optout } = await supabase
@@ -117,7 +169,7 @@ export async function handleNewLead(
 
   if (optout) {
     console.log(`[lead] ${phone} är avregistrerad, inget SMS skickas`);
-    return { outcome: 'optout', phone };
+    return { outcome: 'optout', phone, emailed };
   }
 
   const body = WELCOME_SMS;
@@ -133,7 +185,7 @@ export async function handleNewLead(
       status: 'sent',
     });
     console.log(`[lead] välkomst-SMS skickat till ${phone}`);
-    return { outcome: 'sent', phone };
+    return { outcome: 'sent', phone, emailed };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[lead] kunde inte skicka till ${phone}:`, message);
@@ -145,6 +197,6 @@ export async function handleNewLead(
       status: 'failed',
       error: message,
     });
-    return { outcome: 'failed', phone, error: message };
+    return { outcome: 'failed', phone, emailed, error: message };
   }
 }

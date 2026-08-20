@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { sendAndLog } from '@/lib/email-log';
 import { createClient } from '@supabase/supabase-js';
 import { questions } from '@/data/kvalificera-questions';
 
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     // Confirmation to the visitor
     const firstName = name ? String(name).split(' ')[0] : '';
-    await resend.emails.send({
+    await sendAndLog(resend, {
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
       replyTo: 'erik@enklabokslut.se',
       to: email,
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
           </table>
         </body></html>
       `,
-    });
+    }, 'lead_bekraftelse');
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {
