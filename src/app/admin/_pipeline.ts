@@ -33,3 +33,21 @@ export function fullDate(iso: string): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' });
 }
+
+/** "3 min sedan", "2 tim sedan", "i går 11:36". Notiser läses i den takten. */
+export function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '—';
+
+  const minutes = Math.round((Date.now() - then) / 60000);
+  if (minutes < 1) return 'nyss';
+  if (minutes < 60) return `${minutes} min sedan`;
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} tim sedan`;
+
+  const days = Math.round(hours / 24);
+  if (days === 1) return `i går ${new Date(iso).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`;
+  if (days < 7) return `${days} dagar sedan`;
+  return fullDate(iso);
+}

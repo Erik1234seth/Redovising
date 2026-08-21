@@ -39,3 +39,42 @@ export interface Person {
   firstSeen: string;
   lastActivity: string;
 }
+
+/** Hur en enskild kontroll gick i systemstatusen. */
+export type StatusLevel = 'ok' | 'fail' | 'unknown';
+
+export interface StatusCheck {
+  id: string;
+  label: string;
+  level: StatusLevel;
+  /** Vad kontrollen faktiskt såg. Visas under etiketten. */
+  detail: string;
+  /** Vad man gör åt det. Visas bara när nivån inte är ok. */
+  hint?: string;
+  /** Tidpunkten kontrollen bygger på, när det finns en. */
+  at?: string | null;
+}
+
+export interface StatusGroup {
+  title: string;
+  /** Kort förklaring av vad gruppen bevisar. */
+  note: string;
+  checks: StatusCheck[];
+}
+
+export interface StatusReport {
+  groups: StatusGroup[];
+  checkedAt: string;
+}
+
+/** En rad i notisklockan. */
+export interface AdminNotice {
+  id: string;
+  at: string;
+  /** ok = gick fram, fail = misslyckades, info = hände bara. */
+  level: 'ok' | 'fail' | 'info';
+  title: string;
+  detail?: string;
+  /** Nyckel till personvyn, när notisen går att knyta till någon. */
+  personKey?: string | null;
+}
