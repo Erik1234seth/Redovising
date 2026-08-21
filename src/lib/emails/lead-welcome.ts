@@ -17,51 +17,43 @@
  * Därav också: inga <style>, inga inline-stilar, inga tabeller. Bara stycken.
  * Gmail renderar då i mottagarens vanliga brödtext, precis som ett skrivet
  * mejl. `stripHtml` i Apps Script gör textversionen av samma stycken.
+ *
+ * Uppmaningen är att svara på mejlet, inte att klicka på en länk. Svaret går
+ * till mail-AI:n som ställer kvalificeringsfrågorna, så texten innehåller
+ * medvetet inga länkar alls.
  */
-
-const START_URL = 'https://www.enklabokslut.se/kvalificera';
-const SITE_URL = 'https://www.enklabokslut.se/';
-
-/** Länkar skrivs ut i klartext, som när man klistrar in en adress själv. */
-function link(url: string): string {
-  return `<a href="${url}">${url}</a>`;
-}
 
 const PARAGRAPHS = [
   'Hej,',
 
-  'Du fyllde nyligen i vårt formulär för att få veta mer om EnklaBokslut och det är vi glada för!',
+  'Du fyllde nyligen i vårt formulär för att få veta mer om EnklaBokslut.',
 
-  'Vi har valt att fokusera på mindre företag med relativt enkla verksamheter. '
-    + 'Det gör att vi kan hålla nere priset samtidigt som vi tar hand om det som '
-    + 'behövs för att redovisningen ska bli rätt.',
+  'Vi hjälper mindre enskilda firmor med löpande bokföring, momsredovisning, '
+    + 'bokslut och deklaration. Tanken är att det ska vara så enkelt som möjligt '
+    + 'för dig. Du mejlar in dina kvitton, fakturor, kontoutdrag och andra '
+    + 'underlag, så sköter vi bokföringen och hör av oss om det är något vi '
+    + 'behöver fråga om.',
 
-  'Upplägget är enkelt. Du mejlar in dina kvitton, fakturor, kontoutdrag och '
-    + 'eventuella listor från till exempel PayPal, eller en egen Excel-fil om du '
-    + 'brukar använda det. Vi sköter bokföringen och hör av oss om det är något '
-    + 'vi behöver fråga om eller komplettera.',
+  'Priset är 299 kr per månad exklusive moms. Om du börjar under året betalar '
+    + 'du också för de månader som redan har gått, eftersom vi då tar hand om '
+    + 'bokföringen för hela året. Om du hellre vill betala årsvis går det också '
+    + 'bra. Då är priset 3 999 kr exklusive moms för året.',
 
-  'När året är slut sätter vi ihop allt inför bokslut, momsdeklaration och '
-    + 'inkomstdeklaration, ställer frågor om det behövs och lämnar in till Skatteverket.',
+  'Vi tar in ett begränsat antal kunder så om du funderar på att komma igång är '
+    + 'det bra om du hör av dig snabbt. Det gör också att vi kan få in underlagen '
+    + 'och komma igång i lugn och ro, istället för att allt behöver göras nära '
+    + 'bokslut och deklaration. Det är bättre för både dig och oss!',
 
-  'Tanken är helt enkelt att du ska behöva lägga så lite tid som möjligt på '
-    + 'redovisningen själv – du skickar in underlagen, så tar vi hand om resten.',
+  'När året är slut gör vi klart bokslutet, momsdeklarationen och '
+    + 'inkomstdeklarationen och lämnar in det som ska lämnas in till Skatteverket.',
 
-  'Om du vill komma igång är nästa steg att svara på några korta frågor om ditt '
-    + 'företag, välja om du vill ha ett månads- eller årsabonnemang och skapa konto. '
-    + 'Sen är det bara att börja maila dina underlag.',
-
-  `Du kommer igång här:<br>${link(START_URL)}`,
-
-  `Om du vill kolla lite själv först så är hemsidan ${link(SITE_URL)} också full av information.`,
-
-  'En sak till. Priset är fast så du behöver aldrig oroa dig för vad det kostar:).',
-
-  'Hör gärna av dig om du undrar över något!',
+  'Låter det intressant? Svara bara ja på mejlet så skickar jag några enkla '
+    + 'frågor för att se om det passar din verksamhet. Om du undrar över något '
+    + 'är det bara att svara på mejlet med din fråga.',
 ];
 
 export function leadWelcomeEmail(): { subject: string; html: string } {
   const html = PARAGRAPHS.map((p) => `<p>${p}</p>`).join('\n');
 
-  return { subject: 'Tack — här är nästa steg', html };
+  return { subject: 'Du fyllde i vårt formulär – här är lite mer info', html };
 }
