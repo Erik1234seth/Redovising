@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, parseJSON, formatAmount } from '../openai-client';
+import { PLAIN_TEXT_RULES } from '../plain-text';
 
 interface EditInstruction {
   transaction_index: number;
@@ -59,13 +60,16 @@ export async function handleEditTransaction(params: {
   }
 
   const txList = transactions
-    .map((t, i) => `${i + 1}. ${t.datum} — ${t.beskrivning} — ${formatAmount(Number(t.belopp))} — ${t.betalningssatt}`)
+    .map((t, i) => `${i + 1}. ${t.datum} - ${t.beskrivning} - ${formatAmount(Number(t.belopp))} - ${t.betalningssatt}`)
     .join('\n');
 
   const systemPrompt = `Du är bokföringsassistent. Användaren vill ändra befintliga transaktioner.
 
 Transaktioner:
 ${txList}
+
+Texten i replyMessage går rakt ut i ett mejl till kunden.
+${PLAIN_TEXT_RULES}
 
 Returnera JSON:
 {

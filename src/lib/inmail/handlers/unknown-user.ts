@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, parseJSON } from '../openai-client';
 import { ENKLA_BOKSLUT_CONTEXT } from '../service-context';
+import { PLAIN_TEXT_RULES } from '../plain-text';
 import crypto from 'crypto';
 
 interface InitialReply {
@@ -20,10 +21,12 @@ async function generateInitialReply(
 
 Du jobbar på Enkla Bokslut och svarar en potentiell kund. Håll det kort. Ingen säljig ton, inga tomma fraser. Svara rakt på frågan, var hjälpsam och professionell men avslappnad. Avsluta med "// Enkla Bokslut".
 
-Lägg bara med registreringslänken (${registrationLink}) om de tydligt vill komma igång eller skapa konto. Annars — svara bara på frågan.
+Lägg bara med registreringslänken (${registrationLink}) om de tydligt vill komma igång eller skapa konto. Annars svarar du bara på frågan.
 ${history ? `
 Det här är ett svar i en pågående mejlkonversation, inte första kontakten. Hälsa inte som om ni aldrig pratat, och upprepa inte sådant som redan står i historiken. Har länken redan skickats behöver den inte med igen.
 ` : ''}
+${PLAIN_TEXT_RULES}
+
 Returnera JSON:
 {
   "isInterested": boolean,

@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, parseJSON, formatAmount } from '../openai-client';
+import { PLAIN_TEXT_RULES } from '../plain-text';
 
 interface AIDeleteResponse {
   transaction_indices: number[];  // 1-baserade index att ta bort
@@ -48,7 +49,7 @@ export async function handleDeleteRequest(params: {
   }
 
   const txList = transactions
-    .map((t, i) => `${i + 1}. ${t.datum} — ${t.beskrivning} — ${formatAmount(Number(t.belopp))}`)
+    .map((t, i) => `${i + 1}. ${t.datum} - ${t.beskrivning} - ${formatAmount(Number(t.belopp))}`)
     .join('\n');
 
   const systemPrompt = `Du är bokföringsassistent. Användaren vill ta bort transaktioner.
@@ -58,10 +59,13 @@ ${txList}
 
 Identifiera vilka som ska tas bort baserat på användarens meddelande.
 
+Texten i confirmationQuestion och replyMessage går rakt ut i ett mejl till kunden.
+${PLAIN_TEXT_RULES}
+
 Returnera JSON:
 {
   "transaction_indices": [1, 2, ...] (1-baserade index på de som ska tas bort),
-  "needsConfirmation": true (alltid true — vi bekräftar alltid radering),
+  "needsConfirmation": true (alltid true, vi bekräftar alltid radering),
   "confirmationQuestion": "Är du säker på att du vill ta bort: [lista]?",
   "replyMessage": "använd detta om du är osäker på vad som ska tas bort"
 }
@@ -93,7 +97,7 @@ Om du är osäker: sätt transaction_indices: [] och förklara i replyMessage.`;
     .filter(Boolean);
 
   const toDeleteIds = toDelete.map(t => t.id).join(',');
-  const toDeleteDesc = toDelete.map((t, i) => `${i + 1}. ${t.datum} — ${t.beskrivning} — ${formatAmount(Number(t.belopp))}`).join('\n');
+  const toDeleteDesc = toDelete.map((t, i) => `${i + 1}. ${t.datum} - ${t.beskrivning} - ${formatAmount(Number(t.belopp))}`).join('\n');
 
   // Save pending state in email_threads
   await supabase.from('email_threads').upsert({
@@ -144,7 +148,7 @@ export async function handleDeleteConfirm(params: {
     .eq('gmail_thread_id', gmailThreadId);
 
   const deleted = (txBefore ?? [])
-    .map((t, i) => `${i + 1}. ${t.datum} — ${t.beskrivning} — ${formatAmount(Number(t.belopp))}`)
+    .map((t, i) => `${i + 1}. ${t.datum} - ${t.beskrivning} - ${formatAmount(Number(t.belopp))}`)
     .join('\n');
 
   return {

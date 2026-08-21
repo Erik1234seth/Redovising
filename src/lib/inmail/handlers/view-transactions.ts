@@ -25,7 +25,7 @@ export async function handleViewTransactions(params: {
   const lines = transactions.map((t, i) => {
     const datum = t.datum ?? 'okänt datum';
     const belopp = formatAmount(Number(t.belopp));
-    return `${i + 1}. ${datum} — ${t.beskrivning || 'Okänd'} — ${belopp} (${t.betalningssatt ?? 'okänt betalningssätt'})`;
+    return `${i + 1}. ${datum} - ${t.beskrivning || 'Okänd'} - ${belopp} (${t.betalningssatt ?? 'okänt betalningssätt'})`;
   });
 
   const replyBody = `Hej${firstName}!\n\nHär är dina senaste ${transactions.length} bokförda transaktioner:\n\n${lines.join('\n')}\n\nVill du ändra eller ta bort något? Svara på det här mejlet.\n\n// Enkla Bokslut`;

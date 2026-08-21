@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, formatAmount } from '../openai-client';
 import { ENKLA_BOKSLUT_CONTEXT } from '../service-context';
 import { retrieveKnowledge, retrieveExamples, embedQuery } from '../retrieve';
+import { PLAIN_TEXT_RULES } from '../plain-text';
 
 const MOMS_PERIOD_TEXT: Record<string, string> = {
   monthly: 'månadsvis',
@@ -61,7 +62,7 @@ async function buildSenderContext(
         const datum = t.datum ?? 'okänt datum';
         const belopp = formatAmount(Number(t.belopp));
         const moms = t.moms != null ? `, moms ${formatAmount(Number(t.moms))}` : '';
-        return `  • ${datum} — ${t.beskrivning || 'Okänd'} — ${belopp}${moms} (${t.betalningssatt ?? 'okänt betalningssätt'})`;
+        return `  - ${datum} - ${t.beskrivning || 'Okänd'} - ${belopp}${moms} (${t.betalningssatt ?? 'okänt betalningssätt'})`;
       });
       txBlock = `Totalt ${count ?? txs.length} bokförda transaktioner. Senaste ${txs.length}:\n${txLines.join('\n')}`;
     }
@@ -113,13 +114,7 @@ Regler för innehållet:
 - Inled med en naturlig hälsning med kundens förnamn, t.ex. "Hej Danne," Kundens namn finns under OM AVSÄNDAREN. Saknas namn, skriv bara "Hej,"
 - Om kunden vill beställa, bli kund eller komma igång: hänvisa till https://www.enklabokslut.se/ (INTE boka-mötes-sidan)
 - Avsluta INTE med någon signatur (t.ex. "// Enkla Bokslut" eller "Mvh"), det sköts separat
-
-Regler för tecken. Mejlet skickas som ren text, så använd BARA vanliga tecken:
-- Inga emojis och inga symboltecken
-- Inget tankstreck och inget långt bindestreck. Skriv om meningen eller använd komma, punkt eller vanligt bindestreck.
-- Inga typografiska citattecken, bara vanliga raka
-- Ingen markdown. Ingen fetstil med stjärnor, inga rubriker med brädgård.
-- Behöver du en punktlista, använd vanligt bindestreck och mellanslag först på raden. Använd inga andra listtecken.`;
+${PLAIN_TEXT_RULES}`;
 
   const userContent = emailHistory
     ? `Mailkonversation:\n\n${emailHistory}`
