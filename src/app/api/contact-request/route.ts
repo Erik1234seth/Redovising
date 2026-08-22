@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
-import { sendAndLog } from '@/lib/email-log';
+import { sendAndLog, INTERNAL_NOTICE_TO } from '@/lib/email-log';
 import { createClient } from '@supabase/supabase-js';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // Notify oss
     await resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
-      to: 'info@enklabokslut.se',
+      to: INTERNAL_NOTICE_TO,
       subject: `Ny kontaktförfrågan – ${packageName}`,
       html: `
         <h2>Ny kontaktförfrågan</h2>

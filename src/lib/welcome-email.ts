@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { sendAndLog } from './email-log';
+import { sendAndLog, INTERNAL_NOTICE_TO } from './email-log';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -97,7 +97,7 @@ export async function sendWelcomeEmails(params: {
   await Promise.all([
     resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
-      to: 'info@enklabokslut.se',
+      to: INTERNAL_NOTICE_TO,
       subject: `Ny prenumerant – ${name || email}`,
       html: `
         <h2>Ny prenumerant!</h2>

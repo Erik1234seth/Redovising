@@ -15,8 +15,11 @@ import { leadWelcomeEmail } from '../emails/lead-welcome';
  * Att det numera går via Gmail och inte Resend är avsiktligt: svaret landar då
  * i inkorgen som mail-AI:n redan bevakar.
  *
- * Utskicken går direkt, dygnet runt. Ett lead är som varmast de första
- * minuterna, och det vägde tyngre än att undvika enstaka nattliga SMS.
+ * Fördröjningen ligger inte här. Zapen har ett "Delay For"-steg på 20 minuter
+ * före webhook-anropet, så mejl och SMS går ut en stund efter att personen
+ * fyllt i formuläret i stället för i samma sekund. Vi skickar alltså fortfarande
+ * direkt när vi väl blir anropade — tar du bort delay-steget i Zapier är
+ * fördröjningen borta, utan att någon rad här ändras.
  */
 
 /** Markerar raden i sms_messages som ett lead-utskick, inte ett AI-svar. */

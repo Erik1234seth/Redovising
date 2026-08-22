@@ -10,13 +10,22 @@ import type { Resend } from 'resend';
  *
  * Två saker är medvetna:
  *  - Vi loggar bara mejl som går till kunden eller prospektet. Notiserna till
- *    info@enklabokslut.se hör inte hemma på någons tidslinje.
+ *    oss själva (se INTERNAL_NOTICE_TO) hör inte hemma på någons tidslinje.
  *  - Ett misslyckat mejl kastar inte vidare. Resend-SDK:n returnerar fel som
  *    ett fält istället för ett undantag, och anropande routes har aldrig
  *    kollat det. Att börja kasta nu hade gett besökaren ett 500-svar på ett
  *    formulär som i övrigt gick bra. Felet hamnar i loggen med status
  *    'failed' istället, där det syns i panelen.
  */
+
+/**
+ * Dit alla interna notiser går: nytt lead, ny kontaktförfrågan, ny prenumerant,
+ * bokat möte, fråga från sajten. Låg tidigare hårdkodad som info@ på fem ställen,
+ * vilket gjorde att en flytt lätt missade något. Skickas alltid med
+ * `resend.emails.send` direkt och aldrig med `sendAndLog` — se doc-kommentaren
+ * ovan om varför de inte ska hamna i tidslinjen.
+ */
+export const INTERNAL_NOTICE_TO = 'erik@enklabokslut.se';
 
 /** Vilket utskick det rör sig om. Syns som etikett i tidslinjen. */
 export type EmailKind =
@@ -35,6 +44,13 @@ interface EmailPayload {
   subject: string;
   html: string;
   replyTo?: string;
+  /**
+   * ISO 8601-tidpunkt då Resend ska skicka mejlet i stället för direkt. Resend
+   * håller det åt oss, så en fördröjning kräver varken kö eller cron-jobb.
+   * Observera att raden i `email_log` skrivs när vi lämnar över mejlet, inte
+   * när det går ut — tidslinjen visar alltså tidpunkten vi bokade utskicket.
+   */
+  scheduledAt?: string;
 }
 
 function getSupabase() {

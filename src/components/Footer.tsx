@@ -124,7 +124,7 @@ export default function Footer() {
             © {new Date().getFullYear()} Enkla Bokslut. Alla rättigheter förbehållna.
           </p>
           <p className="text-white/35 text-xs">
-            Specialiserade på förenklad redovisning för enskilda firmor
+            Enkla Bokslut är en del av Sethapp Innovation
           </p>
         </div>
       </div>

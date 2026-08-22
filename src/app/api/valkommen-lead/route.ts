@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
-import { sendAndLog } from '@/lib/email-log';
+import { sendAndLog, INTERNAL_NOTICE_TO } from '@/lib/email-log';
 import { createClient } from '@supabase/supabase-js';
 import { questions } from '@/data/kvalificera-questions';
 
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     await resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
       replyTo: email,
-      to: 'info@enklabokslut.se',
+      to: INTERNAL_NOTICE_TO,
       subject: `Nytt lead från ${sourceWord}${ref ? ` (${ref})` : ''} – ${name || email}`,
       html: `
         <h2 style="color:${NAV_BG};">Nytt lead från ${sourceWord}</h2>
@@ -94,12 +94,22 @@ export async function POST(request: NextRequest) {
     });
 
     // Confirmation to the visitor
+    //
+    // Bekräftelsen skjuts upp 20 minuter, samma fördröjning som Facebook-leadsen
+    // får via delay-steget i Zapier. Här finns ingen Zapier emellan, så Resends
+    // egen schemaläggning får göra jobbet — den håller mejlet åt oss, vilket
+    // sparar oss både kö och cron-jobb. Notisen till oss ovan går fortfarande
+    // direkt: fördröjningen gäller besökaren, inte oss.
+    const CONFIRMATION_DELAY_MINUTES = 20;
+    const scheduledAt = new Date(Date.now() + CONFIRMATION_DELAY_MINUTES * 60_000).toISOString();
+
     const firstName = name ? String(name).split(' ')[0] : '';
     await sendAndLog(resend, {
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
       replyTo: 'erik@enklabokslut.se',
       to: email,
       subject: 'Tack — vi hör av oss inom kort',
+      scheduledAt,
       html: `
         <!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"></head>
         <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { INTERNAL_NOTICE_TO } from '@/lib/email-log';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await resend.emails.send({
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
-      to: ['info@enklabokslut.se'],
+      to: [INTERNAL_NOTICE_TO],
       replyTo: email,
       subject: `Fråga från ${name}${orderId ? ` (Order: ${orderId})` : ''}`,
       html: `
