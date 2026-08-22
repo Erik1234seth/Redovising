@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, parseJSON, formatAmount } from '../openai-client';
-import { PLAIN_TEXT_RULES } from '../plain-text';
+import { REPLY_RULES } from '../reply-rules';
 
 interface AIDeleteResponse {
   transaction_indices: number[];  // 1-baserade index att ta bort
@@ -44,7 +44,7 @@ export async function handleDeleteRequest(params: {
   if (!transactions.length) {
     return {
       action: 'no_transactions',
-      replyBody: `Hej${firstName}!\n\nDu har inga bokförda transaktioner att ta bort.\n\n// Enkla Bokslut`,
+      replyBody: `Hej${firstName}!\n\nDu har inga bokförda transaktioner att ta bort.`,
     };
   }
 
@@ -60,7 +60,7 @@ ${txList}
 Identifiera vilka som ska tas bort baserat på användarens meddelande.
 
 Texten i confirmationQuestion och replyMessage går rakt ut i ett mejl till kunden.
-${PLAIN_TEXT_RULES}
+${REPLY_RULES}
 
 Returnera JSON:
 {
@@ -87,7 +87,7 @@ Om du är osäker: sätt transaction_indices: [] och förklara i replyMessage.`;
   if (!parsed.transaction_indices?.length) {
     return {
       action: 'unclear',
-      replyBody: `Hej${firstName}!\n\n${parsed.replyMessage || 'Vi förstod inte vilken transaktion du vill ta bort.'}\n\nHär är dina senaste transaktioner:\n\n${txList}\n\nSkriv vilken nummer du vill ta bort.\n\n// Enkla Bokslut`,
+      replyBody: `Hej${firstName}!\n\n${parsed.replyMessage || 'Vi förstod inte vilken transaktion du vill ta bort.'}\n\nHär är dina senaste transaktioner:\n\n${txList}\n\nSkriv vilken nummer du vill ta bort.`,
     };
   }
 
@@ -112,7 +112,7 @@ Om du är osäker: sätt transaction_indices: [] och förklara i replyMessage.`;
 
   return {
     action: 'awaiting_confirmation',
-    replyBody: `Hej${firstName}!\n\n${confirmQ}\n\n// Enkla Bokslut`,
+    replyBody: `Hej${firstName}!\n\n${confirmQ}`,
     pendingState: `pending_delete:${toDeleteIds}`,
   };
 }
@@ -131,7 +131,7 @@ export async function handleDeleteConfirm(params: {
   const idsToDelete = pendingState.replace('pending_delete:', '').split(',').filter(Boolean);
 
   if (!idsToDelete.length) {
-    return { action: 'error', replyBody: `Hej${firstName}!\n\nNågot gick fel med raderingen. Vänligen försök igen.\n\n// Enkla Bokslut` };
+    return { action: 'error', replyBody: `Hej${firstName}!\n\nNågot gick fel med raderingen. Vänligen försök igen.` };
   }
 
   const { data: txBefore } = await supabase
@@ -153,7 +153,7 @@ export async function handleDeleteConfirm(params: {
 
   return {
     action: 'ok',
-    replyBody: `Hej${firstName}!\n\nFöljande transaktioner har tagits bort:\n\n${deleted}\n\n// Enkla Bokslut`,
+    replyBody: `Hej${firstName}!\n\nFöljande transaktioner har tagits bort:\n\n${deleted}`,
   };
 }
 
@@ -174,6 +174,6 @@ export async function handleDeleteCancel(params: {
 
   return {
     action: 'ok',
-    replyBody: `Hej${firstName}!\n\nRaderingen avbröts. Inga transaktioner togs bort.\n\n// Enkla Bokslut`,
+    replyBody: `Hej${firstName}!\n\nRaderingen avbröts. Inga transaktioner togs bort.`,
   };
 }

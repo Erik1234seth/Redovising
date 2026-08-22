@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, parseJSON } from '../openai-client';
-import { PLAIN_TEXT_RULES } from '../plain-text';
+import { REPLY_RULES } from '../reply-rules';
 
 interface OnboardingExtraction {
   collectedName: string | null;
@@ -28,8 +28,8 @@ Du behöver samla in tre saker för att kunna ta hand om deras bokföring:
 
 Läs igenom mejl-historiken och ta reda på vad som redan samlats in.
 
-Skriv nextQuestion som om du är en riktig person på företaget, enkelt och naturligt. Förklara kort varför vi behöver infon (koppla det till bokföringen eller Skatteverket, aldrig till "att skapa konto"). En fråga i taget. Avsluta alltid med "// Enkla Bokslut".
-${PLAIN_TEXT_RULES}
+Skriv nextQuestion som om du är en riktig person på företaget, enkelt och naturligt. Förklara kort varför vi behöver infon (koppla det till bokföringen eller Skatteverket, aldrig till "att skapa konto"). En fråga i taget.
+${REPLY_RULES}
 
 Returnera JSON:
 {
@@ -75,7 +75,7 @@ Returnera JSON:
     const firstName = state.collectedName?.split(' ')[0] ?? '';
     return {
       action: 'onboarding_error',
-      replyBody: `Hej${firstName ? ` ${firstName}` : ''}!\n\nNågot krånglade lite från vår sida, men oroa dig inte. Vi ser till att du kommer igång och hör av oss inom kort.\n\n// Enkla Bokslut`,
+      replyBody: `Hej${firstName ? ` ${firstName}` : ''}!\n\nNågot krånglade lite från vår sida, men oroa dig inte. Vi ser till att du kommer igång och hör av oss inom kort.`,
     };
   }
 
@@ -99,6 +99,6 @@ Returnera JSON:
 
   return {
     action: 'onboarding_complete',
-    replyBody: `${firstName ? `Tack ${firstName}! ` : 'Tack! '}Nu är allt klart från vår sida.\n\nVi har registrerat dig ${packageText} och kopplat allt till ${senderEmail}. Du kan direkt börja skicka in kvitton och fakturor hit, vi tar hand om bokföringen.\n\nHar du frågor är det bara att svara på det här mejlet.\n\n// Enkla Bokslut`,
+    replyBody: `${firstName ? `Tack ${firstName}! ` : 'Tack! '}Nu är allt klart från vår sida.\n\nVi har registrerat dig ${packageText} och kopplat allt till ${senderEmail}. Du kan direkt börja skicka in kvitton och fakturor hit, vi tar hand om bokföringen.\n\nHar du frågor är det bara att svara på det här mejlet.`,
   };
 }

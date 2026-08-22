@@ -2,7 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, formatAmount } from '../openai-client';
 import { ENKLA_BOKSLUT_CONTEXT } from '../service-context';
 import { retrieveKnowledge, retrieveExamples, embedQuery } from '../retrieve';
-import { PLAIN_TEXT_RULES } from '../plain-text';
+import { REPLY_RULES } from '../reply-rules';
 
 const MOMS_PERIOD_TEXT: Record<string, string> = {
   monthly: 'månadsvis',
@@ -113,8 +113,7 @@ Regler för innehållet:
 - Inga inledande artighetsfraser som "Tack för din fråga" och ingen sammanfattning på slutet
 - Inled med en naturlig hälsning med kundens förnamn, t.ex. "Hej Danne," Kundens namn finns under OM AVSÄNDAREN. Saknas namn, skriv bara "Hej,"
 - Om kunden vill beställa, bli kund eller komma igång: hänvisa till https://www.enklabokslut.se/ (INTE boka-mötes-sidan)
-- Avsluta INTE med någon signatur (t.ex. "// Enkla Bokslut" eller "Mvh"), det sköts separat
-${PLAIN_TEXT_RULES}`;
+${REPLY_RULES}`;
 
   const userContent = emailHistory
     ? `Mailkonversation:\n\n${emailHistory}`
@@ -131,6 +130,6 @@ ${PLAIN_TEXT_RULES}`;
 
   return {
     action: 'ok',
-    replyBody: `${stripEmojis(answer)}\n\nVänliga hälsningar\nErik`,
+    replyBody: stripEmojis(answer),
   };
 }

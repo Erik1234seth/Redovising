@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, parseJSON, formatAmount } from '../openai-client';
-import { PLAIN_TEXT_RULES } from '../plain-text';
+import { REPLY_RULES } from '../reply-rules';
 
 interface EditInstruction {
   transaction_index: number;
@@ -55,7 +55,7 @@ export async function handleEditTransaction(params: {
   if (!transactions.length) {
     return {
       action: 'no_transactions',
-      replyBody: `Hej${firstName}!\n\nVi hittade inga transaktioner att ändra.\n\n// Enkla Bokslut`,
+      replyBody: `Hej${firstName}!\n\nVi hittade inga transaktioner att ändra.`,
     };
   }
 
@@ -69,7 +69,7 @@ Transaktioner:
 ${txList}
 
 Texten i replyMessage går rakt ut i ett mejl till kunden.
-${PLAIN_TEXT_RULES}
+${REPLY_RULES}
 
 Returnera JSON:
 {
@@ -128,6 +128,6 @@ Om du är osäker på vad som ska ändras: sätt edits: [] och förklara i reply
 
   return {
     action: 'ok',
-    replyBody: `${parsed.replyMessage}\n\n// Enkla Bokslut`,
+    replyBody: parsed.replyMessage,
   };
 }

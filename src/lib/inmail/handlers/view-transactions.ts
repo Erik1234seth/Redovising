@@ -18,7 +18,7 @@ export async function handleViewTransactions(params: {
   if (!transactions?.length) {
     return {
       action: 'ok',
-      replyBody: `Hej${firstName}!\n\nDu har inga bokförda transaktioner än.\n\nSkicka ett kvitto eller en faktura till det här mejlet så bokför vi det direkt!\n\n// Enkla Bokslut`,
+      replyBody: `Hej${firstName}!\n\nDu har inga bokförda transaktioner än.\n\nSkicka ett kvitto eller en faktura till det här mejlet så bokför vi det direkt!`,
     };
   }
 
@@ -28,7 +28,7 @@ export async function handleViewTransactions(params: {
     return `${i + 1}. ${datum} - ${t.beskrivning || 'Okänd'} - ${belopp} (${t.betalningssatt ?? 'okänt betalningssätt'})`;
   });
 
-  const replyBody = `Hej${firstName}!\n\nHär är dina senaste ${transactions.length} bokförda transaktioner:\n\n${lines.join('\n')}\n\nVill du ändra eller ta bort något? Svara på det här mejlet.\n\n// Enkla Bokslut`;
+  const replyBody = `Hej${firstName}!\n\nHär är dina senaste ${transactions.length} bokförda transaktioner:\n\n${lines.join('\n')}\n\nVill du ändra eller ta bort något? Svara på det här mejlet.`;
 
   return { action: 'ok', replyBody };
 }

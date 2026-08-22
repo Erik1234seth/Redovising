@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, parseJSON } from '../openai-client';
 import { ENKLA_BOKSLUT_CONTEXT } from '../service-context';
-import { PLAIN_TEXT_RULES } from '../plain-text';
+import { REPLY_RULES } from '../reply-rules';
 import crypto from 'crypto';
 
 interface InitialReply {
@@ -19,13 +19,13 @@ async function generateInitialReply(
 ): Promise<InitialReply> {
   const systemPrompt = `${ENKLA_BOKSLUT_CONTEXT}
 
-Du jobbar på Enkla Bokslut och svarar en potentiell kund. Håll det kort. Ingen säljig ton, inga tomma fraser. Svara rakt på frågan, var hjälpsam och professionell men avslappnad. Avsluta med "// Enkla Bokslut".
+Du jobbar på Enkla Bokslut och svarar en potentiell kund. Håll det kort. Ingen säljig ton, inga tomma fraser. Svara rakt på frågan, var hjälpsam och professionell men avslappnad.
 
 Lägg bara med registreringslänken (${registrationLink}) om de tydligt vill komma igång eller skapa konto. Annars svarar du bara på frågan.
 ${history ? `
 Det här är ett svar i en pågående mejlkonversation, inte första kontakten. Hälsa inte som om ni aldrig pratat, och upprepa inte sådant som redan står i historiken. Har länken redan skickats behöver den inte med igen.
 ` : ''}
-${PLAIN_TEXT_RULES}
+${REPLY_RULES}
 
 Returnera JSON:
 {
@@ -93,14 +93,14 @@ export async function handleUnknownUser(params: {
       isInterested: true,
       isExistingCustomer: false,
       includeLink: true,
-      message: `Hej!\n\nTack för ditt mejl! Du kan komma igång direkt här:\n${registrationLink}\n\n// Enkla Bokslut`,
+      message: `Hej!\n\nTack för ditt mejl! Du kan komma igång direkt här:\n${registrationLink}`,
     };
   }
 
   if (reply.isExistingCustomer) {
     return {
       action: 'unknown_user_existing',
-      replyBody: `Hej!\n\nVi kunde inte hitta något konto kopplat till ${senderEmail}.\n\nKontrollera att du mejlar från samma adress som du registrerade dig med. Har du frågor är det bara att svara på det här mejlet.\n\n// Enkla Bokslut`,
+      replyBody: `Hej!\n\nVi kunde inte hitta något konto kopplat till ${senderEmail}.\n\nKontrollera att du mejlar från samma adress som du registrerade dig med. Har du frågor är det bara att svara på det här mejlet.`,
     };
   }
 

@@ -141,7 +141,7 @@ export async function POST(request: Request) {
       default:
         return NextResponse.json({
           action: 'ok',
-          replyBody: `Hej${profile.full_name ? ' ' + profile.full_name.split(' ')[0] : ''}!\n\nTack för ditt mejl. Vi förstod inte riktigt vad du behöver hjälp med. Kan du beskriva lite mer vad du vill göra?\n\nExempel:\n- Skicka kvitto eller faktura som bilaga för att bokföra\n- Skriv "visa mina transaktioner" för att se dina bokföringar\n- Skriv "ta bort transaktion" följt av vilken\n\n// Enkla Bokslut`,
+          replyBody: `Hej${profile.full_name ? ' ' + profile.full_name.split(' ')[0] : ''}!\n\nTack för ditt mejl. Vi förstod inte riktigt vad du behöver hjälp med. Kan du beskriva lite mer vad du vill göra?\n\nExempel:\n- Skicka kvitto eller faktura som bilaga för att bokföra\n- Skriv "visa mina transaktioner" för att se dina bokföringar\n- Skriv "ta bort transaktion" följt av vilken`,
         });
     }
   } catch (err) {

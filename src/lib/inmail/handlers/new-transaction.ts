@@ -98,7 +98,7 @@ export async function handleNewTransaction(params: {
 
   if (!attachments.length) {
     // TILLFÄLLIGT tystad — se noteringen längst ned i funktionen.
-    // replyBody: `Hej${profile.full_name ? ' ' + profile.full_name.split(' ')[0] : ''}!\n\nVi fick ditt mejl men kunde inte hitta något kvitto eller faktura bifogat.\n\nBifoga gärna kvittot som PDF, JPG eller PNG så bokför vi det direkt.\n\n// Enkla Bokslut`
+    // replyBody: `Hej${profile.full_name ? ' ' + profile.full_name.split(' ')[0] : ''}!\n\nVi fick ditt mejl men kunde inte hitta något kvitto eller faktura bifogat.\n\nBifoga gärna kvittot som PDF, JPG eller PNG så bokför vi det direkt.`
     return { action: 'no_attachment' };
   }
 
@@ -137,7 +137,7 @@ export async function handleNewTransaction(params: {
 
   if (!results.length) {
     // TILLFÄLLIGT tystad — se noteringen längst ned i funktionen.
-    // replyBody: `Hej${profile.full_name ? ' ' + profile.full_name.split(' ')[0] : ''}!\n\nVi kunde tyvärr inte tolka ${attachments.length > 1 ? 'bilagorna' : 'bilagan'}. Kontrollera att filen är ett tydligt kvitto eller en faktura och skicka gärna igen.\n\n// Enkla Bokslut`
+    // replyBody: `Hej${profile.full_name ? ' ' + profile.full_name.split(' ')[0] : ''}!\n\nVi kunde tyvärr inte tolka ${attachments.length > 1 ? 'bilagorna' : 'bilagan'}. Kontrollera att filen är ett tydligt kvitto eller en faktura och skicka gärna igen.`
     return { action: 'analysis_failed' };
   }
 
@@ -159,7 +159,7 @@ export async function handleNewTransaction(params: {
   //   const a = r.analysis;
   //   return `${i + 1}. ${a.avsandare || 'Okänd'} — ${formatAmount(a.belopp)}\n   Vad: ${a.vad} · Datum: ${a.datum ?? 'okänt'} · Moms: ${formatAmount(a.moms)} · Betalat: ${a.betalningssatt ?? 'okänt'}`;
   // });
-  // const replyBody = `Hej${firstName}!\n\nVi har bokfört ditt${results.length > 1 ? ` ${results.length} kvitton` : ' kvitto'}:\n\n${lines.join('\n\n')}\n\nStämmer det? Svara på det här mejlet om något behöver ändras.\n\n// Enkla Bokslut`;
+  // const replyBody = `Hej${firstName}!\n\nVi har bokfört ditt${results.length > 1 ? ` ${results.length} kvitton` : ' kvitto'}:\n\n${lines.join('\n\n')}\n\nStämmer det? Svara på det här mejlet om något behöver ändras.`;
 
   return { action: 'ok' };
 }
