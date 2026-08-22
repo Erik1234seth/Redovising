@@ -47,7 +47,7 @@ Returnera JSON:
       { role: 'user', content: `Mejl-historik:\n\n${emailHistory}` },
     ],
     responseFormat: { type: 'json_object' },
-    maxTokens: 400,
+    maxTokens: 4000,
   });
 
   const state = parseJSON<OnboardingExtraction>(raw);

@@ -101,7 +101,7 @@ Om du är osäker på vad som ska ändras: sätt edits: [] och förklara i reply
       { role: 'user', content: userContent },
     ],
     responseFormat: { type: 'json_object' },
-    maxTokens: 1000,
+    maxTokens: 6000,
   });
 
   const parsed = parseJSON<AIEditResponse>(raw);

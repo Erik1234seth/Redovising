@@ -58,7 +58,7 @@ ${body.slice(0, 1500)}`;
         { role: 'user', content: userMsg },
       ],
       responseFormat: { type: 'json_object' },
-      maxTokens: 500,
+      maxTokens: 4000,
     });
 
     return parseJSON<ClassifyResult>(raw);

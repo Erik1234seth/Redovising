@@ -125,7 +125,7 @@ ${REPLY_RULES}`;
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },
     ],
-    maxTokens: 4000,
+    maxTokens: 8000,
   });
 
   return {

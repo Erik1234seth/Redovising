@@ -6,10 +6,13 @@ export async function callOpenAI(options: {
   responseFormat?: { type: 'json_object' | 'text' };
   maxTokens?: number;
 }): Promise<string> {
+  // o3 räknar sitt eget tänkande i den här budgeten, inte bara svaret. En snål
+  // siffra ger 400 ("Could not finish the message...") i stället för ett svar,
+  // så budgetarna ligger med god marginal. Vi betalar bara för det som används.
   const body: Record<string, unknown> = {
     model: options.model,
     messages: options.messages,
-    max_completion_tokens: options.maxTokens ?? 2000,
+    max_completion_tokens: options.maxTokens ?? 8000,
   };
   if (options.responseFormat) {
     body.response_format = options.responseFormat;

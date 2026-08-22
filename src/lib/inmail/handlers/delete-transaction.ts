@@ -79,7 +79,7 @@ Om du är osäker: sätt transaction_indices: [] och förklara i replyMessage.`;
       { role: 'user', content: body },
     ],
     responseFormat: { type: 'json_object' },
-    maxTokens: 500,
+    maxTokens: 4000,
   });
 
   const parsed = parseJSON<AIDeleteResponse>(raw);

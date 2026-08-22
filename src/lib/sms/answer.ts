@@ -147,7 +147,7 @@ Vad du inte får göra:
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },
     ],
-    maxTokens: 2000,
+    maxTokens: 6000,
   });
 
   return sanitize(answer);
