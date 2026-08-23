@@ -43,6 +43,68 @@ function checkInbox() {
   }
 }
 
+// ─── Signatur ─────────────────────────────────────────────────────────────────
+// Gmails automatiska signatur klistras bara in av webbklientens compose-vy, när
+// du själv klickar Svara. Ett utkast som skapas här via createDraftReply går
+// aldrig den vägen, så det får ingen signatur alls. Därför hängs den på här.
+//
+// Utkastet får både en text- och en HTML-version, så att mejlet ser rätt ut i
+// alla klienter. Modellen skriver fortfarande ren text; den escapas och
+// radbrytningarna blir <br>, annars äter HTML:en formateringen.
+//
+// HTML:en är en nerbantad variant av email-templates/signatur-erik-seth.html:
+// samma uppgifter och samma färger, men utan logotyp, utan varumärkesbanner och
+// utan "Läs mer"-knapp. Inga bilder och inga spårlänkar, för det är sådant som
+// drar upp spampoängen. De två länkarna går till egna numret och egna domänen.
+//
+// Skriv signaturen ingen annanstans. Prompterna (src/lib/inmail/reply-rules.ts)
+// förbjuder modellen att skriva egen signatur, och replyBody-strängarna i
+// src/lib/inmail/handlers/ ska inte heller ha någon. Annars står den två gånger.
+const FONT_STACK = "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif";
+
+const SIGNATURE_TEXT =
+  '\n\nMed vänliga hälsningar,\n' +
+  'Erik Seth\n' +
+  'Ekonomiavdelningen\n' +
+  'Enkla Bokslut\n' +
+  '072-519 16 16\n' +
+  'www.enklabokslut.se';
+
+const SIGNATURE_HTML =
+  '<div style="font-family:' + FONT_STACK + '; font-size:14px; color:#374151; margin-top:22px;">' +
+    '<p style="margin:0 0 14px 0; font-style:italic; font-size:14px; color:#173b57;">Med vänliga hälsningar,</p>' +
+    '<table cellpadding="0" cellspacing="0" border="0"><tr>' +
+      '<td style="border-left:3px solid #E95C63; padding-left:18px;">' +
+        '<p style="margin:0; font-size:16px; font-weight:600; color:#173b57; letter-spacing:-0.2px;">Erik Seth</p>' +
+        '<p style="margin:1px 0 5px 0; font-size:13px; font-weight:400; color:#173b57;">Ekonomiavdelningen</p>' +
+        '<p style="margin:0; font-size:13px; line-height:1.5; color:#173b57;">' +
+          'Enkla Bokslut<br>' +
+          '<a href="tel:+46725191616" style="color:#173b57; text-decoration:none;">072-519 16 16</a><br>' +
+          '<a href="https://www.enklabokslut.se" style="color:#173b57; text-decoration:none;">www.enklabokslut.se</a>' +
+        '</p>' +
+      '</td>' +
+    '</tr></table>' +
+  '</div>';
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/** Textversionen av utkastet: modellens svar plus signaturen som ren text. */
+function withSignature(replyBody) {
+  return String(replyBody).replace(/\s+$/, '') + SIGNATURE_TEXT;
+}
+
+/** HTML-versionen av samma utkast. */
+function withSignatureHtml(replyBody) {
+  const body = escapeHtml(String(replyBody).replace(/\s+$/, '')).replace(/\n/g, '<br>');
+  return '<div style="font-family:' + FONT_STACK + '; font-size:14px; line-height:1.6; color:#374151;">' +
+    body + '</div>' + SIGNATURE_HTML;
+}
+
 // ─── Nytt mail ────────────────────────────────────────────────────────────────
 
 function handleNewMail(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments) {
@@ -63,7 +125,7 @@ function handleNewMail(config, thread, senderEmail, threadId, messageId, subject
   // Spara AI-svaret som utkast i rätt tråd
   if (response.replyBody) {
     const lastMsg = thread.getMessages()[thread.getMessages().length - 1];
-    lastMsg.createDraftReply(response.replyBody);
+    lastMsg.createDraftReply(withSignature(response.replyBody), { htmlBody: withSignatureHtml(response.replyBody) });
   }
 }
 
@@ -90,7 +152,7 @@ function handleReply(config, thread, senderEmail, threadId, messageId, subject, 
 
   if (response && response.replyBody) {
     const lastMsg = thread.getMessages()[thread.getMessages().length - 1];
-    lastMsg.createDraftReply(response.replyBody);
+    lastMsg.createDraftReply(withSignature(response.replyBody), { htmlBody: withSignatureHtml(response.replyBody) });
   }
 }
 
