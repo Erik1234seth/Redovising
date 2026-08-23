@@ -14,14 +14,22 @@
  * signalerat massutskick, och hela poängen är att svaret ska landa i tråden
  * som mail-AI:n bevakar.
  *
- * Därav också: inga <style>, inga inline-stilar, inga tabeller. Bara stycken.
- * Gmail renderar då i mottagarens vanliga brödtext, precis som ett skrivet
- * mejl. `stripHtml` i Apps Script gör textversionen av samma stycken.
+ * Därav också: inga <style>, inga inline-stilar, inga tabeller i själva texten.
+ * Bara stycken. Gmail renderar då i mottagarens vanliga brödtext, precis som
+ * ett skrivet mejl. `stripHtml` i Apps Script gör textversionen av samma
+ * stycken.
+ *
+ * Undantaget är signaturen sist. Den är formgiven, och det är meningen: ett
+ * skrivet mejl slutar med en signatur, det är frånvaron av en som ser konstig
+ * ut. Gmail lägger inte på sin egen här, eftersom mejlet går via
+ * `GmailApp.sendEmail` och inte via compose-fönstret.
  *
  * Uppmaningen är att svara på mejlet, inte att klicka på en länk. Svaret går
- * till mail-AI:n som ställer kvalificeringsfrågorna, så texten innehåller
- * medvetet inga länkar alls.
+ * till mail-AI:n som ställer kvalificeringsfrågorna, så brödtexten innehåller
+ * medvetet inga länkar alls. De två i signaturen är numret och domänen.
  */
+
+import { SIGNATURE_HTML } from './signature';
 
 const PARAGRAPHS = [
   'Hej,',
@@ -53,7 +61,7 @@ const PARAGRAPHS = [
 ];
 
 export function leadWelcomeEmail(): { subject: string; html: string } {
-  const html = PARAGRAPHS.map((p) => `<p>${p}</p>`).join('\n');
+  const html = PARAGRAPHS.map((p) => `<p>${p}</p>`).join('\n') + '\n' + SIGNATURE_HTML;
 
   return { subject: 'Du fyllde i vårt formulär – här är lite mer info', html };
 }
