@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { packages } from '@/data/packages';
 import { PAYMENTS_ENABLED } from '@/lib/config';
+import { parsePlan, signupUrl } from '@/lib/signupUrl';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
@@ -24,21 +26,17 @@ const yearlyFeatures = [
   'Betala först när allt är färdigställt',
 ];
 
-export default function SkaffaPage() {
+function SkaffaContent() {
   const pkg = packages[0];
-  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
+  // Sidan är också en fristående landningssida (footern och mail-AI:n länkar hit),
+  // så utan ?plan= i URL:en börjar den på månadsvis som förut.
+  const [billing, setBilling] = useState<'monthly' | 'yearly'>(
+    parsePlan(useSearchParams().get('plan')) ?? 'monthly'
+  );
   const isYearly = billing === 'yearly';
 
-  // Förvälj det upplägg kunden redan valde på startsidan (sätts i sessionStorage
-  // vid "Kom igång"). Läses efter mount för att undvika hydration-mismatch.
-  useEffect(() => {
-    const saved = sessionStorage.getItem('billingPeriod');
-    if (saved === 'monthly' || saved === 'yearly') setBilling(saved);
-  }, []);
-
   const handleGetStarted = () => {
-    sessionStorage.setItem('billingPeriod', billing);
-    window.location.href = 'https://app.enklabokslut.se/auth/signup';
+    window.location.href = signupUrl(billing);
   };
 
   const features = isYearly ? yearlyFeatures : monthlyFeatures;
@@ -259,5 +257,13 @@ export default function SkaffaPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function SkaffaPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <SkaffaContent />
+    </Suspense>
   );
 }

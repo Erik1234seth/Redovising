@@ -1,15 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { questions } from '@/data/kvalificera-questions';
+import { packages } from '@/data/packages';
+import { parsePlan, signupUrl } from '@/lib/signupUrl';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
 
-export default function KvalificeraPage() {
+function KvalificeraFlow() {
   const router = useRouter();
+  // Kunden som kommer från priskortet på startsidan har redan valt upplägg, och
+  // ska då inte få frågan igen på /skaffa utan gå direkt till kontoskapandet.
+  const plan = parsePlan(useSearchParams().get('plan'));
+  const pkg = packages[0];
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0);
   const [result, setResult] = useState<'pass' | 'fail' | null>(null);
@@ -83,11 +89,18 @@ export default function KvalificeraPage() {
           <div className="text-left rounded-2xl border border-slate-100 bg-slate-50/60 p-5 mb-8">
             <p className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: CORAL }}>Så här går det till</p>
             <div className="space-y-3.5">
-              {[
-                { t: 'Välj hur du vill betala', d: 'Månadsvis eller årsvis — du bestämmer.' },
-                { t: 'Skapa ditt konto', d: 'Tar under en minut.' },
-                { t: 'Mejla in dina underlag', d: 'Vi sköter resten och lämnar in till Skatteverket.' },
-              ].map((s, i) => (
+              {(plan
+                ? [
+                    { t: 'Skapa ditt konto', d: 'Tar under en minut.' },
+                    { t: 'Fyll i dina uppgifter', d: 'Några korta frågor om din verksamhet.' },
+                    { t: 'Mejla in dina underlag', d: 'Vi sköter resten och lämnar in till Skatteverket.' },
+                  ]
+                : [
+                    { t: 'Välj hur du vill betala', d: 'Månadsvis eller årsvis — du bestämmer.' },
+                    { t: 'Skapa ditt konto', d: 'Tar under en minut.' },
+                    { t: 'Mejla in dina underlag', d: 'Vi sköter resten och lämnar in till Skatteverket.' },
+                  ]
+              ).map((s, i) => (
                 <div key={s.t} className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: NAV_BG }}>{i + 1}</div>
                   <div>
@@ -99,12 +112,36 @@ export default function KvalificeraPage() {
             </div>
           </div>
 
+          {/* Bekräfta upplägget kunden valde på startsidan i stället för att fråga igen */}
+          {plan && (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 mb-4 text-left">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Ditt val</p>
+                <p className="text-sm font-bold" style={{ color: NAV_BG }}>
+                  {plan === 'yearly'
+                    ? `Årsvis · ${pkg.yearlyPrice.toLocaleString('sv')} kr/år`
+                    : `Månadsvis · ${pkg.price.toLocaleString('sv')} kr/mån`}
+                  <span className="font-normal text-slate-400"> (exkl. moms)</span>
+                </p>
+              </div>
+              <Link
+                href={`/skaffa?plan=${plan}`}
+                className="flex-shrink-0 text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                Byt upplägg
+              </Link>
+            </div>
+          )}
+
           <button
-            onClick={() => router.push('/skaffa')}
+            onClick={() => {
+              if (plan) window.location.href = signupUrl(plan);
+              else router.push('/skaffa');
+            }}
             className="w-full py-5 rounded-2xl font-bold text-base text-white transition-all duration-200 hover:scale-[1.02]"
             style={{ backgroundColor: CORAL, boxShadow: `0 12px 28px ${CORAL}50` }}
           >
-            Välj upplägg och kom igång →
+            {plan ? 'Skapa ditt konto →' : 'Välj upplägg och kom igång →'}
           </button>
           <p className="text-xs text-slate-400 mt-3">Ingen betalning nu · Ingen bindningstid</p>
           <Link href="/" className="block mt-5 text-sm text-slate-400 hover:text-slate-600 transition-colors">
@@ -267,5 +304,13 @@ export default function KvalificeraPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function KvalificeraPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <KvalificeraFlow />
+    </Suspense>
   );
 }

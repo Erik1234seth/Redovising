@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import FlowCheckpoints from '@/components/FlowCheckpoints';
 import { useMainSiteUrl } from '@/lib/useMainSiteUrl';
+import { parsePlan } from '@/lib/signupUrl';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
@@ -22,6 +23,16 @@ function SignupForm() {
   const searchParams = useSearchParams();
   const mainSiteUrl = useMainSiteUrl();
   const redirectUrl = searchParams.get('redirect') || '/';
+
+  // Upplägget kunden valde på webbplatsen kommer hit som ?plan=. Härifrån och
+  // fram till /betalning är vi på samma origin, så det får ligga i sessionStorage
+  // (sessionStorage på enklabokslut.se går inte att läsa på app-subdomänen).
+  useEffect(() => {
+    const plan = parsePlan(searchParams.get('plan'));
+    if (plan) {
+      try { sessionStorage.setItem('billingPeriod', plan); } catch {}
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

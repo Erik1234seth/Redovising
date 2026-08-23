@@ -722,8 +722,7 @@ export default function Home() {
                     </ul>
 
                     <Link
-                      href="/kvalificera"
-                      onClick={() => { try { sessionStorage.setItem('billingPeriod', billing); } catch {} }}
+                      href={`/kvalificera?plan=${billing}`}
                       className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 text-sm hover:opacity-90 hover:scale-[1.01]"
                       style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 20px ${CORAL}40` }}
                     >

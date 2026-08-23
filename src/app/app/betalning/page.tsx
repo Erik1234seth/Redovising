@@ -25,8 +25,28 @@ export default function BetalningPage() {
   const pkg = packages[0];
 
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
+  const [preselected, setPreselected] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Valde kunden upplägg redan på webbplatsen följde det med hit via ?plan= på
+  // signup-sidan. Förvälj det i stället för att ställa samma fråga en gång till.
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('billingPeriod');
+      if (saved === 'monthly' || saved === 'yearly') {
+        setBilling(saved);
+        setPreselected(true);
+      }
+    } catch {}
+  }, []);
+
+  // Byter kunden här är det det valet som gäller, även efter en omladdning.
+  const chooseBilling = (next: 'monthly' | 'yearly') => {
+    setBilling(next);
+    setPreselected(false);
+    try { sessionStorage.setItem('billingPeriod', next); } catch {}
+  };
 
   // Redan aktiv? Skicka till välkomstskärmen (inte in i appen).
   useEffect(() => {
@@ -129,14 +149,14 @@ export default function BetalningPage() {
               {/* Billing toggle */}
               <div className="flex items-center gap-1 p-1 rounded-xl mb-6" style={{ backgroundColor: 'rgba(255,255,255,0.07)' }}>
                 <button
-                  onClick={() => setBilling('monthly')}
+                  onClick={() => chooseBilling('monthly')}
                   className="flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200"
                   style={billing === 'monthly' ? { backgroundColor: 'white', color: NAV_BG } : { color: 'rgba(255,255,255,0.5)' }}
                 >
                   Månadsvis
                 </button>
                 <button
-                  onClick={() => setBilling('yearly')}
+                  onClick={() => chooseBilling('yearly')}
                   className="flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5"
                   style={billing === 'yearly' ? { backgroundColor: 'white', color: NAV_BG } : { color: 'rgba(255,255,255,0.5)' }}
                 >
@@ -146,6 +166,12 @@ export default function BetalningPage() {
                   </span>
                 </button>
               </div>
+
+              {preselected && (
+                <p className="text-xs text-white/45 -mt-3 mb-5 text-center">
+                  Vi har förvalt upplägget du valde på webbplatsen — du kan byta här.
+                </p>
+              )}
 
               <div className="mb-6 pb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                 <div className="flex items-end gap-1.5">
