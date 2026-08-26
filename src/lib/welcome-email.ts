@@ -1,10 +1,18 @@
 import { Resend } from 'resend';
-import { sendAndLog, INTERNAL_NOTICE_TO } from './email-log';
+import { INTERNAL_NOTICE_TO } from './email-log';
+import { sendViaGmail } from './emails/send-via-gmail';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Skickar välkomstmejl till kunden + notis till Erik. Återanvänds av både
 // månads-checkout (Stripe-webhook) och årsvis-signup (faktureras i efterhand).
+//
+// Kundens mejl går via Eriks Gmail, inte via Resend. Det kommer då från
+// erik@enklabokslut.se istället för noreply@, hamnar i Skickat, och svarar
+// kunden landar svaret i tråden som mail-AI:n bevakar — ett noreply@ hade
+// varit en återvändsgränd. Notisen till oss själva ligger kvar på Resend:
+// den ska ingen svara på, och den behöver kundens adress som replyTo, vilket
+// Apps Script-utskicket inte kan sätta per mejl.
 export async function sendWelcomeEmails(params: {
   email: string;
   name?: string;
@@ -107,12 +115,11 @@ export async function sendWelcomeEmails(params: {
         <p><strong>Kontaktmetod:</strong> ${contactMethod === 'meeting' ? 'Möte' : 'Mail'}</p>
       `,
     }),
-    sendAndLog(resend, {
-      from: 'Enkla Bokslut <noreply@enklabokslut.se>',
-      replyTo: 'erik@enklabokslut.se',
+    sendViaGmail({
       to: email,
       subject: 'Välkommen till Enkla Bokslut!',
       html: customerHtml,
-    }, 'valkommen'),
+      kind: 'valkommen',
+    }),
   ]);
 }
