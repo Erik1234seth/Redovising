@@ -287,14 +287,31 @@ async function build(): Promise<Map<string, Built>> {
     const root = groups.join([phoneKey(r.phone)]);
     const outgoing = r.direction === 'out';
     const failed = r.status === 'failed' || r.status === 'rate_limited';
+    // AI-svaren skrivs som utkast och går ut först när någon godkänt dem på
+    // /admin/sms. Ett utkast som ligger kvar är inget fel, men det är heller
+    // inte ett skickat SMS — därför egen titel och ingen räkning.
+    const draft = r.status === 'draft' || r.status === 'sending';
+    const dropped = r.status === 'discarded' || r.status === 'skipped';
+
     add(root, r.created_at, {
       type: outgoing ? 'sms_ut' : 'sms_in',
-      title: outgoing ? (r.kind === 'lead_welcome' ? 'Välkomst-SMS' : 'SMS från oss') : 'SMS från personen',
+      title: outgoing
+        ? draft ? 'SMS-utkast väntar på godkännande'
+          : r.status === 'discarded' ? 'SMS-utkast slängt'
+          : r.status === 'skipped' ? 'SMS stoppat'
+          : r.kind === 'lead_welcome' ? 'Välkomst-SMS'
+          : 'SMS från oss'
+        : 'SMS från personen',
       detail: r.body,
-      meta: failed ? label(r.error, 'misslyckades') : r.status === 'queued' ? 'köat' : undefined,
+      meta: failed ? label(r.error, 'misslyckades')
+        : draft ? 'ej skickat'
+        : dropped ? label(r.error, 'gick aldrig ut')
+        : r.status === 'queued' ? 'köat'
+        : undefined,
       bad: failed,
     }, { phone: r.phone, alias: [phoneKey(r.phone)] });
-    if (root && !failed) person(root).smsCount += 1;
+
+    if (root && !failed && !draft && !dropped) person(root).smsCount += 1;
   }
 
   for (const r of rows.optouts) {

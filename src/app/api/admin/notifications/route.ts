@@ -105,15 +105,24 @@ export async function GET() {
 
     const failed = r.status === 'failed';
     const queued = r.status === 'queued';
+    // Ett utkast är det enda här som kräver att någon gör något: personen som
+    // messade får inget svar förrän knappen på /admin/sms trycks.
+    const draft = r.status === 'draft' || r.status === 'sending';
+    const discarded = r.status === 'discarded';
+
     notices.push({
       id: `sms-${r.id}`,
       at: r.created_at,
-      level: failed ? 'fail' : queued ? 'info' : 'ok',
+      level: failed ? 'fail' : draft || queued || discarded ? 'info' : 'ok',
       title: failed
         ? `SMS:et till ${r.phone} gick inte fram`
-        : queued
-          ? `SMS till ${r.phone} ligger i kön`
-          : `SMS skickat till ${r.phone}`,
+        : draft
+          ? `Svar till ${r.phone} väntar på ditt godkännande`
+          : discarded
+            ? `Utkastet till ${r.phone} slängdes`
+            : queued
+              ? `SMS till ${r.phone} ligger i kön`
+              : `SMS skickat till ${r.phone}`,
       detail: short(failed ? r.error : r.body),
       personKey: phoneKey(r.phone),
     });

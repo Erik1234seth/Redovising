@@ -284,7 +284,13 @@ async function checkFlows(supabase: SupabaseClient): Promise<StatusCheck[]> {
       label: 'SMS-AI:n svarar',
       row: aiRow,
       failed: aiRow?.status === 'failed',
-      okText: 'Senaste AI-svaret gick fram.',
+      // AI-svaren går inte ut av sig själva längre. Att det senaste ligger som
+      // utkast betyder att AI:n gjort sitt jobb — inte att något gått fram.
+      okText: aiRow?.status === 'draft' || aiRow?.status === 'sending'
+        ? 'Senaste AI-svaret ligger som utkast och väntar på godkännande på /admin/sms.'
+        : aiRow?.status === 'discarded'
+          ? 'Senaste AI-svaret slängdes utan att skickas.'
+          : 'Senaste AI-svaret gick fram.',
       emptyText: 'AI:n har inte behövt svara på något SMS än.',
     }),
     {

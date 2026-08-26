@@ -67,6 +67,25 @@ export interface StatusReport {
   checkedAt: string;
 }
 
+/**
+ * Ett AI-svar som väntar på att godkännas på /admin/sms.
+ *
+ * Är en rad i `sms_messages` med `status: 'draft'` — ingen egen tabell. `body`
+ * är AI:ns förslag, eller den senast sparade ändringen av det.
+ */
+export interface SmsDraft {
+  id: string;
+  phone: string;
+  body: string;
+  /** När utkastet skrevs. Ålder är det som avgör hur bråttom det är. */
+  at: string;
+  /** SMS:et personen skickade, som utkastet svarar på. */
+  question: string | null;
+  questionAt: string | null;
+  /** Numret har skrivit STOPP medan utkastet låg. Då går det inte att skicka. */
+  optedOut: boolean;
+}
+
 /** En rad i notisklockan. */
 export interface AdminNotice {
   id: string;

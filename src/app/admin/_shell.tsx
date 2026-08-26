@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import NotificationBell from './_bell';
+import DraftBadge from './_draft-badge';
 
 const ADMIN_CODE = 'Erik0511';
 
@@ -65,6 +66,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <Link href="/admin" className="text-white font-bold text-sm hover:text-gold-500 transition">
               Admin
             </Link>
+            <DraftBadge />
             <Link href="/admin/status" className="text-warm-400 text-sm hover:text-gold-500 transition">
               Systemstatus
             </Link>

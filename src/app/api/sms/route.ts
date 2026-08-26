@@ -6,15 +6,31 @@ import { identifySender } from '@/lib/sms/identify';
 import { generateSmsReply } from '@/lib/sms/answer';
 
 // o3 plus två vektorsökningar tar längre tid än Twilios webhook-timeout på 15 s.
-// Därför kvitteras webhooken direkt och svaret genereras och skickas efteråt,
-// via Twilios REST-API istället för TwiML.
+// Därför kvitteras webhooken direkt och svaret genereras efteråt, via Twilios
+// REST-API istället för TwiML.
+//
+// AI-svaret skickas INTE härifrån. Det sparas som ett utkast (status 'draft')
+// och går ut först när någon tryckt Skicka i adminpanelen, på /admin/sms.
+// Fram till dess får personen som messat inget svar alls — förr kom det inom
+// någon halvminut. Det är priset för att ingenting går ut ogranskat, och det
+// är därför utkasten har en egen sida med räknare i navigeringen istället för
+// att bara ligga i tidslinjen.
+//
+// Opt-in-bekräftelsen nedan går fortfarande direkt: den är en fast mening,
+// inte AI-genererad, och ett svar på START som dröjer är obegripligt.
 export const maxDuration = 120;
 
 /** Ord som stänger av utskick. Twilios inbyggda opt-out är på engelska. */
 const STOP_WORDS = ['stopp', 'stop', 'avsluta', 'avregistrera', 'sluta', 'unsubscribe'];
 const START_WORDS = ['start', 'starta', 'ja tack'];
 
-/** Tak för utgående SMS per nummer och rullande timme — hindrar loopar och rusningar. */
+/**
+ * Tak för utgående rader per nummer och rullande timme.
+ *
+ * Räknar även utkast, inklusive slängda. Sedan svaren blev utkast kan inget gå
+ * i loop av sig självt längre — det taket skyddar numera mot att någon som
+ * spammar oss kostar oss ett o3-anrop per SMS.
+ */
 const MAX_OUT_PER_HOUR = 10;
 
 function getSupabase() {
@@ -165,17 +181,17 @@ export async function POST(request: Request) {
         return;
       }
 
-      const sid = await sendSms({ to: from, body: reply });
+      // Utkast, inte utskick. Raden plockas upp av /admin/sms.
       await log(sb, {
         phone: from, direction: 'out', body: reply,
-        twilio_sid: sid, user_id: sender.userId, status: 'sent',
+        user_id: sender.userId, status: 'draft',
       });
-      console.log(`[sms] svarade ${from} (${sender.kind}, ${reply.length} tecken)`);
+      console.log(`[sms] utkast till ${from} väntar på godkännande (${sender.kind}, ${reply.length} tecken)`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[sms] kunde inte svara ${from}:`, msg);
+      console.error(`[sms] kunde inte skriva utkast till ${from}:`, msg);
       await log(sb, {
-        phone: from, direction: 'out', body: '(inget svar skickat)',
+        phone: from, direction: 'out', body: '(inget utkast skrevs)',
         user_id: sender.userId, status: 'failed', error: msg,
       });
     }
