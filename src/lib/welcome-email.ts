@@ -77,16 +77,19 @@ export async function sendWelcomeEmails(params: {
           ${emailHeader}
           <tr><td style="padding:40px;">
             <p style="margin:0 0 8px;font-size:24px;font-weight:700;color:#173b57;">Välkommen${firstName ? ', ' + firstName : ''}!</p>
-            <p style="margin:0 0 16px;font-size:16px;color:#5a6a7a;line-height:1.6;">Tack för att du valt Enkla Bokslut — kul att du hoppade ombord! Vi tar hand om din bokföring, momsredovisning, bokslut och NE-bilaga.</p>
+            <p style="margin:0 0 16px;font-size:16px;color:#5a6a7a;line-height:1.6;">Tack för att du valt Enkla Bokslut — kul att du hoppade ombord!</p>
             <p style="margin:0 0 16px;font-size:15px;color:#5a6a7a;line-height:1.7;">Nu är allt uppsatt och klart — du behöver inte göra något mer för att komma igång.</p>
-            <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Härifrån är det enkelt: mejla in dina underlag löpande, till exempel kvitton och fakturor, så tar vi hand om resten.</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Härifrån är det enkelt: mejla in dina underlag löpande, så tar vi hand om resten. Underlagen kan bestå av till exempel text, foton, kontoutdrag, pdf-filer eller excelfiler. Huvudsaken är att vi får de uppgifter vi behöver för att kunna kontera dem på ett säkert sätt.</p>
             <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#fdf3f3;border-radius:8px;border:1px solid #f5d7d9;margin-bottom:24px;">
               <tr><td style="padding:20px;text-align:center;">
                 <p style="margin:0 0 6px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#8fa3b1;">Skicka dina underlag till</p>
                 <p style="margin:0;font-size:18px;font-weight:700;"><a href="mailto:erik@enklabokslut.se" style="color:#E95C63;text-decoration:none;">erik@enklabokslut.se</a></p>
               </td></tr>
             </table>
-            <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Har du några frågor är det bara att höra av dig — svara direkt på detta mail, det är jag som läser det.</p>
+            <p style="margin:0 0 16px;font-size:15px;color:#5a6a7a;line-height:1.7;">I början kommer vi säkert att ställa en del frågor:)</p>
+            <p style="margin:0 0 16px;font-size:15px;color:#5a6a7a;line-height:1.7;">Du använder alltid denna e-postadress när du mailar till oss oavsett om det är frågor eller underlag du skickar in.</p>
+            <p style="margin:0 0 16px;font-size:15px;color:#5a6a7a;line-height:1.7;">För att vi ska komma igång får du gärna börja skicka in underlag direkt. Då kan vi se att underlagen innehåller den information vi behöver för att kunna bokföra dem rätt och om det är något vi behöver komplettera med hör vi av oss.</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Har du några frågor är det bara att höra av dig.</p>
             <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:24px;">
               <tr><td style="padding:20px;">
                 <p style="margin:0 0 8px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#8fa3b1;">Din prenumeration</p>
