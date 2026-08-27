@@ -103,7 +103,18 @@ export async function retrieveExamples(params: {
   /** Se retrieveKnowledge — samma embedding kan återanvändas här. */
   queryEmbedding?: number[] | null;
 }): Promise<string> {
-  const { supabase, query, matchCount = 3, threshold = 0.35 } = params;
+  // Tröskeln var 0.35, vilket i praktiken inte filtrerade något: mätt över
+  // mailbanken klarade 93 procent av alla par den gränsen. Medianlikheten
+  // mellan två slumpmässiga mejl ligger på 0.52, så allt därunder är brus och
+  // ett svar om moms kunde dras in som "liknande" på en fråga om priset.
+  //
+  // 0.60 släpper igenom 18 procent av paren och ligger tydligt över brusgolvet.
+  // Kalibrerat mot kända par: 0.738 (betalning mot betalning) och 0.655
+  // (faktura mot kreditfaktura) ska med, 0.595 ska bort.
+  //
+  // Hellre inga exempel än fel exempel. Blocket är en stilförebild, och
+  // returneras tom sträng skriver modellen utifrån prompten som förut.
+  const { supabase, query, matchCount = 3, threshold = 0.6 } = params;
 
   if (!query.trim()) return '';
 
