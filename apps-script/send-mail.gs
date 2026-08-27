@@ -1,48 +1,37 @@
-// ─── Konfiguration ────────────────────────────────────────────────────────────
-// Läggs till som en EGEN FIL i samma Apps Script-projekt som checkInbox.
-// Rör inte den befintliga koden — projektet får ha en doGet och en doPost, och
-// den gamla filen äger doGet medan den här äger doPost.
-//
-// Sätt i: Project Settings → Script Properties:
-// GMAIL_SCRIPT_SECRET = (samma hemliga nyckel som i .env och Vercel)
-//
-// Publicera sedan om projektet så att doPost kommer med:
-// Distribuera → Hantera distributioner → pennan → Version: Ny version → Distribuera
-// Samma URL som förut fortsätter gälla, nu med både doGet och doPost.
-// Den URL:en läggs i GMAIL_SCRIPT_URL i .env.local och i Vercel.
+/**
+ * Skickar mejl från Eriks Gmail på begäran av enklabokslut.se.
+ *
+ * Klistras in i SAMMA Apps Script-projekt som redan driver mail-AI:n, så att
+ * utskick och inkommande svar hamnar i samma konto. Lägg till som en egen fil
+ * — rör inte den befintliga koden.
+ *
+ * Publicera sedan: Distribuera → Ny distribution → Webbapp
+ *   Kör som:            Jag (erik@enklabokslut.se)
+ *   Vem har åtkomst:    Alla
+ * Kopiera webbapp-URL:en till GMAIL_SCRIPT_URL i Vercel.
+ *
+ * "Alla" låter otäckt men är enda sättet att nå den utan Google-inloggning.
+ * Skyddet är hemligheten i anropets kropp — utan rätt SECRET händer ingenting.
+ */
+
+// Måste vara exakt samma sträng som GMAIL_SCRIPT_SECRET i .env.local och i
+// Vercel. Byt ut den HÄR I APPS SCRIPT-REDIGERAREN, inte i den här filen —
+// filen ligger i git och hemligheten ska inte med dit.
+const SECRET = 'SATT_I_APPS_SCRIPT_REDIGERAREN';
 
 const SENDER_NAME = 'Erik på Enkla Bokslut';
 const REPLY_TO = 'erik@enklabokslut.se';
 
-function getSendConfig() {
-  const props = PropertiesService.getScriptProperties();
-  return {
-    secret: props.getProperty('GMAIL_SCRIPT_SECRET'),
-  };
-}
-
-// ─── Utskick på begäran från enklabokslut.se ──────────────────────────────────
-// Webbappen måste publiceras med "Alla" som åtkomst, annars svarar Google med
-// en inloggningssida istället. Skyddet är hemligheten i anropets kropp —
-// headers går inte att kräva på en publicerad Apps Script-webbapp.
-
 function doPost(e) {
   try {
-    const config = getSendConfig();
-
-    if (!config.secret) {
-      return json({ ok: false, error: 'GMAIL_SCRIPT_SECRET saknas i Script Properties' });
-    }
-
     if (!e || !e.postData || !e.postData.contents) {
       return json({ ok: false, error: 'Tom förfrågan' });
     }
 
     const payload = JSON.parse(e.postData.contents);
 
-    if (payload.secret !== config.secret) {
-      console.error('doPost: fel hemlighet');
-      return json({ ok: false, error: 'Unauthorized' });
+    if (payload.secret !== SECRET) {
+      return json({ ok: false, error: 'Fel hemlighet' });
     }
 
     if (!payload.to || !payload.subject || !payload.html) {
@@ -55,31 +44,23 @@ function doPost(e) {
       replyTo: REPLY_TO,
     });
 
-    console.log('doPost: mejl skickat till ' + payload.to);
+    // Trådens id gör att svaret går att koppla ihop med utskicket. Gmail ger
+    // oss inget id direkt från sendEmail, så vi letar upp den nyss skickade.
+    var threadId = '';
+    try {
+      const sent = GmailApp.search('to:' + payload.to + ' in:sent', 0, 1);
+      if (sent.length > 0) threadId = sent[0].getId();
+    } catch (searchError) {
+      // Utskicket gick ändå — id:t är en bonus, inte ett krav
+    }
 
-    return json({ ok: true, threadId: findSentThreadId(payload.to) });
-  } catch (err) {
-    console.error('doPost error:', err.message);
-    return json({ ok: false, error: String(err) });
+    return json({ ok: true, threadId: threadId });
+  } catch (error) {
+    return json({ ok: false, error: String(error) });
   }
 }
 
-// ─── Hjälpfunktioner ──────────────────────────────────────────────────────────
-
-// GmailApp.sendEmail returnerar ingenting, så tråden får letas upp i efterhand.
-// Best effort: id:t används bara för att kunna koppla ihop svaret med utskicket
-// i adminpanelen, och utskicket har redan gått när vi kommer hit.
-function findSentThreadId(to) {
-  try {
-    const sent = GmailApp.search('in:sent to:' + to, 0, 1);
-    return sent.length > 0 ? sent[0].getId() : '';
-  } catch (err) {
-    console.error('findSentThreadId error:', err.message);
-    return '';
-  }
-}
-
-// Textversion för mejlklienter som inte visar HTML.
+/** Textversion för mejlklienter som inte visar HTML. */
 function stripHtml(html) {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -90,7 +71,6 @@ function stripHtml(html) {
     .replace(/&amp;/g, '&')
     .replace(/&mdash;/g, '—')
     .replace(/&middot;/g, '·')
-    .replace(/&#10003;/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -101,13 +81,14 @@ function json(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// Kör en gång från redigeraren för att godkänna Gmail-behörigheten innan du
-// publicerar. Mejlar dig själv.
+/**
+ * Kör den här en gång från redigeraren för att godkänna behörigheterna, innan
+ * du publicerar. Den mejlar dig själv.
+ */
 function testaUtskick() {
   GmailApp.sendEmail(REPLY_TO, 'Test från Apps Script', 'Fungerar.', {
     htmlBody: '<p>Fungerar.</p>',
     name: SENDER_NAME,
     replyTo: REPLY_TO,
   });
-  console.log('testaUtskick: skickat till ' + REPLY_TO);
 }
