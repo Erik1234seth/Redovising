@@ -42,6 +42,30 @@ const LINE_MARKERS = [
   /^[ \t]*(?:Skickat|Hämta|Skaffa) (?:från|för) Outlook /mi,
   /^[ \t]*Get Outlook for /mi,
   /^[ \t]*Detta mejl kan innehålla konfidentiell/mi,
+
+  // Citathuvud från Gmail på ungerska. En av kunderna har sin Gmail inställd
+  // så, och då hjälper varken det svenska eller det engelska mönstret. Raden
+  // inleds med avsändarens namn i stället för ett datum, så här matchas hela
+  // raden fram till frasen och klippet hamnar ändå vid radens början.
+  /^[^\n]*\bezt írta \(időpont:/mi,
+
+  // Avslutningsfraser. Allt efter dem är signatur, inte innehåll. Gäller både
+  // kundens mejl (id=3 och id=4 slutade med avsändarens egen signatur) och
+  // våra egna svar, där signaturen annars motsäger reply-rules.ts som
+  // uttryckligen förbjuder modellen att skriva någon.
+  /^[ \t]*Med[ \t]+vänlig(?:a|t)?[ \t]+hälsning(?:ar)?\b/mi,
+  /^[ \t]*(?:Vänliga|Bästa|Varma)[ \t]+hälsningar\b/mi,
+  /^[ \t]*Hälsningar\b/mi,
+  /^[ \t]*Hälsar\b/mi,
+  /^[ \t]*Mvh\b/mi,
+  /^[ \t]*M\.[ \t]*v\.[ \t]*h\.?/mi,
+  /^[ \t]*(?:Best|Kind)[ \t]+regards\b/mi,
+  /^[ \t]*Sincerely\b/mi,
+
+  // "Vänligen" bara när den står ensam på raden. Som inledning är den nästan
+  // alltid en uppmaning ("Vänligen återkom med...") och inte en avslutning,
+  // och då hade ett klipp tagit bort resten av mejlet.
+  /^[ \t]*Vänligen[ \t]*[,!.]?[ \t]*$/mi,
 ];
 
 // Citathuvuden ("Den mån 22 aug. 2026 kl. 11:31 skrev Erik <...>:").
