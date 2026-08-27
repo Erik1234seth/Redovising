@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
@@ -453,15 +452,16 @@ export default function NyFakturaPage() {
           {sparadeProdukter.length === 0 ? (
             <div className="flex flex-col items-center py-6 text-center">
               <p className="text-sm text-slate-500 mb-4">Du har inga sparade produkter ännu.</p>
-              <Link
-                href="/kunder-produkter/ny-produkt"
+              <button
+                type="button"
+                onClick={() => setNyProduktForRadId(rader[0].id)}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-xl hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: NAV_BG }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                 </svg>
                 Lägg till produkt
-              </Link>
+              </button>
             </div>
           ) : (
             <>
