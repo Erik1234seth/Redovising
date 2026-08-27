@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import type { SmsDraft } from '@/lib/admin-types';
-import { relativeTime, fullDate } from '../_pipeline';
+import { relativeTime, fullDate, segments } from '../_pipeline';
 import { formatPhone } from '@/lib/sms/phone';
+import SmsComposer from '../_sms-composer';
 
 /**
  * AI-svaren som väntar på godkännande.
@@ -18,28 +19,13 @@ import { formatPhone } from '@/lib/sms/phone';
  * det som står i rutan är också det som hamnar i personens tidslinje efteråt.
  */
 
-/** Twilio delar långa SMS i segment som debiteras var för sig. */
-const GSM_SEGMENT = 160;
-const UNICODE_SEGMENT = 70;
-
-/**
- * Ungefär hur många SMS texten blir. Ett tecken utanför Latin-1 — en emoji, ett
- * tankstreck klistrat från Word — tvingar Twilio till UCS-2, och då ryms 70
- * tecken per segment istället för 160. Räknaren finns för att den skillnaden
- * ska synas innan man trycker skicka, inte på fakturan.
- */
-function segments(text: string): number {
-  if (!text) return 0;
-  const unicode = [...text].some((c) => (c.codePointAt(0) ?? 0) > 0xff);
-  return Math.ceil(text.length / (unicode ? UNICODE_SEGMENT : GSM_SEGMENT));
-}
-
 export default function SmsDraftsPage() {
   const [drafts, setDrafts] = useState<SmsDraft[]>([]);
   const [bodies, setBodies] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [composing, setComposing] = useState(false);
 
   const load = useCallback(() => {
     fetch('/api/admin/sms-drafts')
@@ -101,12 +87,20 @@ export default function SmsDraftsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">SMS-utkast</h1>
-        <p className="text-warm-400 text-sm mt-1.5">
-          AI:n har skrivit svaren nedan men inget går ut förrän du trycker Skicka. Ändra
-          texten om du vill. Personen väntar under tiden.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">SMS-utkast</h1>
+          <p className="text-warm-400 text-sm mt-1.5">
+            AI:n har skrivit svaren nedan men inget går ut förrän du trycker Skicka. Ändra
+            texten om du vill. Personen väntar under tiden.
+          </p>
+        </div>
+        <button
+          onClick={() => setComposing(true)}
+          className="px-4 py-2 bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-xl text-sm font-medium transition shrink-0"
+        >
+          + Nytt SMS
+        </button>
       </div>
 
       {error && (
@@ -207,8 +201,10 @@ export default function SmsDraftsPage() {
 
       <p className="text-warm-600 text-xs">
         Välkomst-SMS till nya leads går fortfarande ut direkt — de är en fast mall och
-        hamnar aldrig här.
+        hamnar aldrig här. Detsamma gäller det du själv skriver under + Nytt SMS.
       </p>
+
+      {composing && <SmsComposer onClose={() => setComposing(false)} />}
     </div>
   );
 }

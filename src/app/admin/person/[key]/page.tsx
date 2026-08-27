@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import type { Person, TimelineEvent } from '@/lib/admin-types';
 import { STAGES, EVENT_STYLE, fullDate } from '../../_pipeline';
+import DeletePerson from '../../_delete-person';
+import SmsComposer from '../../_sms-composer';
 import { formatPhone } from '@/lib/sms/phone';
 
 export default function PersonPage() {
@@ -18,8 +20,12 @@ export default function PersonPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [savingStage, setSavingStage] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [messaging, setMessaging] = useState(false);
 
-  useEffect(() => {
+  // Ligger i en useCallback för att kunna köras om efter ett manuellt SMS —
+  // det ska synas i historiken direkt, utan att sidan laddas om.
+  const load = useCallback(() => {
     if (!rawKey) return;
     fetch(`/api/admin/people?key=${encodeURIComponent(decodeURIComponent(rawKey))}`)
       .then((r) => r.json())
@@ -34,6 +40,8 @@ export default function PersonPage() {
       })
       .catch(() => { setError('Kunde inte hämta personen'); setLoading(false); });
   }, [rawKey]);
+
+  useEffect(load, [load]);
 
   const setStage = async (stage: number) => {
     if (!person?.contactId || savingStage) return;
@@ -52,17 +60,6 @@ export default function PersonPage() {
       setPerson((p) => (p ? { ...p, stage: previous } : p));
       setError('Steget kunde inte sparas');
     }
-  };
-
-  const remove = async () => {
-    if (!person?.contactId) return;
-    if (!confirm('Ta bort kontaktförfrågan? Mejl, SMS och möten ligger kvar.')) return;
-    await fetch('/api/admin/people', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contactId: person.contactId }),
-    });
-    router.push('/admin');
   };
 
   if (loading) return <div className="text-center py-20 text-warm-400">Laddar...</div>;
@@ -123,14 +120,24 @@ export default function PersonPage() {
             )}
           </div>
 
-          {person.contactId && (
+          <div className="flex items-center gap-2 shrink-0">
+            {person.phone && (
+              <button
+                onClick={() => setMessaging(true)}
+                disabled={person.optedOut}
+                title={person.optedOut ? 'Numret har avregistrerat sig från SMS' : undefined}
+                className="px-3 py-1.5 text-xs bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                + SMS
+              </button>
+            )}
             <button
-              onClick={remove}
-              className="px-3 py-1.5 text-xs bg-red-500/15 hover:bg-red-500/30 text-red-400 rounded-lg transition shrink-0"
+              onClick={() => setDeleting(true)}
+              className="px-3 py-1.5 text-xs bg-red-500/15 hover:bg-red-500/30 text-red-400 rounded-lg transition"
             >
               Ta bort
             </button>
-          )}
+          </div>
         </div>
       </div>
 
@@ -234,6 +241,22 @@ export default function PersonPage() {
           Mejl loggas sedan 20 aug 2026. Äldre utskick finns inte registrerade.
         </p>
       </div>
+
+      {messaging && person.phone && (
+        <SmsComposer
+          to={{ phone: person.phone, name: person.name, optedOut: person.optedOut }}
+          onClose={() => setMessaging(false)}
+          onSent={load}
+        />
+      )}
+
+      {deleting && (
+        <DeletePerson
+          people={[person]}
+          onClose={() => setDeleting(false)}
+          onDeleted={() => router.push('/admin')}
+        />
+      )}
     </div>
   );
 }
