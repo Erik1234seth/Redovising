@@ -1,8 +1,26 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { ADMIN_COOKIE, isValidSession } from '@/lib/admin-auth';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
+
+  /**
+   * Admin-API:t kräver inloggning, och kontrollen ligger här istället för i
+   * varje route — då går den inte att glömma i nästa endpoint någon lägger
+   * till. Inloggningsrouten är undantagen, annars fanns ingen väg in.
+   *
+   * Sidorna under /admin är medvetet inte spärrade här: de innehåller ingen
+   * data i sig utan hämtar allt härifrån, och skalet visar kodrutan när
+   * anropet nedan svarar 401.
+   */
+  if (request.nextUrl.pathname.startsWith('/api/admin')) {
+    const isLogin = request.nextUrl.pathname === '/api/admin/login';
+    if (!isLogin && !(await isValidSession(request.cookies.get(ADMIN_COOKIE)?.value))) {
+      return NextResponse.json({ error: 'Ej inloggad' }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
 
   const isApp =
     hostname === 'app.enklabokslut.se' ||

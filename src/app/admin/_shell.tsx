@@ -5,21 +5,30 @@ import Link from 'next/link';
 import NotificationBell from './_bell';
 import DraftBadge from './_draft-badge';
 
-const ADMIN_CODE = 'Erik0511';
-
+/**
+ * Koden kontrolleras på servern, i `/api/admin/login`. Att jämföra den här
+ * inne vore verkningslöst: allt som ligger i en klientkomponent går att läsa i
+ * webbläsaren, och det är ändå middleware som avgör om API:t svarar.
+ */
 function CodeGate({ onUnlock }: { onUnlock: () => void }) {
   const [code, setCode] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (code === ADMIN_CODE) {
-      sessionStorage.setItem('admin_unlocked', '1');
-      onUnlock();
-    } else {
-      setError(true);
-      setCode('');
-    }
+    setBusy(true);
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    }).catch(() => null);
+    setBusy(false);
+
+    if (res?.ok) { onUnlock(); return; }
+    const data = await res?.json().catch(() => null);
+    setError(data?.error || 'Fel kod, försök igen');
+    setCode('');
   };
 
   return (
@@ -30,16 +39,17 @@ function CodeGate({ onUnlock }: { onUnlock: () => void }) {
         <input
           type="password"
           value={code}
-          onChange={(e) => { setCode(e.target.value); setError(false); }}
+          onChange={(e) => { setCode(e.target.value); setError(''); }}
           autoFocus
           className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition mb-4"
         />
-        {error && <p className="text-red-400 text-sm mb-3">Fel kod, försök igen</p>}
+        {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
         <button
           type="submit"
-          className="w-full py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200"
+          disabled={busy || !code}
+          className="w-full py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200 disabled:opacity-50"
         >
-          Logga in
+          {busy ? 'Loggar in...' : 'Logga in'}
         </button>
       </form>
     </div>
@@ -50,9 +60,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const [unlocked, setUnlocked] = useState(false);
   const [checked, setChecked] = useState(false);
 
+  // Kakan är HttpOnly och går inte att läsa härifrån — servern får svara på
+  // om den fortfarande duger.
   useEffect(() => {
-    if (sessionStorage.getItem('admin_unlocked') === '1') setUnlocked(true);
-    setChecked(true);
+    fetch('/api/admin/login')
+      .then((r) => setUnlocked(r.ok))
+      .catch(() => setUnlocked(false))
+      .finally(() => setChecked(true));
   }, []);
 
   if (!checked) return null;
@@ -74,7 +88,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           <div className="flex items-center gap-1">
             <NotificationBell />
             <button
-              onClick={() => { sessionStorage.removeItem('admin_unlocked'); setUnlocked(false); }}
+              onClick={async () => {
+                await fetch('/api/admin/login', { method: 'DELETE' }).catch(() => null);
+                setUnlocked(false);
+              }}
               className="px-3 py-1.5 text-xs text-warm-500 hover:text-warm-300 transition"
             >
               Logga ut

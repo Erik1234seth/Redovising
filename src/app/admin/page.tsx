@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import type { Person } from '@/lib/admin-types';
 import { STAGES, shortDate } from './_pipeline';
+import DeletePerson from './_delete-person';
 import { formatPhone } from '@/lib/sms/phone';
 
 type Filter = 'alla' | 'prospekt' | 'kunder';
@@ -31,6 +32,8 @@ export default function PeoplePage() {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', phone: '' });
   const [saving, setSaving] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState<Person[] | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -56,6 +59,19 @@ export default function PeoplePage() {
         .some((v) => v?.toLowerCase().includes(q));
     });
   }, [people, query, filter]);
+
+  const toggle = (key: string) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  };
+
+  // Markeringen följer med när man söker eller byter filter — den som väljer ut
+  // fem rader och sedan skriver i sökrutan har inte ångrat sitt urval.
+  const chosen = people.filter((p) => selected.has(p.key));
+  const allVisibleSelected = visible.length > 0 && visible.every((p) => selected.has(p.key));
 
   const save = async () => {
     setSaving(true);
@@ -123,11 +139,53 @@ export default function PeoplePage() {
             {people.length === 0 ? 'Inga personer ännu' : 'Ingen träff'}
           </div>
         ) : (
-          visible.map((p) => (
-            <Link
+          <>
+          <div className="flex items-center gap-3 px-4 py-2 bg-navy-800/40 border-b border-navy-600">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={() => setSelected(allVisibleSelected
+                ? new Set()
+                : new Set(visible.map((p) => p.key)))}
+              aria-label="Markera alla i listan"
+              className="w-4 h-4 accent-gold-500 cursor-pointer"
+            />
+            <span className="text-warm-500 text-xs">
+              {selected.size > 0 ? `${selected.size} valda` : 'Markera alla'}
+            </span>
+            {selected.size > 0 && (
+              <button
+                onClick={() => setDeleting(chosen)}
+                className="ml-auto px-3 py-1 text-xs font-medium bg-red-500/15 hover:bg-red-500/30 text-red-400 rounded-lg transition"
+              >
+                Radera valda
+              </button>
+            )}
+          </div>
+
+          {visible.map((p) => (
+            // Kryssrutan och papperskorgen ligger utanför länken — interaktiva
+            // element inuti en <a> går varken att klicka på i lugn och ro
+            // eller att nå med tangentbordet.
+            <div
               key={p.key}
+              className={`flex items-center border-b border-navy-600/50 last:border-0 group transition-colors ${
+                selected.has(p.key) ? 'bg-gold-500/5' : 'hover:bg-navy-700/40'
+              }`}
+            >
+            <label className="pl-4 pr-2 py-3 shrink-0 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selected.has(p.key)}
+                onChange={() => toggle(p.key)}
+                aria-label={`Markera ${p.name || p.email || p.phone || 'personen'}`}
+                className="w-4 h-4 accent-gold-500 cursor-pointer"
+              />
+            </label>
+
+            <Link
               href={`/admin/person/${encodeURIComponent(p.key)}`}
-              className="flex items-center gap-4 px-4 py-3 border-b border-navy-600/50 last:border-0 hover:bg-navy-700/40 transition-colors"
+              className="flex items-center gap-4 flex-1 min-w-0 py-3 pr-2"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -157,9 +215,30 @@ export default function PeoplePage() {
                 {shortDate(p.lastActivity)}
               </div>
             </Link>
-          ))
+
+            <button
+              onClick={() => setDeleting([p])}
+              title="Radera personen"
+              aria-label={`Radera ${p.name || p.email || p.phone || 'personen'}`}
+              className="mr-3 w-7 h-7 shrink-0 flex items-center justify-center rounded-lg text-warm-600 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-500/20 hover:text-red-400 transition"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                <path d="M3 6h18M8 6V4h8v2m-9 0v14a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            </div>
+          ))}
+          </>
         )}
       </div>
+
+      {deleting && (
+        <DeletePerson
+          people={deleting}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => { setDeleting(null); setSelected(new Set()); load(); }}
+        />
+      )}
 
       {adding && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">

@@ -296,10 +296,14 @@ async function build(): Promise<Map<string, Built>> {
     add(root, r.created_at, {
       type: outgoing ? 'sms_ut' : 'sms_in',
       title: outgoing
-        ? draft ? 'SMS-utkast väntar på godkännande'
+        // Ett manuellt SMS passerar aldrig utkaststadiet — står det kvar som
+        // 'sending' fastnade det på vägen ut, och det är något annat än ett
+        // förslag som väntar på dig.
+        ? draft ? r.kind === 'manual' ? 'SMS fastnade på väg ut' : 'SMS-utkast väntar på godkännande'
           : r.status === 'discarded' ? 'SMS-utkast slängt'
           : r.status === 'skipped' ? 'SMS stoppat'
           : r.kind === 'lead_welcome' ? 'Välkomst-SMS'
+          : r.kind === 'manual' ? 'SMS du skrev själv'
           : 'SMS från oss'
         : 'SMS från personen',
       detail: r.body,
@@ -405,11 +409,7 @@ export async function GET(request: NextRequest) {
 
     // Slå upp på vilken som helst av personens adresser eller nummer, så att
     // länken håller även om vi senare byter vilken uppgift som är primär.
-    const needle = wanted; // searchParams har redan avkodat värdet
-    const match = [...people.values()].find(
-      (p) => p.key === needle || p.aliases.includes(needle)
-        || p.email?.toLowerCase() === needle.toLowerCase() || p.phone === needle,
-    );
+    const match = locate(people, wanted); // searchParams har redan avkodat värdet
 
     if (!match) return NextResponse.json({ error: 'Hittade ingen sådan person' }, { status: 404 });
     return NextResponse.json({
@@ -463,19 +463,247 @@ export async function POST(request: NextRequest) {
   }
 }
 
+
 /**
- * Tar bort kontaktförfrågan. Mejl, SMS och möten ligger kvar — de hör till
- * historiken och skulle ändå inte gå att koppla tillbaka om de raderades.
+ * Vad en radering faktiskt rör, i den ordning främmande nycklar tillåter:
+ * barnraderna först, profilen sist, och auth-användaren allra sist.
+ *
+ * `sms_optouts` står medvetet inte med. Har någon skrivit STOPP ska det gälla
+ * även efter att vi rensat bort resten — annars börjar utskicken om från noll
+ * nästa gång numret dyker upp. `subscriptions` lämnas också kvar: den raden är
+ * vår spegling av Stripe, och att radera den säger inte upp någonting.
+ */
+interface DeleteStep {
+  table: string;
+  column: string;
+  values: string[];
+}
+
+interface DeletePlan {
+  steps: DeleteStep[];
+  /** Inloggningskonton som ska bort ur auth.users när tabellerna är tömda. */
+  authUserIds: string[];
+  /** Personen betalar fortfarande i Stripe. Raderingen stoppar inte det. */
+  activeSubscription: boolean;
+}
+
+async function planDeletion(persons: Built[]): Promise<DeletePlan> {
+  const supabase = getSupabase();
+
+  // Flera personer på en gång blir en enda plan. Alternativet — en plan per
+  // person — hade läst om samma tabeller en gång per markerad rad.
+  const keys = [...new Set(persons.flatMap((p) => [p.key, ...p.aliases]))];
+  const emails = keys.filter((k) => k.startsWith('e:')).map((k) => k.slice(2));
+  const phones = keys.filter((k) => k.startsWith('p:')).map((k) => k.slice(2));
+
+  const mine = (email: string | null, phone: string | null) => {
+    const e = email?.trim().toLowerCase();
+    const p = normalizePhone(phone);
+    return (!!e && emails.includes(e)) || (!!p && phones.includes(p));
+  };
+
+  /**
+   * Telefonnummer ligger orörda i databasen — "070-123 45 67" och
+   * "+46701234567" är samma nummer men olika strängar, så urvalet måste göras
+   * i JS efter normalisering. Tabellerna det gäller rymmer några tiotal rader
+   * var, så att hämta hem dem kostar ingenting.
+   */
+  async function pick(
+    table: string,
+    columns: string,
+    keep: (row: Record<string, string | null>) => boolean,
+  ): Promise<string[]> {
+    const found: string[] = [];
+    // PostgREST kapar svaret vid 1000 rader, så tabellen måste bläddras
+    // igenom. Rader vi missar här blir kvar i databasen efter raderingen —
+    // tyst, och utan att någon märker det.
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase.from(table).select(columns).range(from, from + 999);
+      if (error) throw new Error(`Kunde inte läsa ${table}: ${error.message}`);
+      const page = (data ?? []) as unknown as Record<string, string | null>[];
+      for (const row of page.filter(keep)) found.push(row.id as string);
+      if (page.length < 1000) return found;
+    }
+  }
+
+  /** Tabeller som bara pekar på ett id klarar sig med en vanlig in-fråga. */
+  async function idsWhere(table: string, column: string, values: string[]): Promise<string[]> {
+    if (!values.length) return [];
+    const found: string[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from(table).select('id').in(column, values).range(from, from + 999);
+      if (error) throw new Error(`Kunde inte läsa ${table}: ${error.message}`);
+      const page = data ?? [];
+      for (const row of page) found.push((row as { id: string }).id);
+      if (page.length < 1000) return found;
+    }
+  }
+
+  const profiles = await pick('profiles', 'id, email, phone', (r) => mine(r.email, r.phone));
+  const contacts = await pick('contact_requests', 'id, email, phone', (r) => mine(r.email, r.phone));
+  const meetings = await pick('meetings', 'id, email, phone', (r) => mine(r.email, r.phone));
+  const mails = await pick('email_log', 'id, to_email', (r) => mine(r.to_email, null));
+  const links = await pick('pending_registrations', 'id, email', (r) => mine(r.email, null));
+  const sms = await pick('sms_messages', 'id, phone, user_id',
+    (r) => mine(null, r.phone) || (!!r.user_id && profiles.includes(r.user_id)));
+  const orders = await pick('orders', 'id, guest_email, guest_phone, user_id',
+    (r) => mine(r.guest_email, r.guest_phone) || (!!r.user_id && profiles.includes(r.user_id)));
+  const customers = await idsWhere('kunder', 'user_id', profiles);
+
+  // Ordningen är inte kosmetisk: fakturor pekar på kunder, filer på ordrar och
+  // nästan allt på profiles. Flyttar man en rad hit upp fallerar raderingen.
+  const steps: DeleteStep[] = [
+    { table: 'contact_files', column: 'contact_id', values: contacts },
+    { table: 'contact_requests', column: 'id', values: contacts },
+    { table: 'meetings', column: 'id', values: meetings },
+    { table: 'pending_registrations', column: 'id', values: links },
+    { table: 'email_log', column: 'id', values: mails },
+    { table: 'sms_messages', column: 'id', values: sms },
+    { table: 'files', column: 'order_id', values: orders },
+    { table: 'files', column: 'user_id', values: profiles },
+    { table: 'user_accounting_documents', column: 'order_id', values: orders },
+    { table: 'user_accounting_documents', column: 'user_id', values: profiles },
+    { table: 'orders', column: 'id', values: orders },
+    { table: 'fakturor', column: 'user_id', values: profiles },
+    { table: 'fakturor', column: 'kund_id', values: customers },
+    { table: 'kunder', column: 'user_id', values: profiles },
+    { table: 'produkter', column: 'user_id', values: profiles },
+    { table: 'lagertillgangar', column: 'user_id', values: profiles },
+    { table: 'bokforing_transaktioner', column: 'user_id', values: profiles },
+    { table: 'manual_transactions', column: 'user_id', values: profiles },
+    { table: 'manual_transactions', column: 'guest_email', values: emails },
+    { table: 'parsed_transactions', column: 'user_id', values: profiles },
+    { table: 'parsed_transactions', column: 'guest_email', values: emails },
+    { table: 'funnel_events', column: 'user_id', values: profiles },
+    { table: 'sie_files', column: 'kund_id', values: profiles },
+    { table: 'email_threads', column: 'user_id', values: profiles },
+    { table: 'profiles', column: 'id', values: profiles },
+  ].filter((step) => step.values.length > 0);
+
+  let activeSubscription = false;
+  if (emails.length) {
+    const { data } = await supabase.from('subscriptions').select('status').in('email', emails);
+    activeSubscription = (data ?? []).some((row) =>
+      ['active', 'trialing', 'past_due'].includes((row as { status: string }).status));
+  }
+
+  return { steps, authUserIds: profiles, activeSubscription };
+}
+
+/**
+ * PostgREST tar emot urvalet som en frågesträng, så en `in`-lista med tusentals
+ * id:n blir en URL som servern vägrar. Markerar man hela listan i panelen är vi
+ * snabbt där, alltså går varje steg i portioner.
+ */
+function chunks(values: string[], size = 200): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < values.length; i += size) out.push(values.slice(i, i + size));
+  return out;
+}
+
+/** Räknar rader per tabell utan att röra något — underlaget till bekräftelsen. */
+async function previewDeletion(plan: DeletePlan) {
+  const supabase = getSupabase();
+
+  const counted = await Promise.all(plan.steps.map(async (step) => {
+    let rows = 0;
+    for (const part of chunks(step.values)) {
+      const { count, error } = await supabase
+        .from(step.table)
+        .select('id', { count: 'exact', head: true })
+        .in(step.column, part);
+      if (error) throw new Error(`Kunde inte räkna ${step.table}: ${error.message}`);
+      rows += count ?? 0;
+    }
+    return { table: step.table, rows };
+  }));
+
+  // Samma tabell kan träffas via flera kolumner — slå ihop dem till en rad
+  const perTable = new Map<string, number>();
+  for (const { table, rows } of counted) {
+    if (rows > 0) perTable.set(table, (perTable.get(table) ?? 0) + rows);
+  }
+
+  return {
+    tables: [...perTable].map(([table, rows]) => ({ table, rows })),
+    total: [...perTable.values()].reduce((sum, n) => sum + n, 0),
+    authUsers: plan.authUserIds.length,
+    activeSubscription: plan.activeSubscription,
+  };
+}
+
+/** Hittar personen på vilken som helst av adresserna eller numren. */
+function locate(people: Map<string, Built>, needle: string): Built | undefined {
+  return [...people.values()].find(
+    (p) => p.key === needle || p.aliases.includes(needle)
+      || p.email?.toLowerCase() === needle.toLowerCase() || p.phone === needle,
+  );
+}
+
+/**
+ * Raderar en eller flera personer ur alla tabeller de förekommer i, inklusive
+ * inloggningskontot. Tar `key` för en person eller `keys` för flera.
+ *
+ * Med `dryRun: true` raderas ingenting — då kommer bara sammanställningen av
+ * vad som skulle försvinna tillbaka, den som bekräftelserutan visar upp. Rutan
+ * är också hela skyddet: det finns ingen bekräftelsesträng och inget sätt att
+ * ångra sig efteråt.
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const { contactId } = await request.json();
-    if (!contactId) return NextResponse.json({ error: 'contactId krävs' }, { status: 400 });
-    const { error } = await getSupabase().from('contact_requests').delete().eq('id', contactId);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const body = await request.json();
+    const wanted: string[] = Array.isArray(body.keys) ? body.keys : body.key ? [body.key] : [];
+    if (!wanted.length) return NextResponse.json({ error: 'key eller keys krävs' }, { status: 400 });
+
+    const people = await build();
+    // Två markerade rader kan visa sig vara samma person — nyckeln avgör
+    const targets = new Map<string, Built>();
+    const missing: string[] = [];
+    for (const key of wanted) {
+      const found = locate(people, key);
+      if (found) targets.set(found.key, found);
+      else missing.push(key);
+    }
+    if (missing.length) {
+      return NextResponse.json(
+        { error: `Hittade ingen person för ${missing.join(', ')}` },
+        { status: 404 },
+      );
+    }
+
+    const plan = await planDeletion([...targets.values()]);
+    if (body.dryRun) return NextResponse.json({ preview: await previewDeletion(plan) });
+
+    const supabase = getSupabase();
+    for (const step of plan.steps) {
+      for (const part of chunks(step.values)) {
+        const { error } = await supabase.from(step.table).delete().in(step.column, part);
+        if (error) {
+          return NextResponse.json(
+            { error: `Stannade vid ${step.table}: ${error.message}. Det som hann raderas är borta.` },
+            { status: 500 },
+          );
+        }
+      }
+    }
+
+    // Auth-användaren sist: profilraden pekar på den, så den måste vara borta
+    // först. Går det ändå fel står personen kvar med ett tomt konto.
+    for (const id of plan.authUserIds) {
+      const { error } = await supabase.auth.admin.deleteUser(id);
+      if (error) {
+        return NextResponse.json(
+          { error: `All data är raderad men inloggningen finns kvar: ${error.message}` },
+          { status: 500 },
+        );
+      }
+    }
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internt fel';
+    console.error('[admin/people DELETE]', message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
