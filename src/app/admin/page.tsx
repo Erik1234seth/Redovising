@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import Link from 'next/link';
 import type { Person } from '@/lib/admin-types';
 import { STAGES, shortDate } from './_pipeline';
@@ -49,16 +49,32 @@ export default function PeoplePage() {
 
   useEffect(load, []);
 
-  const visible = useMemo(() => {
+  /** Sökningen gäller oavsett flik — antalen på flikarna ska följa den. */
+  const found = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return people.filter((p) => {
-      if (filter === 'kunder' && !p.isCustomer) return false;
-      if (filter === 'prospekt' && p.isCustomer) return false;
-      if (!q) return true;
-      return [p.name, p.email, p.phone, p.company, p.source]
-        .some((v) => v?.toLowerCase().includes(q));
-    });
-  }, [people, query, filter]);
+    if (!q) return people;
+    return people.filter((p) =>
+      [p.name, p.email, p.phone, p.company, p.source].some((v) => v?.toLowerCase().includes(q)),
+    );
+  }, [people, query]);
+
+  const counts = useMemo(() => ({
+    alla: found.length,
+    prospekt: found.filter((p) => !p.isCustomer).length,
+    kunder: found.filter((p) => p.isCustomer).length,
+  }), [found]);
+
+  // I "alla" ligger kunderna först och prospekten sedan, med en rubrik emellan.
+  // Sorteringen är stabil, så ordningen inom varje grupp är den API:t gav —
+  // senaste aktivitet först.
+  const visible = useMemo(() => {
+    if (filter === 'kunder') return found.filter((p) => p.isCustomer);
+    if (filter === 'prospekt') return found.filter((p) => !p.isCustomer);
+    return [...found].sort((a, b) => Number(b.isCustomer) - Number(a.isCustomer));
+  }, [found, filter]);
+
+  /** Rubrikraderna dyker bara upp när båda sorterna visas samtidigt. */
+  const grouped = filter === 'alla' && counts.kunder > 0 && counts.prospekt > 0;
 
   const toggle = (key: string) => {
     setSelected((current) => {
@@ -121,11 +137,16 @@ export default function PeoplePage() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition ${
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition flex items-center gap-1.5 ${
                 filter === f ? 'bg-gold-500 text-navy-900' : 'text-warm-400 hover:text-white'
               }`}
             >
               {f}
+              {/* Antalet gör flikarna till en översikt i sig — hur många kunder
+                  vi har mot hur många som fortfarande är på väg in. */}
+              <span className={filter === f ? 'text-navy-900/70' : 'text-warm-600'}>
+                {counts[f]}
+              </span>
             </button>
           ))}
         </div>
@@ -163,12 +184,25 @@ export default function PeoplePage() {
             )}
           </div>
 
-          {visible.map((p) => (
-            // Kryssrutan och papperskorgen ligger utanför länken — interaktiva
-            // element inuti en <a> går varken att klicka på i lugn och ro
-            // eller att nå med tangentbordet.
+          {visible.map((p, i) => (
+            <Fragment key={p.key}>
+            {/* Rubriken hängs på första raden i varje grupp. Listan delar sig
+                därmed utan att behöva renderas i två omgångar, och kryssrutan
+                "markera alla" fortsätter gälla allt som visas. */}
+            {grouped && (i === 0 || visible[i - 1].isCustomer !== p.isCustomer) && (
+              <div className="flex items-baseline gap-2 px-4 py-2 bg-navy-800/60 border-b border-navy-600">
+                <span className="text-warm-300 text-[11px] font-semibold uppercase tracking-widest">
+                  {p.isCustomer ? 'Kunder' : 'Prospekt'}
+                </span>
+                <span className="text-warm-600 text-[11px]">
+                  {p.isCustomer ? counts.kunder : counts.prospekt}
+                </span>
+              </div>
+            )}
+            {/* Kryssrutan och papperskorgen ligger utanför länken — interaktiva
+                element inuti en <a> går varken att klicka på i lugn och ro
+                eller att nå med tangentbordet. */}
             <div
-              key={p.key}
               className={`flex items-center border-b border-navy-600/50 last:border-0 group transition-colors ${
                 selected.has(p.key) ? 'bg-gold-500/5' : 'hover:bg-navy-700/40'
               }`}
@@ -227,6 +261,7 @@ export default function PeoplePage() {
               </svg>
             </button>
             </div>
+            </Fragment>
           ))}
           </>
         )}
