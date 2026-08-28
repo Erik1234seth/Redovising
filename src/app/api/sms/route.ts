@@ -186,7 +186,10 @@ export async function POST(request: Request) {
         phone: from, direction: 'out', body: reply,
         user_id: sender.userId, status: 'draft',
       });
-      console.log(`[sms] utkast till ${from} väntar på godkännande (${sender.kind}, ${reply.length} tecken)`);
+      console.log(
+        `[sms] utkast till ${from} väntar på godkännande ` +
+          `(${sender.kind}, konto: ${sender.hasAccount ? sender.account?.matchedBy ?? 'ja' : 'nej'}, ${reply.length} tecken)`,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[sms] kunde inte skriva utkast till ${from}:`, msg);
