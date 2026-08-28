@@ -44,6 +44,7 @@ interface LeadRow {
   name: string | null;
   email: string | null;
   phone: string | null;
+  created_at: string | null;
 }
 
 /**
@@ -57,6 +58,11 @@ interface LeadRow {
  */
 function findMatch<T extends { phone: string | null }>(rows: T[] | null, e164: string): T | null {
   return rows?.find((r) => normalizePhone(r.phone) === e164) ?? null;
+}
+
+/** Samma matchning, men alla rader — ett nummer förekommer ofta på flera. */
+function findMatches<T extends { phone: string | null }>(rows: T[] | null, e164: string): T[] {
+  return rows?.filter((r) => normalizePhone(r.phone) === e164) ?? [];
 }
 
 /** Mejladresser jämförs skiftlägesokänsligt — samma skäl som ovan, folk skriver som de vill. */
@@ -115,23 +121,33 @@ export async function identifySender(
     };
   }
 
-  // Ingen kundprofil på numret — kolla om numret lämnats som lead. Mötesbokningar
-  // först, de är ett starkare intresse än ett kontaktformulär.
-  const meeting = findMatch(meetingsRes.data as LeadRow[] | null, e164);
-  const contact = findMatch(contactsRes.data as LeadRow[] | null, e164);
-  const lead = meeting ?? contact;
+  // Ingen kundprofil på numret — kolla om numret lämnats som lead. Vi tar ALLA
+  // rader som matchar, inte bara den senaste: samma telefon återkommer ofta med
+  // olika adresser (jobbadress i ett formulär, privat i nästa), och det räcker
+  // att en enda av dem har ett konto för att personen ska vara kund. Tar vi bara
+  // den översta raden avgör slumpen om AI:n hittar kontot eller inte.
+  const meetingMatches = findMatches(meetingsRes.data as LeadRow[] | null, e164);
+  const contactMatches = findMatches(contactsRes.data as LeadRow[] | null, e164);
 
-  if (lead) {
-    const source = meeting ? 'meetings' : 'contact_requests';
-    // Lead-raden har en mejladress, och den kan höra till ett konto även om
-    // profilen aldrig fått numret. Hittar vi ett konto är personen kund, inte
-    // prospekt — annars börjar AI:n sälja in tjänsten till någon som redan betalar.
-    const byEmail = findByEmail(profiles, lead.email);
-    if (byEmail) {
+  // Mötesbokningar först, de är ett starkare intresse än ett kontaktformulär.
+  const primary = meetingMatches[0] ?? contactMatches[0] ?? null;
+
+  if (primary) {
+    const source = meetingMatches.length ? 'meetings' : 'contact_requests';
+
+    // Kontot söks på den nyaste adressen först — har personen bytt adress är
+    // den senast lämnade den som gäller.
+    const byDate = [...meetingMatches, ...contactMatches].sort(
+      (a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''),
+    );
+
+    for (const lead of byDate) {
+      const byEmail = findByEmail(profiles, lead.email);
+      if (!byEmail) continue;
       return {
         kind: 'customer',
         userId: byEmail.id,
-        name: byEmail.full_name ?? lead.name ?? null,
+        name: byEmail.full_name ?? lead.name ?? primary.name ?? null,
         email: byEmail.email ?? lead.email ?? null,
         source: `${source} + profiles (via e-post)`,
         hasAccount: true,
@@ -142,8 +158,8 @@ export async function identifySender(
     return {
       kind: 'prospect',
       userId: null,
-      name: lead.name ?? null,
-      email: lead.email ?? null,
+      name: primary.name ?? null,
+      email: primary.email ?? null,
       source,
       hasAccount: false,
       account: null,
