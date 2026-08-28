@@ -138,8 +138,10 @@ const SHOW_HOW_STAGE = false;
 const CONTACT_PROGRESS = ['opened', 'name', 'email', 'method', 'phone', 'notes'] as const;
 type ContactProgress = (typeof CONTACT_PROGRESS)[number];
 
-export default function AdFunnel({ refCode, onClose, source = 'annons', showDeadlineOffer = false, visitId = null }: { refCode: string | null; onClose?: () => void; source?: 'annons' | 'brev' | 'organic'; showDeadlineOffer?: boolean; visitId?: number | null }) {
-  const [stage, setStage] = useState<Stage>('hook');
+export default function AdFunnel({ refCode, onClose, source = 'annons', showDeadlineOffer = false, visitId = null, skipHook = false }: { refCode: string | null; onClose?: () => void; source?: 'annons' | 'brev' | 'organic'; showDeadlineOffer?: boolean; visitId?: number | null; skipHook?: boolean }) {
+  // skipHook: besökaren klickade sig hit från "Kom igång" i hero:n och har redan
+  // läst kroken på sidan bakom — att visa den igen hade bara blivit ett klick till.
+  const [stage, setStage] = useState<Stage>(skipHook ? 'questions' : 'hook');
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, boolean | 'unknown'>>({});
   const [failReason, setFailReason] = useState('');
@@ -225,7 +227,8 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
 
   const back = () => {
     if (stage === 'how') setStage('hook');
-    else if (stage === 'questions' && step === 0) setStage(SHOW_HOW_STAGE ? 'how' : 'hook');
+    // Utan kroken finns inget steg bakom första frågan att gå tillbaka till.
+    else if (stage === 'questions' && step === 0) { if (!skipHook) setStage(SHOW_HOW_STAGE ? 'how' : 'hook'); }
     else if (stage === 'questions') setStep(step - 1);
   };
 
@@ -252,7 +255,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
     }
   };
 
-  const showBack = stage === 'how' || stage === 'questions';
+  const showBack = stage === 'how' || (stage === 'questions' && !(skipHook && step === 0));
   const onPhoto = stage === 'hook';
   const variant: Variant = { ...DEFAULT_VARIANT, ...((refCode && VARIANTS[refCode]) || {}) };
 

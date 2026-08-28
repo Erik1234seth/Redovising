@@ -279,6 +279,9 @@ export default function Home() {
   const [showBrevPopup, setShowBrevPopup] = useState(false);
   const [showFbPopup, setShowFbPopup] = useState(false);
   const [showOrganicPopup, setShowOrganicPopup] = useState(false);
+  // Popupen som besökaren själv öppnar med "Kom igång" i hero:n. Samma flöde som
+  // de automatiska, men utan kroken — den har de redan läst på sidan.
+  const [showHeroPopup, setShowHeroPopup] = useState(false);
   const [brevRef, setBrevRef] = useState<string | null>(null);
   const [fbRef, setFbRef] = useState<string | null>(null);
   const [popupVisitId, setPopupVisitId] = useState<number | null>(null);
@@ -373,7 +376,7 @@ export default function Home() {
   // Lås sidan bakom popupen. overflow:hidden på body räcker inte i iOS
   // Safari — den scrollar vidare ändå. position:fixed gör det, men nollställer
   // scrollpositionen, så den sparas och återställs när popupen stängs.
-  const popupOpen = showBrevPopup || showFbPopup || showOrganicPopup;
+  const popupOpen = showBrevPopup || showFbPopup || showOrganicPopup || showHeroPopup;
   useEffect(() => {
     if (!popupOpen) return;
 
@@ -424,6 +427,10 @@ export default function Home() {
     try { localStorage.setItem('organicPopupDismissed', '1'); } catch {}
     releaseCookieBanner();
   };
+
+  // Ingen dismissed-flagga här: besökaren bad om popupen och ska kunna öppna den
+  // igen direkt efteråt.
+  const dismissHeroPopup = () => setShowHeroPopup(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -491,7 +498,7 @@ export default function Home() {
 
               {/* Knapparna delar raden på mobil (flex-1) och krymper till sitt
                   eget innehåll från sm: och uppåt. items-stretch håller dem
-                  lika höga trots att "Boka möte" har en extra rad. */}
+                  lika höga oavsett innehåll. */}
               <div className="flex flex-row gap-2.5 sm:gap-3 justify-center lg:justify-start items-stretch">
                 <Link
                   href="#kontakta-oss"
@@ -500,13 +507,13 @@ export default function Home() {
                 >
                   Kontakta oss
                 </Link>
-                <Link
-                  href="/boka-mote"
-                  className="flex-1 sm:flex-none px-4 sm:px-7 py-2.5 font-semibold text-slate-600 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm sm:text-base flex flex-col items-center justify-center text-center leading-tight"
+                <button
+                  type="button"
+                  onClick={() => setShowHeroPopup(true)}
+                  className="flex-1 sm:flex-none px-4 sm:px-7 py-2.5 font-semibold text-slate-600 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 text-sm sm:text-base flex items-center justify-center text-center leading-tight"
                 >
-                  <span>Boka möte</span>
-                  <span className="text-xs font-normal text-slate-400">Såklart gratis</span>
-                </Link>
+                  Kom igång
+                </button>
               </div>
 
               {/* Mini trust signals */}
@@ -1011,7 +1018,7 @@ export default function Home() {
           31 augusti-erbjudandet (showDeadlineOffer) testas bara på den organiska
           popupen än så länge — lägg till på brev/fb också när det känns bra.
       ══════════════════════════════════════════ */}
-      {(showBrevPopup || showFbPopup || showOrganicPopup) && (
+      {(showBrevPopup || showFbPopup || showOrganicPopup || showHeroPopup) && (
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center p-4"
           role="dialog"
@@ -1023,7 +1030,9 @@ export default function Home() {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]" />
 
           <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto animate-[popIn_0.28s_cubic-bezier(0.16,1,0.3,1)]">
-            {showBrevPopup ? (
+            {showHeroPopup ? (
+              <AdFunnel refCode={null} onClose={dismissHeroPopup} source="organic" showDeadlineOffer skipHook visitId={popupVisitId} />
+            ) : showBrevPopup ? (
               <AdFunnel refCode={brevRef} onClose={dismissBrevPopup} source="brev" visitId={popupVisitId} />
             ) : showFbPopup ? (
               <AdFunnel refCode={fbRef} onClose={dismissFbPopup} source="annons" visitId={popupVisitId} />
