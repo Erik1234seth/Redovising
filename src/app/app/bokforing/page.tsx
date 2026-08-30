@@ -23,45 +23,10 @@ const CORAL = '#E95C63';
 
 const eventTypes = [
   {
-    id: 'kund-betalat',
-    label: 'Jag fick betalt av en kund',
-    description: 'En kund har betalat för en tjänst eller vara',
-    icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-      </svg>
-    ),
-    color: '#059669',
-    bg: '#ECFDF5',
-  },
-  {
-    id: 'kopt-nagot',
-    label: 'Jag köpte något till företaget',
-    description: 'Verktyg, material, prenumeration eller annat du betalat för',
-    icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-      </svg>
-    ),
-    color: '#2563EB',
-    bg: '#EFF6FF',
-  },
-  {
-    id: 'privata-pengar',
-    label: 'Privata pengar in eller ut',
-    description: 'Du satte in egna pengar i företaget, eller tog ut för privat bruk',
-    icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-      </svg>
-    ),
-    color: '#7C3AED',
-    bg: '#F5F3FF',
-  },
-  {
     id: 'ladda-upp',
-    label: 'Ladda upp transaktionslista',
-    description: 'Din egen eller från exempelvis Zettle, PayPal, Stripe eller din bank.',
+    label: 'Ladda upp underlag',
+    description: 'Kvitton, fakturor eller transaktionslista — från din bank, Zettle, PayPal eller Stripe.',
+    href: '/bokforing/ladda-upp',
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -71,28 +36,17 @@ const eventTypes = [
     bg: '#ECFEFF',
   },
   {
-    id: 'skatt-moms',
-    label: 'Jag betalade skatt eller moms',
-    description: 'Du betalade in skatt eller moms till Skatteverket',
+    id: 'manuell',
+    label: 'Lägg till transaktion',
+    description: 'Registrera ett köp eller en försäljning manuellt, steg för steg.',
+    href: '/bokforing/manuell',
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 4v16m8-8H4" />
       </svg>
     ),
-    color: '#DB2777',
-    bg: '#FDF2F8',
-  },
-  {
-    id: 'lan-bidrag',
-    label: 'Övrigt',
-    description: 'Något som inte passar in i de andra kategorierna',
-    icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-    color: '#0891B2',
-    bg: '#ECFEFF',
+    color: '#059669',
+    bg: '#ECFDF5',
   },
 ];
 
@@ -143,11 +97,11 @@ export default function BokforingPage() {
       <div className="px-8 pt-12 pb-2">
         <p className="text-sm font-medium text-slate-400 mb-1">Bokföring</p>
         <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Vad har hänt?</h1>
-        <p className="text-slate-400 text-sm mt-2">Välj det som stämmer bäst — vi sköter resten.</p>
+        <p className="text-slate-400 text-sm mt-2">Ladda upp dina underlag så sköter vi resten — eller lägg in en transaktion manuellt.</p>
       </div>
 
-      {/* 6 alternativ */}
-      <div className="px-8 py-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl">
+      {/* 2 alternativ */}
+      <div className="px-8 py-8 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
         {eventTypes.map(ev => {
           const cardContent = (
             <>
@@ -167,35 +121,14 @@ export default function BokforingPage() {
             </>
           );
 
-          const hrefs: Record<string, string> = {
-            'kund-betalat': '/bokforing/kund-betalat',
-            'kopt-nagot': '/bokforing/kopt-nagot',
-            'privata-pengar': '/bokforing/privat-pengar',
-            'ladda-upp': '/bokforing/ladda-upp',
-            'skatt-moms': '/bokforing/skatteverket',
-            'lan-bidrag': '/bokforing/ovrigt',
-          };
-
-          const href = hrefs[ev.id];
-          if (href) {
-            return (
-              <Link
-                key={ev.id}
-                href={href}
-                className="group flex items-start gap-4 text-left bg-white rounded-2xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-md transition-all duration-150"
-              >
-                {cardContent}
-              </Link>
-            );
-          }
-
           return (
-            <button
+            <Link
               key={ev.id}
+              href={ev.href}
               className="group flex items-start gap-4 text-left bg-white rounded-2xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-md transition-all duration-150"
             >
               {cardContent}
-            </button>
+            </Link>
           );
         })}
       </div>
