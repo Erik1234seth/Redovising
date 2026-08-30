@@ -18,6 +18,7 @@ export interface Profile {
   saljer_till: 'privat' | 'foretag' | null;
   saljer_i: 'sverige' | 'eu' | 'utanfor-eu' | null;
   koper_i: 'sverige' | 'eu' | 'import' | null;
+  har_foretagskonto: 'ja' | 'nej' | null;
   bokforing_metod: 'excel-kalkylark' | 'hemsidan' | 'maila-underlag' | null;
   skicka_in_metod: 'maila-fil' | 'ladda-upp' | null;
   onboarding_done: boolean;

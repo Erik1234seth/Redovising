@@ -89,6 +89,7 @@ export default function OnboardingPage() {
   const [saljerTill, setSaljerTill] = useState<'privat' | 'foretag' | null>(null);
   const [saljerI, setSaljerI] = useState<'sverige' | 'eu' | 'utanfor-eu' | null>(null);
   const [koperI, setKoperI] = useState<'sverige' | 'eu' | 'import' | null>(null);
+  const [harForetagskonto, setHarForetagskonto] = useState<'ja' | 'nej' | null>(null);
   // Bokföringsmetod är numera alltid "maila-underlag" — inget steg för det längre
   const bokforingMetod: BokforingMetod = 'maila-underlag';
   const skickaInMetod: SkickaInMetod | null = null;
@@ -107,6 +108,7 @@ export default function OnboardingPage() {
     if (profile.saljer_till) setSaljerTill(profile.saljer_till);
     if (profile.saljer_i) setSaljerI(profile.saljer_i);
     if (profile.koper_i) setKoperI(profile.koper_i);
+    if (profile.har_foretagskonto) setHarForetagskonto(profile.har_foretagskonto);
     setHydrated(true);
   }, [profile, hydrated]);
 
@@ -129,6 +131,7 @@ export default function OnboardingPage() {
           saljer_till: saljerTill,
           saljer_i: saljerI,
           koper_i: koperI,
+          har_foretagskonto: harForetagskonto,
           bokforing_metod: bokforingMetod,
           skicka_in_metod: skickaInMetod,
           onboarding_done: true,
@@ -283,6 +286,13 @@ export default function OnboardingPage() {
 
             {/* Chip-frågor */}
             <div className="flex flex-col gap-5 mt-6">
+              <ChipQuestion
+                label="Har du ett företagskonto?"
+                hint="Ett bankkonto som bara används till företaget, skilt från din privatekonomi."
+                options={[{ value: 'ja', label: 'Ja' }, { value: 'nej', label: 'Nej' }]}
+                value={harForetagskonto}
+                onChange={v => setHarForetagskonto(v as 'ja' | 'nej')}
+              />
               <ChipQuestion
                 label="Jag säljer mest till"
                 options={[{ value: 'privat', label: 'Privat' }, { value: 'foretag', label: 'Företag' }]}
@@ -498,15 +508,17 @@ export default function OnboardingPage() {
   );
 }
 
-function ChipQuestion({ label, options, value, onChange }: {
+function ChipQuestion({ label, hint, options, value, onChange }: {
   label: string;
+  hint?: string;
   options: { value: string; label: string }[];
   value: string | null;
   onChange: (v: string) => void;
 }) {
   return (
     <div>
-      <p className="text-xs font-semibold text-slate-500 mb-2.5">{label}</p>
+      <p className={`text-xs font-semibold text-slate-500 ${hint ? 'mb-1' : 'mb-2.5'}`}>{label}</p>
+      {hint && <p className="text-xs text-slate-400 mb-2.5 leading-relaxed">{hint}</p>}
       <div className="flex flex-wrap gap-2">
         {options.map(opt => {
           const active = value === opt.value;
