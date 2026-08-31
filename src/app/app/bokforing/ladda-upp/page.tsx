@@ -28,16 +28,25 @@ export default function LaddaUppPage() {
   const [processingFile, setProcessingFile] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<ParsedTransaction[] | null>(null);
   const [done, setDone] = useState(false);
   const [openService, setOpenService] = useState<string | null>(null);
   const [showServices, setShowServices] = useState(false);
 
+  function fileKey(f: File) {
+    return `${f.name}-${f.size}-${f.lastModified}`;
+  }
+
   function addFiles(newFiles: FileList | null) {
     if (!newFiles) return;
+    // Läs ut filerna direkt — FileList:en töms när inputen nollställs,
+    // annars hinner den bli tom innan setFiles-uppdateringen körs.
+    const incoming = Array.from(newFiles);
+    if (incoming.length === 0) return;
     setFiles(prev => {
-      const existing = new Set(prev.map(f => f.name));
-      const toAdd = Array.from(newFiles).filter(f => !existing.has(f.name));
+      const existing = new Set(prev.map(fileKey));
+      const toAdd = incoming.filter(f => !existing.has(fileKey(f)));
       return [...prev, ...toAdd];
     });
     setError(null);
@@ -82,21 +91,35 @@ export default function LaddaUppPage() {
     if (files.length === 0) return;
     setProcessing(true);
     setError(null);
+    setWarning(null);
     try {
       const allTransactions: ParsedTransaction[] = [];
+      const skipped: string[] = [];
       for (const f of files) {
         setProcessingFile(f.name);
         const fd = new FormData();
         fd.append('file', f);
-        const res = await fetch('/api/bokforing/analyze-transactions', { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? 'Okänt fel');
-        allTransactions.push(...(data.transactions ?? []));
+        try {
+          const res = await fetch('/api/bokforing/analyze-transactions', { method: 'POST', body: fd });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? 'Okänt fel');
+          const found: ParsedTransaction[] = data.transactions ?? [];
+          if (found.length === 0) skipped.push(f.name);
+          allTransactions.push(...found);
+        } catch (err: unknown) {
+          // En fil som strular ska inte stoppa de andra
+          skipped.push(`${f.name} (${err instanceof Error ? err.message : 'okänt fel'})`);
+        }
       }
 
       if (allTransactions.length === 0) {
-        setError('Vi hittade inga transaktioner i filen. Kontrollera att filen innehåller rätt data och försök igen.');
+        const vilka = skipped.length > 0 ? skipped.join(', ') : 'filen';
+        setError(`Vi hittade inga transaktioner i ${vilka}. Kontrollera att filen innehåller rätt data och försök igen.`);
         return;
+      }
+
+      if (skipped.length > 0) {
+        setWarning(`Vi hittade inga transaktioner i ${skipped.join(', ')} — övriga filer har lästs in.`);
       }
 
       const missing = getMissingFields(allTransactions);
@@ -248,6 +271,7 @@ export default function LaddaUppPage() {
         </div>
 
         <div className="px-6 pb-10 pt-4 max-w-2xl mx-auto w-full">
+          {warning && <p className="mb-4 text-sm text-amber-600 text-center">{warning}</p>}
           {error && <p className="mb-4 text-sm text-red-500 text-center">{error}</p>}
           <button
             onClick={saveAll}
@@ -302,7 +326,7 @@ export default function LaddaUppPage() {
             ))}
           </div>
           <p className="text-xs text-slate-700 mb-2">* Valuta behövs bara om transaktionerna inte är i SEK — Zettle, Stripe och PayPal använder ofta USD eller EUR.</p>
-          <p className="text-xs text-slate-400">Vi stödjer CSV, Excel och PDF (.csv, .xlsx, .xls, .pdf)</p>
+          <p className="text-xs text-slate-400">Vi stödjer CSV, Excel, PDF och bilder</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -338,7 +362,7 @@ export default function LaddaUppPage() {
               { name: 'Etsy', desc: 'Logga in på etsy.com → Finanser → Betalningskonto → Ladda ned CSV.', filnamn: 'EtsyPaymentAccountCSVDownload.csv' },
               { name: 'Amazon', desc: 'Logga in på Seller Central → Rapporter → Betalningar → Transaktionsvy → Exportera CSV.', filnamn: 'transaction-report.csv' },
               { name: 'Annat', desc: 'Exportfunktionen finns vanligtvis under Inställningar → Rapporter, Ekonomi eller Kontoutdrag. Hittar du inte? Hör av dig till oss så hjälper vi dig.', filnamn: null },
-              { name: 'Jag har en egen fil', desc: 'Det fungerar bra! Se till att filen innehåller rätt uppgifter (datum, beskrivning, belopp och moms) och är i ett godkänt format: CSV, Excel (.xlsx, .xls) eller PDF.', filnamn: null },
+              { name: 'Jag har en egen fil', desc: 'Det fungerar bra! Se till att filen innehåller rätt uppgifter (datum, beskrivning, belopp och moms) och är i ett godkänt format: CSV, Excel (.xlsx, .xls), PDF eller bild (.png, .jpg, .jpeg).', filnamn: null },
             ] as { name: string; desc: string; filnamn: string | null }[]).map(s => {
               const isOpen = openService === s.name;
               return (
@@ -390,7 +414,7 @@ export default function LaddaUppPage() {
           className="bg-white rounded-2xl border-2 border-dashed p-8 flex flex-col items-center justify-center cursor-pointer transition-all duration-150"
           style={{ borderColor: dragging ? ACCENT : files.length > 0 ? '#059669' : '#E2E8F0', backgroundColor: dragging ? '#ECFEFF' : undefined }}
         >
-          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.pdf" multiple onChange={handleChange} className="hidden" />
+          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.pdf,.png,.jpg,.jpeg" multiple onChange={handleChange} className="hidden" />
           {files.length > 0 ? (
             <div className="w-full space-y-2">
               {files.map((f, i) => (
@@ -420,7 +444,7 @@ export default function LaddaUppPage() {
                 </svg>
               </div>
               <p className="font-semibold text-slate-700 text-sm">Dra och släpp dina filer här</p>
-              <p className="text-xs text-slate-400 mt-1">eller klicka för att välja · CSV, XLSX, XLS, PDF</p>
+              <p className="text-xs text-slate-400 mt-1">eller klicka för att välja · CSV, XLSX, XLS, PDF, PNG, JPG</p>
             </>
           )}
         </div>

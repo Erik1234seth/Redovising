@@ -51,11 +51,19 @@ export default function ExcelGuidePage() {
   const [transactions, setTransactions] = useState<ParsedTransaction[] | null>(null);
   const [done, setDone] = useState(false);
 
+  function fileKey(f: File) {
+    return `${f.name}-${f.size}-${f.lastModified}`;
+  }
+
   function addFiles(newFiles: FileList | null) {
     if (!newFiles) return;
+    // Läs ut filerna direkt — FileList:en töms när inputen nollställs,
+    // annars hinner den bli tom innan setFiles-uppdateringen körs.
+    const incoming = Array.from(newFiles);
+    if (incoming.length === 0) return;
     setFiles(prev => {
-      const existing = new Set(prev.map(f => f.name));
-      const toAdd = Array.from(newFiles).filter(f => !existing.has(f.name));
+      const existing = new Set(prev.map(fileKey));
+      const toAdd = incoming.filter(f => !existing.has(fileKey(f)));
       return [...prev, ...toAdd];
     });
     setError(null);

@@ -58,6 +58,16 @@ interface ParsedTransaction {
   kredit_namn: string;
 }
 
+function isImage(mimeType: string, fileName: string): boolean {
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+  return ['png', 'jpg', 'jpeg'].includes(ext) || mimeType === 'image/png' || mimeType === 'image/jpeg';
+}
+
+function imageMimeType(mimeType: string, fileName: string): string {
+  if (mimeType === 'image/png' || mimeType === 'image/jpeg') return mimeType;
+  return fileName.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+}
+
 async function fileToText(buffer: Buffer, mimeType: string, fileName: string): Promise<string> {
   const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
 
@@ -97,14 +107,24 @@ export async function POST(request: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    let csvText: string;
-    try {
-      csvText = await fileToText(buffer, file.type, file.name);
-    } catch {
-      return NextResponse.json({ error: 'Kunde inte läsa filen. Kontrollera att det är en giltig CSV- eller Excel-fil.' }, { status: 400 });
-    }
 
-    const truncated = truncateRows(csvText, 200);
+    // Bilder skickas som bild till AI:n, övriga filer görs om till text först
+    let userContent: unknown;
+    if (isImage(file.type, file.name)) {
+      const mimeType = imageMimeType(file.type, file.name);
+      userContent = [
+        { type: 'text', text: 'Analysera transaktionerna i den här bilden:' },
+        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${buffer.toString('base64')}` } },
+      ];
+    } else {
+      let csvText: string;
+      try {
+        csvText = await fileToText(buffer, file.type, file.name);
+      } catch {
+        return NextResponse.json({ error: 'Kunde inte läsa filen. Kontrollera att det är en giltig CSV-, Excel-, PDF- eller bildfil.' }, { status: 400 });
+      }
+      userContent = `Analysera dessa transaktioner:\n\n${truncateRows(csvText, 200)}`;
+    }
 
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -117,7 +137,7 @@ export async function POST(request: Request) {
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Analysera dessa transaktioner:\n\n${truncated}` },
+          { role: 'user', content: userContent },
         ],
         max_completion_tokens: 16000,
       }),
@@ -130,18 +150,35 @@ export async function POST(request: Request) {
     }
 
     const openAIData = await openAIResponse.json();
-    const rawContent = openAIData.choices?.[0]?.message?.content ?? '';
+    const choice = openAIData.choices?.[0];
+    const finishReason = choice?.finish_reason;
+    const rawContent = (choice?.message?.content ?? '').trim();
 
-    let parsed: { transactions: ParsedTransaction[] };
+    if (choice?.message?.refusal) {
+      console.error('OpenAI refusal:', choice.message.refusal);
+      return NextResponse.json({ error: `AI:n kunde inte läsa ${file.name}. Kontrollera att filen innehåller en transaktionslista.` }, { status: 422 });
+    }
+
+    if (finishReason === 'length') {
+      return NextResponse.json({ error: `${file.name} innehåller för många transaktioner för att läsas i en omgång. Dela upp filen och försök igen.` }, { status: 413 });
+    }
+
+    // Tomt svar = AI:n hittade inget i filen, inte ett fel
+    if (!rawContent) {
+      return NextResponse.json({ transactions: [] });
+    }
+
+    let parsed: { transactions?: ParsedTransaction[] };
     try {
       parsed = JSON.parse(rawContent);
     } catch {
       const match = rawContent.match(/\{[\s\S]*\}/);
-      if (match) {
+      try {
+        if (!match) throw new Error('no json object in response');
         parsed = JSON.parse(match[0]);
-      } else {
-        console.error('Could not parse OpenAI response:', rawContent);
-        return NextResponse.json({ error: 'Kunde inte tolka AI-svaret' }, { status: 500 });
+      } catch {
+        console.error(`Could not parse OpenAI response (finish_reason: ${finishReason}):`, rawContent);
+        return NextResponse.json({ error: `Kunde inte tolka AI-svaret för ${file.name}.` }, { status: 500 });
       }
     }
 
