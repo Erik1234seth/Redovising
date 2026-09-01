@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase';
+import { uploadUnderlag } from '@/lib/bokforing-underlag';
 
 const NAV_BG = '#173b57';
 const ACCENT = '#0891B2';
@@ -14,18 +14,6 @@ const SHEET_ROWS = [
   ['2025-03-20', 'Faktura 101 – Kund AB', '6 250', '1 250', 'Inkomst'],
   ['2025-04-02', 'Mobilabonnemang', '400', '80', 'Utgift'],
 ];
-
-interface ParsedTransaction {
-  datum: string;
-  beskrivning: string;
-  belopp: number;
-  moms: number;
-  haendelse_typ: string;
-  debit_konto: string;
-  debit_namn: string;
-  kredit_konto: string;
-  kredit_namn: string;
-}
 
 export default function ExcelGuidePage() {
   const router = useRouter();
@@ -46,9 +34,8 @@ export default function ExcelGuidePage() {
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [processingFile, setProcessingFile] = useState('');
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [transactions, setTransactions] = useState<ParsedTransaction[] | null>(null);
+  const [uploadedCount, setUploadedCount] = useState(0);
   const [done, setDone] = useState(false);
 
   function fileKey(f: File) {
@@ -84,62 +71,19 @@ export default function ExcelGuidePage() {
     e.target.value = '';
   }
 
-  async function analyzeAll() {
+  async function uploadAll() {
     if (files.length === 0) return;
     setProcessing(true);
     setError(null);
     try {
-      const allTransactions: ParsedTransaction[] = [];
-      for (const f of files) {
-        setProcessingFile(f.name);
-        const fd = new FormData();
-        fd.append('file', f);
-        const res = await fetch('/api/bokforing/analyze-transactions', { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? 'Okänt fel');
-        allTransactions.push(...(data.transactions ?? []));
-      }
-      if (allTransactions.length === 0) {
-        setError('Vi hittade inga transaktioner i filen. Kontrollera att filen innehåller rätt data och försök igen.');
-        return;
-      }
-      setTransactions(allTransactions);
+      await uploadUnderlag(files, setProcessingFile);
+      setUploadedCount(files.length);
+      setDone(true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Något gick fel. Försök igen.');
+      setError(err instanceof Error ? err.message : 'Något gick fel vid uppladdningen. Försök igen.');
     } finally {
       setProcessing(false);
       setProcessingFile('');
-    }
-  }
-
-  async function saveAll() {
-    if (!transactions?.length) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Inte inloggad');
-      const rows = transactions.map(t => ({
-        user_id: user.id,
-        haendelse_typ: t.haendelse_typ,
-        datum: t.datum,
-        beskrivning: t.beskrivning,
-        belopp: Math.abs(t.belopp),
-        moms: t.moms,
-        ai_kategori: t.beskrivning,
-        ai_debit_konto: t.debit_konto,
-        ai_debit_namn: t.debit_namn,
-        ai_kredit_konto: t.kredit_konto,
-        ai_kredit_namn: t.kredit_namn,
-      }));
-      const { error: dbError } = await supabase.from('bokforing_transaktioner').insert(rows);
-      if (dbError) throw dbError;
-      setDone(true);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Något gick fel vid sparning.');
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -154,9 +98,10 @@ export default function ExcelGuidePage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-xl font-extrabold text-slate-800 mb-2">{transactions?.length} transaktioner bokförda!</h2>
+          <h2 className="text-xl font-extrabold text-slate-800 mb-2">Tack för ditt underlag!</h2>
           <p className="text-sm text-slate-400 leading-relaxed mb-8">
-            Alla transaktioner har sparats och syns nu under <span className="font-semibold text-slate-600">Bokförda händelser</span>.
+            Vi har tagit emot {uploadedCount === 1 ? 'din fil' : `dina ${uploadedCount} filer`} och går igenom {uploadedCount === 1 ? 'den' : 'dem'} åt dig.
+            Så snart vi är klara ser du bokföringen här under <span className="font-semibold text-slate-600">Bokförda händelser</span>.
           </p>
           <button onClick={() => router.push('/bokforing')} className="w-full py-3 text-sm font-bold text-white rounded-xl" style={{ backgroundColor: NAV_BG }}>
             Gå till bokföringen
@@ -178,71 +123,8 @@ export default function ExcelGuidePage() {
           </svg>
         </div>
         <div className="text-center">
-          <p className="text-xl font-bold text-slate-800">Läser igenom filen...</p>
+          <p className="text-xl font-bold text-slate-800">Laddar upp underlaget...</p>
           {processingFile && <p className="text-slate-400 text-sm mt-1.5 truncate max-w-xs">{processingFile}</p>}
-          <p className="text-slate-400 text-xs mt-1">Vi identifierar och sorterar dina transaktioner</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Preview ────────────────────────────────────────────────────────────────
-
-  if (transactions) {
-    return (
-      <div className="flex flex-col min-h-full bg-slate-50">
-        <div className="px-6 pt-10 pb-4 max-w-2xl mx-auto w-full">
-          <button onClick={() => setTransactions(null)} className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors mb-6">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Tillbaka
-          </button>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ backgroundColor: '#EFF6FF', color: '#2563EB' }}>
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Vi hittade {transactions.length} transaktioner
-          </div>
-          <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">Granska innan du bokför</h1>
-          <p className="text-slate-400 text-sm mt-1 mb-6">Kontrollera att transaktionerna ser rätt ut.</p>
-        </div>
-        <div className="px-6 pb-4 max-w-2xl mx-auto w-full flex flex-col gap-3">
-          {transactions.map((t, i) => {
-            const isIncome = t.haendelse_typ === 'kund-betalat';
-            return (
-              <div key={i} className="bg-white rounded-2xl border border-slate-200 p-4 flex items-start gap-4">
-                <div className="flex-shrink-0 mt-0.5">
-                  <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ backgroundColor: isIncome ? '#ECFDF5' : '#FEF2F2', color: isIncome ? '#059669' : '#DC2626' }}>
-                    {isIncome ? '+ Inkomst' : '− Utgift'}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-700 truncate">{t.beskrivning}</p>
-                    <p className="text-sm font-bold text-slate-800 whitespace-nowrap flex-shrink-0">
-                      {isIncome ? '+' : '−'}{Math.abs(t.belopp).toLocaleString('sv-SE')} kr
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
-                    <span>{t.datum}</span>
-                    {t.moms > 0 && <span>Moms: {t.moms.toLocaleString('sv-SE')} kr</span>}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="px-6 pb-10 pt-4 max-w-2xl mx-auto w-full">
-          {error && <p className="mb-4 text-sm text-red-500 text-center">{error}</p>}
-          <button
-            onClick={saveAll}
-            disabled={saving || transactions.length === 0}
-            className="w-full py-3.5 text-sm font-bold text-white rounded-2xl transition-opacity disabled:opacity-40"
-            style={{ backgroundColor: NAV_BG }}
-          >
-            {saving ? 'Sparar...' : `Bokför alla ${transactions.length} transaktioner`}
-          </button>
         </div>
       </div>
     );
@@ -295,7 +177,7 @@ export default function ExcelGuidePage() {
           dragging={dragging} files={files} error={error}
           fileRef={fileRef} setDragging={setDragging}
           handleDrop={handleDrop} handleChange={handleChange}
-          removeFile={removeFile} analyzeAll={analyzeAll}
+          removeFile={removeFile} uploadAll={uploadAll}
         />}
 
         {hasVisited && (
@@ -442,7 +324,7 @@ export default function ExcelGuidePage() {
           dragging={dragging} files={files} error={error}
           fileRef={fileRef} setDragging={setDragging}
           handleDrop={handleDrop} handleChange={handleChange}
-          removeFile={removeFile} analyzeAll={analyzeAll}
+          removeFile={removeFile} uploadAll={uploadAll}
         />}
 
         <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}18` }}>
@@ -468,10 +350,10 @@ interface UploadSectionProps {
   handleDrop: (e: React.DragEvent) => void;
   handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   removeFile: (i: number) => void;
-  analyzeAll: () => void;
+  uploadAll: () => void;
 }
 
-function UploadSection({ dragging, files, error, fileRef, setDragging, handleDrop, handleChange, removeFile, analyzeAll }: UploadSectionProps) {
+function UploadSection({ dragging, files, error, fileRef, setDragging, handleDrop, handleChange, removeFile, uploadAll }: UploadSectionProps) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
       <div className="flex items-center gap-3 mb-4">
@@ -533,11 +415,11 @@ function UploadSection({ dragging, files, error, fileRef, setDragging, handleDro
 
       {files.length > 0 && (
         <button
-          onClick={analyzeAll}
+          onClick={uploadAll}
           className="mt-4 w-full py-3.5 text-sm font-bold text-white rounded-xl transition-all hover:opacity-90 hover:-translate-y-0.5"
           style={{ backgroundColor: NAV_BG, boxShadow: `0 6px 20px ${NAV_BG}35` }}
         >
-          Analysera {files.length === 1 ? 'filen' : `${files.length} filer`}
+          Skicka in {files.length === 1 ? 'underlaget' : `${files.length} filer`}
         </button>
       )}
     </div>

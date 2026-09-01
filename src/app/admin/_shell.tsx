@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import NotificationBell from './_bell';
 import DraftBadge from './_draft-badge';
+import UnderlagBadge from './_underlag-badge';
 
 /**
  * Koden kontrolleras på servern, i `/api/admin/login`. Att jämföra den här
@@ -81,6 +82,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               Admin
             </Link>
             <DraftBadge />
+            <UnderlagBadge />
             <Link href="/admin/status" className="text-warm-400 text-sm hover:text-gold-500 transition">
               Systemstatus
             </Link>

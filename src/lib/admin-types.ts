@@ -86,6 +86,29 @@ export interface SmsDraft {
   optedOut: boolean;
 }
 
+/**
+ * Ett underlag kunden laddat upp i bokföringsfliken.
+ *
+ * Filen sparas rå vid uppladdningen — den tolkas först när Erik går igenom den,
+ * så raden säger bara vad som kommit in och hur långt genomgången nått.
+ */
+export interface AdminUnderlag {
+  id: string;
+  fileName: string;
+  fileSize: number | null;
+  mimeType: string | null;
+  /** inkommet | granskas | bokfort */
+  status: string;
+  at: string;
+  /** Signerad nedladdningslänk. Bucketen är privat och länken lever en timme. */
+  url: string | null;
+  /** Nyckel till personvyn, när filen går att knyta till en profil. */
+  personKey: string | null;
+  personName: string | null;
+  personEmail: string | null;
+  company: string | null;
+}
+
 /** En rad i notisklockan. */
 export interface AdminNotice {
   id: string;

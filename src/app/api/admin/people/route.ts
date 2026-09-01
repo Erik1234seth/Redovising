@@ -94,7 +94,7 @@ async function build(): Promise<Map<string, Built>> {
 
   const [
     contacts, meetings, profiles, registrations,
-    threads, sms, optouts, orders, emails, files,
+    threads, sms, optouts, orders, emails, files, underlag,
   ] = await Promise.all([
     supabase.from('contact_requests').select('id, name, email, phone, ref, stage, notes, package_type, contact_method, qualification_answers, created_at'),
     supabase.from('meetings').select('id, name, email, phone, date, time, message, created_at'),
@@ -106,6 +106,7 @@ async function build(): Promise<Map<string, Built>> {
     supabase.from('orders').select('id, user_id, guest_email, guest_name, guest_phone, guest_company, package_type, bank, status, created_at'),
     supabase.from('email_log').select('id, to_email, subject, kind, status, error, created_at'),
     supabase.from('contact_files').select('id, contact_id, stage, file_name, created_at'),
+    supabase.from('bokforing_underlag').select('id, user_id, file_name, status, created_at'),
   ]);
 
   // En tabell som fallerar får inte tyst göra tidslinjen ofullständig — då ser
@@ -113,7 +114,7 @@ async function build(): Promise<Map<string, Built>> {
   for (const [name, result] of Object.entries({
     contact_requests: contacts, meetings, profiles, pending_registrations: registrations,
     email_threads: threads, sms_messages: sms, sms_optouts: optouts, orders,
-    email_log: emails, contact_files: files,
+    email_log: emails, contact_files: files, bokforing_underlag: underlag,
   })) {
     if (result.error) throw new Error(`Kunde inte läsa ${name}: ${result.error.message}`);
   }
@@ -129,6 +130,7 @@ async function build(): Promise<Map<string, Built>> {
     orders: orders.data ?? [],
     emails: emails.data ?? [],
     files: files.data ?? [],
+    underlag: underlag.data ?? [],
   };
 
   const groups = new Groups();
@@ -344,6 +346,18 @@ async function build(): Promise<Map<string, Built>> {
       title: 'Fil uppladdad',
       detail: r.file_name || undefined,
       meta: r.stage ? `steg ${r.stage}` : undefined,
+    });
+  }
+
+  // Underlagen från bokföringsfliken. De tolkas inte vid uppladdningen, så
+  // statusen säger hur långt genomgången kommit — hanteras på /admin/underlag.
+  for (const r of rows.underlag) {
+    const root = r.user_id ? byUser.get(r.user_id) ?? null : null;
+    add(root, toIso(r.created_at), {
+      type: 'fil',
+      title: 'Underlag uppladdat',
+      detail: r.file_name || undefined,
+      meta: r.status || undefined,
     });
   }
 
@@ -571,6 +585,7 @@ async function planDeletion(persons: Built[]): Promise<DeletePlan> {
     { table: 'produkter', column: 'user_id', values: profiles },
     { table: 'lagertillgangar', column: 'user_id', values: profiles },
     { table: 'bokforing_transaktioner', column: 'user_id', values: profiles },
+    { table: 'bokforing_underlag', column: 'user_id', values: profiles },
     { table: 'manual_transactions', column: 'user_id', values: profiles },
     { table: 'manual_transactions', column: 'guest_email', values: emails },
     { table: 'parsed_transactions', column: 'user_id', values: profiles },

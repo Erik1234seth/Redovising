@@ -2,22 +2,10 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase';
+import { uploadUnderlag } from '@/lib/bokforing-underlag';
 
 const NAV_BG = '#173b57';
 const ACCENT = '#0891B2';
-
-interface ParsedTransaction {
-  datum: string;
-  beskrivning: string;
-  belopp: number;
-  moms: number;
-  haendelse_typ: string;
-  debit_konto: string;
-  debit_namn: string;
-  kredit_konto: string;
-  kredit_namn: string;
-}
 
 export default function LaddaUppPage() {
   const router = useRouter();
@@ -26,10 +14,8 @@ export default function LaddaUppPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [processingFile, setProcessingFile] = useState('');
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
-  const [transactions, setTransactions] = useState<ParsedTransaction[] | null>(null);
+  const [uploadedCount, setUploadedCount] = useState(0);
   const [done, setDone] = useState(false);
   const [openService, setOpenService] = useState<string | null>(null);
   const [showServices, setShowServices] = useState(false);
@@ -67,108 +53,19 @@ export default function LaddaUppPage() {
     e.target.value = '';
   }
 
-  function getMissingFields(txns: ParsedTransaction[]): string[] {
-    if (txns.length === 0) return [];
-    const missing: string[] = [];
-    const half = txns.length * 0.5;
-
-    const emptyDatum = txns.filter(t => !t.datum || t.datum.trim() === '').length;
-    if (emptyDatum > half) missing.push('Datum');
-
-    const emptyBesk = txns.filter(t => !t.beskrivning || t.beskrivning.trim() === '').length;
-    if (emptyBesk > half) missing.push('Beskrivning');
-
-    const allZeroBelopp = txns.every(t => !t.belopp || t.belopp === 0);
-    if (allZeroBelopp) missing.push('Belopp');
-
-    const allNullMoms = txns.every(t => t.moms === null || t.moms === undefined);
-    if (allNullMoms) missing.push('Moms');
-
-    return missing;
-  }
-
-  async function analyzeAll() {
+  async function uploadAll() {
     if (files.length === 0) return;
     setProcessing(true);
     setError(null);
-    setWarning(null);
     try {
-      const allTransactions: ParsedTransaction[] = [];
-      const skipped: string[] = [];
-      for (const f of files) {
-        setProcessingFile(f.name);
-        const fd = new FormData();
-        fd.append('file', f);
-        try {
-          const res = await fetch('/api/bokforing/analyze-transactions', { method: 'POST', body: fd });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error ?? 'Okänt fel');
-          const found: ParsedTransaction[] = data.transactions ?? [];
-          if (found.length === 0) skipped.push(f.name);
-          allTransactions.push(...found);
-        } catch (err: unknown) {
-          // En fil som strular ska inte stoppa de andra
-          skipped.push(`${f.name} (${err instanceof Error ? err.message : 'okänt fel'})`);
-        }
-      }
-
-      if (allTransactions.length === 0) {
-        const vilka = skipped.length > 0 ? skipped.join(', ') : 'filen';
-        setError(`Vi hittade inga transaktioner i ${vilka}. Kontrollera att filen innehåller rätt data och försök igen.`);
-        return;
-      }
-
-      if (skipped.length > 0) {
-        setWarning(`Vi hittade inga transaktioner i ${skipped.join(', ')} — övriga filer har lästs in.`);
-      }
-
-      const missing = getMissingFields(allTransactions);
-      if (missing.length > 0) {
-        const fields = missing.join(', ');
-        const valutaNote = 'Obs: Valuta behöver bara anges om transaktionerna inte är i SEK.';
-        setError(`Filen saknar: ${fields}. Kontrollera att filen innehåller dessa kolumner och försök igen. ${valutaNote}`);
-        return;
-      }
-
-      setTransactions(allTransactions);
+      await uploadUnderlag(files, setProcessingFile);
+      setUploadedCount(files.length);
+      setDone(true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Något gick fel. Försök igen.');
+      setError(err instanceof Error ? err.message : 'Något gick fel vid uppladdningen. Försök igen.');
     } finally {
       setProcessing(false);
       setProcessingFile('');
-    }
-  }
-
-  async function saveAll() {
-    if (!transactions?.length) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Inte inloggad');
-
-      const rows = transactions.map(t => ({
-        user_id: user.id,
-        haendelse_typ: t.haendelse_typ,
-        datum: t.datum,
-        beskrivning: t.beskrivning,
-        belopp: Math.abs(t.belopp),
-        moms: t.moms,
-        ai_kategori: t.beskrivning,
-        ai_debit_konto: t.debit_konto,
-        ai_debit_namn: t.debit_namn,
-        ai_kredit_konto: t.kredit_konto,
-        ai_kredit_namn: t.kredit_namn,
-      }));
-
-      const { error: dbError } = await supabase.from('bokforing_transaktioner').insert(rows);
-      if (dbError) throw dbError;
-      setDone(true);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Något gick fel vid sparning.');
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -183,9 +80,10 @@ export default function LaddaUppPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-xl font-extrabold text-slate-800 mb-2">{transactions?.length} transaktioner bokförda!</h2>
+          <h2 className="text-xl font-extrabold text-slate-800 mb-2">Tack för ditt underlag!</h2>
           <p className="text-sm text-slate-400 leading-relaxed mb-8">
-            Alla transaktioner har sparats och syns nu under <span className="font-semibold text-slate-600">Bokförda händelser</span>.
+            Vi har tagit emot {uploadedCount === 1 ? 'din fil' : `dina ${uploadedCount} filer`} och går igenom {uploadedCount === 1 ? 'den' : 'dem'} åt dig.
+            Så snart vi är klara ser du bokföringen här under <span className="font-semibold text-slate-600">Bokförda händelser</span>.
           </p>
           <button onClick={() => router.push('/bokforing')} className="w-full py-3 text-sm font-bold text-white rounded-xl" style={{ backgroundColor: NAV_BG }}>
             Gå till bokföringen
@@ -207,80 +105,8 @@ export default function LaddaUppPage() {
           </svg>
         </div>
         <div className="text-center">
-          <p className="text-xl font-bold text-slate-800">Läser igenom filen...</p>
+          <p className="text-xl font-bold text-slate-800">Laddar upp underlaget...</p>
           {processingFile && <p className="text-slate-400 text-sm mt-1.5 truncate max-w-xs">{processingFile}</p>}
-          <p className="text-slate-400 text-xs mt-1">Vi identifierar och sorterar dina transaktioner</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Preview ────────────────────────────────────────────────────────────────
-
-  if (transactions) {
-    return (
-      <div className="flex flex-col min-h-full bg-slate-50">
-        <div className="px-6 pt-10 pb-4 max-w-2xl mx-auto w-full">
-          <button onClick={() => setTransactions(null)} className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors mb-6">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Tillbaka
-          </button>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ backgroundColor: '#EFF6FF', color: '#2563EB' }}>
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Vi hittade {transactions.length} transaktioner
-          </div>
-          <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">Granska innan du bokför</h1>
-          <p className="text-slate-400 text-sm mt-1 mb-6">Kontrollera att transaktionerna ser rätt ut.</p>
-        </div>
-
-        <div className="px-6 pb-4 max-w-2xl mx-auto w-full flex flex-col gap-3">
-          {transactions.map((t, i) => {
-            const isIncome = t.haendelse_typ === 'kund-betalat';
-            return (
-              <div key={i} className="bg-white rounded-2xl border border-slate-200 p-4 flex items-start gap-4">
-                <div className="flex-shrink-0 mt-0.5">
-                  <span
-                    className="text-xs font-bold px-2 py-1 rounded-lg"
-                    style={{
-                      backgroundColor: isIncome ? '#ECFDF5' : '#FEF2F2',
-                      color: isIncome ? '#059669' : '#DC2626',
-                    }}
-                  >
-                    {isIncome ? '+ Inkomst' : '− Utgift'}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-700 truncate">{t.beskrivning}</p>
-                    <p className="text-sm font-bold text-slate-800 whitespace-nowrap flex-shrink-0">
-                      {isIncome ? '+' : '−'}{Math.abs(t.belopp).toLocaleString('sv-SE')} kr
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
-                    <span>{t.datum}</span>
-                    {t.moms > 0 && <span>Moms: {t.moms.toLocaleString('sv-SE')} kr</span>}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="px-6 pb-10 pt-4 max-w-2xl mx-auto w-full">
-          {warning && <p className="mb-4 text-sm text-amber-600 text-center">{warning}</p>}
-          {error && <p className="mb-4 text-sm text-red-500 text-center">{error}</p>}
-          <button
-            onClick={saveAll}
-            disabled={saving || transactions.length === 0}
-            className="w-full py-3.5 text-sm font-bold text-white rounded-2xl transition-opacity disabled:opacity-40"
-            style={{ backgroundColor: NAV_BG }}
-          >
-            {saving ? 'Sparar...' : `Bokför alla ${transactions.length} transaktioner`}
-          </button>
         </div>
       </div>
     );
@@ -453,12 +279,12 @@ export default function LaddaUppPage() {
 
         <div className="flex gap-3">
           <button
-            onClick={analyzeAll}
+            onClick={uploadAll}
             disabled={files.length === 0}
             className="flex-1 py-3.5 text-sm font-bold text-white rounded-2xl transition-opacity disabled:opacity-40"
             style={{ backgroundColor: NAV_BG }}
           >
-            Klar
+            Skicka in underlaget
           </button>
           <button
             onClick={() => fileRef.current?.click()}
