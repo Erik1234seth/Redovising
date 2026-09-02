@@ -47,6 +47,17 @@ export async function sendWelcomeEmails(params: {
       </tr>
     </table>`;
 
+  // Ombudsanmälan hos Skatteverket. Ligger i båda mejlvarianterna: kunden
+  // behöver göra det oavsett om vi bokat möte eller kör direkt via mejl.
+  const ombudBlock = `
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:24px;">
+              <tr><td style="padding:20px;">
+                <p style="margin:0 0 8px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#8fa3b1;">Nästa steg – anmäl oss som ombud</p>
+                <p style="margin:0 0 12px;font-size:15px;color:#5a6a7a;line-height:1.7;">Nu kan du lägga till <strong style="color:#173b57;">Daniel Seth</strong>, personnummer <strong style="color:#173b57;">720607-2436</strong>, som ombud hos Skatteverket. Då kan vi sköta deklarationer och kontakten med Skatteverket åt dig.</p>
+                <p style="margin:0;font-size:15px;"><a href="https://www.enklabokslut.se/ombud" style="color:#E95C63;text-decoration:none;font-weight:600;">Så gör du, steg för steg &rarr;</a></p>
+              </td></tr>
+            </table>`;
+
   const customerHtml = contactMethod === 'meeting' ? `
     <!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"></head>
     <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
@@ -56,6 +67,7 @@ export async function sendWelcomeEmails(params: {
           <tr><td style="padding:40px;">
             <p style="margin:0 0 8px;font-size:24px;font-weight:700;color:#173b57;">Välkommen${firstName ? ', ' + firstName : ''}!</p>
             <p style="margin:0 0 24px;font-size:16px;color:#5a6a7a;line-height:1.6;">Ditt konto är aktiverat. Vi hör av oss för att boka in ett möte så att vi kan gå igenom ditt ärende tillsammans.</p>
+            ${ombudBlock}
             <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:24px;">
               <tr><td style="padding:20px;">
                 <p style="margin:0 0 8px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#8fa3b1;">Din prenumeration</p>
@@ -89,6 +101,7 @@ export async function sendWelcomeEmails(params: {
             <p style="margin:0 0 16px;font-size:15px;color:#5a6a7a;line-height:1.7;">I början kommer vi säkert att ställa en del frågor:)</p>
             <p style="margin:0 0 16px;font-size:15px;color:#5a6a7a;line-height:1.7;">Du använder alltid denna e-postadress när du mailar till oss oavsett om det är frågor eller underlag du skickar in.</p>
             <p style="margin:0 0 16px;font-size:15px;color:#5a6a7a;line-height:1.7;">För att vi ska komma igång får du gärna börja skicka in underlag direkt. Då kan vi se att underlagen innehåller den information vi behöver för att kunna bokföra dem rätt och om det är något vi behöver komplettera med hör vi av oss.</p>
+            ${ombudBlock}
             <p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.7;">Har du några frågor är det bara att höra av dig.</p>
             <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:24px;">
               <tr><td style="padding:20px;">
