@@ -26,6 +26,16 @@ function checkInbox() {
     if (!lastMsg.isUnread()) continue;
 
     const senderEmail = extractEmail(lastMsg.getFrom());
+
+    // Systemutskick och studsar hoppas över helt, innan bilagorna läses in.
+    // Markeras som lästa så att de inte ligger kvar och äter av de 20 trådar
+    // sökningen hämtar.
+    if (isNoReplyAddress(senderEmail)) {
+      console.log('Hoppar över no-reply-avsändare: ' + senderEmail);
+      lastMsg.markRead();
+      continue;
+    }
+
     const threadId = thread.getId();
     const messageId = lastMsg.getId();
     const subject = lastMsg.getSubject() || '';
@@ -189,6 +199,29 @@ function callApi(config, path, payload) {
     console.error('callApi error:', e.message);
     return null;
   }
+}
+
+// ─── Avsändare vi aldrig svarar ───────────────────────────────────────────────
+// Våra egna systemutskick (välkomstmejl, bokningsbekräftelser, fakturor) går
+// från noreply@enklabokslut.se via Resend och landar i samma inkorg. Utan det
+// här filtret la AI:n ett svarsutkast till en adress som ingen läser. Samma sak
+// gäller studsar och andra maskinavsändare.
+//
+// Listan finns också på serversidan i src/lib/inmail/no-reply.ts, som en spärr
+// om skriptet inte distribuerats om. Ändrar du här, ändra där också.
+const NO_REPLY_LOCAL_PARTS = [
+  'noreply', 'no-reply', 'no_reply',
+  'donotreply', 'do-not-reply', 'do_not_reply',
+  'mailer-daemon', 'mailerdaemon', 'postmaster',
+  'bounce', 'bounces',
+  'notification', 'notifications',
+];
+
+function isNoReplyAddress(email) {
+  const at = String(email).lastIndexOf('@');
+  if (at < 1) return false;
+  const localPart = String(email).slice(0, at).toLowerCase().trim().split('+')[0];
+  return NO_REPLY_LOCAL_PARTS.indexOf(localPart) !== -1;
 }
 
 function extractEmail(from) {

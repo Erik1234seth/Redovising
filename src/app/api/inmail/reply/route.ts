@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { classifyIntent } from '@/lib/inmail/classify';
+import { isNoReplyAddress } from '@/lib/inmail/no-reply';
 import { handleNewTransaction } from '@/lib/inmail/handlers/new-transaction';
 import { handleEditTransaction } from '@/lib/inmail/handlers/edit-transaction';
 import { handleDeleteRequest, handleDeleteConfirm, handleDeleteCancel } from '@/lib/inmail/handlers/delete-transaction';
@@ -40,6 +41,13 @@ export async function POST(request: Request) {
 
     if (!senderEmail || !gmailThreadId || !messageId) {
       return NextResponse.json({ error: 'Saknar obligatoriska fält' }, { status: 400 });
+    }
+
+    // Systemutskick och studsar får aldrig ett utkast. Skriptet skapar bara ett
+    // utkast när svaret har replyBody, så det räcker att svara utan.
+    if (isNoReplyAddress(senderEmail)) {
+      console.log(`[inmail/reply] ${senderEmail} är en no-reply-adress — inget utkast`);
+      return NextResponse.json({ action: 'skipped', reason: 'no-reply-sender' });
     }
 
     const supabase = getSupabase();
