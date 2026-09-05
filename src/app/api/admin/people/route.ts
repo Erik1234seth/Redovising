@@ -306,6 +306,7 @@ async function build(): Promise<Map<string, Built>> {
           : r.status === 'skipped' ? 'SMS stoppat'
           : r.kind === 'lead_welcome' ? 'Välkomst-SMS'
           : r.kind === 'lead_booking' ? 'Bokningsbekräftelse via SMS'
+          : r.kind === 'meeting_reminder' ? 'Påminnelse inför mötet'
           : r.kind === 'manual' ? 'SMS du skrev själv'
           : 'SMS från oss'
         : 'SMS från personen',
