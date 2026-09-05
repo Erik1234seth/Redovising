@@ -18,7 +18,90 @@ const FIELDS = {
   externalId: ['leadgenid', 'leadid', 'id'],
   createdTime: ['createdtime', 'createdat', 'created', 'timestamp', 'skapad'],
   formName: ['formname', 'form', 'formularnamn', 'campaignname', 'adname'],
+  // Steget "hur vill du bli kontaktad?" i snabbformuläret. Frågans egen text
+  // blir fältnamnet hos Facebook och är alltså både lång och språkberoende —
+  // därför finns en värdebaserad reserv i `pickContactChoice` nedan.
+  contactChoice: ['contactmethod', 'kontaktmetod', 'kontaktsatt', 'kontaktvag', 'contactpreference', 'hurvilldublikontaktad'],
+  meetingDate: ['appointmentdate', 'bookingdate', 'preferreddate', 'onskatdatum', 'motesdatum', 'datum', 'date'],
+  meetingTime: ['appointmenttime', 'bookingtime', 'preferredtime', 'onskadtid', 'motestid', 'klockslag', 'tid', 'time'],
 } as const;
+
+const MONTHS = [
+  ['januari', 'january', 'jan'],
+  ['februari', 'february', 'feb'],
+  ['mars', 'march', 'mar'],
+  ['april', 'april', 'apr'],
+  ['maj', 'may'],
+  ['juni', 'june', 'jun'],
+  ['juli', 'july', 'jul'],
+  ['augusti', 'august', 'aug'],
+  ['september', 'september', 'sep'],
+  ['oktober', 'october', 'oct', 'okt'],
+  ['november', 'november', 'nov'],
+  ['december', 'december', 'dec'],
+];
+
+/** Gemener utan diakriter — samma behandling som nycklarna får. */
+function normalizeValue(value: string): string {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/**
+ * Tolkar svaret på kontaktfrågan. Vi jämför mot orden i alternativen, inte mot
+ * exakta strängar: Erik kan formulera om alternativen i formuläret utan att
+ * den här filen behöver ändras.
+ */
+export function interpretContactChoice(value: string | null): 'meeting' | 'email' | null {
+  if (!value) return null;
+  const v = normalizeValue(value);
+  if (/(mote|boka|ring|samtal|meeting|appointment|call)/.test(v)) return 'meeting';
+  if (/(mejl|mail|email|epost|e-post)/.test(v)) return 'email';
+  return null;
+}
+
+/** "2026-09-08", "8 september 2026" och "September 8, 2026" → "2026-09-08". */
+export function parseMeetingDate(value: string | null, today = new Date()): string | null {
+  if (!value) return null;
+  const v = normalizeValue(value);
+
+  const iso = v.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+
+  const monthIndex = MONTHS.findIndex(names => names.some(n => v.includes(n)));
+  if (monthIndex < 0) return null;
+
+  const day = v.match(/\b(\d{1,2})\b/);
+  if (!day) return null;
+
+  const yearMatch = v.match(/\b(20\d{2})\b/);
+  let year = yearMatch ? Number(yearMatch[1]) : today.getFullYear();
+  // Utan årtal i texten: ett datum som redan passerat med god marginal syftar
+  // rimligen på nästa år, inte på en tid som varit.
+  if (!yearMatch && new Date(year, monthIndex, Number(day[1])) < new Date(today.getTime() - 30 * 864e5)) {
+    year += 1;
+  }
+  return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${day[1].padStart(2, '0')}`;
+}
+
+/** "10:00", "10.00", "10:00 AM" och "2 pm" → "10:00" respektive "14:00". */
+export function parseMeetingTime(value: string | null): string | null {
+  if (!value) return null;
+  const v = normalizeValue(value);
+
+  const withMinutes = v.match(/\b(\d{1,2})[:.](\d{2})\s*(am|pm)?/);
+  const wholeHour = withMinutes ? null : v.match(/\b(\d{1,2})\s*(am|pm)\b/);
+  const m = withMinutes ?? wholeHour;
+  if (!m) return null;
+
+  let hour = Number(m[1]);
+  const minutes = withMinutes ? m[2] : '00';
+  const suffix = withMinutes ? m[3] : m[2];
+  if (suffix === 'pm' && hour < 12) hour += 12;
+  if (suffix === 'am' && hour === 12) hour = 0;
+  if (hour > 23) return null;
+
+  return `${String(hour).padStart(2, '0')}:${minutes}`;
+}
 
 /** "Phone Number", "phone_number" och "phoneNumber" ska alla bli "phonenumber". */
 function normalizeKey(key: string): string {

@@ -49,6 +49,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Ogiltig JSON' }, { status: 400 });
   }
 
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+
+  // Payloaden sparas rå innan vi tolkar den. Fältnamnen kommer från
+  // formulärets egna frågetexter och ändras varje gång ett steg läggs till —
+  // utan den här raden går det inte att se vad Zapen faktiskt skickade, bara
+  // vad vi råkade känna igen. Får aldrig stoppa leadet.
+  await supabase
+    .from('webhook_logs')
+    .insert({ payload: { source: 'facebook-lead', body: payload } })
+    .then(({ error }) => {
+      if (error) console.warn('[lead] kunde inte logga payloaden:', error.message);
+    });
+
   const { lead, keys } = mapLeadPayload(payload);
 
   if (!lead.phone && !lead.email) {
@@ -59,15 +76,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-
   // Zapier väntar på svaret, så resultatet syns direkt i Zapens historik.
   // SMS:et tar ungefär en sekund; det är billigare än att felsöka i blindo.
   const result = await handleNewLead(supabase, lead);
 
-  return NextResponse.json({ ok: result.outcome !== 'failed', ...result });
+  // `keys` följer med även när allt gick bra: de syns i Zapens historik och är
+  // det snabbaste sättet att se vad ett nytt formulärsteg heter.
+  return NextResponse.json({ ok: result.outcome !== 'failed', ...result, keys });
 }
