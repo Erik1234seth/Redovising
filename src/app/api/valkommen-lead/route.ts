@@ -3,6 +3,7 @@ import { Resend } from 'resend';
 import { sendAndLog, INTERNAL_NOTICE_TO } from '@/lib/email-log';
 import { createClient } from '@supabase/supabase-js';
 import { questions } from '@/data/kvalificera-questions';
+import { meetingConfirmationEmail, formatMeetingSlot } from '@/lib/emails/meeting-confirmation';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -18,17 +19,23 @@ function escapeHtml(s: string) {
 // instead and never reach this route.
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, phone, notes, contactMethod, ref, answers } = await request.json();
+    const { name, email, phone, notes, contactMethod, meetingDate, meetingTime, ref, answers } = await request.json();
+    const hasMeeting = !!meetingDate && !!meetingTime;
+    const formattedMeeting = hasMeeting ? formatMeetingSlot(meetingDate, meetingTime) : '';
     const hasAnswers = !!answers && Object.keys(answers).length > 0;
     const sourceWord =
       typeof ref === 'string' && ref.toLowerCase().startsWith('brev-') ? 'brev' :
       ref === 'hemsida-kontakt' ? 'hemsidan' : 'annons';
-    const contactMethodLabel = contactMethod === 'phone' ? 'Ring mig' : contactMethod === 'email' ? 'Mejla mig' : '—';
+    const contactMethodLabel =
+      hasMeeting ? `Bokat möte – ${formattedMeeting}` :
+      contactMethod === 'phone' ? 'Ring mig' :
+      contactMethod === 'email' ? 'Mejla mig' : '—';
 
-    // Vi lovar alltid ett mejl tillbaka, aldrig ett samtal — oavsett om
-    // besökaren lämnat telefonnummer eller kryssat "Ring mig". Numret är
-    // bara extra kontaktväg för oss internt. Samma besked som
-    // bekräftelseskärmarna ger, annars får besökaren två olika svar.
+    // Utan bokad tid lovar vi alltid ett mejl tillbaka, aldrig ett samtal —
+    // oavsett om besökaren lämnat telefonnummer eller kryssat "Ring mig".
+    // Numret är bara extra kontaktväg för oss internt. Har de däremot bokat en
+    // tid i popupen är samtalet utlovat, och då säger både mail och
+    // bekräftelseskärm samma sak.
 
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return NextResponse.json({ error: 'Ogiltig e-postadress' }, { status: 400 });
@@ -51,6 +58,20 @@ export async function POST(request: NextRequest) {
       qualification_answers: answers || null,
     });
 
+    // Bokad tid lever i samma tabell som /boka-mote och kontaktflödet, så
+    // adminpanelens tidslinje och de upptagna tiderna stämmer oavsett var
+    // bokningen gjordes.
+    if (hasMeeting) {
+      await supabase.from('meetings').insert({
+        name: name || null,
+        email,
+        phone: phone || null,
+        date: meetingDate,
+        time: meetingTime,
+        message: notes || null,
+      });
+    }
+
     const answerRows = questions
       .map((q) => {
         const a = answers?.[q.id];
@@ -68,7 +89,9 @@ export async function POST(request: NextRequest) {
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
       replyTo: email,
       to: INTERNAL_NOTICE_TO,
-      subject: `Nytt lead från ${sourceWord}${ref ? ` (${ref})` : ''} – ${name || email}`,
+      subject: hasMeeting
+        ? `Möte bokat – ${formattedMeeting} – ${name || email}`
+        : `Nytt lead från ${sourceWord}${ref ? ` (${ref})` : ''} – ${name || email}`,
       html: `
         <h2 style="color:${NAV_BG};">Nytt lead från ${sourceWord}</h2>
         <p><strong>Namn:</strong> ${name || '—'}</p>
@@ -100,17 +123,28 @@ export async function POST(request: NextRequest) {
     // egen schemaläggning får göra jobbet — den håller mejlet åt oss, vilket
     // sparar oss både kö och cron-jobb. Notisen till oss ovan går fortfarande
     // direkt: fördröjningen gäller besökaren, inte oss.
+    // En bokningsbekräftelse måste komma direkt — fördröjningen gäller bara
+    // det vanliga "vi hör av oss"-mejlet.
     const CONFIRMATION_DELAY_MINUTES = 20;
-    const scheduledAt = new Date(Date.now() + CONFIRMATION_DELAY_MINUTES * 60_000).toISOString();
+    const scheduledAt = hasMeeting
+      ? undefined
+      : new Date(Date.now() + CONFIRMATION_DELAY_MINUTES * 60_000).toISOString();
 
     const firstName = name ? String(name).split(' ')[0] : '';
+
+    // Bokade tider får samma mejl som /boka-mote skickar — kunden ska se
+    // exakt samma bekräftelse oavsett var på sajten hen bokade.
+    const booking = hasMeeting
+      ? meetingConfirmationEmail({ name, phone, date: meetingDate, time: meetingTime })
+      : null;
+
     await sendAndLog(resend, {
       from: 'Enkla Bokslut <noreply@enklabokslut.se>',
       replyTo: 'erik@enklabokslut.se',
       to: email,
-      subject: 'Tack — vi hör av oss inom kort',
+      subject: booking ? booking.subject : 'Tack — vi hör av oss inom kort',
       scheduledAt,
-      html: `
+      html: booking ? booking.html : `
         <!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"></head>
         <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
           <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:40px 16px;">
@@ -156,7 +190,7 @@ export async function POST(request: NextRequest) {
           </table>
         </body></html>
       `,
-    }, 'lead_bekraftelse');
+    }, booking ? 'motebokning' : 'lead_bekraftelse');
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {

@@ -4,6 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { questions } from '@/data/kvalificera-questions';
+import {
+  TIME_SLOTS,
+  isSlotBooked,
+  toDateStr,
+  firstBookableDate,
+  upcomingWeekdays,
+  minBookableDate,
+  formatMeetingDate,
+} from '@/lib/meetingSlots';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
@@ -95,6 +104,12 @@ const VARIANTS: Record<string, Partial<Variant>> = {
   'fb-g': { image: '/vinkafacebook.png' },
 };
 
+const DAY_LABELS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
+
+// Hur många dagar framåt datumraden i popupen erbjuder. Färre än på
+// /boka-mote — popupen ska gå att överblicka utan att bli en egen kalender.
+const POPUP_DAYS = 6;
+
 const howItWorks = [
   { t: 'Du mejlar in dina underlag', d: 'Kvitton och fakturor, precis som de ser ut.' },
   { t: 'Vi sköter resten', d: 'Bokföring, moms och bokslut — allt ingår.' },
@@ -124,7 +139,7 @@ function TopControl({ onClick, label, dark, children }: { onClick: () => void; l
   );
 }
 
-type Stage = 'hook' | 'how' | 'questions' | 'contact' | 'done' | 'fail';
+type Stage = 'hook' | 'how' | 'questions' | 'contact' | 'meeting' | 'done' | 'fail';
 
 // "Så funkar det"-steget är tillfälligt avstängt: hooken tappade sex gånger
 // fler besökare än kontaktformuläret, och ett mellansteg till innan frågorna
@@ -203,6 +218,36 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
 
+  // Mötet är standardvägen ut ur popupen: en tid ligger förvald redan när
+  // kontaktsteget öppnas, och besökaren får aktivt välja bort det.
+  const [wantsMeeting, setWantsMeeting] = useState(true);
+  const [bookedSlots, setBookedSlots] = useState<Record<string, string[]>>({});
+  const meetingDays = upcomingWeekdays(minBookableDate(), POPUP_DAYS);
+  const [meetingDate, setMeetingDate] = useState(() => {
+    const d = firstBookableDate(minBookableDate());
+    return toDateStr(d.getFullYear(), d.getMonth(), d.getDate());
+  });
+  const [meetingTime, setMeetingTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (stage !== 'contact' && stage !== 'meeting') return;
+    fetch('/api/booked-slots')
+      .then(r => r.json())
+      .then(d => setBookedSlots(d.slots ?? {}))
+      .catch(() => {});
+  }, [stage]);
+
+  const freeTimesOn = (dateStr: string) => TIME_SLOTS.filter(t => !isSlotBooked(dateStr, t, bookedSlots));
+
+  const bookingMeeting = wantsMeeting && !!meetingTime;
+
+  // Förvälj första lediga tiden på vald dag — annars vore "boka möte" ett
+  // extra klick jämfört med att bara lämna sina uppgifter.
+  useEffect(() => {
+    const free = TIME_SLOTS.filter(t => !isSlotBooked(meetingDate, t, bookedSlots));
+    setMeetingTime(prev => (prev && free.includes(prev) ? prev : free[0] ?? null));
+  }, [meetingDate, bookedSlots]);
+
   const answer = (value: boolean) => {
     const q = questions[step];
     setAnswers({ ...answers, [q.id]: value });
@@ -226,23 +271,42 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
   };
 
   const back = () => {
-    if (stage === 'how') setStage('hook');
+    if (stage === 'meeting') setStage('contact');
+    else if (stage === 'how') setStage('hook');
     // Utan kroken finns inget steg bakom första frågan att gå tillbaka till.
     else if (stage === 'questions' && step === 0) { if (!skipHook) setStage(SHOW_HOW_STAGE ? 'how' : 'hook'); }
     else if (stage === 'questions') setStep(step - 1);
   };
 
+  // Steg 1 skickar ingenting — uppgifterna bärs vidare till tidsvalet, som är
+  // det steg som faktiskt postar leadet.
+  const goToMeeting = (e: React.FormEvent) => {
+    e.preventDefault();
+    setStage('meeting');
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (wantsMeeting && !meetingTime) return;
     setSending(true);
     setSendError('');
     try {
       const res = await fetch('/api/valkommen-lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Inget contactMethod: popupen frågar inte längre om preferens, och
-        // att gissa åt besökaren hade blivit fel i notismailet.
-        body: JSON.stringify({ name, email, phone, notes, ref: refCode, answers }),
+        // contactMethod följer vad besökaren faktiskt valde i formuläret:
+        // 'meeting' med tid, annars 'email' för den som bara vill ha info.
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          notes,
+          ref: refCode,
+          answers,
+          contactMethod: bookingMeeting ? 'meeting' : 'email',
+          meetingDate: bookingMeeting ? meetingDate : null,
+          meetingTime: bookingMeeting ? meetingTime : null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Något gick fel');
@@ -255,7 +319,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
     }
   };
 
-  const showBack = stage === 'how' || (stage === 'questions' && !(skipHook && step === 0));
+  const showBack = stage === 'meeting' || stage === 'how' || (stage === 'questions' && !(skipHook && step === 0));
   const onPhoto = stage === 'hook';
   const variant: Variant = { ...DEFAULT_VARIANT, ...((refCode && VARIANTS[refCode]) || {}) };
 
@@ -526,10 +590,10 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
           </div>
 
           <p className="text-sm sm:text-base leading-relaxed mb-3 sm:mb-7 text-slate-500">
-            Lämna dina uppgifter så hör vi av oss och berättar mer. Sen bestämmer du i lugn och ro om det känns rätt.
+            Lämna dina uppgifter först — sen väljer du en tid när vi ringer upp dig. Kostnadsfritt, och du bestämmer i lugn och ro efteråt.
           </p>
 
-          <form onSubmit={submit} className="space-y-2.5 sm:space-y-4">
+          <form onSubmit={goToMeeting} className="space-y-2.5 sm:space-y-4">
             {([
               { label: 'Namn', value: name, set: setName, type: 'text', autoComplete: 'name', progress: 'name' as const },
               { label: 'E-post', value: email, set: setEmail, type: 'email', autoComplete: 'email', progress: 'email' as const },
@@ -585,18 +649,145 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
             </div>
 
             <div className="sticky bottom-0 z-10 pt-2 pb-1 space-y-2 bg-white border-t border-slate-100 sm:static sm:pt-0 sm:pb-0 sm:space-y-0 sm:bg-transparent sm:border-t-0">
-              {sendError && <p className="text-sm text-center" style={{ color: CORAL }}>{sendError}</p>}
-
               <button
                 type="submit"
-                disabled={sending}
-                className="w-full py-3.5 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90 disabled:opacity-50"
+                className="w-full py-3.5 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90"
                 style={{ backgroundColor: NAV_BG, boxShadow: `0 10px 24px ${NAV_BG}40` }}
               >
-                {sending ? 'Skickar…' : 'Skicka — så hör vi av oss'}
+                Fortsätt — välj en tid
               </button>
             </div>
           </form>
+
+          <p className="text-center text-xs sm:text-sm mt-1.5 sm:mt-2 text-slate-400">
+            Ingen betalning nu · Ingen bindningstid
+          </p>
+        </div>
+      )}
+
+      {/* ── Boka tid ── */}
+      {stage === 'meeting' && (
+        <div className="px-6 sm:px-9 pt-10 sm:pt-14 pb-5 sm:pb-9 sm:flex-1 sm:flex sm:flex-col sm:justify-center">
+          {/* Växeln högst upp: mötet är förvalt, mejlet finns för den som inte
+              vill prata med någon än. Två lika breda halvor — men bara den
+              valda halvan är fylld, så förvalet syns direkt. */}
+          <div className="flex gap-1 p-1 rounded-xl bg-slate-100 mb-4 sm:mb-6">
+            {[
+              { value: true, label: 'Boka ett möte' },
+              { value: false, label: 'Mer info på mailen' },
+            ].map(({ value, label }) => {
+              const active = wantsMeeting === value;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => { setWantsMeeting(value); markProgress('method'); }}
+                  className="flex-1 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all duration-150"
+                  style={
+                    active
+                      ? { backgroundColor: 'white', color: NAV_BG, boxShadow: '0 1px 3px rgba(15,23,42,0.12)' }
+                      : { color: '#94a3b8' }
+                  }
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          <h2 className="text-xl sm:text-3xl font-extrabold leading-tight mb-2 sm:mb-3" style={{ color: NAV_BG }}>
+            {wantsMeeting ? 'När passar det att vi ringer?' : 'Vi mejlar dig mer info'}
+          </h2>
+          <p className="text-sm sm:text-base leading-relaxed mb-4 sm:mb-6 text-slate-500">
+            {wantsMeeting
+              ? 'Vi går igenom hur allt fungerar och vad det kostar för just din firma. Kostnadsfritt och tar ett kvart.'
+              : 'Du får ett mejl med hur allt fungerar och vad det kostar. Vill du hellre prata med oss kan du byta till ett möte här ovanför.'}
+          </p>
+
+          {wantsMeeting && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+              <p className="text-xs sm:text-sm font-semibold mb-2.5 first-letter:uppercase" style={{ color: NAV_BG }}>
+                Vi ringer dig {formatMeetingDate(meetingDate)}{meetingTime ? ` kl. ${meetingTime}` : ''}
+              </p>
+
+              <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
+                {meetingDays.map(d => {
+                  const dateStr = toDateStr(d.getFullYear(), d.getMonth(), d.getDate());
+                  const isSelected = meetingDate === dateStr;
+                  const free = freeTimesOn(dateStr).length;
+                  return (
+                    <button
+                      key={dateStr}
+                      type="button"
+                      disabled={free === 0}
+                      onClick={() => { setMeetingDate(dateStr); markProgress('method'); }}
+                      className="flex-shrink-0 w-[54px] py-1.5 rounded-lg text-center transition-all duration-150"
+                      style={
+                        isSelected
+                          ? { backgroundColor: NAV_BG, color: 'white', border: `1.5px solid ${NAV_BG}` }
+                          : free === 0
+                          ? { backgroundColor: '#f1f5f9', color: '#cbd5e1', border: '1.5px solid transparent' }
+                          : { backgroundColor: 'white', color: NAV_BG, border: '1.5px solid #e2e8f0' }
+                      }
+                    >
+                      <span className="block text-[10px] font-semibold uppercase tracking-wide opacity-70">
+                        {DAY_LABELS[(d.getDay() + 6) % 7]}
+                      </span>
+                      <span className="block text-base font-extrabold leading-tight">{d.getDate()}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-2 sm:mt-2.5">
+                {TIME_SLOTS.map(t => {
+                  const booked = isSlotBooked(meetingDate, t, bookedSlots);
+                  const isSelected = meetingTime === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      disabled={booked}
+                      onClick={() => { setMeetingTime(t); markProgress('method'); }}
+                      className="py-2 sm:py-2.5 rounded-lg text-sm font-bold transition-all duration-150"
+                      style={
+                        booked
+                          ? { backgroundColor: '#f1f5f9', color: '#cbd5e1', textDecoration: 'line-through', border: '1.5px solid transparent' }
+                          : isSelected
+                          ? { backgroundColor: NAV_BG, color: 'white', border: `1.5px solid ${NAV_BG}`, boxShadow: `0 3px 10px ${NAV_BG}33` }
+                          : { backgroundColor: 'white', color: NAV_BG, border: '1.5px solid #e2e8f0' }
+                      }
+                    >
+                      <span className="inline-flex items-center justify-center gap-1">
+                        {isSelected && <Check className="w-3 h-3" />}
+                        {t}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="sticky bottom-0 z-10 mt-4 sm:mt-6 pt-2 pb-1 space-y-2 bg-white border-t border-slate-100 sm:static sm:pt-0 sm:pb-0 sm:space-y-0 sm:bg-transparent sm:border-t-0">
+            {sendError && <p className="text-sm text-center" style={{ color: CORAL }}>{sendError}</p>}
+
+            <button
+              type="button"
+              onClick={submit}
+              disabled={sending || (wantsMeeting && !meetingTime)}
+              className="w-full py-3.5 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: NAV_BG, boxShadow: `0 10px 24px ${NAV_BG}40` }}
+            >
+              {sending
+                ? 'Skickar…'
+                : wantsMeeting
+                ? meetingTime
+                  ? `Boka ${DAY_LABELS[(new Date(meetingDate + 'T12:00:00').getDay() + 6) % 7].toLowerCase()} kl. ${meetingTime}`
+                  : 'Välj en tid'
+                : 'Skicka — så mejlar vi dig'}
+            </button>
+          </div>
 
           <p className="text-center text-xs sm:text-sm mt-2 sm:mt-3 text-slate-400">
             Ingen betalning nu · Ingen bindningstid
@@ -615,7 +806,9 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
           </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold mb-2.5" style={{ color: NAV_BG }}>Tack{name ? `, ${name.split(' ')[0]}` : ''}!</h2>
           <p className="text-sm sm:text-base leading-relaxed mb-5 text-slate-500">
-            Vi har tagit emot din förfrågan och går igenom dina svar.
+            {bookingMeeting
+              ? 'Din tid är bokad — vi hörs snart.'
+              : 'Vi har tagit emot din förfrågan och går igenom dina svar.'}
           </p>
 
           <div className="flex items-start gap-3 text-left rounded-xl px-4 py-3.5 mb-7 bg-slate-50 border border-slate-200">
@@ -623,16 +816,34 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
               className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
               style={{ backgroundColor: NAV_TINT, color: NAV_BG }}
             >
-              {/* Alltid mejl — telefonnumret är bara extra kontaktväg för
-                  oss, inget löfte om ett samtal. Samma besked som API:t ger i
-                  bekräftelsemailet, så skärmen och mailet aldrig säger olika. */}
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+              {/* Bokat möte lovar ett samtal; utan bokning lovar vi bara mejl
+                  — telefonnumret i sig är ingen utlovad ringning. Samma besked
+                  som API:t ger i bekräftelsemailet, så skärmen och mailet
+                  aldrig säger olika. */}
+              {bookingMeeting ? (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              )}
             </span>
             <p className="text-sm sm:text-base leading-relaxed" style={{ color: NAV_BG }}>
-              Vi mejlar dig{email ? <> på <span className="font-semibold">{email}</span></> : ''} inom kort. Då går vi igenom hur allt fungerar och stämmer av om det passar din verksamhet.
-              <span className="block text-xs sm:text-sm mt-1.5 text-slate-400">Kolla gärna skräpposten om du inte ser något.</span>
+              {bookingMeeting ? (
+                <>
+                  Vi ringer dig <span className="font-semibold">{formatMeetingDate(meetingDate)} kl. {meetingTime}</span>{phone ? <> på <span className="font-semibold">{phone}</span></> : ''}.
+                  <span className="block text-xs sm:text-sm mt-1.5 text-slate-400">
+                    En bekräftelse{email ? <> till {email}</> : ''} är på väg — kolla gärna skräpposten.
+                  </span>
+                </>
+              ) : (
+                <>
+                  Vi mejlar dig{email ? <> på <span className="font-semibold">{email}</span></> : ''} inom kort.
+                  <span className="block text-xs sm:text-sm mt-1.5 text-slate-400">Kolla gärna skräpposten om du inte ser något.</span>
+                </>
+              )}
             </p>
           </div>
           {onClose ? (

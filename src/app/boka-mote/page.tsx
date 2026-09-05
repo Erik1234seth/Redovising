@@ -5,14 +5,10 @@ import { useState, useEffect } from 'react';
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
 
-import { TIME_SLOTS, isSlotBooked } from '@/lib/meetingSlots';
+import { TIME_SLOTS, isSlotBooked, toDateStr, firstBookableDate, upcomingWeekdays } from '@/lib/meetingSlots';
 
 const WEEKDAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
 const MONTHS = ['Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni', 'Juli', 'Augusti', 'September', 'Oktober', 'November', 'december'];
-
-function toDateStr(y: number, m: number, d: number) {
-  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-}
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -26,19 +22,25 @@ function getFirstDayOfMonth(year: number, month: number) {
 
 export default function BokaMote() {
   const today = new Date();
-  // Min bookable date = today + 2
+  // Min bookable date = today + 1
   const minDate = new Date(today);
-  minDate.setDate(today.getDate() + 2);
+  minDate.setDate(today.getDate() + 1);
 
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const firstDate = firstBookableDate(minDate);
+
+  const [viewYear, setViewYear] = useState(firstDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState(firstDate.getMonth());
+  const [selectedDate, setSelectedDate] = useState<string | null>(
+    toDateStr(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate())
+  );
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [step, setStep] = useState<'calendar' | 'form' | 'done'>('calendar');
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [bookedSlots, setBookedSlots] = useState<Record<string, string[]>>({});
+  // På mobil visas som standard bara de närmaste dagarna, inte hela månaden.
+  const [showFullCalendar, setShowFullCalendar] = useState(false);
 
   useEffect(() => {
     fetch('/api/booked-slots').then(r => r.json()).then(d => setBookedSlots(d.slots ?? {}));
@@ -46,6 +48,20 @@ export default function BokaMote() {
 
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
+
+  const freeSlotsOn = (dateStr: string) =>
+    TIME_SLOTS.filter(t => !isSlotBooked(dateStr, t, bookedSlots)).length;
+
+  const freeCount = selectedDate ? freeSlotsOn(selectedDate) : 0;
+
+  const upcoming = upcomingWeekdays(minDate, 10);
+
+  function pickDate(dateStr: string, year: number, month: number) {
+    setSelectedDate(dateStr);
+    setSelectedTime(null);
+    setViewYear(year);
+    setViewMonth(month);
+  }
 
   function prevMonth() {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
@@ -114,38 +130,66 @@ export default function BokaMote() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#f8fafc' }}>
       {/* Header */}
-      <div className="py-14 sm:py-16 px-4" style={{ backgroundColor: NAV_BG }}>
+      <div className="py-10 sm:py-16 px-4" style={{ backgroundColor: NAV_BG }}>
         <div className="max-w-2xl mx-auto text-center">
           <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Kostnadsfritt</p>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">Boka ett möte med oss</h1>
-          <p className="text-white/65 text-base sm:text-lg leading-relaxed mb-8">
+          <p className="text-white/65 text-sm sm:text-lg leading-relaxed">
             Är du osäker på vilket paket som passar, eller vill du bara ställa frågor innan du bestämmer dig? Vi ringer upp dig och hjälper dig att hitta rätt — utan press och utan kostnad.
           </p>
-          <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto">
-            {[
-              { icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', text: 'Vi hjälper dig välja rätt paket' },
-              { icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', text: 'Kostnadsfritt, ingen bindning' },
-              { icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z', text: 'Vi ringer upp dig på vald tid' },
-            ].map(({ icon, text }) => (
-              <div key={text} className="rounded-xl p-4 text-center" style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <svg className="w-5 h-5 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={icon} />
-                </svg>
-                <p className="text-xs leading-snug" style={{ color: 'rgba(255,255,255,0.6)' }}>{text}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
         {step === 'calendar' && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
-            <div className="grid md:grid-cols-[1fr_auto] divide-y md:divide-y-0 md:divide-x divide-gray-100">
+            {/* Kompakt datumrad — bara mobil */}
+            <div className={`md:hidden px-4 pt-5 pb-4 border-b border-gray-100 ${showFullCalendar ? 'hidden' : ''}`}>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Välj dag</p>
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4" style={{ scrollbarWidth: 'none' }}>
+                {upcoming.map(d => {
+                  const dateStr = toDateStr(d.getFullYear(), d.getMonth(), d.getDate());
+                  const isSelected = selectedDate === dateStr;
+                  const free = freeSlotsOn(dateStr);
+                  return (
+                    <button
+                      key={dateStr}
+                      onClick={() => pickDate(dateStr, d.getFullYear(), d.getMonth())}
+                      disabled={free === 0}
+                      className="flex-shrink-0 w-[62px] py-2.5 rounded-xl text-center transition-all duration-150"
+                      style={
+                        isSelected
+                          ? { backgroundColor: NAV_BG, color: 'white', border: `1.5px solid ${NAV_BG}` }
+                          : free === 0
+                          ? { backgroundColor: '#f8fafc', color: '#cbd5e1', border: '1.5px solid transparent' }
+                          : { backgroundColor: 'white', color: NAV_BG, border: `1.5px solid ${NAV_BG}20` }
+                      }
+                    >
+                      <span className="block text-[10px] font-semibold uppercase tracking-wide opacity-70">
+                        {WEEKDAYS[(d.getDay() + 6) % 7]}
+                      </span>
+                      <span className="block text-lg font-extrabold leading-tight">{d.getDate()}</span>
+                      <span className="block text-[10px] opacity-70">
+                        {free === 0 ? 'fullt' : `${free} lediga`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => setShowFullCalendar(true)}
+                className="mt-3 text-xs font-semibold underline underline-offset-2"
+                style={{ color: NAV_BG, opacity: 0.6 }}
+              >
+                Visa hela kalendern
+              </button>
+            </div>
+
+            <div className="grid md:grid-cols-[1fr_340px] divide-y md:divide-y-0 md:divide-x divide-gray-100">
 
               {/* Calendar */}
-              <div className="p-6 sm:p-8">
+              <div className={`p-6 sm:p-8 ${showFullCalendar ? '' : 'hidden md:block'}`}>
                 {/* Month nav */}
                 <div className="flex items-center justify-between mb-6">
                   <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors">
@@ -182,7 +226,7 @@ export default function BokaMote() {
                       <button
                         key={day}
                         disabled={!selectable}
-                        onClick={() => { setSelectedDate(dateStr); setSelectedTime(null); }}
+                        onClick={() => pickDate(dateStr, viewYear, viewMonth)}
                         className="aspect-square flex items-center justify-center rounded-xl text-sm font-medium transition-all duration-150"
                         style={
                           isSelected
@@ -201,40 +245,62 @@ export default function BokaMote() {
                     );
                   })}
                 </div>
+
+                <button
+                  onClick={() => setShowFullCalendar(false)}
+                  className="md:hidden mt-4 text-xs font-semibold underline underline-offset-2"
+                  style={{ color: NAV_BG, opacity: 0.6 }}
+                >
+                  Visa närmaste dagar
+                </button>
               </div>
 
               {/* Time slots */}
-              <div className="p-6 sm:p-8 md:w-52">
-                <p className="text-sm font-bold mb-4" style={{ color: NAV_BG }}>
+              <div className="p-6 sm:p-8" style={{ backgroundColor: '#fbfcfe' }}>
+                <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: CORAL }}>Välj en tid</p>
+                <p className="text-lg font-extrabold mb-1 capitalize" style={{ color: NAV_BG }}>
                   {selectedDate ? formatSelectedDate(selectedDate) : 'Välj ett datum'}
                 </p>
-                {!selectedDate && (
-                  <p className="text-xs text-slate-400">Välj ett datum till vänster för att se tillgängliga tider.</p>
-                )}
-                {selectedDate && (
-                  <div className="space-y-2">
-                    {TIME_SLOTS.map(t => {
-                      const booked = isSlotBooked(selectedDate, t, bookedSlots);
-                      const isSelected = selectedTime === t;
-                      return (
-                        <button
-                          key={t}
-                          disabled={booked}
-                          onClick={() => setSelectedTime(t)}
-                          className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all duration-150"
-                          style={
-                            booked
-                              ? { backgroundColor: '#f1f5f9', color: '#cbd5e1', cursor: 'default', textDecoration: 'line-through' }
-                              : isSelected
-                              ? { backgroundColor: CORAL, color: 'white', boxShadow: `0 4px 12px ${CORAL}40` }
-                              : { backgroundColor: `${NAV_BG}08`, color: NAV_BG }
-                          }
-                        >
-                          {booked ? `${t} — Bokad` : t}
-                        </button>
-                      );
-                    })}
-                  </div>
+                {!selectedDate ? (
+                  <p className="text-sm text-slate-400 mt-3">Välj ett datum i kalendern för att se lediga tider.</p>
+                ) : (
+                  <>
+                    <p className="text-xs text-slate-400 mb-5">
+                      {freeCount === 0
+                        ? 'Alla tider är bokade — välj ett annat datum'
+                        : `${freeCount} av ${TIME_SLOTS.length} tider lediga`}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {TIME_SLOTS.map(t => {
+                        const booked = isSlotBooked(selectedDate, t, bookedSlots);
+                        const isSelected = selectedTime === t;
+                        return (
+                          <button
+                            key={t}
+                            disabled={booked}
+                            onClick={() => setSelectedTime(t)}
+                            className="w-full py-4 rounded-xl text-base font-bold transition-all duration-150"
+                            style={
+                              booked
+                                ? { backgroundColor: '#f1f5f9', color: '#cbd5e1', cursor: 'default', textDecoration: 'line-through', border: '1.5px solid transparent' }
+                                : isSelected
+                                ? { backgroundColor: NAV_BG, color: 'white', border: `1.5px solid ${NAV_BG}`, boxShadow: `0 6px 16px ${NAV_BG}33` }
+                                : { backgroundColor: 'white', color: NAV_BG, border: `1.5px solid ${NAV_BG}20`, cursor: 'pointer' }
+                            }
+                          >
+                            <span className="inline-flex items-center justify-center gap-1.5">
+                              {isSelected && (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                              {t}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -256,7 +322,7 @@ export default function BokaMote() {
         )}
 
         {step === 'form' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             {/* Selected time summary */}
             <div className="px-6 sm:px-8 py-5 border-b border-gray-100 flex items-center justify-between">
               <div>
