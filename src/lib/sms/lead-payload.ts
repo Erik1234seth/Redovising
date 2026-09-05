@@ -24,6 +24,10 @@ const FIELDS = {
   contactChoice: ['contactmethod', 'kontaktmetod', 'kontaktsatt', 'kontaktvag', 'contactpreference', 'hurvilldublikontaktad'],
   meetingDate: ['appointmentdate', 'bookingdate', 'preferreddate', 'onskatdatum', 'motesdatum', 'datum', 'date'],
   meetingTime: ['appointmenttime', 'bookingtime', 'preferredtime', 'onskadtid', 'motestid', 'klockslag', 'tid', 'time'],
+  // Snabbformulärets tidsval kommer som en enda tidpunkt: "bokad_tid":
+  // "2026-09-07T14:30:00+0000". Både dag och klockslag ligger alltså i
+  // samma fält, och tidpunkten är i UTC.
+  meetingSlot: ['bokadtid', 'bokadtidpunkt', 'appointmentdatetime', 'bokning', 'motestidpunkt'],
 } as const;
 
 const MONTHS = [
@@ -57,6 +61,56 @@ export function interpretContactChoice(value: string | null): 'meeting' | 'email
   if (/(mote|boka|ring|samtal|meeting|appointment|call)/.test(v)) return 'meeting';
   if (/(mejl|mail|email|epost|e-post)/.test(v)) return 'email';
   return null;
+}
+
+/**
+ * Tidpunkten från formulärets tidsval, till dag och klockslag i svensk tid.
+ *
+ * Facebook levererar valet i UTC ("...T14:30:00+0000"), medan personen som
+ * fyllde i formuläret såg och valde 16:30 svensk tid. Utan omräkningen skulle
+ * bekräftelsen lova en tid två timmar fel — därför är det instansen som
+ * formateras om till Europe/Stockholm, inte siffrorna som läses av rakt.
+ *
+ * Saknar strängen tidszon tolkas den som svensk väggklocka och används som den är.
+ */
+export function parseBookedSlot(value: string | null): { date: string; time: string } | null {
+  if (!value) return null;
+
+  const hasZone = /(z|[+-]\d{2}:?\d{2})$/i.test(value.trim());
+  if (!hasZone) {
+    const date = parseMeetingDate(value);
+    const time = parseMeetingTime(value);
+    return date && time ? { date, time } : null;
+  }
+
+  // "+0000" utan kolon är inte giltig ISO 8601 och tolkas olika av olika
+  // motorer — normalisera innan Date får se strängen.
+  const iso = value.trim().replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Stockholm',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+    .formatToParts(at)
+    .reduce<Record<string, string>>((acc, p) => {
+      acc[p.type] = p.value;
+      return acc;
+    }, {});
+
+  if (!parts.year || !parts.month || !parts.day || !parts.hour || !parts.minute) return null;
+
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    // Midnatt formateras som "24" i sv-SE, vilket inte är ett klockslag.
+    time: `${parts.hour === '24' ? '00' : parts.hour}:${parts.minute}`,
+  };
 }
 
 /** "2026-09-08", "8 september 2026" och "September 8, 2026" → "2026-09-08". */
@@ -179,6 +233,23 @@ export function mapLeadPayload(payload: unknown): { lead: IncomingLead; keys: st
     .join(' ');
   const phone = pick(fields, FIELDS.phone);
 
+  // Tidsvalet ligger normalt i ett fält ("bokad_tid"), men ett formulär kan
+  // lika gärna dela upp det i datum och tid. Båda vägarna landar i samma två
+  // värden.
+  const slot =
+    parseBookedSlot(pick(fields, FIELDS.meetingSlot)) ??
+    (() => {
+      const date = parseMeetingDate(pick(fields, FIELDS.meetingDate));
+      const time = parseMeetingTime(pick(fields, FIELDS.meetingTime));
+      return date && time ? { date, time } : null;
+    })();
+
+  const meeting = {
+    contactChoice: interpretContactChoice(pick(fields, FIELDS.contactChoice)),
+    meetingDate: slot?.date ?? null,
+    meetingTime: slot?.time ?? null,
+  };
+
   return {
     lead: {
       externalId: pick(fields, FIELDS.externalId) ?? syntheticId(fields, phone),
@@ -187,6 +258,7 @@ export function mapLeadPayload(payload: unknown): { lead: IncomingLead; keys: st
       phone,
       formName: pick(fields, FIELDS.formName),
       ref: 'facebook',
+      ...meeting,
     },
     keys: [...fields.keys()],
   };

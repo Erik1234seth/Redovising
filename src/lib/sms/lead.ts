@@ -3,6 +3,7 @@ import { normalizePhone } from './phone';
 import { sendSms } from './twilio';
 import { sendViaGmail } from '../emails/send-via-gmail';
 import { leadWelcomeEmail } from '../emails/lead-welcome';
+import { meetingConfirmationEmail } from '../emails/meeting-confirmation';
 
 /**
  * Nya leads utifrån (Facebooks snabbformulär via Zapier) får två saker: ett
@@ -28,6 +29,13 @@ const WELCOME_KIND = 'lead_welcome';
 /** Motsvarande märkning för mejlet, i email_log. */
 const WELCOME_EMAIL_KIND = 'lead_valkomst';
 
+/**
+ * Har personen bokat en tid i snabbformuläret får hen bekräftelsen i stället
+ * för välkomstmejlet — två mejl på en gång vore ett för mycket, och
+ * bekräftelsen säger allt välkomstmejlet säger plus tiden.
+ */
+const BOOKING_EMAIL_KIND = 'motebokning';
+
 /** Hur långt tillbaka dubblettspärren tittar när leadet saknar eget id. */
 const DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -41,6 +49,11 @@ export interface IncomingLead {
   formName?: string | null;
   /** Källmärkning i contact_requests.ref, t.ex. "facebook". */
   ref?: string | null;
+  /** Svaret på "hur vill du bli kontaktad?" i snabbformuläret. */
+  contactChoice?: 'meeting' | 'email' | null;
+  /** Vald dag och tid, i svensk tid, när formuläret innehöll ett tidsval. */
+  meetingDate?: string | null;
+  meetingTime?: string | null;
 }
 
 export type LeadOutcome =
@@ -99,7 +112,9 @@ async function alreadyWelcomed(
       // eq, inte ilike: understreck är vanligt i mejladresser och skulle
       // tolkas som jokertecken i ett LIKE-mönster
       .eq('to_email', email.trim().toLowerCase())
-      .eq('kind', WELCOME_EMAIL_KIND)
+      // Bokningsbekräftelsen räknas också som hälsning — annars får den som
+      // bokat tid ett välkomstmejl på köpet när Zapen körs om.
+      .in('kind', [WELCOME_EMAIL_KIND, BOOKING_EMAIL_KIND])
       .eq('status', 'sent')
       .gte('created_at', since);
     if ((count ?? 0) > 0) return true;
@@ -119,6 +134,14 @@ export async function handleNewLead(
   const phone = normalizePhone(lead.phone);
   const ref = (lead.ref ?? 'facebook').slice(0, 40);
 
+  // En bokning kräver en tid — svaret "jag vill boka" utan tidsval är bara en
+  // avsikt, och då är välkomstmejlet fortfarande rätt mejl. Har personen
+  // uttryckligen bett om mejl väger det tyngre än ett tidsval de råkat lämna.
+  const booking =
+    lead.contactChoice !== 'email' && lead.meetingDate && lead.meetingTime
+      ? { date: lead.meetingDate, time: lead.meetingTime }
+      : null;
+
   // Insert först: det unika indexet på external_id är det som gör dubbletter
   // omöjliga även om två Zap-körningar landar samtidigt. E-post är NOT NULL i
   // contact_requests, så saknas den kan leadet inte sparas — SMS:et går ändå ut.
@@ -129,6 +152,7 @@ export async function handleNewLead(
       email: lead.email,
       phone: lead.phone || null,
       notes: lead.formName ? `Facebook-formulär: ${lead.formName}` : null,
+      contact_method: lead.contactChoice ?? null,
       package_type: 'komplett',
       ref,
     });
@@ -151,12 +175,43 @@ export async function handleNewLead(
     return { outcome: 'duplicate', phone, emailed: false };
   }
 
+  // Bokningen skrivs till samma tabell som sajtens egna bokningar, så att
+  // adminpanelens tidslinje och tiderna på /boka-mote stämmer oavsett var
+  // personen bokade. Ligger efter dubblettspärrarna ovan — en omkörd Zap ska
+  // inte ge två rader.
+  if (booking && lead.email) {
+    const { error } = await supabase.from('meetings').insert({
+      name: lead.name || lead.email,
+      email: lead.email,
+      phone: lead.phone || null,
+      date: booking.date,
+      time: booking.time,
+      message: 'Bokat via Facebooks snabbformulär',
+    });
+    if (error) console.error('[lead] kunde inte spara bokningen:', error.message);
+  }
+
   // Mejlet först. SMS:et säger "vi har precis skickat ett mejl till dig", så
   // ordningen är den enda som gör påståendet sant.
+  //
+  // Går via Gmail och inte Resend, även bekräftelsen: mejlet ska komma från
+  // erik@ och svaret landa i inkorgen som mail-AI:n bevakar.
   let emailed = false;
   if (lead.email) {
-    const { subject, html } = leadWelcomeEmail();
-    emailed = await sendViaGmail({ to: lead.email, subject, html, kind: WELCOME_EMAIL_KIND });
+    const { subject, html } = booking
+      ? meetingConfirmationEmail({
+          name: lead.name,
+          phone: lead.phone,
+          date: booking.date,
+          time: booking.time,
+        })
+      : leadWelcomeEmail();
+    emailed = await sendViaGmail({
+      to: lead.email,
+      subject,
+      html,
+      kind: booking ? BOOKING_EMAIL_KIND : WELCOME_EMAIL_KIND,
+    });
   }
 
   if (!phone) {
