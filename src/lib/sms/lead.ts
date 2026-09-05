@@ -204,7 +204,7 @@ export async function handleNewLead(
       phone: lead.phone || null,
       date: booking.date,
       time: booking.time,
-      message: 'Bokat via Facebooks snabbformulär',
+      source: 'facebook',
     });
     if (error) console.error('[lead] kunde inte spara bokningen:', error.message);
   }

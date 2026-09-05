@@ -1,4 +1,8 @@
-import { formatMeetingDate } from '../meetingSlots';
+import { formatMeetingDate, timeInSweden, todayInSweden } from '../meetingSlots';
+
+// Cron-jobbet hämtar dem härifrån; de bor i meetingSlots eftersom även
+// adminpanelen behöver samma svenska väggklocka.
+export { timeInSweden, todayInSweden };
 
 /**
  * Påminnelsen som går ut på mötesdagens morgon till den som bokat tid.
@@ -20,21 +24,6 @@ export function meetingReminderSms(date: string, time: string): string {
     `från ${CALLING_NUMBER}. Passar det inte, svara på det här SMS:et så bokar vi om.\n\n` +
     'Hälsningar\nErik på EnklaBokslut'
   );
-}
-
-/** Dagens datum i svensk tid — servern går på UTC, mötena på väggklockan. */
-export function todayInSweden(now = new Date()): string {
-  return now.toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' });
-}
-
-/** Klockslaget nu i svensk tid, som "HH:MM". */
-export function timeInSweden(now = new Date()): string {
-  return now.toLocaleTimeString('sv-SE', {
-    timeZone: 'Europe/Stockholm',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
 }
 
 /** Bara för loggen: "måndag 7 september". */

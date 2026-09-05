@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getSupabase();
-    await supabase.from('meetings').insert({ name, email, phone: phone || null, date, time, message: message || null, session_id: sessionId || null });
+    await supabase.from('meetings').insert({ name, email, phone: phone || null, date, time, message: message || null, session_id: sessionId || null, source: 'boka-mote' });
 
     const formattedDate = formatDate(date);
 

@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
         time: meetingTime,
         message: `Via flödet – ${packageName}`,
         session_id: sessionId || null,
+        source: 'flodet',
       });
     }
 

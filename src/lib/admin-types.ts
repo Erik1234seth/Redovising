@@ -109,6 +109,27 @@ export interface AdminUnderlag {
   company: string | null;
 }
 
+/** En bokad tid, som den visas i mötesvyn. */
+export interface AdminMeeting {
+  id: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  /** "YYYY-MM-DD" och "HH:MM", svensk tid. Lagras som text, inte tidsstämpel. */
+  date: string;
+  time: string;
+  message: string | null;
+  bookedAt: string;
+  /** Var bokningen gjordes. */
+  source: 'boka-mote' | 'popup' | 'flodet' | 'facebook' | 'okand';
+  /** Nyckel till personvyn, när mötet går att knyta till en adress. */
+  personKey: string | null;
+  /** Påminnelse-SMS:ets status samma dag: 'sent', 'failed' eller null. */
+  reminder: string | null;
+  /** Tiden har passerat. Räknat i svensk tid på servern. */
+  past: boolean;
+}
+
 /** En rad i notisklockan. */
 export interface AdminNotice {
   id: string;

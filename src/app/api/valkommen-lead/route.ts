@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
         date: meetingDate,
         time: meetingTime,
         message: notes || null,
+        source: 'popup',
       });
     }
 

@@ -61,6 +61,26 @@ export function minBookableDate(today = new Date()) {
   return d;
 }
 
+/** Dagens datum i svensk tid. Servern går på UTC, mötena på väggklockan. */
+export function todayInSweden(now = new Date()): string {
+  return now.toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' });
+}
+
+/** Klockslaget nu i svensk tid, som "HH:MM" — jämförbart med en slottid. */
+export function timeInSweden(now = new Date()): string {
+  return now.toLocaleTimeString('sv-SE', {
+    timeZone: 'Europe/Stockholm',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+/** Vilket svenskt datum en tidsstämpel inföll på. */
+export function swedishDateOf(iso: string): string {
+  return todayInSweden(new Date(iso));
+}
+
 export function formatMeetingDate(dateStr: string) {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('sv-SE', {
     weekday: 'long',
