@@ -4,6 +4,7 @@ import { sendSms } from './twilio';
 import { sendViaGmail } from '../emails/send-via-gmail';
 import { leadWelcomeEmail } from '../emails/lead-welcome';
 import { meetingConfirmationEmail } from '../emails/meeting-confirmation';
+import { formatMeetingDate } from '../meetingSlots';
 
 /**
  * Nya leads utifrån (Facebooks snabbformulär via Zapier) får två saker: ett
@@ -25,6 +26,9 @@ import { meetingConfirmationEmail } from '../emails/meeting-confirmation';
 
 /** Markerar raden i sms_messages som ett lead-utskick, inte ett AI-svar. */
 const WELCOME_KIND = 'lead_welcome';
+
+/** Samma sak för den som bokat tid — SMS:et säger något annat då. */
+const BOOKING_SMS_KIND = 'lead_booking';
 
 /** Motsvarande märkning för mejlet, i email_log. */
 const WELCOME_EMAIL_KIND = 'lead_valkomst';
@@ -82,6 +86,20 @@ export const WELCOME_SMS =
   'Hälsningar\nErik på EnklaBokslut';
 
 /**
+ * Har personen bokat en tid i snabbformuläret är "vi har skickat ett mejl"
+ * inte det viktigaste vi har att säga — tiden är det. SMS:et upprepar den
+ * därför i klartext, så att den finns i telefonen utan att kunden behöver
+ * leta upp mejlet.
+ */
+export function bookingSms(date: string, time: string): string {
+  return (
+    `Hej! Erik på EnklaBokslut här. Din tid är bokad: ${formatMeetingDate(date)} kl. ${time}. ` +
+    'Jag ringer upp dig då. Bekräftelsen har gått till din mejl, kika gärna i skräpposten också.\n\n' +
+    'Hälsningar\nErik på EnklaBokslut'
+  );
+}
+
+/**
  * Har vi redan hälsat på den här personen det senaste dygnet? Tittar på båda
  * kanalerna: numret kan ha fått SMS:et och adressen kan ha fått mejlet, och
  * ett lead som kommer in två gånger ska inte ge dubbelt av någotdera.
@@ -99,7 +117,7 @@ async function alreadyWelcomed(
       .select('id', { count: 'exact', head: true })
       .eq('phone', phone)
       .eq('direction', 'out')
-      .eq('kind', WELCOME_KIND)
+      .in('kind', [WELCOME_KIND, BOOKING_SMS_KIND])
       .in('status', ['sent', 'queued'])
       .gte('created_at', since);
     if ((count ?? 0) > 0) return true;
@@ -230,7 +248,8 @@ export async function handleNewLead(
     return { outcome: 'optout', phone, emailed };
   }
 
-  const body = WELCOME_SMS;
+  const body = booking ? bookingSms(booking.date, booking.time) : WELCOME_SMS;
+  const smsKind = booking ? BOOKING_SMS_KIND : WELCOME_KIND;
 
   try {
     const sid = await sendSms({ to: phone, body });
@@ -238,7 +257,7 @@ export async function handleNewLead(
       phone,
       direction: 'out',
       body,
-      kind: WELCOME_KIND,
+      kind: smsKind,
       twilio_sid: sid,
       status: 'sent',
     });
@@ -251,7 +270,7 @@ export async function handleNewLead(
       phone,
       direction: 'out',
       body,
-      kind: WELCOME_KIND,
+      kind: smsKind,
       status: 'failed',
       error: message,
     });

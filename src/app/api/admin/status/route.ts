@@ -190,10 +190,12 @@ async function latest(
   supabase: SupabaseClient,
   table: string,
   columns: string,
-  filters: Record<string, string> = {},
+  filters: Record<string, string | string[]> = {},
 ): Promise<Record<string, unknown> | null> {
   let query = supabase.from(table).select(columns).order('created_at', { ascending: false }).limit(1);
-  for (const [column, value] of Object.entries(filters)) query = query.eq(column, value);
+  for (const [column, value] of Object.entries(filters)) {
+    query = Array.isArray(value) ? query.in(column, value) : query.eq(column, value);
+  }
   const { data } = await query.maybeSingle();
   return (data as Record<string, unknown> | null) ?? null;
 }
@@ -227,8 +229,11 @@ async function checkFlows(supabase: SupabaseClient): Promise<StatusCheck[]> {
 
   const [lead, email, smsOut, smsIn, smsAi, thread, queued, failedEmails, failedSms] = await Promise.all([
     latest(supabase, 'contact_requests', 'id, created_at, name, ref'),
-    latest(supabase, 'email_log', 'id, created_at, status, error, to_email', { kind: 'lead_valkomst' }),
-    latest(supabase, 'sms_messages', 'id, created_at, status, error, phone', { kind: 'lead_welcome', direction: 'out' }),
+    // Ett lead får antingen välkomstmejlet eller mötesbekräftelsen, aldrig
+    // båda. Kollar panelen bara den ena ser den ut att ha slutat fungera så
+    // fort ett par leads i rad bokat tid.
+    latest(supabase, 'email_log', 'id, created_at, status, error, to_email', { kind: ['lead_valkomst', 'motebokning'] }),
+    latest(supabase, 'sms_messages', 'id, created_at, status, error, phone', { kind: ['lead_welcome', 'lead_booking'], direction: 'out' }),
     latest(supabase, 'sms_messages', 'id, created_at, phone', { direction: 'in' }),
     supabase.from('sms_messages').select('id, created_at, status, error').is('kind', null).eq('direction', 'out')
       .order('created_at', { ascending: false }).limit(1).maybeSingle(),
