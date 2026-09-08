@@ -3,11 +3,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import type { Person, TimelineEvent } from '@/lib/admin-types';
-import { STAGES, EVENT_STYLE, fullDate } from '../../_pipeline';
+import type { Person, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
+import { STAGES, EVENT_STYLE, REDOVISNINGSMETODER, fullDate } from '../../_pipeline';
 import DeletePerson from '../../_delete-person';
 import SmsComposer from '../../_sms-composer';
 import { formatPhone } from '@/lib/sms/phone';
+
+/**
+ * Flikarna i personkortet. Kundkontext, bokföringsmetod och adresser läses
+ * sällan men tog tre kort i höjd innan tidslinjen ens började — som flikar
+ * kostar de en rad, och det man faktiskt kommer hit för syns direkt.
+ */
+const TABS = [
+  { id: 'kontext', label: 'Kundkontext' },
+  { id: 'metod', label: 'Bokföringsmetod' },
+  { id: 'mejl', label: 'Mejladresser' },
+] as const;
+
+type Tab = (typeof TABS)[number]['id'];
 
 export default function PersonPage() {
   const params = useParams<{ key: string }>();
@@ -20,8 +33,12 @@ export default function PersonPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [savingStage, setSavingStage] = useState(false);
+  const [savingMetod, setSavingMetod] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [messaging, setMessaging] = useState(false);
+  const [tab, setTab] = useState<Tab>('kontext');
 
   // Ligger i en useCallback för att kunna köras om efter ett manuellt SMS —
   // det ska synas i historiken direkt, utan att sidan laddas om.
@@ -60,6 +77,69 @@ export default function PersonPage() {
       setPerson((p) => (p ? { ...p, stage: previous } : p));
       setError('Steget kunde inte sparas');
     }
+  };
+
+  /**
+   * Klick på den redan valda metoden tar bort valet igen — annars går ett
+   * felklick inte att ångra, och "vet inte" är ett ärligare svar än fel metod.
+   */
+  const setMetod = async (value: Redovisningsmetod) => {
+    if (!person || savingMetod) return;
+    const next = person.redovisningsmetod === value ? null : value;
+    const previous = person.redovisningsmetod;
+    setPerson({ ...person, redovisningsmetod: next });
+    setSavingMetod(true);
+    const res = await fetch('/api/admin/people', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: person.profileId,
+        contactId: person.contactId,
+        redovisningsmetod: next,
+      }),
+    });
+    setSavingMetod(false);
+    if (!res.ok) {
+      setPerson((p) => (p ? { ...p, redovisningsmetod: previous } : p));
+      setError('Bokföringsmetoden kunde inte sparas');
+    }
+  };
+
+  /**
+   * Kopplar en till adress till personen. Laddar om efteråt i stället för att
+   * skriva i state: kopplingen slår ihop personen med allt som redan kommit in
+   * på adressen, och då ändras både tidslinjen och kontaktuppgifterna.
+   */
+  const addEmail = async () => {
+    if (!person || savingEmail) return;
+    const email = newEmail.trim().toLowerCase();
+    if (!email.includes('@')) { setError('Ange en giltig mejladress'); return; }
+    setSavingEmail(true);
+    const res = await fetch('/api/admin/people/alias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ personKey: person.key, profileId: person.profileId, email }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setSavingEmail(false);
+    if (!res.ok) { setError(data.error || 'Adressen kunde inte kopplas'); return; }
+    setError('');
+    setNewEmail('');
+    load();
+  };
+
+  const removeEmail = async (id: string) => {
+    if (savingEmail) return;
+    setSavingEmail(true);
+    const res = await fetch('/api/admin/people/alias', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    setSavingEmail(false);
+    if (!res.ok) { setError('Kopplingen kunde inte tas bort'); return; }
+    setError('');
+    load();
   };
 
   if (loading) return <div className="text-center py-20 text-warm-400">Laddar...</div>;
@@ -141,16 +221,161 @@ export default function PersonPage() {
         </div>
       </div>
 
-      {/* Vad personen sagt om sin verksamhet — samma text AI:n får med sig */}
-      <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-6">
-        <h2 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-3">Kundkontext</h2>
-        {person.verksamhet ? (
-          <p className="text-warm-100 text-sm whitespace-pre-wrap break-words">{person.verksamhet}</p>
-        ) : (
-          <p className="text-warm-500 text-sm">
-            Ingen verksamhetsbeskrivning ifylld{person.isCustomer ? '' : ' — personen har inget konto än'}.
-          </p>
-        )}
+      <div className="bg-navy-700/50 border border-navy-600 rounded-xl">
+        {/* Fliknamnen bär små märken så att en tom bokföringsmetod eller en
+            handpåkopplad adress syns utan att man öppnar fliken först. */}
+        <div className="flex overflow-x-auto border-b border-navy-600">
+          {TABS.map((t) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                aria-current={active ? 'true' : undefined}
+                className={`flex items-center gap-1.5 px-4 sm:px-5 py-3 text-xs font-semibold uppercase tracking-widest whitespace-nowrap border-b-2 -mb-px transition ${
+                  active
+                    ? 'border-gold-500 text-gold-400'
+                    : 'border-transparent text-warm-500 hover:text-warm-300'
+                }`}
+              >
+                {t.label}
+                {t.id === 'metod' && !person.redovisningsmetod && (
+                  <span title="Inte ifyllt än" className="w-1.5 h-1.5 rounded-full bg-warm-600 shrink-0" />
+                )}
+                {t.id === 'mejl' && person.manualEmails.length > 0 && (
+                  <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
+                    +{person.manualEmails.length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="p-6">
+          {/* Vad personen sagt om sin verksamhet — samma text AI:n får med sig */}
+          {tab === 'kontext' && (
+            person.verksamhet ? (
+              <p className="text-warm-100 text-sm whitespace-pre-wrap break-words">{person.verksamhet}</p>
+            ) : (
+              <p className="text-warm-500 text-sm">
+                Ingen verksamhetsbeskrivning ifylld{person.isCustomer ? '' : ' — personen har inget konto än'}.
+              </p>
+            )
+          )}
+
+          {/* Kontantmetoden eller faktureringsmetoden. Är inget valt står korten
+              tomma tills någon klickar i ett — vi gissar inte åt kunden. */}
+          {tab === 'metod' && (
+            person.profileId || person.contactId ? (
+              <>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {REDOVISNINGSMETODER.map((m) => {
+                    const chosen = person.redovisningsmetod === m.value;
+                    return (
+                      <button
+                        key={m.value}
+                        onClick={() => setMetod(m.value)}
+                        disabled={savingMetod}
+                        aria-pressed={chosen}
+                        title={chosen ? 'Klicka igen för att ta bort valet' : undefined}
+                        className={`text-left rounded-xl border p-4 transition disabled:opacity-60 ${
+                          chosen
+                            ? 'bg-gold-500/15 border-gold-500 ring-1 ring-gold-500/30'
+                            : 'bg-navy-800/40 border-navy-600 hover:border-warm-500'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                            chosen ? 'bg-gold-500 border-gold-500' : 'border-navy-500'
+                          }`}>
+                            {chosen && <span className="text-navy-900 text-[9px] font-bold leading-none">✓</span>}
+                          </span>
+                          <span className={`text-sm font-semibold ${chosen ? 'text-gold-400' : 'text-warm-200'}`}>
+                            {m.label}
+                          </span>
+                        </div>
+                        <p className="text-warm-500 text-xs mt-2 leading-relaxed">{m.hint}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-warm-600 text-xs mt-3">
+                  {person.profileId
+                    ? 'Sparas på kundens konto.'
+                    : 'Personen har inget konto än — valet sparas på kontaktförfrågan och följer med när kontot skapas.'}
+                </p>
+              </>
+            ) : (
+              <p className="text-warm-500 text-sm">
+                Varken konto eller kontaktförfrågan är kopplad, så det finns ingen rad att spara metoden
+                på. Personen syns här för att vi har mejlat eller messat numret.
+              </p>
+            )
+          )}
+
+          {/* Adresser som pekats ut för hand. Panelen slår ihop rader som delar
+              mejl eller telefon av sig själv — det här är för kunden som svarat
+              från en adress vi aldrig sett, där det inte finns något att haka i. */}
+          {tab === 'mejl' && (
+            <>
+              <div className="space-y-2">
+                {/* Huvudadressen är den vi hörde av senast, och det kan mycket väl
+                    vara den handpåkopplade. Då är det samma adress som raden nedan
+                    och ska inte stå två gånger. */}
+                {!person.manualEmails.some((m) => m.email === person.email) && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-warm-100 break-all">{person.email || '—'}</span>
+                    <span className="text-warm-600 text-[11px] shrink-0">huvudadress</span>
+                  </div>
+                )}
+
+                {person.manualEmails.map((m) => (
+                  <div key={m.id} className="flex items-center gap-2 text-sm">
+                    <span className="text-warm-100 break-all">{m.email}</span>
+                    <span className="text-warm-600 text-[11px] shrink-0">
+                      {m.email === person.email ? 'huvudadress · tillagd för hand' : 'tillagd för hand'}
+                    </span>
+                    <button
+                      onClick={() => removeEmail(m.id)}
+                      disabled={savingEmail}
+                      title="Ta bort kopplingen"
+                      className="ml-auto shrink-0 px-2 py-0.5 text-[11px] text-warm-600 hover:text-red-400 rounded transition disabled:opacity-40"
+                    >
+                      Ta bort
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2 mt-4">
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') addEmail(); }}
+                  placeholder="annan.adress@exempel.se"
+                  className="flex-1 min-w-0 bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-warm-600 focus:outline-none focus:border-gold-500 transition"
+                />
+                <button
+                  onClick={addEmail}
+                  disabled={savingEmail || !newEmail.trim()}
+                  className="shrink-0 px-4 py-2 text-sm bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Koppla
+                </button>
+              </div>
+
+              <p className="text-warm-600 text-xs mt-3 leading-relaxed">
+                Allt som redan kommit in på adressen flyttas hit när du kopplar den, och personen
+                försvinner ur listan som en egen rad.{' '}
+                {person.profileId
+                  ? 'Mail-AI:n känner igen adressen som kundens och svarar med kontots uppgifter.'
+                  : 'Personen har inget konto, så mail-AI:n har inga kontouppgifter att känna igen adressen med.'}
+              </p>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Var i flödet personen står */}

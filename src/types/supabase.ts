@@ -20,6 +20,8 @@ export interface Profile {
   koper_i: 'sverige' | 'eu' | 'import' | null;
   har_foretagskonto: 'ja' | 'nej' | null;
   bokforing_metod: 'excel-kalkylark' | 'hemsidan' | 'maila-underlag' | null;
+  /** Kontantmetoden eller faktureringsmetoden — inte samma sak som raden ovan. */
+  redovisningsmetod: 'faktureringsmetoden' | 'kontantmetoden' | null;
   skicka_in_metod: 'maila-fil' | 'ladda-upp' | null;
   onboarding_done: boolean;
   subscription_status: string | null;

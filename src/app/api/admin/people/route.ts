@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { normalizePhone } from '@/lib/sms/phone';
-import type { Person, TimelineEvent } from '@/lib/admin-types';
+import type { Person, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
 
 /**
  * Allt adminpanelen visar, samlat per person.
@@ -94,11 +94,11 @@ async function build(): Promise<Map<string, Built>> {
 
   const [
     contacts, meetings, profiles, registrations,
-    threads, sms, optouts, orders, emails, files, underlag,
+    threads, sms, optouts, orders, emails, files, underlag, links,
   ] = await Promise.all([
-    supabase.from('contact_requests').select('id, name, email, phone, ref, stage, notes, package_type, contact_method, qualification_answers, created_at'),
+    supabase.from('contact_requests').select('id, name, email, phone, ref, stage, notes, package_type, contact_method, qualification_answers, redovisningsmetod, created_at'),
     supabase.from('meetings').select('id, name, email, phone, date, time, message, created_at'),
-    supabase.from('profiles').select('id, email, full_name, phone, company_name, verksamhet, created_at, onboarding_done, subscription_status'),
+    supabase.from('profiles').select('id, email, full_name, phone, company_name, verksamhet, redovisningsmetod, created_at, onboarding_done, subscription_status'),
     supabase.from('pending_registrations').select('id, email, source, created_at, expires_at, used_at'),
     supabase.from('email_threads').select('id, user_id, state, created_at, updated_at'),
     supabase.from('sms_messages').select('id, phone, direction, body, status, error, kind, created_at').order('created_at'),
@@ -107,6 +107,7 @@ async function build(): Promise<Map<string, Built>> {
     supabase.from('email_log').select('id, to_email, subject, kind, status, error, created_at'),
     supabase.from('contact_files').select('id, contact_id, stage, file_name, created_at'),
     supabase.from('bokforing_underlag').select('id, user_id, file_name, status, created_at'),
+    supabase.from('person_aliases').select('id, alias_email, person_key, created_at'),
   ]);
 
   // En tabell som fallerar får inte tyst göra tidslinjen ofullständig — då ser
@@ -115,6 +116,7 @@ async function build(): Promise<Map<string, Built>> {
     contact_requests: contacts, meetings, profiles, pending_registrations: registrations,
     email_threads: threads, sms_messages: sms, sms_optouts: optouts, orders,
     email_log: emails, contact_files: files, bokforing_underlag: underlag,
+    person_aliases: links,
   })) {
     if (result.error) throw new Error(`Kunde inte läsa ${name}: ${result.error.message}`);
   }
@@ -131,9 +133,15 @@ async function build(): Promise<Map<string, Built>> {
     emails: emails.data ?? [],
     files: files.data ?? [],
     underlag: underlag.data ?? [],
+    links: links.data ?? [],
   };
 
   const groups = new Groups();
+
+  // Steg 0: de handpåkopplade adresserna. Ligger före allt annat så att
+  // resten av sammanslagningen räknar med dem från början — annars hinner
+  // adressen bli en egen person innan kopplingen kommer fram.
+  for (const r of rows.links) groups.join([emailKey(r.alias_email), r.person_key]);
 
   // Steg 1: knyt ihop identiteter. Bara rader som själva bär en adress eller
   // ett nummer — trådar och filer hänger på via user_id respektive contact_id
@@ -168,7 +176,8 @@ async function build(): Promise<Map<string, Built>> {
     if (!found) {
       found = {
         key: root, name: null, email: null, phone: null, company: null,
-        verksamhet: null, source: null, stage: null, contactId: null, isCustomer: false,
+        verksamhet: null, source: null, stage: null, contactId: null, profileId: null,
+        redovisningsmetod: null, manualEmails: [], isCustomer: false,
         optedOut: false, emailCount: 0, smsCount: 0,
         firstSeen: '', lastActivity: '', events: [], aliases: [], seen: [],
       };
@@ -220,6 +229,9 @@ async function build(): Promise<Map<string, Built>> {
         stageOwnedSince.set(root, r.created_at);
         p.contactId = r.id;
         p.stage = r.stage ?? 1;
+        // Metoden hör ihop med raden den skrevs på. Profilen får skriva över
+        // längre ned — har personen konto är det där den underhålls.
+        p.redovisningsmetod = (r.redovisningsmetod as Redovisningsmetod | null) ?? null;
       }
       if (!p.source && r.ref) p.source = r.ref;
     }
@@ -249,6 +261,8 @@ async function build(): Promise<Map<string, Built>> {
       if (r.full_name?.trim()) p.name = r.full_name.trim();
       if (r.company_name?.trim()) p.company = r.company_name.trim();
       if (r.verksamhet?.trim()) p.verksamhet = r.verksamhet.trim();
+      if (r.id) p.profileId = r.id;
+      if (r.redovisningsmetod) p.redovisningsmetod = r.redovisningsmetod as Redovisningsmetod;
     }
   }
 
@@ -364,6 +378,19 @@ async function build(): Promise<Map<string, Built>> {
     });
   }
 
+  // De handpåkopplade adresserna hör till personen även när adressen ännu
+  // inte förekommer på någon rad — kunden kan ha skrivit till oss innan
+  // kopplingen gjordes, eller inte alls. Nyckeln läggs därför på för hand, så
+  // att uppslag på adressen hittar rätt person.
+  for (const r of rows.links) {
+    const key = emailKey(r.alias_email);
+    if (!key) continue;
+    const p = people.get(groups.find(key));
+    if (!p) continue;
+    if (!p.aliases.includes(key)) p.aliases.push(key);
+    p.manualEmails.push({ id: r.id, email: r.alias_email });
+  }
+
   // Sortera och summera
   for (const p of people.values()) {
     p.events.sort((a, b) => a.at.localeCompare(b.at));
@@ -404,9 +431,12 @@ function summary(p: Built): Person {
 function otherContacts(p: Built): { emails: string[]; phones: string[] } {
   const emails = new Set<string>();
   const phones = new Set<string>();
+  // De handpåkopplade listas för sig — annars ser en koppling någon gjort
+  // likadan ut som en sammanslagning systemet kom på själv.
+  const manual = new Set(p.manualEmails.map((m) => m.email.toLowerCase()));
   for (const alias of p.aliases) {
     const value = alias.slice(2);
-    if (alias.startsWith('e:') && value !== p.email) emails.add(value);
+    if (alias.startsWith('e:') && value !== p.email && !manual.has(value)) emails.add(value);
     if (alias.startsWith('p:') && value !== p.phone) phones.add(value);
   }
   return { emails: [...emails], phones: [...phones] };
@@ -441,16 +471,55 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** Flyttar personen till ett annat steg i pipelinen. */
+const METODER: Redovisningsmetod[] = ['faktureringsmetoden', 'kontantmetoden'];
+
+/**
+ * Ändrar det Erik själv får bestämma om en person: steget i pipelinen och
+ * bokföringsmetoden. Allt annat på raderna är insamlad data och rörs inte.
+ *
+ * Metoden bor på två ställen eftersom personen gör det: en prospekt har bara
+ * en kontaktförfrågan, en kund har en profil, och samma människa hinner vara
+ * båda. Skrivningen går därför till alla rader personen äger, inte bara till
+ * den GET råkar läsa starkast — annars skulle ett borttaget val vakna till liv
+ * igen från den rad som inte skrevs över.
+ */
 export async function PATCH(request: NextRequest) {
   try {
-    const { contactId, stage } = await request.json();
+    const { contactId, profileId, stage, redovisningsmetod } = await request.json();
+    const supabase = getSupabase();
+
+    if (redovisningsmetod !== undefined) {
+      // null betyder "ta bort valet" — annars måste det vara en av de två.
+      if (redovisningsmetod !== null && !METODER.includes(redovisningsmetod)) {
+        return NextResponse.json(
+          { error: `redovisningsmetod måste vara ${METODER.join(' eller ')}` },
+          { status: 400 },
+        );
+      }
+      const targets: { table: 'profiles' | 'contact_requests'; id: string }[] = [];
+      if (profileId) targets.push({ table: 'profiles', id: profileId });
+      if (contactId) targets.push({ table: 'contact_requests', id: contactId });
+      if (!targets.length) {
+        return NextResponse.json(
+          { error: 'Personen har varken konto eller kontaktförfrågan att spara metoden på' },
+          { status: 400 },
+        );
+      }
+      for (const target of targets) {
+        const { error } = await supabase
+          .from(target.table)
+          .update({ redovisningsmetod })
+          .eq('id', target.id);
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     if (!contactId) return NextResponse.json({ error: 'contactId krävs' }, { status: 400 });
     if (!Number.isInteger(stage) || stage < 1 || stage > 5) {
       return NextResponse.json({ error: 'stage måste vara 1–5' }, { status: 400 });
     }
-    // Bara steget får skrivas här — resten av raden är insamlad data
-    const { error } = await getSupabase().from('contact_requests').update({ stage }).eq('id', contactId);
+    const { error } = await supabase.from('contact_requests').update({ stage }).eq('id', contactId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   } catch (error) {

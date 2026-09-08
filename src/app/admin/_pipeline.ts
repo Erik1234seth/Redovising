@@ -1,4 +1,4 @@
-import type { EventType } from '@/lib/admin-types';
+import type { EventType, Redovisningsmetod } from '@/lib/admin-types';
 
 /** Stegen en kund går igenom, i ordning. Speglar contact_requests.stage. */
 export const STAGES = [
@@ -8,6 +8,33 @@ export const STAGES = [
   { step: 4, label: 'Skickat NE-bilaga' },
   { step: 5, label: 'Lämnat in NE-bilaga' },
 ] as const;
+
+/**
+ * De två sätten att bokföra, i den ordning de visas som val.
+ *
+ * `short` är till listan där det bara får plats ett ord. Ingen av dem är
+ * förvald: står metoden som null har ingen tagit ställning än, och det är en
+ * annan sak än att kunden faktiskt kör faktureringsmetoden.
+ */
+export const REDOVISNINGSMETODER: {
+  value: Redovisningsmetod;
+  label: string;
+  short: string;
+  hint: string;
+}[] = [
+  {
+    value: 'faktureringsmetoden',
+    label: 'Faktureringsmetoden',
+    short: 'Faktura',
+    hint: 'Bokförs när fakturan skickas eller tas emot, och en gång till när den betalas.',
+  },
+  {
+    value: 'kontantmetoden',
+    label: 'Kontantmetoden',
+    short: 'Kontant',
+    hint: 'Bokförs när pengarna rör sig. Obetalda fakturor tas först vid årets slut.',
+  },
+];
 
 /** Hur varje händelsetyp visas i tidslinjen. */
 export const EVENT_STYLE: Record<EventType, { label: string; dot: string }> = {

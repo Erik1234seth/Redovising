@@ -3,11 +3,28 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import Link from 'next/link';
 import type { Person } from '@/lib/admin-types';
-import { STAGES, shortDate } from './_pipeline';
+import { STAGES, REDOVISNINGSMETODER, shortDate } from './_pipeline';
 import DeletePerson from './_delete-person';
 import { formatPhone } from '@/lib/sms/phone';
 
 type Filter = 'alla' | 'prospekt' | 'kunder';
+
+/**
+ * Bokföringsmetoden i ett ord. Saknas den syns ingenting — raden ska inte
+ * påstå något om den som ingen tagit ställning till än.
+ */
+function MetodBadge({ value }: { value: Person['redovisningsmetod'] }) {
+  const m = REDOVISNINGSMETODER.find((x) => x.value === value);
+  if (!m) return null;
+  return (
+    <span
+      title={`Bokföringsmetod: ${m.label}`}
+      className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gold-500/15 text-gold-400 shrink-0"
+    >
+      {m.short}
+    </span>
+  );
+}
 
 function StageDots({ stage }: { stage: number | null }) {
   if (!stage) return <span className="text-warm-600 text-xs">—</span>;
@@ -232,6 +249,7 @@ export default function PeoplePage() {
                   {p.optedOut && (
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/20 text-red-400 shrink-0">Avreg</span>
                   )}
+                  <MetodBadge value={p.redovisningsmetod} />
                 </div>
                 <div className="text-xs text-warm-500 truncate">
                   {[p.email, p.phone && formatPhone(p.phone), p.source].filter(Boolean).join(' · ') || '—'}

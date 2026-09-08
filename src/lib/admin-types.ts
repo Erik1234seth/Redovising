@@ -22,6 +22,14 @@ export interface TimelineEvent {
   bad?: boolean;
 }
 
+/**
+ * Hur kundens affärshändelser bokförs.
+ *
+ * Inte samma sak som `profiles.bokforing_metod`, som handlar om hur underlagen
+ * kommer in till oss. De två går lätt att blanda ihop — därför det längre namnet.
+ */
+export type Redovisningsmetod = 'faktureringsmetoden' | 'kontantmetoden';
+
 export interface Person {
   key: string;
   name: string | null;
@@ -34,6 +42,16 @@ export interface Person {
   stage: number | null;
   /** Raden i contact_requests som steget skrivs till. Saknas den går steget inte att ändra. */
   contactId: string | null;
+  /** Profilraden, när personen har ett konto. Metoden nedan skrivs helst hit. */
+  profileId: string | null;
+  /** Kontantmetoden eller faktureringsmetoden. Null tills någon valt. */
+  redovisningsmetod: Redovisningsmetod | null;
+  /**
+   * Adresser som kopplats hit för hand, för att personen svarat från en annan
+   * mejl än den vi kände till. Skiljda från de sammanslagna adresserna i
+   * `other`: de här har någon valt, och går därför att ta bort igen.
+   */
+  manualEmails: { id: string; email: string }[];
   isCustomer: boolean;
   optedOut: boolean;
   emailCount: number;
