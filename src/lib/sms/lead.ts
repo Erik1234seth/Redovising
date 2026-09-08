@@ -5,6 +5,7 @@ import { sendViaGmail } from '../emails/send-via-gmail';
 import { leadWelcomeEmail } from '../emails/lead-welcome';
 import { meetingConfirmationEmail } from '../emails/meeting-confirmation';
 import { formatMeetingDate } from '../meetingSlots';
+import { createMeetingEvent } from '../googleCalendar';
 
 /**
  * Nya leads utifrån (Facebooks snabbformulär via Zapier) får två saker: ett
@@ -207,6 +208,21 @@ export async function handleNewLead(
       source: 'facebook',
     });
     if (error) console.error('[lead] kunde inte spara bokningen:', error.message);
+
+    // ...och in i Google Calendar, precis som en bokning från /boka-mote
+    // eller popupen. Tiden från Facebook är redan omräknad till svensk
+    // väggklocka i mapLeadPayload, så den går in likadant som de andra.
+    // Misslyckas det loggar createMeetingEvent och returnerar null: bokningen
+    // ligger kvar i Supabase och mejl och SMS ska gå ut ändå.
+    await createMeetingEvent({
+      name: lead.name || lead.email,
+      email: lead.email,
+      phone: lead.phone,
+      date: booking.date,
+      time: booking.time,
+      message: lead.formName ? `Facebook-formulär: ${lead.formName}` : null,
+      source: 'facebook',
+    });
   }
 
   // Mejlet först. SMS:et säger "vi har precis skickat ett mejl till dig", så
