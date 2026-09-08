@@ -30,6 +30,7 @@ export const INTERNAL_NOTICE_TO = 'erik@enklabokslut.se';
 /** Vilket utskick det rör sig om. Syns som etikett i tidslinjen. */
 export type EmailKind =
   | 'lead_valkomst'
+  | 'lead_paminnelse'
   | 'lead_bekraftelse'
   | 'kontakt_bekraftelse'
   | 'motebokning'
