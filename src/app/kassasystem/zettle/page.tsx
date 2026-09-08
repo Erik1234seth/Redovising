@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
 
@@ -124,17 +122,6 @@ export default function ZettleGuidePage() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Back link */}
-        <div className="pt-2">
-          <Link
-            href="/tutorial"
-            className="text-sm font-semibold underline underline-offset-2"
-            style={{ color: NAV_BG }}
-          >
-            ← Tillbaka till guider
-          </Link>
         </div>
 
       </div>

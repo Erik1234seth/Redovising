@@ -1014,9 +1014,6 @@ export default function Home() {
           Bara "source" skiljer dem åt: pillens text/ikon säger brev eller annons,
           och syns inte alls för organiska besökare. Hela kvalificeringen bor i
           AdFunnel; besökaren skickas aldrig vidare till en egen sida.
-
-          31 augusti-erbjudandet (showDeadlineOffer) testas bara på den organiska
-          popupen än så länge — lägg till på brev/fb också när det känns bra.
       ══════════════════════════════════════════ */}
       {(showBrevPopup || showFbPopup || showOrganicPopup || showHeroPopup) && (
         <div
@@ -1031,13 +1028,13 @@ export default function Home() {
 
           <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto animate-[popIn_0.28s_cubic-bezier(0.16,1,0.3,1)]">
             {showHeroPopup ? (
-              <AdFunnel refCode={null} onClose={dismissHeroPopup} source="organic" showDeadlineOffer skipHook visitId={popupVisitId} />
+              <AdFunnel refCode={null} onClose={dismissHeroPopup} source="organic" skipHook visitId={popupVisitId} />
             ) : showBrevPopup ? (
               <AdFunnel refCode={brevRef} onClose={dismissBrevPopup} source="brev" visitId={popupVisitId} />
             ) : showFbPopup ? (
               <AdFunnel refCode={fbRef} onClose={dismissFbPopup} source="annons" visitId={popupVisitId} />
             ) : (
-              <AdFunnel refCode={null} onClose={dismissOrganicPopup} source="organic" showDeadlineOffer visitId={popupVisitId} />
+              <AdFunnel refCode={null} onClose={dismissOrganicPopup} source="organic" visitId={popupVisitId} />
             )}
           </div>
 

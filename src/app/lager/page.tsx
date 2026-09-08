@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
 
@@ -189,17 +187,6 @@ export default function LagerPage() {
               <p className="text-white/55 text-sm">Uppskatta totalt inköpsvärde per 31 december och skicka till oss.</p>
             </div>
           </div>
-        </div>
-
-        {/* Back link */}
-        <div className="pt-2">
-          <Link
-            href="/tutorial"
-            className="text-sm font-semibold underline underline-offset-2"
-            style={{ color: NAV_BG }}
-          >
-            ← Tillbaka till guider
-          </Link>
         </div>
 
       </div>

@@ -153,7 +153,7 @@ const SHOW_HOW_STAGE = false;
 const CONTACT_PROGRESS = ['opened', 'name', 'email', 'method', 'phone', 'notes'] as const;
 type ContactProgress = (typeof CONTACT_PROGRESS)[number];
 
-export default function AdFunnel({ refCode, onClose, source = 'annons', showDeadlineOffer = false, visitId = null, skipHook = false }: { refCode: string | null; onClose?: () => void; source?: 'annons' | 'brev' | 'organic'; showDeadlineOffer?: boolean; visitId?: number | null; skipHook?: boolean }) {
+export default function AdFunnel({ refCode, onClose, source = 'annons', visitId = null, skipHook = false }: { refCode: string | null; onClose?: () => void; source?: 'annons' | 'brev' | 'organic'; visitId?: number | null; skipHook?: boolean }) {
   // skipHook: besökaren klickade sig hit från "Kom igång" i hero:n och har redan
   // läst kroken på sidan bakom — att visa den igen hade bara blivit ett klick till.
   const [stage, setStage] = useState<Stage>(skipHook ? 'questions' : 'hook');
@@ -426,18 +426,6 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', showDead
                   <span className="font-bold">Att reservera är inte bindande.</span>{' '}
                   <span className="text-slate-500">Du bestämmer dig när vi börjar med dina underlag och betalar när vi lämnat in till Skatteverket — inget nu, inget i förskott.</span>
                 </p>
-              </div>
-            )}
-
-            {showDeadlineOffer && (
-              <div className="flex items-center gap-3 rounded-xl px-4 py-3 mb-5" style={{ backgroundColor: `${CORAL}14`, border: `1px solid ${CORAL}40` }}>
-                <svg className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" fill="none" stroke={CORAL} strokeWidth={2.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <p className="text-sm sm:text-base font-bold leading-tight" style={{ color: CORAL }}>Registrera dig senast 31 augusti 2026</p>
-                  <p className="text-xs sm:text-sm text-slate-500">Vi sköter hela årets redovisning för 2026 — du betalar först från september.</p>
-                </div>
               </div>
             )}
 

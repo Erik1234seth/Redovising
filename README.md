@@ -12,7 +12,6 @@ Denna webbplats är byggd med Next.js, React och TypeScript, och erbjuder två h
 
 ### Huvudsidor
 - **Startsida** (`/`) - Landningssida med paketval och ny/återkommande kund-toggle
-- **Guider** (`/tutorial`) - Steg-för-steg instruktioner för båda paketen med bankspecifika videor
 - **Om oss** (`/om-oss`) - Information om företaget och förenklad redovisning
 - **Kontakt** (`/kontakt`) - Kontaktformulär och kontaktinformation
 
@@ -84,7 +83,6 @@ redovisning-site/
 │   ├── app/                    # Next.js App Router sidor
 │   │   ├── flow/              # Interaktiva flöden för båda paketen
 │   │   │   └── [package]/     # Dynamiska routes per paket
-│   │   ├── tutorial/          # Guidesida
 │   │   ├── kontakt/           # Kontaktsida
 │   │   ├── om-oss/            # Om oss-sida
 │   │   ├── layout.tsx         # Huvudlayout

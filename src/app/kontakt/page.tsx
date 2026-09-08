@@ -101,23 +101,6 @@ export default function KontaktPage() {
               ))}
             </div>
 
-            <div className="border-t border-gray-100 pt-8 mb-6">
-              <h3 className="font-semibold text-navy-900 mb-2">Vanliga frågor?</h3>
-              <p className="text-slate-500 text-sm mb-3 leading-relaxed">
-                Kolla in vår guidesida för svar på vanliga frågor och steg-för-steg instruktioner.
-              </p>
-              <Link
-                href="/tutorial"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold transition-colors"
-                style={{ color: CORAL }}
-              >
-                Till guider
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-
             <div className="border-t border-gray-100 pt-8">
               <div className="rounded-2xl p-6" style={{ backgroundColor: NAV_BG }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ backgroundColor: CORAL }}>
