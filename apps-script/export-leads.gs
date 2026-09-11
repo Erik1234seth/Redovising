@@ -171,6 +171,19 @@ function resetLeadExport() {
 
 // ─── Hjälpfunktioner ──────────────────────────────────────────────────────────
 
+// En studs är inget svar. Kommer mejlet tillbaka från mailer-daemon har adressen
+// inte ens tagit emot utskicket, och räknades det som ett svar hade personen
+// märkts som prospect i panelen — en påhittad konversation med en död adress.
+function isMachineSender(from) {
+  var local = from.split('@')[0];
+  return (
+    local === 'mailer-daemon' ||
+    local === 'postmaster' ||
+    local.indexOf('noreply') === 0 ||
+    local.indexOf('no-reply') === 0
+  );
+}
+
 // Plockar ut ett utskick per tråd: vem det gick till, när, och om mottagaren
 // svarade. Att titta på hela tråden och inte bara utskicket är hela poängen —
 // ett svar är det som avgör om personen ska hoppas över i påminnelsejobbet.
@@ -191,7 +204,7 @@ function collectLeadMails(threads, ownerEmail) {
         // Första utskicket i tråden är välkomstmejlet. Skickade Erik fler i
         // samma tråd är det uppföljningar, och de ändrar inget här.
         if (!outgoing) outgoing = messages[i];
-      } else {
+      } else if (!isMachineSender(from)) {
         replied = true;
       }
     }

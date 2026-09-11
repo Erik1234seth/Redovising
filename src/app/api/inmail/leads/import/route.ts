@@ -67,16 +67,24 @@ export async function POST(request: Request) {
 
     const supabase = getSupabase();
 
-    // Dubblettspärr på Gmails message_id, som ligger i provider_id. Adressen
-    // duger inte: samma person kan mycket väl ha fått mejlet mer än en gång.
-    const ids = mails.map((m) => m.messageId);
+    // Dubblettspärr på provider_id, och den måste slå på två olika sorters id.
+    // Importen skickar Gmails message_id, men raderna vår egen kod redan skrivit
+    // bär trådens id — `sendViaGmail` loggar det Apps Script svarar med, och det
+    // är en tråd, inte ett meddelande. Utan tråd-id:t i uppslaget hade en import
+    // som råkar svepa över våra egna utskick lagt en andra rad på varje.
+    //
+    // Adressen duger inte som nyckel: samma person kan mycket väl ha fått
+    // mejlet mer än en gång, och båda gångerna hör hemma i tidslinjen.
+    const ids = [...new Set(mails.flatMap((m) => [m.messageId, m.gmailThreadId]))];
     const { data: existing } = await supabase
       .from('email_log')
       .select('provider_id')
       .in('provider_id', ids);
     const alreadyLogged = new Set((existing ?? []).map((r) => r.provider_id as string));
 
-    const fresh = mails.filter((m) => !alreadyLogged.has(m.messageId));
+    const fresh = mails.filter(
+      (m) => !alreadyLogged.has(m.messageId) && !alreadyLogged.has(m.gmailThreadId),
+    );
 
     if (body.dryRun) {
       return NextResponse.json({
