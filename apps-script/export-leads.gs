@@ -34,8 +34,9 @@
 //                             den säger KLART. Apps Script bryter en körning
 //                             efter 6 minuter, därav portionerna.
 //
-// Vill du börja om: resetLeadExport(). Att köra om är ofarligt — importen
-// stoppar dubbletter på Gmails message_id.
+// Byter du ämnesrad börjar skriptet om från första tråden av sig självt.
+// resetLeadExport() finns för att köra om samma ämnesrad en gång till. Att köra
+// om är ofarligt — importen stoppar dubbletter på Gmails message_id.
 
 // Ämnesraden på mejlet Zapier skickade. Fylls i efter steg 1 ovan.
 // Tomt värde = skriptet vägrar köra, hellre det än att importera fel mejl.
@@ -137,7 +138,22 @@ function runLeadExport(dryRun) {
 
   // Torrkörningen har en egen offset, så att den inte flyttar fram den skarpa.
   var key = dryRun ? 'LEAD_OFFSET_DRY' : 'LEAD_OFFSET';
+  var subjectKey = key + '_SUBJECT';
   var offset = Number(props.getProperty(key) || 0);
+
+  // Offseten hör ihop med en viss sökning. Byter man ämnesrad utan att nollställa
+  // fortsätter den räkna från förra omgångens slut, och är den nya sökningen
+  // kortare än så får man noll träffar och ett "KLART" som ser ut som att allt
+  // är avbetat — fast ingen enda tråd gåtts igenom. Det hände på riktigt: efter
+  // 68 Zapier-trådar startade nästa omgång på 68 i en sökning med 48 träffar.
+  // Därför sparas ämnesraden bredvid offseten och en ny ämnesrad börjar om.
+  if (props.getProperty(subjectKey) !== LEAD_SUBJECT) {
+    if (offset > 0) {
+      console.log('Ny ämnesrad sedan förra körningen — börjar om från första tråden.');
+    }
+    offset = 0;
+    props.setProperty(subjectKey, LEAD_SUBJECT);
+  }
 
   var threads = GmailApp.search(leadQuery(), offset, LEAD_THREADS_PER_RUN);
 
@@ -167,6 +183,8 @@ function resetLeadExport() {
   var props = PropertiesService.getScriptProperties();
   props.deleteProperty('LEAD_OFFSET');
   props.deleteProperty('LEAD_OFFSET_DRY');
+  props.deleteProperty('LEAD_OFFSET_SUBJECT');
+  props.deleteProperty('LEAD_OFFSET_DRY_SUBJECT');
   console.log('Nollställt. Nästa körning börjar om från första tråden.');
 }
 
