@@ -6,9 +6,10 @@
  * skrivet mejl, för det är den sortens mejl man svarar på. Svaret landar då i
  * tråden som mail-AI:n bevakar och kvalificeringen kan börja där.
  *
- * Innehållet upprepar erbjudandet i kort form. Den som inte läste det första
- * mejlet ska inte behöva leta upp det, och den som läste det behöver inte
- * påminnas om varje detalj.
+ * Medvetet kort, och medvetet utan pris och tjänstebeskrivning. Allt det stod i
+ * välkomstmejlet och finns kvar i inkorgen. Upprepar påminnelsen det blir den
+ * ett andra säljutskick, och då läser mottagaren den som ett massmejl. En
+ * påminnelse ska låta som en människa som undrar hur det gick — inget annat.
  *
  * Sista stycket är viktigast: en påminnelse till någon som inte svarat måste
  * innehålla ett tydligt sätt att säga nej. Det är enda anständiga sättet att
@@ -27,31 +28,19 @@ export const REMINDER_EMAIL_KIND = 'lead_paminnelse';
 const PARAGRAPHS = [
   'Hej,',
 
-  'Jag hörde av mig för ett par veckor sedan, efter att du fyllt i vårt '
-    + 'formulär om bokföring för enskild firma. Jag vet inte om mejlet '
-    + 'försvann i inkorgen eller om det bara inte var rätt läge, så jag gör ett '
-    + 'försök till.',
+  'Jag hörde av mig för ett par veckor sedan om bokföringen för din firma, men '
+    + 'har inte hört något sedan dess. Jag vet hur det är — sådant här hamnar '
+    + 'lätt längst ner i högen.',
 
-  'Kort om vad vi gör: vi sköter löpande bokföring, momsredovisning, bokslut '
-    + 'och deklaration för mindre enskilda firmor. Du mejlar in kvitton, '
-    + 'fakturor och kontoutdrag, så gör vi resten och hör av oss om det är '
-    + 'något vi behöver fråga om.',
+  'Är det fortfarande aktuellt? Svara bara på det här mejlet så tar vi det '
+    + 'därifrån. Har du en fråga i stället är det lika bra att ställa den här.',
 
-  'Priset är 299 kr per månad exklusive moms, eller 3 999 kr exklusive moms om '
-    + 'du betalar för hela året. Börjar du mitt under året tar vi hand om '
-    + 'bokföringen för hela året, och då betalar du också för de månader som '
-    + 'redan har gått.',
-
-  'Är det fortfarande aktuellt? Svara bara ja på det här mejlet så skickar jag '
-    + 'några enkla frågor för att se om det passar din verksamhet. Undrar du '
-    + 'över något är det lika bra att svara här med din fråga.',
-
-  'Och är det inte aktuellt är det helt okej — säg bara till, så hör jag inte '
-    + 'av mig igen.',
+  'Och är det inte aktuellt är det helt okej. Säg bara till, så hör jag inte av '
+    + 'mig igen.',
 ];
 
 export function leadReminderEmail(): { subject: string; html: string } {
   const html = PARAGRAPHS.map((p) => `<p>${p}</p>`).join('\n') + '\n' + SIGNATURE_HTML;
 
-  return { subject: 'Är bokföringen fortfarande aktuell?', html };
+  return { subject: 'Är det fortfarande aktuellt?', html };
 }
