@@ -160,6 +160,11 @@ export async function POST(request: Request) {
       imported,
       replies,
       skipped: mails.length - fresh.length,
+      // Hur många trådar skriptet såg ett svar i, oavsett om vi redan visste om
+      // det. `replies` räknar bara nya rader, och när mail-AI:n redan märkt en
+      // tråd som prospect blir den noll — vilket ser likadant ut som en trasig
+      // svarsdetektering. Den här siffran skiljer de två fallen åt.
+      repliedSeen: repliers.length,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

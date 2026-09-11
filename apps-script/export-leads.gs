@@ -156,7 +156,8 @@ function runLeadExport(dryRun) {
     (dryRun ? 'TORRKÖRNING ' : '') +
     'trådar ' + offset + '-' + newOffset + ': ' +
     mails.length + ' utskick hittade, ' +
-    res.imported + ' nya, ' + res.replies + ' hade svarat, ' +
+    res.imported + ' nya, ' +
+    res.repliedSeen + ' hade svarat (' + res.replies + ' av dem nya för oss), ' +
     res.skipped + ' redan kända. ' +
     'Kör ' + (dryRun ? 'exportLeadsDryRun' : 'exportLeadsBackfill') + '() igen för nästa portion.'
   );
@@ -233,6 +234,7 @@ function collectLeadMails(threads, ownerEmail) {
 function flushLeadMails(config, mails, dryRun) {
   var imported = 0;
   var replies = 0;
+  var repliedSeen = 0;
   var skipped = 0;
 
   for (var i = 0; i < mails.length; i += LEAD_BATCH_SIZE) {
@@ -246,8 +248,9 @@ function flushLeadMails(config, mails, dryRun) {
 
     imported += res.imported || 0;
     replies += res.replies || 0;
+    repliedSeen += res.repliedSeen || 0;
     skipped += res.skipped || 0;
   }
 
-  return { imported: imported, replies: replies, skipped: skipped };
+  return { imported: imported, replies: replies, repliedSeen: repliedSeen, skipped: skipped };
 }
