@@ -171,16 +171,11 @@ export async function runLeadReminders(
     if (normalized) phones.set(email, normalized);
   }
 
-  const candidates: Candidate[] = emails
-    .filter((email) => !responded.has(email))
-    .map((email) => ({
-      email,
-      welcomedAt: firstWelcome.get(email)!,
-      phone: phones.get(email) ?? null,
-    }));
-
-  // Spärrarna på SMS-sidan slås upp på numren vi faktiskt tänkt oss.
-  const numbers = candidates.map((c) => c.phone).filter((p): p is string => !!p);
+  // Numren slås upp innan kandidatlistan sätts, för att ett inkommande SMS ska
+  // hinna diskvalificera hela personen och inte bara SMS-kanalen. Den som
+  // svarat "nej tack" i en tråd med SMS-AI:n har svarat, och ska inte få
+  // påminnelsemejlet heller.
+  const numbers = [...new Set(phones.values())];
   const [{ data: optouts }, { data: smsSeen }] = await Promise.all([
     numbers.length
       ? supabase.from('sms_optouts').select('phone').in('phone', numbers)
@@ -196,10 +191,27 @@ export async function runLeadReminders(
       : Promise.resolve({ data: [] as { phone: string; direction: string; kind: string }[] }),
   ]);
 
+  const answeredBySms = new Set(
+    (smsSeen ?? []).filter((s) => s.direction === 'in').map((s) => s.phone as string),
+  );
+  for (const [email, phone] of phones) {
+    if (answeredBySms.has(phone)) responded.add(email);
+  }
+
+  // Avregistrerade nummer och nummer som redan fått påminnelsen stoppar bara
+  // SMS:et. Mejlet är en egen kanal med en egen spärr.
   const blockedNumbers = new Set<string>([
     ...(optouts ?? []).map((o) => o.phone as string),
     ...(smsSeen ?? []).map((s) => s.phone as string),
   ]);
+
+  const candidates: Candidate[] = emails
+    .filter((email) => !responded.has(email))
+    .map((email) => ({
+      email,
+      welcomedAt: firstWelcome.get(email)!,
+      phone: phones.get(email) ?? null,
+    }));
 
   const due = candidates.slice(0, MAX_PER_RUN);
   const remaining = Math.max(0, candidates.length - due.length);
