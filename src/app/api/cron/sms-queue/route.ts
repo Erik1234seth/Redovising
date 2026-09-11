@@ -1,14 +1,21 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendSms } from '@/lib/sms/twilio';
+import { runLeadReminders, type ReminderRun } from '@/lib/leads/reminders';
 
 /**
- * Skyddsnät: skickar välkomst-SMS som blivit liggande med status 'queued'.
+ * Morgonens utskick: tömmer SMS-kön och skickar dagens lead-påminnelser.
  *
- * Sedan nattspärren togs bort går lead-SMS ut direkt och inget nytt hamnar
- * här, så jobbet har normalt ingenting att göra. Det finns kvar för att tömma
- * det som redan låg i kön, och som utgång om ett utskick behöver skjutas upp.
- * Körs av Vercel Cron enligt schemat i vercel.json.
+ * Två saker i ett jobb, och det är en planbegränsning som styr det. Vercels
+ * Hobby-plan tillåter två schemalagda jobb, och de är tagna av det här och
+ * mötespåminnelserna. Lead-påminnelserna behöver bara väckas en gång om dygnet,
+ * så de åker med här i stället för att få ett eget schema. Själva logiken bor i
+ * `src/lib/leads/reminders.ts` och går även att trigga för hand via
+ * /api/cron/lead-reminders.
+ *
+ * Kön i sig är ett skyddsnät: sedan nattspärren togs bort går lead-SMS ut
+ * direkt och inget nytt hamnar här, så den delen har normalt ingenting att
+ * göra. Den finns kvar som utgång om ett utskick behöver skjutas upp.
  *
  * Vercel skickar `Authorization: Bearer $CRON_SECRET` när CRON_SECRET finns
  * bland miljövariablerna. Utan den kan vem som helst trigga körningen.
@@ -42,20 +49,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  if (!queued?.length) return NextResponse.json({ sent: 0, failed: 0, skipped: 0 });
-
   // Alla avregistreringar hämtas i ett svep istället för en fråga per rad
-  const { data: optouts } = await supabase
-    .from('sms_optouts')
-    .select('phone')
-    .in('phone', queued.map((m) => m.phone));
+  const { data: optouts } = queued?.length
+    ? await supabase.from('sms_optouts').select('phone').in('phone', queued.map((m) => m.phone))
+    : { data: [] as { phone: string }[] };
   const optedOut = new Set((optouts ?? []).map((o) => o.phone));
 
   let sent = 0;
   let failed = 0;
   let skipped = 0;
 
-  for (const message of queued) {
+  for (const message of queued ?? []) {
     if (optedOut.has(message.phone)) {
       await supabase
         .from('sms_messages')
@@ -83,6 +87,20 @@ export async function GET(request: Request) {
     }
   }
 
-  console.log(`[sms-queue] ${sent} skickade, ${failed} misslyckade, ${skipped} överhoppade`);
-  return NextResponse.json({ sent, failed, skipped });
+  if (sent || failed || skipped) {
+    console.log(`[sms-queue] ${sent} skickade, ${failed} misslyckade, ${skipped} överhoppade`);
+  }
+
+  // Påminnelserna sist, och med egen felhantering: en trasig mejlkoppling ska
+  // inte få det att se ut som om kön inte tömdes.
+  let reminders: ReminderRun | { error: string };
+  try {
+    reminders = await runLeadReminders(supabase);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[sms-queue] lead-påminnelserna avbröts:', message);
+    reminders = { error: message };
+  }
+
+  return NextResponse.json({ sent, failed, skipped, reminders });
 }
