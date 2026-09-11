@@ -18,8 +18,10 @@ import { LEAD_REMINDER_SMS, REMINDER_AFTER_DAYS, REMINDER_SMS_KIND } from '../sm
  * pusslas ihop av det vi faktiskt kan se:
  *  - en profiles-rad: personen har blivit kund
  *  - en meetings-rad: personen har bokat tid
- *  - en email_threads-rad med state 'prospect:<adress>': mail-AI:n har svarat
- *    på ett inkommande mejl från adressen
+ *  - en email_threads-rad med state 'prospect:<adress>' eller 'kontakt:<adress>':
+ *    mail-AI:n har svarat på ett inkommande mejl från adressen. Skillnaden är om
+ *    vi skickade registreringslänken eller inte; båda betyder att personen hört
+ *    av sig
  *  - ett inkommande SMS från numret
  *  - en person_aliases-rad som pekar på adressen: någon har kopplat ihop
  *    personen med en annan adress för hand, vilket bara görs när de hört av sig
@@ -153,7 +155,8 @@ export async function runLeadReminders(
   ] = await Promise.all([
     supabase.from('profiles').select('email').not('email', 'is', null),
     supabase.from('meetings').select('email').not('email', 'is', null),
-    supabase.from('email_threads').select('state').like('state', 'prospect:%'),
+    // Både prospect: och kontakt: räknas som svar — se unknown-user.ts.
+    supabase.from('email_threads').select('state').or('state.like.prospect:%,state.like.kontakt:%'),
     supabase.from('person_aliases').select('person_key, alias_email'),
     // Numret bor i kontaktförfrågan — email_log har bara adressen. Vi hämtar
     // alla och matchar i JS: adresserna är skrivna med det skiftläge personen
@@ -170,7 +173,7 @@ export async function runLeadReminders(
     ...reminded.map((r) => r.to_email.trim().toLowerCase()),
     ...(profiles ?? []).map((p) => (p.email as string).trim().toLowerCase()),
     ...(meetings ?? []).map((m) => (m.email as string).trim().toLowerCase()),
-    ...(threads ?? []).map((t) => (t.state as string).slice('prospect:'.length).toLowerCase()),
+    ...(threads ?? []).map((t) => (t.state as string).split(':').slice(1).join(':').toLowerCase()),
   ]);
 
   // En handkopplad adress betyder att personen svarat från något annat håll.

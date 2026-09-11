@@ -91,33 +91,48 @@ export async function handleUnknownUser(params: {
     };
   }
 
-  // Håll reda på tråden bara om vi faktiskt skickade länken — då är det ett lead
-  // att följa upp, och `/api/inmail/reply` behöver känna igen tråden nästa gång.
-  if (reply.includeLink) {
-    // Ingen unik nyckel på gmail_thread_id, så en blind insert ger en dubblett
-    // vid varje svar — och `/api/inmail/reply` läser tråden med .single(), som
-    // slutar fungera så fort det finns två rader.
-    const { data: thread } = await supabase
-      .from('email_threads')
-      .select('id')
-      .eq('gmail_thread_id', gmailThreadId)
-      .limit(1)
-      .maybeSingle();
+  // Tråden antecknas alltid, inte bara när länken gick med.
+  //
+  // Förut skrevs raden enbart om `includeLink` var sant. Den som svarade "nej
+  // tack" eller ställde en fråga utan att vilja komma igång lämnade alltså inget
+  // spår alls — och för påminnelsejobbet såg det ut som om personen aldrig hört
+  // av sig. Att få en påminnelse efter att uttryckligen ha tackat nej är det
+  // sämsta utskicket vi kan göra.
+  //
+  // Tillståndet skiljer ändå på de två: `prospect:` betyder att vi skickat
+  // länken och har ett lead att följa upp, `kontakt:` att personen skrivit men
+  // inte är på väg att registrera sig. Båda räknas som svar.
+  const state = reply.includeLink ? `prospect:${senderEmail}` : `kontakt:${senderEmail}`;
 
-    const { error } = thread
-      ? await supabase
-          .from('email_threads')
-          .update({ last_message_id: messageId, updated_at: new Date().toISOString() })
-          .eq('id', thread.id)
-      : await supabase.from('email_threads').insert({
-          gmail_thread_id: gmailThreadId,
+  // Ingen unik nyckel på gmail_thread_id, så en blind insert ger en dubblett
+  // vid varje svar — och `/api/inmail/reply` läser tråden med .single(), som
+  // slutar fungera så fort det finns två rader.
+  const { data: thread } = await supabase
+    .from('email_threads')
+    .select('id, state')
+    .eq('gmail_thread_id', gmailThreadId)
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = thread
+    ? await supabase
+        .from('email_threads')
+        .update({
           last_message_id: messageId,
-          transaction_ids: [],
-          state: `prospect:${senderEmail}`,
-        });
+          updated_at: new Date().toISOString(),
+          // En tråd som en gång blivit prospect ska inte degraderas till kontakt
+          // för att nästa mejl råkade vara en följdfråga utan länk.
+          ...(thread.state?.startsWith('prospect:') ? {} : { state }),
+        })
+        .eq('id', thread.id)
+    : await supabase.from('email_threads').insert({
+        gmail_thread_id: gmailThreadId,
+        last_message_id: messageId,
+        transaction_ids: [],
+        state,
+      });
 
-    if (error) console.error('[unknown-user] kunde inte spara tråden:', error.message);
-  }
+  if (error) console.error('[unknown-user] kunde inte spara tråden:', error.message);
 
   return {
     action: reply.includeLink ? 'unknown_user_prospect' : 'unknown_user_general',
