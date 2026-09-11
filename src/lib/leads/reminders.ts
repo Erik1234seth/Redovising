@@ -62,6 +62,27 @@ interface Candidate {
   phone: string | null;
 }
 
+/**
+ * Adresser som aldrig ska få ett utskick.
+ *
+ * Facebooks formulärverktyg skickar testleads med adresser som test@meta.com
+ * när man förhandsgranskar ett formulär, och de hamnar i Gmail som vilket lead
+ * som helst. Vår egen domän står med av samma skäl: interna utskick och Eriks
+ * egna testrader ska inte komma tillbaka som påminnelser.
+ *
+ * Det här behövdes inte så länge urvalet kom ur email_log — vår egen kod hade
+ * redan sorterat bort skräpet innan det loggades. Med Gmail som källa kommer
+ * allt med, inklusive det vi aldrig menade att skicka på riktigt.
+ */
+const SKIP_DOMAINS = ['enklabokslut.se', 'meta.com', 'example.com'];
+const SKIP_LOCAL_PARTS = ['test', 'testtest', 'noreply', 'no-reply'];
+
+function isInternalOrTest(email: string): boolean {
+  const [local, domain] = email.split('@');
+  if (!domain) return true;
+  return SKIP_DOMAINS.includes(domain) || SKIP_LOCAL_PARTS.includes(local);
+}
+
 /** Vad vi behöver av en Supabase-fråga för att kunna bläddra i den. */
 interface Pageable<T> {
   range(from: number, to: number): PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
@@ -206,7 +227,7 @@ export async function runLeadReminders(
   ]);
 
   const candidates: Candidate[] = emails
-    .filter((email) => !responded.has(email))
+    .filter((email) => !responded.has(email) && !isInternalOrTest(email))
     .map((email) => ({
       email,
       welcomedAt: firstWelcome.get(email)!,
