@@ -62,6 +62,9 @@ function checkInbox() {
 // alla klienter. Modellen skriver fortfarande ren text; den escapas och
 // radbrytningarna blir <br>, annars äter HTML:en formateringen.
 //
+// Själva svarstexten får ingen styling alls, så den ärver Gmails standardfont
+// och standardfärg. Bara signaturen har egna stilar.
+//
 // HTML:en är en nerbantad variant av email-templates/signatur-erik-seth.html:
 // samma uppgifter och samma färger, men utan logotyp, utan varumärkesbanner och
 // utan "Läs mer"-knapp. Inga bilder och inga spårlänkar, för det är sådant som
@@ -111,8 +114,7 @@ function withSignature(replyBody) {
 /** HTML-versionen av samma utkast. */
 function withSignatureHtml(replyBody) {
   const body = escapeHtml(String(replyBody).replace(/\s+$/, '')).replace(/\n/g, '<br>');
-  return '<div style="font-family:' + FONT_STACK + '; font-size:14px; line-height:1.6; color:#374151;">' +
-    body + '</div>' + SIGNATURE_HTML;
+  return body + SIGNATURE_HTML;
 }
 
 // ─── Nytt mail ────────────────────────────────────────────────────────────────
