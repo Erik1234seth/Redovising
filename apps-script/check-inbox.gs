@@ -36,11 +36,16 @@ function checkInbox() {
       continue;
     }
 
+    // Bilagorna sparas som underlag innan något annat händer (save-attachments.gs).
+    // Går det inte lämnas mejlet oläst och tas om vid nästa körning.
+    if (!saveThreadAttachments(config, messages)) continue;
+
     const threadId = thread.getId();
     const messageId = lastMsg.getId();
     const subject = lastMsg.getSubject() || '';
     const emailBody = lastMsg.getPlainBody() || '';
-    const attachments = getAttachments(lastMsg);
+    // Bara namn och typ — filerna är redan sparade och tolkas inte här
+    const attachments = getAttachmentInfo(lastMsg);
     const isReply = messages.length > 1;
 
     if (isReply) {

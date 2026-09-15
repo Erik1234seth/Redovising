@@ -138,6 +138,8 @@ export interface AdminUnderlag {
   /** inkommet | granskas | bokfort */
   status: string;
   at: string;
+  /** app = uppladdat i appen, mejl = bilaga i ett inkommande mejl. */
+  source: string;
   /** Signerad nedladdningslänk. Bucketen är privat och länken lever en timme. */
   url: string | null;
   /** Nyckel till personvyn, när filen går att knyta till en profil. */

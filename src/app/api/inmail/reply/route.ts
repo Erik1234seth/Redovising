@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { classifyIntent } from '@/lib/inmail/classify';
 import { isNoReplyAddress } from '@/lib/inmail/no-reply';
-import { handleNewTransaction } from '@/lib/inmail/handlers/new-transaction';
 import { handleEditTransaction } from '@/lib/inmail/handlers/edit-transaction';
 import { handleDeleteRequest, handleDeleteConfirm, handleDeleteCancel } from '@/lib/inmail/handlers/delete-transaction';
 import { handleViewTransactions } from '@/lib/inmail/handlers/view-transactions';
 import { handleGeneralQuestion } from '@/lib/inmail/handlers/general-question';
 import { handleUnknownUser } from '@/lib/inmail/handlers/unknown-user';
+import { saveMailAttachments } from '@/lib/inmail/save-attachments';
 
 function getSupabase() {
   return createClient(
@@ -31,7 +31,8 @@ export async function POST(request: Request) {
       subject?: string;
       emailBody?: string;
       emailHistory: string;
-      attachments?: Array<{ base64: string; mimeType: string; name: string }>;
+      // Nyare scriptversioner laddar upp filerna själva och skickar bara namnen hit
+      attachments?: Array<{ base64?: string; mimeType?: string; name?: string; size?: number }>;
     };
 
     const { senderEmail, gmailThreadId, messageId, emailHistory } = body;
@@ -51,6 +52,10 @@ export async function POST(request: Request) {
     }
 
     const supabase = getSupabase();
+
+    // Bilagorna sparas som underlag först — se samma steg i /api/inmail
+    const savedUnderlag = await saveMailAttachments({ supabase, senderEmail, messageId, attachments });
+    if (savedUnderlag) console.log(`[inmail/reply] ${savedUnderlag} bilagor från ${senderEmail} sparade som underlag`);
 
     // Require known user for replies
     const { data: profile } = await supabase
@@ -119,10 +124,9 @@ export async function POST(request: Request) {
 
     switch (classification.intent) {
       case 'NEW_TRANSACTION':
-        // Could be new receipt even in reply thread
-        return NextResponse.json(await handleNewTransaction({
-          supabase, profile, gmailThreadId, messageId, attachments,
-        }));
+        // Filerna är redan sparade som underlag ovan. Tolkningen görs i ett
+        // separat steg senare, inte här — och inget svar går tillbaka.
+        return NextResponse.json({ action: 'saved_as_underlag', saved: savedUnderlag });
 
       case 'EDIT_TRANSACTION':
         return NextResponse.json(await handleEditTransaction({

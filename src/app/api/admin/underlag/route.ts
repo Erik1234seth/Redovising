@@ -35,7 +35,7 @@ export async function GET() {
 
     const { data: rows, error } = await supabase
       .from('bokforing_underlag')
-      .select('id, user_id, file_name, file_path, file_size, mime_type, status, created_at')
+      .select('id, user_id, sender_email, source, file_name, file_path, file_size, mime_type, status, created_at')
       .order('created_at', { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -59,8 +59,9 @@ export async function GET() {
     );
 
     const list: AdminUnderlag[] = underlag.map((r, i) => {
-      const profile = byUser.get(r.user_id);
-      const email = profile?.email?.trim() || null;
+      // Mejlade underlag från någon utan konto har bara avsändarens adress
+      const profile = r.user_id ? byUser.get(r.user_id) : undefined;
+      const email = profile?.email?.trim() || r.sender_email?.trim() || null;
       return {
         id: r.id,
         fileName: r.file_name,
@@ -68,6 +69,7 @@ export async function GET() {
         mimeType: r.mime_type,
         status: r.status,
         at: r.created_at,
+        source: r.source ?? 'app',
         url: signed[i],
         // Personvyn slår upp på vilken adress som helst, så mejlnyckeln räcker
         personKey: email ? `e:${email.toLowerCase()}` : null,

@@ -152,7 +152,7 @@ async function build(): Promise<Map<string, Built>> {
     supabase.from('orders').select('id, user_id, guest_email, guest_name, guest_phone, guest_company, package_type, bank, status, created_at'),
     supabase.from('email_log').select('id, to_email, subject, kind, status, error, created_at, issue_dismissed_at'),
     supabase.from('contact_files').select('id, contact_id, stage, file_name, created_at'),
-    supabase.from('bokforing_underlag').select('id, user_id, file_name, status, created_at'),
+    supabase.from('bokforing_underlag').select('id, user_id, sender_email, source, file_name, status, created_at'),
     supabase.from('person_aliases').select('id, alias_email, person_key, created_at'),
   ]);
 
@@ -200,6 +200,8 @@ async function build(): Promise<Map<string, Built>> {
   for (const r of rows.emails) groups.join([emailKey(r.to_email)]);
   for (const r of rows.sms) groups.join([phoneKey(r.phone)]);
   for (const r of rows.optouts) groups.join([phoneKey(r.phone)]);
+  // Mejlade underlag utan konto hittar personen via avsändarens adress
+  for (const r of rows.underlag) if (!r.user_id) groups.join([emailKey(r.sender_email)]);
 
   // Steg 2: vägar in för rader utan egen kontaktuppgift
   const byUser = new Map<string, string>();
@@ -442,13 +444,14 @@ async function build(): Promise<Map<string, Built>> {
   // Underlagen från bokföringsfliken. De tolkas inte vid uppladdningen, så
   // statusen säger hur långt genomgången kommit — hanteras på /admin/underlag.
   for (const r of rows.underlag) {
-    const root = r.user_id ? byUser.get(r.user_id) ?? null : null;
+    const byAccount = r.user_id ? byUser.get(r.user_id) ?? null : null;
+    const root = byAccount ?? groups.join([emailKey(r.sender_email)]);
     add(root, toIso(r.created_at), {
       type: 'fil',
-      title: 'Underlag uppladdat',
+      title: r.source === 'mejl' ? 'Underlag mejlat in' : 'Underlag uppladdat',
       detail: r.file_name || undefined,
       meta: r.status || undefined,
-    });
+    }, byAccount ? undefined : { email: r.sender_email, alias: [emailKey(r.sender_email)] });
   }
 
   // De handpåkopplade adresserna hör till personen även när adressen ännu
@@ -732,6 +735,7 @@ async function planDeletion(persons: Built[]): Promise<DeletePlan> {
     { table: 'lagertillgangar', column: 'user_id', values: profiles },
     { table: 'bokforing_transaktioner', column: 'user_id', values: profiles },
     { table: 'bokforing_underlag', column: 'user_id', values: profiles },
+    { table: 'bokforing_underlag', column: 'sender_email', values: emails },
     { table: 'manual_transactions', column: 'user_id', values: profiles },
     { table: 'manual_transactions', column: 'guest_email', values: emails },
     { table: 'parsed_transactions', column: 'user_id', values: profiles },

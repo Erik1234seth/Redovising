@@ -119,8 +119,8 @@ export default function UnderlagPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">Inkomna underlag</h1>
         <p className="text-warm-400 text-sm mt-1.5">
-          Filerna kunderna laddat upp i bokföringsfliken. De har fått besked om att vi går
-          igenom dem, så bokföringen behöver läggas in innan de ser något.
+          Filerna kunderna laddat upp i bokföringsfliken eller mejlat in som bilagor. Bokföringen
+          behöver läggas in innan de ser något.
         </p>
       </div>
 
@@ -171,6 +171,11 @@ export default function UnderlagPage() {
                     <p className="text-white font-semibold truncate">{u.fileName}</p>
                     {u.fileSize !== null && (
                       <span className="text-warm-600 text-xs">{fileSize(u.fileSize)}</span>
+                    )}
+                    {u.source === 'mejl' && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border bg-blue-500/10 text-blue-300 border-blue-500/30">
+                        ✉ via mejl
+                      </span>
                     )}
                   </div>
 
