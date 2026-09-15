@@ -8,6 +8,7 @@ import { handleViewTransactions } from '@/lib/inmail/handlers/view-transactions'
 import { handleUnknownUser } from '@/lib/inmail/handlers/unknown-user';
 import { handleGeneralQuestion } from '@/lib/inmail/handlers/general-question';
 import { saveMailAttachments } from '@/lib/inmail/save-attachments';
+import { withUnderlagAck } from '@/lib/inmail/underlag-ack';
 
 function getSupabase() {
   return createClient(
@@ -17,7 +18,12 @@ function getSupabase() {
   );
 }
 
+/** Svaret på mejlet, plus en bekräftelse när det kom underlag med det. */
 export async function POST(request: Request) {
+  return withUnderlagAck(request, await handlePost(request.clone()));
+}
+
+async function handlePost(request: Request) {
   try {
     const secret = request.headers.get('x-inmail-secret');
     if (secret !== process.env.INMAIL_SECRET) {
