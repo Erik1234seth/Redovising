@@ -128,6 +128,21 @@ export default function PersonPage() {
     load();
   };
 
+  /** Markerar fel som hanterade, eller ångrar. Laddar om så att listan och tidslinjen följer med. */
+  const [savingIssue, setSavingIssue] = useState(false);
+  const setDismissed = async (items: { channel: 'mejl' | 'sms'; id: string }[], dismissed: boolean) => {
+    if (savingIssue || !items.length) return;
+    setSavingIssue(true);
+    const res = await fetch('/api/admin/people/issues', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items, dismissed }),
+    }).catch(() => null);
+    setSavingIssue(false);
+    if (!res?.ok) { setError('Markeringen kunde inte sparas'); return; }
+    load();
+  };
+
   const removeEmail = async (id: string) => {
     if (savingEmail) return;
     setSavingEmail(true);
@@ -220,6 +235,51 @@ export default function PersonPage() {
           </div>
         </div>
       </div>
+
+      {/* Utskick som inte gick fram. Ligger överst så att det inte går att
+          missa — längst ner i tidslinjen hann det se ut som att allt gått bra. */}
+      {person.issues.length > 0 && (
+        <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="text-red-400 font-bold text-sm flex items-center gap-2">
+              ⚠ {person.issues.length === 1
+                ? 'Ett utskick gick inte som det skulle'
+                : `${person.issues.length} utskick gick inte som de skulle`}
+            </h2>
+            {person.issues.length > 1 && (
+              <button
+                onClick={() => setDismissed(person.issues.map((x) => ({ channel: x.channel, id: x.id })), true)}
+                disabled={savingIssue}
+                className="px-3 py-1 text-xs font-medium bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-lg transition disabled:opacity-50"
+              >
+                ✓ Markera alla som hanterade
+              </button>
+            )}
+          </div>
+          <ul className="mt-3 space-y-2.5">
+            {person.issues.map((x) => (
+              <li key={x.id} className="text-sm">
+                <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                  <span className="text-white font-medium">
+                    {x.channel === 'mejl' ? '✉' : '💬'} {x.what}
+                  </span>
+                  <span className="flex items-center gap-3 shrink-0">
+                    <span className="text-warm-500 text-[11px]">{fullDate(x.at)}</span>
+                    <button
+                      onClick={() => setDismissed([{ channel: x.channel, id: x.id }], true)}
+                      disabled={savingIssue}
+                      className="px-2 py-0.5 text-[11px] font-medium text-warm-300 hover:text-white bg-navy-700/80 hover:bg-navy-600 rounded-md transition disabled:opacity-50"
+                    >
+                      ✓ Hanterat
+                    </button>
+                  </span>
+                </div>
+                <p className="text-red-300/90 mt-0.5">{x.reason}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="bg-navy-700/50 border border-navy-600 rounded-xl">
         {/* Fliknamnen bär små märken så att en tom bokföringsmetod eller en
@@ -446,9 +506,13 @@ export default function PersonPage() {
                       {!last && <span className="w-px flex-1 bg-navy-600 my-1" />}
                     </div>
 
-                    <div className={`min-w-0 flex-1 ${last ? '' : 'pb-5'}`}>
+                    <div className={`min-w-0 flex-1 ${last ? '' : 'pb-5'} ${
+                      e.bad ? 'border-l-2 border-red-500 -ml-2 pl-2' : ''
+                    }`}>
                       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                        <span className="text-white text-sm font-medium">{e.title}</span>
+                        <span className={`text-sm font-medium ${e.bad ? 'text-red-400' : 'text-white'}`}>
+                          {e.bad && '⚠ '}{e.title}
+                        </span>
                         <span className="text-warm-600 text-[11px] shrink-0">{fullDate(e.at)}</span>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
@@ -459,12 +523,33 @@ export default function PersonPage() {
                       </div>
                       {e.detail && (
                         <p className={`mt-2 text-sm whitespace-pre-wrap break-words rounded-lg px-3 py-2 ${
-                          e.type === 'sms_in'
+                          e.bad
+                            ? 'bg-red-500/10 text-red-200'
+                            : e.type === 'sms_in'
                             ? 'bg-navy-600/60 text-warm-100'
                             : 'bg-navy-800/60 text-warm-300'
                         }`}>
                           {e.detail}
                         </p>
+                      )}
+                      {e.issue && (
+                        <button
+                          onClick={() => setDismissed([{ channel: e.issue!.channel, id: e.issue!.id }], !e.issue!.dismissed)}
+                          disabled={savingIssue}
+                          className="mt-1.5 mr-3 text-[11px] text-warm-500 hover:text-white transition disabled:opacity-50"
+                        >
+                          {e.issue.dismissed ? '↺ Markera som fel igen' : '✓ Markera som hanterat'}
+                        </button>
+                      )}
+                      {e.technical && (
+                        <details className="mt-1.5">
+                          <summary className="text-warm-600 text-[11px] cursor-pointer hover:text-warm-400">
+                            Visa tekniskt fel
+                          </summary>
+                          <pre className="mt-1 text-[11px] text-warm-500 bg-navy-800/60 rounded-lg px-3 py-2 whitespace-pre-wrap break-all">
+                            {e.technical}
+                          </pre>
+                        </details>
                       )}
                     </div>
                   </div>

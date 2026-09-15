@@ -107,3 +107,42 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+/**
+ * Raderar ett underlag — både filen i bucketen och raden.
+ *
+ * Filen tas bort först. Går det sedan snett med raden ligger den kvar som
+ * "Filen saknas i lagringen" och kan raderas igen, i stället för att filen
+ * blir liggande i bucketen utan att någon ser den.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const { id } = await request.json();
+    if (!id) return NextResponse.json({ error: 'id krävs' }, { status: 400 });
+
+    const supabase = getSupabase();
+
+    const { data: row, error: fetchError } = await supabase
+      .from('bokforing_underlag')
+      .select('file_path')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    if (!row) return NextResponse.json({ ok: true });
+
+    if (row.file_path) {
+      const { error: storageError } = await supabase.storage.from(BUCKET).remove([row.file_path]);
+      if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 });
+    }
+
+    const { error } = await supabase.from('bokforing_underlag').delete().eq('id', id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internt fel';
+    console.error('[admin/underlag DELETE]', message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

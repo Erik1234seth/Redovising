@@ -43,6 +43,14 @@ Inga hemligheter står i koden. Sätts under Project Settings → Script Propert
 | `INMAIL_SECRET` | samma som i `.env.local` och Vercel |
 | `GMAIL_SCRIPT_SECRET` | samma som i `.env.local` och Vercel |
 
+## Tappade svar i send-mail.gs
+
+Google lämnar scriptets svar på en engångsadress som ibland svarar 404, trots
+att mejlet redan gått iväg. Servern skickar därför med ett `ref`, scriptet
+sparar utfallet i CacheService (6 h), och servern frågar `action: 'lookup'`
+när svaret tappats. Inget skickas om. Kör webbappen en äldre version utan
+lookup loggas utskicket som "okänt om mejlet gick iväg".
+
 ## Efter en ändring
 
 Distribuera → Hantera distributioner → pennan → Version: **Ny version** →

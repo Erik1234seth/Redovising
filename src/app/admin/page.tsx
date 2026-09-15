@@ -220,8 +220,10 @@ export default function PeoplePage() {
                 element inuti en <a> går varken att klicka på i lugn och ro
                 eller att nå med tangentbordet. */}
             <div
-              className={`flex items-center border-b border-navy-600/50 last:border-0 group transition-colors ${
-                selected.has(p.key) ? 'bg-gold-500/5' : 'hover:bg-navy-700/40'
+              className={`flex items-center border-b border-navy-600/50 last:border-0 group transition-colors border-l-2 ${
+                p.issues.length > 0 ? 'border-l-red-500' : 'border-l-transparent'
+              } ${
+                selected.has(p.key) ? 'bg-gold-500/5' : p.issues.length > 0 ? 'bg-red-500/5 hover:bg-red-500/10' : 'hover:bg-navy-700/40'
               }`}
             >
             <label className="pl-4 pr-2 py-3 shrink-0 cursor-pointer">
@@ -248,6 +250,14 @@ export default function PeoplePage() {
                   )}
                   {p.optedOut && (
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/20 text-red-400 shrink-0">Avreg</span>
+                  )}
+                  {p.issues.length > 0 && (
+                    <span
+                      title={p.issues.map((x) => `${x.what}: ${x.reason}`).join('\n')}
+                      className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white shrink-0 flex items-center gap-1"
+                    >
+                      ⚠ {p.issues.length === 1 ? 'Fel' : `${p.issues.length} fel`}
+                    </span>
                   )}
                   <MetodBadge value={p.redovisningsmetod} />
                 </div>

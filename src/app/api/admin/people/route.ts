@@ -89,6 +89,52 @@ function label(value: string | null | undefined, fallback = '—'): string {
   return value?.trim() || fallback;
 }
 
+/**
+ * Äldre fel sparades som de första 200 tecknen av Googles HTML-felsida, vilket
+ * bara är skriptkod och ser avkapat ut. Resten av sidan finns inte kvar, och den
+ * sa ändå inget mer än statuskoden — så vi visar det som står att säga.
+ */
+function cleanTechnical(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  const html = raw.match(/^(.*?)(<!DOCTYPE|<html)/i);
+  if (!html) return raw;
+  return `${html[1].replace(/:\s*$/, '')} — Google svarade med en HTML-felsida i stället för scriptets svar. Sidan innehåller inga fler detaljer.`;
+}
+
+/**
+ * Översätter ett rått felmeddelande till något som går att läsa.
+ *
+ * Felen kommer från Apps Script, Twilio och fetch, och ser ut därefter — en
+ * 404 från Google är en halv HTML-sida. Den råa texten finns kvar i
+ * tidslinjen, men det första man ser ska säga vad som hänt och vad man gör.
+ *
+ * 404 och timeout från Apps Script är lömska: scriptet kan ha hunnit skicka
+ * mejlet innan svaret gick förlorat. Då är "kom inte fram" fel påstående.
+ */
+function explainError(channel: 'mejl' | 'sms', raw: string | null | undefined): string {
+  const error = raw?.trim() ?? '';
+  if (channel === 'mejl') {
+    // Nyare fel är redan skrivna på svenska av send-via-gmail — de står sig själva
+    if (/^Svaret från Gmail tappades/.test(error)) return error;
+    if (/Apps Script svarade 404/.test(error)) {
+      return 'Google svarade med fel (404). Mejlet kan ha gått iväg ändå — kolla Skickat i Gmail.';
+    }
+    if (/timeout|aborted/i.test(error)) {
+      return 'Gmail svarade inte i tid. Mejlet kan ha gått iväg ändå — kolla Skickat i Gmail.';
+    }
+    if (/Oväntat svar från Apps Script/.test(error)) {
+      return 'Apps Script svarade konstigt — webbappen kan behöva publiceras om. Mejlet gick troligen inte iväg.';
+    }
+    if (/saknas/.test(error)) return 'Mejlinställningarna saknas på servern. Mejlet gick inte iväg.';
+    return error ? `Mejlet gick inte iväg: ${error.slice(0, 120)}` : 'Mejlet gick inte iväg.';
+  }
+  if (/Invalid 'To' Phone Number|not a valid phone number/i.test(error)) {
+    return 'Ogiltigt telefonnummer. SMS:et gick inte iväg.';
+  }
+  if (/unsubscribed|21610/i.test(error)) return 'Numret har blockerat SMS från oss.';
+  return error ? `SMS:et gick inte iväg: ${error.slice(0, 120)}` : 'SMS:et gick inte iväg.';
+}
+
 async function build(): Promise<Map<string, Built>> {
   const supabase = getSupabase();
 
@@ -101,10 +147,10 @@ async function build(): Promise<Map<string, Built>> {
     supabase.from('profiles').select('id, email, full_name, phone, company_name, verksamhet, redovisningsmetod, created_at, onboarding_done, subscription_status'),
     supabase.from('pending_registrations').select('id, email, source, created_at, expires_at, used_at'),
     supabase.from('email_threads').select('id, user_id, state, created_at, updated_at'),
-    supabase.from('sms_messages').select('id, phone, direction, body, status, error, kind, created_at').order('created_at'),
+    supabase.from('sms_messages').select('id, phone, direction, body, status, error, kind, created_at, issue_dismissed_at').order('created_at'),
     supabase.from('sms_optouts').select('phone, created_at'),
     supabase.from('orders').select('id, user_id, guest_email, guest_name, guest_phone, guest_company, package_type, bank, status, created_at'),
-    supabase.from('email_log').select('id, to_email, subject, kind, status, error, created_at'),
+    supabase.from('email_log').select('id, to_email, subject, kind, status, error, created_at, issue_dismissed_at'),
     supabase.from('contact_files').select('id, contact_id, stage, file_name, created_at'),
     supabase.from('bokforing_underlag').select('id, user_id, file_name, status, created_at'),
     supabase.from('person_aliases').select('id, alias_email, person_key, created_at'),
@@ -178,7 +224,7 @@ async function build(): Promise<Map<string, Built>> {
         key: root, name: null, email: null, phone: null, company: null,
         verksamhet: null, source: null, stage: null, contactId: null, profileId: null,
         redovisningsmetod: null, manualEmails: [], isCustomer: false,
-        optedOut: false, emailCount: 0, smsCount: 0,
+        optedOut: false, emailCount: 0, smsCount: 0, issues: [],
         firstSeen: '', lastActivity: '', events: [], aliases: [], seen: [],
       };
       people.set(root, found);
@@ -280,14 +326,21 @@ async function build(): Promise<Map<string, Built>> {
   for (const r of rows.emails) {
     const root = groups.join([emailKey(r.to_email)]);
     const failed = r.status === 'failed';
+    const dismissed = !!r.issue_dismissed_at;
+    const reason = failed ? explainError('mejl', r.error) : undefined;
     add(root, r.created_at, {
       type: 'mejl',
       title: label(r.subject, 'Mejl skickat'),
-      detail: r.error || undefined,
-      meta: failed ? 'kom inte fram' : r.kind || undefined,
-      bad: failed,
+      detail: reason,
+      meta: failed ? dismissed ? 'fel vid utskick · hanterat' : 'fel vid utskick' : r.kind || undefined,
+      bad: failed && !dismissed,
+      technical: failed ? cleanTechnical(r.error) : undefined,
+      issue: failed ? { channel: 'mejl', id: r.id, dismissed } : undefined,
     }, { email: r.to_email, alias: [emailKey(r.to_email)] });
     if (root && !failed) person(root).emailCount += 1;
+    if (root && failed && !dismissed && reason) {
+      person(root).issues.push({ id: r.id, at: r.created_at, channel: 'mejl', what: label(r.subject, 'Mejl'), reason });
+    }
   }
 
   for (const r of rows.threads) {
@@ -309,6 +362,14 @@ async function build(): Promise<Map<string, Built>> {
     // inte ett skickat SMS — därför egen titel och ingen räkning.
     const draft = r.status === 'draft' || r.status === 'sending';
     const dropped = r.status === 'discarded' || r.status === 'skipped';
+    // Ett manuellt SMS som står kvar som utkast har fastnat, inte väntat
+    const stuck = outgoing && draft && r.kind === 'manual';
+    const problem = outgoing && (failed || stuck);
+    const dismissed = !!r.issue_dismissed_at;
+    const bad = problem && !dismissed;
+    const reason = !problem ? undefined
+      : stuck ? 'SMS:et fastnade på väg ut och skickades troligen inte.'
+      : explainError('sms', r.error);
 
     add(root, r.created_at, {
       type: outgoing ? 'sms_ut' : 'sms_in',
@@ -326,16 +387,27 @@ async function build(): Promise<Map<string, Built>> {
           : r.kind === 'manual' ? 'SMS du skrev själv'
           : 'SMS från oss'
         : 'SMS från personen',
-      detail: r.body,
-      meta: failed ? label(r.error, 'misslyckades')
+      detail: reason ? `${reason}\n\n${r.body ?? ''}`.trim() : r.body,
+      meta: problem ? dismissed ? 'fel vid utskick · hanterat' : 'fel vid utskick'
         : draft ? 'ej skickat'
         : dropped ? label(r.error, 'gick aldrig ut')
         : r.status === 'queued' ? 'köat'
         : undefined,
-      bad: failed,
+      bad,
+      technical: problem ? cleanTechnical(r.error) : undefined,
+      issue: problem ? { channel: 'sms', id: r.id, dismissed } : undefined,
     }, { phone: r.phone, alias: [phoneKey(r.phone)] });
 
     if (root && !failed && !draft && !dropped) person(root).smsCount += 1;
+    if (root && bad && reason) {
+      const what = r.kind === 'lead_welcome' ? 'Välkomst-SMS'
+        : r.kind === 'lead_booking' ? 'Bokningsbekräftelse via SMS'
+        : r.kind === 'meeting_reminder' ? 'Mötespåminnelse via SMS'
+        : r.kind === 'lead_paminnelse' ? 'Påminnelse-SMS'
+        : r.kind === 'manual' ? 'SMS du skrev själv'
+        : 'SMS';
+      person(root).issues.push({ id: r.id, at: r.created_at, channel: 'sms', what, reason });
+    }
   }
 
   for (const r of rows.optouts) {
@@ -395,6 +467,7 @@ async function build(): Promise<Map<string, Built>> {
   // Sortera och summera
   for (const p of people.values()) {
     p.events.sort((a, b) => a.at.localeCompare(b.at));
+    p.issues.sort((a, b) => b.at.localeCompare(a.at));
     p.firstSeen = p.events[0]?.at ?? '';
     p.lastActivity = p.events[p.events.length - 1]?.at ?? '';
 

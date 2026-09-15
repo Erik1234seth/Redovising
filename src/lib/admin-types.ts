@@ -20,6 +20,22 @@ export interface TimelineEvent {
   meta?: string;
   /** Något gick fel och bör synas som rött. */
   bad?: boolean;
+  /** Det råa felmeddelandet, för den som vill se exakt vad som hände. */
+  technical?: string;
+  /** Satt på misslyckade utskick, så att de går att markera som hanterade. */
+  issue?: { channel: 'mejl' | 'sms'; id: string; dismissed: boolean };
+}
+
+/** Ett utskick som inte gick som det skulle, i klartext. */
+export interface DeliveryIssue {
+  /** Radens id i email_log respektive sms_messages. */
+  id: string;
+  at: string;
+  channel: 'mejl' | 'sms';
+  /** Vad som skickades, t.ex. ämnesraden eller "Välkomst-SMS". */
+  what: string;
+  /** Förklaringen på svenska. */
+  reason: string;
 }
 
 /**
@@ -56,6 +72,8 @@ export interface Person {
   optedOut: boolean;
   emailCount: number;
   smsCount: number;
+  /** Mejl och SMS som inte gick fram, nyast först. Tom när allt fungerat. */
+  issues: DeliveryIssue[];
   firstSeen: string;
   lastActivity: string;
 }

@@ -48,6 +48,8 @@ export default function UnderlagPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showDone, setShowDone] = useState(false);
+  // Radera kräver två klick: första visar "Säker?", andra raderar på riktigt
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const load = useCallback(() => {
     fetch('/api/admin/underlag')
@@ -83,6 +85,26 @@ export default function UnderlagPage() {
     } catch {
       setError('Det gick inte att nå servern');
     }
+    setBusy(null);
+  };
+
+  const remove = async (id: string) => {
+    if (busy) return;
+    setBusy(id);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/underlag', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setError(data.error || 'Det gick inte att radera underlaget');
+      else setUnderlag((list) => list.filter((u) => u.id !== id));
+    } catch {
+      setError('Det gick inte att nå servern');
+    }
+    setConfirmDelete(null);
     setBusy(null);
   };
 
@@ -199,6 +221,33 @@ export default function UnderlagPage() {
                       {step.label}
                     </button>
                   ))}
+
+                  {confirmDelete === u.id ? (
+                    <>
+                      <button
+                        onClick={() => remove(u.id)}
+                        disabled={busy === u.id}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-sm transition disabled:opacity-50"
+                      >
+                        {busy === u.id ? 'Raderar...' : 'Ja, radera'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        disabled={busy === u.id}
+                        className="px-3 py-2 text-warm-500 hover:text-warm-300 rounded-xl text-sm font-medium transition disabled:opacity-50"
+                      >
+                        Avbryt
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(u.id)}
+                      disabled={busy === u.id}
+                      className="px-3 py-2 text-red-400/70 hover:text-red-400 rounded-xl text-sm font-medium transition disabled:opacity-50"
+                    >
+                      Radera
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
