@@ -15,6 +15,7 @@ import { formatPhone } from '@/lib/sms/phone';
  * kostar de en rad, och det man faktiskt kommer hit för syns direkt.
  */
 const TABS = [
+  { id: 'historik', label: 'Historik' },
   { id: 'kontext', label: 'Kundkontext' },
   { id: 'metod', label: 'Bokföringsmetod' },
   { id: 'mejl', label: 'Mejladresser' },
@@ -30,6 +31,7 @@ export default function PersonPage() {
   const [person, setPerson] = useState<Person | null>(null);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [other, setOther] = useState<{ emails: string[]; phones: string[] }>({ emails: [], phones: [] });
+  const [underlag, setUnderlag] = useState<{ id: string; fileName: string; source: string; status: string; at: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [savingStage, setSavingStage] = useState(false);
@@ -38,7 +40,7 @@ export default function PersonPage() {
   const [savingEmail, setSavingEmail] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [messaging, setMessaging] = useState(false);
-  const [tab, setTab] = useState<Tab>('kontext');
+  const [tab, setTab] = useState<Tab>('historik');
 
   // Ligger i en useCallback för att kunna köras om efter ett manuellt SMS —
   // det ska synas i historiken direkt, utan att sidan laddas om.
@@ -52,6 +54,7 @@ export default function PersonPage() {
           setPerson(data.person);
           setEvents(data.events ?? []);
           setOther(data.other ?? { emails: [], phones: [] });
+          setUnderlag(data.underlag ?? []);
         }
         setLoading(false);
       })
@@ -302,6 +305,13 @@ export default function PersonPage() {
                 {t.id === 'metod' && !person.redovisningsmetod && (
                   <span title="Inte ifyllt än" className="w-1.5 h-1.5 rounded-full bg-warm-600 shrink-0" />
                 )}
+                {t.id === 'historik' && (
+                  <span className={`px-1.5 rounded text-[10px] font-bold shrink-0 normal-case tracking-normal ${
+                    person.issues.length > 0 ? 'bg-red-500 text-white' : 'bg-navy-600 text-warm-300'
+                  }`}>
+                    {events.length}
+                  </span>
+                )}
                 {t.id === 'mejl' && person.manualEmails.length > 0 && (
                   <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
                     +{person.manualEmails.length}
@@ -313,6 +323,82 @@ export default function PersonPage() {
         </div>
 
         <div className="p-6">
+          {/* Allt som hänt */}
+          {tab === 'historik' && (
+            events.length === 0 ? (
+              <p className="text-warm-500 text-sm">Inget registrerat ännu.</p>
+            ) : (
+              <>
+                <div className="space-y-0">
+                  {events.map((e, i) => {
+                    const style = EVENT_STYLE[e.type];
+                    const last = i === events.length - 1;
+                    return (
+                      <div key={`${e.at}-${i}`} className="flex gap-4">
+                        {/* Tidslinjens streck */}
+                        <div className="flex flex-col items-center shrink-0 pt-1.5">
+                          <span className={`w-2.5 h-2.5 rounded-full ${style.dot} shrink-0`} />
+                          {!last && <span className="w-px flex-1 bg-navy-600 my-1" />}
+                        </div>
+
+                        <div className={`min-w-0 flex-1 ${last ? '' : 'pb-5'} ${
+                          e.bad ? 'border-l-2 border-red-500 -ml-2 pl-2' : ''
+                        }`}>
+                          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                            <span className={`text-sm font-medium ${e.bad ? 'text-red-400' : 'text-white'}`}>
+                              {e.bad && '⚠ '}{e.title}
+                            </span>
+                            <span className="text-warm-600 text-[11px] shrink-0">{fullDate(e.at)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-warm-500 text-[11px]">{style.label}</span>
+                            {e.meta && (
+                              <span className={`text-[11px] ${e.bad ? 'text-red-400' : 'text-warm-600'}`}>· {e.meta}</span>
+                            )}
+                          </div>
+                          {e.detail && (
+                            <p className={`mt-2 text-sm whitespace-pre-wrap break-words rounded-lg px-3 py-2 ${
+                              e.bad
+                                ? 'bg-red-500/10 text-red-200'
+                                : e.type === 'sms_in'
+                                ? 'bg-navy-600/60 text-warm-100'
+                                : 'bg-navy-800/60 text-warm-300'
+                            }`}>
+                              {e.detail}
+                            </p>
+                          )}
+                          {e.issue && (
+                            <button
+                              onClick={() => setDismissed([{ channel: e.issue!.channel, id: e.issue!.id }], !e.issue!.dismissed)}
+                              disabled={savingIssue}
+                              className="mt-1.5 mr-3 text-[11px] text-warm-500 hover:text-white transition disabled:opacity-50"
+                            >
+                              {e.issue.dismissed ? '↺ Markera som fel igen' : '✓ Markera som hanterat'}
+                            </button>
+                          )}
+                          {e.technical && (
+                            <details className="mt-1.5">
+                              <summary className="text-warm-600 text-[11px] cursor-pointer hover:text-warm-400">
+                                Visa tekniskt fel
+                              </summary>
+                              <pre className="mt-1 text-[11px] text-warm-500 bg-navy-800/60 rounded-lg px-3 py-2 whitespace-pre-wrap break-all">
+                                {e.technical}
+                              </pre>
+                            </details>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <p className="text-warm-600 text-xs mt-5">
+                  Mejl loggas sedan 20 aug 2026. Äldre utskick finns inte registrerade.
+                </p>
+              </>
+            )
+          )}
+
           {/* Vad personen sagt om sin verksamhet — samma text AI:n får med sig */}
           {tab === 'kontext' && (
             person.verksamhet ? (
@@ -482,86 +568,43 @@ export default function PersonPage() {
         )}
       </div>
 
-      {/* Allt som hänt */}
-      <div>
-        <h2 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">
-          Historik <span className="text-warm-600 font-normal normal-case tracking-normal">({events.length})</span>
-        </h2>
+      {/* Filerna personen skickat, så det syns att de hamnat på rätt person */}
+      <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-6">
+        <div className="flex items-baseline justify-between gap-3 mb-4">
+          <h2 className="text-xs font-semibold text-warm-400 uppercase tracking-widest">
+            Underlag <span className="text-warm-600 font-normal normal-case tracking-normal">({underlag.length})</span>
+          </h2>
+          {underlag.length > 0 && (
+            <Link href="/admin/underlag" className="text-gold-500 hover:text-gold-400 text-xs transition">
+              Öppna underlagen →
+            </Link>
+          )}
+        </div>
 
-        {events.length === 0 ? (
-          <div className="bg-navy-700/50 border border-navy-600 rounded-xl text-center py-12 text-warm-400">
-            Inget registrerat ännu
-          </div>
+        {underlag.length === 0 ? (
+          <p className="text-warm-500 text-sm">Inga filer mejlade eller uppladdade än.</p>
         ) : (
-          <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-6">
-            <div className="space-y-0">
-              {events.map((e, i) => {
-                const style = EVENT_STYLE[e.type];
-                const last = i === events.length - 1;
-                return (
-                  <div key={`${e.at}-${i}`} className="flex gap-4">
-                    {/* Tidslinjens streck */}
-                    <div className="flex flex-col items-center shrink-0 pt-1.5">
-                      <span className={`w-2.5 h-2.5 rounded-full ${style.dot} shrink-0`} />
-                      {!last && <span className="w-px flex-1 bg-navy-600 my-1" />}
-                    </div>
-
-                    <div className={`min-w-0 flex-1 ${last ? '' : 'pb-5'} ${
-                      e.bad ? 'border-l-2 border-red-500 -ml-2 pl-2' : ''
-                    }`}>
-                      <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                        <span className={`text-sm font-medium ${e.bad ? 'text-red-400' : 'text-white'}`}>
-                          {e.bad && '⚠ '}{e.title}
-                        </span>
-                        <span className="text-warm-600 text-[11px] shrink-0">{fullDate(e.at)}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-warm-500 text-[11px]">{style.label}</span>
-                        {e.meta && (
-                          <span className={`text-[11px] ${e.bad ? 'text-red-400' : 'text-warm-600'}`}>· {e.meta}</span>
-                        )}
-                      </div>
-                      {e.detail && (
-                        <p className={`mt-2 text-sm whitespace-pre-wrap break-words rounded-lg px-3 py-2 ${
-                          e.bad
-                            ? 'bg-red-500/10 text-red-200'
-                            : e.type === 'sms_in'
-                            ? 'bg-navy-600/60 text-warm-100'
-                            : 'bg-navy-800/60 text-warm-300'
-                        }`}>
-                          {e.detail}
-                        </p>
-                      )}
-                      {e.issue && (
-                        <button
-                          onClick={() => setDismissed([{ channel: e.issue!.channel, id: e.issue!.id }], !e.issue!.dismissed)}
-                          disabled={savingIssue}
-                          className="mt-1.5 mr-3 text-[11px] text-warm-500 hover:text-white transition disabled:opacity-50"
-                        >
-                          {e.issue.dismissed ? '↺ Markera som fel igen' : '✓ Markera som hanterat'}
-                        </button>
-                      )}
-                      {e.technical && (
-                        <details className="mt-1.5">
-                          <summary className="text-warm-600 text-[11px] cursor-pointer hover:text-warm-400">
-                            Visa tekniskt fel
-                          </summary>
-                          <pre className="mt-1 text-[11px] text-warm-500 bg-navy-800/60 rounded-lg px-3 py-2 whitespace-pre-wrap break-all">
-                            {e.technical}
-                          </pre>
-                        </details>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <ul className="divide-y divide-navy-600/60">
+            {underlag.map((f) => (
+              <li key={f.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+                <span className="text-warm-100 text-sm truncate min-w-0 flex-1" title={f.fileName}>
+                  {f.fileName}
+                </span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                  f.source === 'mejl' ? 'bg-blue-500/15 text-blue-300' : 'bg-navy-600 text-warm-300'
+                }`}>
+                  {f.source === 'mejl' ? '✉ mejl' : '⬆ app'}
+                </span>
+                <span className={`text-[11px] shrink-0 w-16 text-right ${
+                  f.status === 'bokfort' ? 'text-emerald-400' : f.status === 'granskas' ? 'text-blue-300' : 'text-gold-400'
+                }`}>
+                  {f.status === 'bokfort' ? 'Bokfört' : f.status === 'granskas' ? 'Granskas' : 'Inkommet'}
+                </span>
+                <span className="text-warm-600 text-[11px] shrink-0 hidden sm:inline">{fullDate(f.at)}</span>
+              </li>
+            ))}
+          </ul>
         )}
-
-        <p className="text-warm-600 text-xs mt-4">
-          Mejl loggas sedan 20 aug 2026. Äldre utskick finns inte registrerade.
-        </p>
       </div>
 
       {messaging && person.phone && (

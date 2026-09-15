@@ -34,6 +34,8 @@ interface Built extends Person {
    * primär uppgift — har någon bytt mejl är det den nya vi vill höra av oss på.
    */
   seen: { at: string; email?: string; phone?: string }[];
+  /** Underlagen personen mejlat in eller laddat upp, för listan på personsidan. */
+  files: { id: string; fileName: string; source: string; status: string; at: string }[];
 }
 
 /**
@@ -227,7 +229,7 @@ async function build(): Promise<Map<string, Built>> {
         verksamhet: null, source: null, stage: null, contactId: null, profileId: null,
         redovisningsmetod: null, manualEmails: [], isCustomer: false,
         optedOut: false, emailCount: 0, smsCount: 0, issues: [],
-        firstSeen: '', lastActivity: '', events: [], aliases: [], seen: [],
+        firstSeen: '', lastActivity: '', events: [], aliases: [], seen: [], files: [],
       };
       people.set(root, found);
     }
@@ -452,6 +454,17 @@ async function build(): Promise<Map<string, Built>> {
       detail: r.file_name || undefined,
       meta: r.status || undefined,
     }, byAccount ? undefined : { email: r.sender_email, alias: [emailKey(r.sender_email)] });
+
+    const at = toIso(r.created_at);
+    if (root && at) {
+      person(root).files.push({
+        id: r.id,
+        fileName: r.file_name || 'Namnlös fil',
+        source: r.source ?? 'app',
+        status: r.status ?? 'inkommet',
+        at,
+      });
+    }
   }
 
   // De handpåkopplade adresserna hör till personen även när adressen ännu
@@ -471,6 +484,7 @@ async function build(): Promise<Map<string, Built>> {
   for (const p of people.values()) {
     p.events.sort((a, b) => a.at.localeCompare(b.at));
     p.issues.sort((a, b) => b.at.localeCompare(a.at));
+    p.files.sort((a, b) => b.at.localeCompare(a.at));
     p.firstSeen = p.events[0]?.at ?? '';
     p.lastActivity = p.events[p.events.length - 1]?.at ?? '';
 
@@ -494,10 +508,11 @@ async function build(): Promise<Map<string, Built>> {
 }
 
 function summary(p: Built): Person {
-  const { events, aliases, seen, ...rest } = p;
+  const { events, aliases, seen, files, ...rest } = p;
   void events;
   void aliases;
   void seen;
+  void files;
   return rest;
 }
 
@@ -540,6 +555,7 @@ export async function GET(request: NextRequest) {
       person: summary(match),
       events: match.events,
       other: otherContacts(match),
+      underlag: match.files,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internt fel';
