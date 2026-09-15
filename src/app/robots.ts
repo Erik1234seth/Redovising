@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/admin', '/api/', '/auth/', '/account'],
+        disallow: ['/admin', '/api/', '/auth/', '/account', '/company'],
       },
     ],
     sitemap: 'https://enklabokslut.se/sitemap.xml',

@@ -28,6 +28,40 @@ export async function middleware(request: NextRequest) {
     hostname === '192.168.68.112:3000' ||
     hostname === '10.5.0.2:3000';
 
+  const isCompany =
+    hostname === 'company.enklabokslut.se' || hostname.startsWith('company.localhost');
+
+  /**
+   * Bolagssidan ligger på company.enklabokslut.se och bär ett eget skal utan
+   * kundnavigering, sidfot, nedräkning och popup. Huvuddomänen är en
+   * konverteringstratt — investerar- och köpartrafik ska varken röra till
+   * navigeringen eller blandas in i kundstatistiken.
+   *
+   * Sökvägen släpps igenom även på huvuddomänen så att den går att öppna
+   * lokalt på localhost:3000/company utan att sätta upp en subdomän först.
+   */
+  if (isCompany || request.nextUrl.pathname.startsWith('/company')) {
+    const companyHeaders = new Headers(request.headers);
+    companyHeaders.set('x-is-company', 'true');
+
+    if (!isCompany) {
+      return NextResponse.next({ request: { headers: companyHeaders } });
+    }
+
+    const companyUrl = request.nextUrl.clone();
+    if (
+      !companyUrl.pathname.startsWith('/_next') &&
+      !companyUrl.pathname.startsWith('/api') &&
+      !companyUrl.pathname.startsWith('/company') &&
+      !companyUrl.pathname.startsWith('/favicon')
+    ) {
+      companyUrl.pathname = `/company${companyUrl.pathname === '/' ? '' : companyUrl.pathname}`;
+      return NextResponse.rewrite(companyUrl, { request: { headers: companyHeaders } });
+    }
+
+    return NextResponse.next({ request: { headers: companyHeaders } });
+  }
+
   // Adminpanelen har ett eget skal och ska varken ha marknadsföringsnavigering,
   // sidfot eller cookieruta ovanpå sig.
   if (request.nextUrl.pathname.startsWith('/admin')) {

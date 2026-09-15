@@ -80,11 +80,15 @@ export default async function RootLayout({
 }>) {
   const headersList = await headers();
   const isApp = headersList.get('x-is-app') === 'true';
-  // Adminpanelen bär sitt eget skal och ska inte ha marknadsföringssidans ramar
-  const bare = isApp || headersList.get('x-is-admin') === 'true';
+  // Bolagssidan vänder sig till uppköpare och investerare och är skriven på
+  // engelska, till skillnad från resten av sajten
+  const isCompany = headersList.get('x-is-company') === 'true';
+  // Adminpanelen och bolagssidan bär sina egna skal och ska inte ha
+  // marknadsföringssidans ramar
+  const bare = isApp || headersList.get('x-is-admin') === 'true' || isCompany;
 
   return (
-    <html lang="sv">
+    <html lang={isCompany ? 'en' : 'sv'}>
       <head>
         {/* Google tag (gtag.js) */}
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-8XZDRG1PSH" />
