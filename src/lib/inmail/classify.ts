@@ -36,6 +36,10 @@ Möjliga intents:
 - CANCEL_ACTION: Avbryter något väntande (t.ex. "nej", "avbryt", "behåll det", "glöm det")
 - UNCLEAR: Oklart eller off-topic mejl
 
+Bilagor utan förklaring:
+- Har mejlet bilagor och texten saknar en uttrycklig fråga eller begäran är det NEW_TRANSACTION. Det gäller tom text, bara en hälsning eller signatur, ett vidarebefordrat mejl, och korta rader som "här kommer kvittot", "underlag för mars" eller "se bifogat". Välj aldrig UNCLEAR i det fallet.
+- Välj bara ett annat intent när texten innehåller en tydlig fråga eller begäran som går utöver att lämna in filerna.
+
 ${pendingState ? `VIKTIGT: Det finns en väntande åtgärd: "${pendingState}". Avgör om mejlet bekräftar (CONFIRM_ACTION) eller avbryter (CANCEL_ACTION) denna.` : ''}
 
 Returnera JSON med exakt dessa fält:

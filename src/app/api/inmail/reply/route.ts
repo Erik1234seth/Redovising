@@ -86,6 +86,7 @@ async function handlePost(request: Request) {
         gmailThreadId,
         messageId,
         emailHistory,
+        attachmentNames: attachments.map((a, i) => a.name || `bilaga-${i + 1}`),
       }));
     }
 
@@ -157,9 +158,15 @@ async function handlePost(request: Request) {
       case 'GENERAL_QUESTION':
         return NextResponse.json(await handleGeneralQuestion({
           supabase, profile, subject, body: emailBody, emailHistory,
+          attachmentNames: attachments.map((a, i) => a.name || `bilaga-${i + 1}`),
         }));
 
       default:
+        // Filer utan begriplig text är inlämnade underlag — ingen ändringsfråga.
+        // Bekräftelsen läggs på av withUnderlagAck.
+        if (attachments.length) {
+          return NextResponse.json({ action: 'saved_as_underlag', saved: savedUnderlag });
+        }
         // Fallback: treat as edit correction (original behavior)
         return NextResponse.json(await handleEditTransaction({
           supabase, profile, gmailThreadId, messageId,

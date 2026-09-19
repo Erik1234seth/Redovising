@@ -15,12 +15,17 @@ async function generateInitialReply(
   subject: string,
   registrationLink: string,
   history?: string,
+  attachmentNames: string[] = [],
 ): Promise<InitialReply> {
   const systemPrompt = `${ENKLA_BOKSLUT_CONTEXT}
 
 Du jobbar på Enkla Bokslut och svarar en potentiell kund. Håll det kort. Ingen säljig ton, inga tomma fraser. Svara rakt på frågan, var hjälpsam och professionell men avslappnad.
 
 Lägg bara med registreringslänken (${registrationLink}) om de tydligt vill komma igång eller skapa konto. Annars svarar du bara på frågan.
+${attachmentNames.length ? `
+Personen har bifogat filer. De är redan sparade, och att vi tagit emot dem bekräftas automatiskt i ett eget stycke efter ditt svar. Nämn inte filerna och ställ inga frågor om dem.
+Innehåller mejltexten ingen egen fråga eller begäran utöver filerna (tom text, bara en hälsning eller signatur, "se bifogat" och liknande), sätt message till en tom sträng och includeLink till false. Då skickas bara bekräftelsen.
+` : ''}
 ${history ? `
 Det här är ett svar i en pågående mejlkonversation, inte första kontakten. Hälsa inte som om ni aldrig pratat, och upprepa inte sådant som redan står i historiken. Har länken redan skickats behöver den inte med igen.
 ` : ''}
@@ -36,6 +41,7 @@ Returnera JSON:
 
   const userContent = [
     `Ämne: ${subject || '(inget ämne)'}`,
+    attachmentNames.length ? `Bilagor: ${attachmentNames.join(', ')}` : '',
     history ? `\nTidigare i tråden:\n${history.slice(-3000)}` : '',
     `\nMejltext:\n${body.slice(0, 1000)}`,
   ].join('\n');
@@ -62,8 +68,11 @@ export async function handleUnknownUser(params: {
   messageId: string;
   /** Sätts när det här är ett svar i en tråd, inte första mejlet. */
   emailHistory?: string;
+  /** Namnen på bifogade filer. De är redan sparade som underlag. */
+  attachmentNames?: string[];
 }): Promise<{ action: string; replyBody: string }> {
   const { supabase, senderEmail, subject, body, gmailThreadId, messageId, emailHistory } = params;
+  const attachmentNames = params.attachmentNames ?? [];
 
   // En vanlig länk till prissidan, utan token. Tokenet fyllde ingen funktion:
   // /skaffa läste det aldrig, och signup-sidan fick det aldrig skickat till sig.
@@ -74,7 +83,7 @@ export async function handleUnknownUser(params: {
 
   let reply: InitialReply;
   try {
-    reply = await generateInitialReply(body, subject, registrationLink, emailHistory);
+    reply = await generateInitialReply(body, subject, registrationLink, emailHistory, attachmentNames);
   } catch (err) {
     // Inget standardsvar här. Tidigare gick ett hårdkodat "registrera dig"-mejl ut
     // så fort AI:n fallerade — även till avsändare som aldrig frågat efter det, som

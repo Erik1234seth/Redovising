@@ -104,6 +104,7 @@ async function handlePost(request: Request) {
         body: emailBody,
         gmailThreadId,
         messageId,
+        attachmentNames: attachments.map((a, i) => a.name || `bilaga-${i + 1}`),
       });
       return NextResponse.json(result);
     }
@@ -180,10 +181,16 @@ async function handlePost(request: Request) {
       case 'GENERAL_QUESTION':
         return NextResponse.json(await handleGeneralQuestion({
           supabase, profile, subject, body: emailBody,
+          attachmentNames: attachments.map((a, i) => a.name || `bilaga-${i + 1}`),
         }));
 
       case 'UNCLEAR':
       default:
+        // Filer utan begriplig text är inlämnade underlag, inget att fråga om.
+        // Bekräftelsen läggs på av withUnderlagAck.
+        if (attachments.length) {
+          return NextResponse.json({ action: 'saved_as_underlag', saved: savedUnderlag });
+        }
         return NextResponse.json({
           action: 'ok',
           replyBody: `Hej${profile.full_name ? ' ' + profile.full_name.split(' ')[0] : ''}!\n\nTack för ditt mejl. Vi förstod inte riktigt vad du behöver hjälp med. Kan du beskriva lite mer vad du vill göra?\n\nExempel:\n- Skicka kvitto eller faktura som bilaga för att bokföra\n- Skriv "visa mina transaktioner" för att se dina bokföringar\n- Skriv "ta bort transaktion" följt av vilken`,

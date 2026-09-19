@@ -87,8 +87,11 @@ export async function handleGeneralQuestion(params: {
   subject: string;
   body: string;
   emailHistory?: string;
+  /** Namnen på bifogade filer. De är redan sparade som underlag. */
+  attachmentNames?: string[];
 }): Promise<{ action: string; replyBody: string }> {
   const { supabase, profile, subject, body, emailHistory } = params;
+  const attachmentNames = params.attachmentNames ?? [];
 
   // Hämta relevanta utdrag ur indexerade dokument (t.ex. K1-vägledningen),
   // tidigare mailsvar med liknande fråga (mailbanken, som stilförebild) samt
@@ -113,7 +116,8 @@ Regler för innehållet:
 - Inga inledande artighetsfraser som "Tack för din fråga" och ingen sammanfattning på slutet
 - Inled med en naturlig hälsning med kundens förnamn, t.ex. "Hej Danne," Kundens namn finns under OM AVSÄNDAREN. Saknas namn, skriv bara "Hej,"
 - Om kunden vill beställa, bli kund eller komma igång: hänvisa till https://www.enklabokslut.se/ (INTE boka-mötes-sidan)
-${REPLY_RULES}`;
+${attachmentNames.length ? `- Kunden har bifogat filer (${attachmentNames.join(', ')}). De är redan sparade och tas om hand senare, och att vi tagit emot dem bekräftas automatiskt efter ditt svar. Svara bara på själva frågan. Nämn inte filerna, kommentera inte innehållet och ställ inga frågor om dem.
+` : ''}${REPLY_RULES}`;
 
   const userContent = emailHistory
     ? `Mailkonversation:\n\n${emailHistory}`
