@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { normalizePhone } from '@/lib/sms/phone';
-import type { Person, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
+import type { AdminMailMessage, AdminVerifikation, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
+import { importPendingSie } from '@/lib/sie/import';
 
 /**
  * Allt adminpanelen visar, samlat per person.
@@ -35,7 +36,7 @@ interface Built extends Person {
    */
   seen: { at: string; email?: string; phone?: string }[];
   /** Underlagen personen mejlat in eller laddat upp, för listan på personsidan. */
-  files: { id: string; fileName: string; source: string; status: string; at: string }[];
+  files: PersonUnderlag[];
 }
 
 /**
@@ -154,7 +155,7 @@ async function build(): Promise<Map<string, Built>> {
     supabase.from('orders').select('id, user_id, guest_email, guest_name, guest_phone, guest_company, package_type, bank, status, created_at'),
     supabase.from('email_log').select('id, to_email, subject, kind, status, error, created_at, issue_dismissed_at'),
     supabase.from('contact_files').select('id, contact_id, stage, file_name, created_at'),
-    supabase.from('bokforing_underlag').select('id, user_id, sender_email, source, file_name, status, created_at'),
+    supabase.from('bokforing_underlag').select('id, user_id, sender_email, source, file_name, status, created_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel'),
     supabase.from('person_aliases').select('id, alias_email, person_key, created_at'),
   ]);
 
@@ -450,12 +451,20 @@ async function build(): Promise<Map<string, Built>> {
     const root = byAccount ?? groups.join([emailKey(r.sender_email)]);
     add(root, toIso(r.created_at), {
       type: 'fil',
-      title: r.source === 'mejl' ? 'Underlag mejlat in' : 'Underlag uppladdat',
+      title: r.source === 'mejl' ? 'Underlag mejlat in'
+        : r.source === 'admin' ? 'Underlag uppladdat av oss'
+        : 'Underlag uppladdat',
       detail: r.file_name || undefined,
       meta: r.status || undefined,
     }, byAccount ? undefined : { email: r.sender_email, alias: [emailKey(r.sender_email)] });
 
     const at = toIso(r.created_at);
+    const imported = r.verifikationer_inlagda_at ? {
+      at: r.verifikationer_inlagda_at,
+      inlagda: r.verifikationer_antal ?? 0,
+      dubbletter: r.verifikationer_dubbletter ?? 0,
+      fel: r.verifikationer_fel,
+    } : null;
     if (root && at) {
       person(root).files.push({
         id: r.id,
@@ -463,6 +472,20 @@ async function build(): Promise<Map<string, Built>> {
         source: r.source ?? 'app',
         status: r.status ?? 'inkommet',
         at,
+        verifikationer: imported,
+      });
+    }
+
+    // SIE-filer läggs in som verifikationer hos kunden — syns som egen händelse
+    if (root && imported) {
+      add(root, imported.at, {
+        type: 'fil',
+        title: imported.fel
+          ? 'Verifikationerna kunde inte läggas in'
+          : `${imported.inlagda} ${imported.inlagda === 1 ? 'verifikation inlagd' : 'verifikationer inlagda'}`,
+        detail: imported.fel ? `${r.file_name}: ${imported.fel}` : `Från ${r.file_name}`,
+        meta: imported.dubbletter > 0 ? `${imported.dubbletter} fanns redan` : 'SIE',
+        bad: !!imported.fel,
       });
     }
   }
@@ -548,20 +571,156 @@ export async function GET(request: NextRequest) {
 
     // Slå upp på vilken som helst av personens adresser eller nummer, så att
     // länken håller även om vi senare byter vilken uppgift som är primär.
-    const match = locate(people, wanted); // searchParams har redan avkodat värdet
+    let match = locate(people, wanted); // searchParams har redan avkodat värdet
 
     if (!match) return NextResponse.json({ error: 'Hittade ingen sådan person' }, { status: 404 });
+
+    // SIE-filer som inte lagts in än — t.ex. uppladdade av kunden i appen, där
+    // ingen server är inblandad. Läggs in nu, och då ska personen läsas om så
+    // att underlagen och historiken visar resultatet.
+    const owner = ownerOf(match);
+    if (await importPendingSie(getSupabase(), owner)) {
+      match = locate(await build(), wanted) ?? match;
+    }
+
+    if (request.nextUrl.searchParams.get('view') === 'verifikationer') {
+      return NextResponse.json({ person: summary(match), verifikationer: await verifikationerFor(owner) });
+    }
+
     return NextResponse.json({
+      verifikationerCount: await countVerifikationer(owner),
       person: summary(match),
       events: match.events,
       other: otherContacts(match),
       underlag: match.files,
+      mail: await mailFor(match),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internt fel';
     console.error('[admin/people]', message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+type Owner = { userIds: string[]; emails: string[] };
+
+/** Kontona och adresserna personens verifikationer kan ligga på. */
+function ownerOf(p: Built): Owner {
+  return {
+    userIds: p.profileId ? [p.profileId] : [],
+    emails: [...new Set(p.aliases.filter((a) => a.startsWith('e:')).map((a) => a.slice(2)))],
+  };
+}
+
+function ownerFilter(owner: Owner): string | null {
+  const parts = [
+    ...(owner.userIds.length ? [`user_id.in.(${owner.userIds.join(',')})`] : []),
+    ...(owner.emails.length ? [`customer_email.in.(${owner.emails.map((e) => `"${e}"`).join(',')})`] : []),
+  ];
+  return parts.length ? parts.join(',') : null;
+}
+
+async function countVerifikationer(owner: Owner): Promise<number> {
+  const filter = ownerFilter(owner);
+  if (!filter) return 0;
+  const { count, error } = await getSupabase()
+    .from('verifikationer')
+    .select('id', { count: 'exact', head: true })
+    .or(filter);
+  if (error) throw new Error(`Kunde inte räkna verifikationer: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
+ * Alla personens verifikationer med konteringsrader, i datumordning. Bläddras
+ * igenom i portioner — PostgREST kapar vid 1000 rader, och en SIE-fil för ett
+ * helt år kan ha flera tusen verifikationer.
+ */
+async function verifikationerFor(owner: Owner): Promise<AdminVerifikation[]> {
+  const filter = ownerFilter(owner);
+  if (!filter) return [];
+
+  const out: AdminVerifikation[] = [];
+  for (let from = 0; ; from += 500) {
+    const { data, error } = await getSupabase()
+      .from('verifikationer')
+      .select('id, kalla, underlag_id, serie, nummer, datum, text, registrerad, signatur, summa, balanserad, bokforing_underlag(file_name), verifikation_rader(radnr, konto, kontonamn, belopp, text, objekt, borttagen, tillagd)')
+      .or(filter)
+      .order('datum', { ascending: true, nullsFirst: true })
+      .order('id')
+      .range(from, from + 499);
+    if (error) throw new Error(`Kunde inte läsa verifikationer: ${error.message}`);
+
+    for (const v of data ?? []) {
+      const file = v.bokforing_underlag as unknown as { file_name: string } | null;
+      const rows = (v.verifikation_rader ?? []) as {
+        radnr: number; konto: string; kontonamn: string | null; belopp: number | string; text: string | null;
+        objekt: { dimension: string; objekt: string }[] | null; borttagen: boolean; tillagd: boolean;
+      }[];
+      out.push({
+        id: v.id,
+        kalla: v.kalla,
+        underlagId: v.underlag_id,
+        fileName: file?.file_name ?? null,
+        serie: v.serie ?? '',
+        nummer: v.nummer ?? '',
+        datum: v.datum ?? '',
+        text: v.text ?? '',
+        registrerad: v.registrerad ?? '',
+        signatur: v.signatur ?? '',
+        summa: Number(v.summa),
+        balanserad: v.balanserad,
+        transaktioner: rows.sort((a, b) => a.radnr - b.radnr).map((t) => ({
+          konto: t.konto,
+          kontonamn: t.kontonamn ?? '',
+          belopp: Number(t.belopp),
+          text: t.text ?? '',
+          objekt: t.objekt ?? [],
+          borttagen: t.borttagen,
+          tillagd: t.tillagd,
+        })),
+      });
+    }
+    if ((data ?? []).length < 500) break;
+  }
+
+  // Nummer är text i databasen — A10 skulle hamna före A2. Sorteras numeriskt här.
+  const num = (n: string) => (/^\d+$/.test(n) ? Number(n) : 0);
+  return out.sort((a, b) =>
+    a.datum.localeCompare(b.datum) || a.serie.localeCompare(b.serie)
+    || num(a.nummer) - num(b.nummer) || a.nummer.localeCompare(b.nummer));
+}
+
+/**
+ * Personens mejlarkiv, synkat från Gmail av apps-script/sync-mail.gs.
+ *
+ * Läses bara för den person som visas, inte i build(): kropparna kan vara
+ * långa, och listan över alla personer behöver dem inte. Mejlen hittas på
+ * alla adresser personen känns igen på, även de handpåkopplade.
+ */
+async function mailFor(p: Built): Promise<AdminMailMessage[]> {
+  const emails = [...new Set(p.aliases.filter((a) => a.startsWith('e:')).map((a) => a.slice(2)))];
+  if (!emails.length) return [];
+
+  const { data, error } = await getSupabase()
+    .from('mail_messages')
+    .select('id, gmail_thread_id, direction, from_email, subject, body, body_raw, attachment_names, sent_at')
+    .in('customer_email', emails)
+    .order('sent_at', { ascending: false })
+    .limit(1000);
+  if (error) throw new Error(`Kunde inte läsa mail_messages: ${error.message}`);
+
+  return (data ?? []).reverse().map((r) => ({
+    id: r.id,
+    threadId: r.gmail_thread_id,
+    direction: r.direction as 'in' | 'out',
+    from: r.from_email,
+    subject: r.subject,
+    body: r.body ?? '',
+    raw: r.body_raw ?? '',
+    attachments: r.attachment_names ?? [],
+    at: r.sent_at,
+  }));
 }
 
 const METODER: Redovisningsmetod[] = ['faktureringsmetoden', 'kontantmetoden'];
@@ -738,6 +897,7 @@ async function planDeletion(persons: Built[]): Promise<DeletePlan> {
     { table: 'meetings', column: 'id', values: meetings },
     { table: 'pending_registrations', column: 'id', values: links },
     { table: 'email_log', column: 'id', values: mails },
+    { table: 'mail_messages', column: 'customer_email', values: emails },
     { table: 'sms_messages', column: 'id', values: sms },
     { table: 'files', column: 'order_id', values: orders },
     { table: 'files', column: 'user_id', values: profiles },
@@ -750,6 +910,9 @@ async function planDeletion(persons: Built[]): Promise<DeletePlan> {
     { table: 'produkter', column: 'user_id', values: profiles },
     { table: 'lagertillgangar', column: 'user_id', values: profiles },
     { table: 'bokforing_transaktioner', column: 'user_id', values: profiles },
+    // Verifikationer utan underlag (AI, manuella) följer inte med i kaskaden
+    { table: 'verifikationer', column: 'user_id', values: profiles },
+    { table: 'verifikationer', column: 'customer_email', values: emails },
     { table: 'bokforing_underlag', column: 'user_id', values: profiles },
     { table: 'bokforing_underlag', column: 'sender_email', values: emails },
     { table: 'manual_transactions', column: 'user_id', values: profiles },

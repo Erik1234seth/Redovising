@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import type { Person, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
+import type { AdminMailMessage, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
 import { STAGES, EVENT_STYLE, REDOVISNINGSMETODER, fullDate } from '../../_pipeline';
 import DeletePerson from '../../_delete-person';
 import SmsComposer from '../../_sms-composer';
 import { formatPhone } from '@/lib/sms/phone';
+import { isSieFile } from '@/lib/sie/parse';
 
 /**
  * Flikarna i personkortet. Kundkontext, bokföringsmetod och adresser läses
@@ -16,6 +17,7 @@ import { formatPhone } from '@/lib/sms/phone';
  */
 const TABS = [
   { id: 'historik', label: 'Historik' },
+  { id: 'konversationer', label: 'Mejl' },
   { id: 'kontext', label: 'Kundkontext' },
   { id: 'metod', label: 'Bokföringsmetod' },
   { id: 'mejl', label: 'Mejladresser' },
@@ -31,7 +33,9 @@ export default function PersonPage() {
   const [person, setPerson] = useState<Person | null>(null);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [other, setOther] = useState<{ emails: string[]; phones: string[] }>({ emails: [], phones: [] });
-  const [underlag, setUnderlag] = useState<{ id: string; fileName: string; source: string; status: string; at: string }[]>([]);
+  const [underlag, setUnderlag] = useState<PersonUnderlag[]>([]);
+  const [verifikationerCount, setVerifikationerCount] = useState(0);
+  const [mail, setMail] = useState<AdminMailMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [savingStage, setSavingStage] = useState(false);
@@ -41,6 +45,9 @@ export default function PersonPage() {
   const [deleting, setDeleting] = useState(false);
   const [messaging, setMessaging] = useState(false);
   const [tab, setTab] = useState<Tab>('historik');
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   // Ligger i en useCallback för att kunna köras om efter ett manuellt SMS —
   // det ska synas i historiken direkt, utan att sidan laddas om.
@@ -55,6 +62,8 @@ export default function PersonPage() {
           setEvents(data.events ?? []);
           setOther(data.other ?? { emails: [], phones: [] });
           setUnderlag(data.underlag ?? []);
+          setMail(data.mail ?? []);
+          setVerifikationerCount(data.verifikationerCount ?? 0);
         }
         setLoading(false);
       })
@@ -160,6 +169,44 @@ export default function PersonPage() {
     load();
   };
 
+  /**
+   * Laddar upp underlag åt personen. Filen går direkt till lagringen med en
+   * engångslänk, så storleken begränsas inte av Vercel. En fil i taget, och
+   * första felet stoppar resten — då syns det vilken som inte kom fram.
+   */
+  const uploadFiles = async (files: File[]) => {
+    if (!person || uploading || !files.length) return;
+    const owner = { profileId: person.profileId, email: person.email };
+    setError('');
+    try {
+      for (const [i, file] of files.entries()) {
+        setUploading(files.length > 1 ? `${file.name} (${i + 1}/${files.length})` : file.name);
+        const meta = { ...owner, fileName: file.name, size: file.size, mimeType: file.type || 'application/octet-stream' };
+        const post = async (action: 'prepare' | 'confirm', extra: object = {}) => {
+          const res = await fetch('/api/admin/underlag/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, ...meta, ...extra }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || `${file.name} kunde inte laddas upp`);
+          return data;
+        };
+
+        const { path, signedUrl } = await post('prepare');
+        const put = await fetch(signedUrl, { method: 'PUT', headers: { 'Content-Type': meta.mimeType }, body: file });
+        if (!put.ok) throw new Error(`${file.name} kom inte fram till lagringen (${put.status})`);
+        await post('confirm', { path });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Uppladdningen misslyckades');
+    } finally {
+      setUploading(null);
+      if (fileInput.current) fileInput.current.value = '';
+      load();
+    }
+  };
+
   if (loading) return <div className="text-center py-20 text-warm-400">Laddar...</div>;
 
   if (error || !person) {
@@ -172,6 +219,9 @@ export default function PersonPage() {
       </div>
     );
   }
+
+  // Utan konto och utan adress finns det inget att koppla filen till
+  const canUpload = !!(person.profileId || person.email);
 
   return (
     <div className="space-y-8">
@@ -312,6 +362,11 @@ export default function PersonPage() {
                     {events.length}
                   </span>
                 )}
+                {t.id === 'konversationer' && mail.length > 0 && (
+                  <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
+                    {mail.length}
+                  </span>
+                )}
                 {t.id === 'mejl' && person.manualEmails.length > 0 && (
                   <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
                     +{person.manualEmails.length}
@@ -398,6 +453,9 @@ export default function PersonPage() {
               </>
             )
           )}
+
+          {/* Hela mejlväxlingen med personen, tråd för tråd */}
+          {tab === 'konversationer' && <MailThreads mail={mail} />}
 
           {/* Vad personen sagt om sin verksamhet — samma text AI:n får med sig */}
           {tab === 'kontext' && (
@@ -569,20 +627,74 @@ export default function PersonPage() {
       </div>
 
       {/* Filerna personen skickat, så det syns att de hamnat på rätt person */}
-      <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-6">
-        <div className="flex items-baseline justify-between gap-3 mb-4">
+      {/* Kundens bokförda verifikationer — egen sida, listan kan bli lång */}
+      <Link
+        href={`/admin/person/${encodeURIComponent(person.key)}/verifikationer`}
+        className="flex items-center justify-between gap-3 bg-navy-700/50 hover:bg-navy-700 border border-navy-600 rounded-xl px-6 py-4 transition group"
+      >
+        <div>
+          <h2 className="text-xs font-semibold text-warm-400 uppercase tracking-widest">
+            Verifikationer{' '}
+            <span className="text-warm-600 font-normal normal-case tracking-normal">({verifikationerCount.toLocaleString('sv-SE')})</span>
+          </h2>
+          <p className="text-warm-600 text-xs mt-1">
+            {verifikationerCount > 0
+              ? 'Allt som lagts in från kundens SIE-filer.'
+              : 'Inga än. SIE-filer som kommer in läggs in här automatiskt.'}
+          </p>
+        </div>
+        <span className="text-gold-500 group-hover:text-gold-400 text-sm shrink-0 transition">Öppna →</span>
+      </Link>
+
+      {/* Går också att släppa filer på kortet för att ladda upp dem åt personen */}
+      <div
+        onDragOver={(e) => { if (canUpload) { e.preventDefault(); setDragging(true); } }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          if (canUpload) uploadFiles([...e.dataTransfer.files]);
+        }}
+        className={`bg-navy-700/50 border rounded-xl p-6 transition ${
+          dragging ? 'border-gold-500 ring-2 ring-gold-500/30' : 'border-navy-600'
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <h2 className="text-xs font-semibold text-warm-400 uppercase tracking-widest">
             Underlag <span className="text-warm-600 font-normal normal-case tracking-normal">({underlag.length})</span>
           </h2>
-          {underlag.length > 0 && (
-            <Link href="/admin/underlag" className="text-gold-500 hover:text-gold-400 text-xs transition">
-              Öppna underlagen →
-            </Link>
-          )}
+          <div className="flex items-center gap-3">
+            {underlag.length > 0 && (
+              <Link href="/admin/underlag" className="text-gold-500 hover:text-gold-400 text-xs transition">
+                Öppna underlagen →
+              </Link>
+            )}
+            <input
+              ref={fileInput}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => uploadFiles([...(e.target.files ?? [])])}
+            />
+            <button
+              onClick={() => fileInput.current?.click()}
+              disabled={!canUpload || !!uploading}
+              title={canUpload ? 'Eller dra och släpp filer på kortet' : 'Personen har varken konto eller mejladress'}
+              className="px-3 py-1.5 text-xs bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              + Ladda upp
+            </button>
+          </div>
         </div>
 
+        {uploading && (
+          <p className="text-gold-400 text-xs mb-3">Laddar upp {uploading}…</p>
+        )}
+
         {underlag.length === 0 ? (
-          <p className="text-warm-500 text-sm">Inga filer mejlade eller uppladdade än.</p>
+          <p className="text-warm-500 text-sm">
+            Inga filer mejlade eller uppladdade än.{canUpload && ' Dra hit filer eller klicka på Ladda upp.'}
+          </p>
         ) : (
           <ul className="divide-y divide-navy-600/60">
             {underlag.map((f) => (
@@ -590,10 +702,31 @@ export default function PersonPage() {
                 <span className="text-warm-100 text-sm truncate min-w-0 flex-1" title={f.fileName}>
                   {f.fileName}
                 </span>
+                {isSieFile(f.fileName) && (
+                  <Link
+                    href={`/admin/underlag/${f.id}`}
+                    title={f.verifikationer?.fel ?? 'Visa verifikationerna i filen'}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 transition ${
+                      f.verifikationer?.fel
+                        ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+                        : f.verifikationer
+                        ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
+                        : 'bg-gold-500/15 text-gold-400 hover:bg-gold-500/25'
+                    }`}
+                  >
+                    {f.verifikationer?.fel
+                      ? '⚠ SIE kunde inte läggas in'
+                      : f.verifikationer
+                      ? `✓ ${f.verifikationer.inlagda} ver. inlagda${f.verifikationer.dubbletter ? ` · ${f.verifikationer.dubbletter} fanns redan` : ''}`
+                      : 'SIE · verifikationer →'}
+                  </Link>
+                )}
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
-                  f.source === 'mejl' ? 'bg-blue-500/15 text-blue-300' : 'bg-navy-600 text-warm-300'
+                  f.source === 'mejl' ? 'bg-blue-500/15 text-blue-300'
+                    : f.source === 'admin' ? 'bg-gold-500/15 text-gold-400'
+                    : 'bg-navy-600 text-warm-300'
                 }`}>
-                  {f.source === 'mejl' ? '✉ mejl' : '⬆ app'}
+                  {f.source === 'mejl' ? '✉ mejl' : f.source === 'admin' ? '👤 admin' : '⬆ app'}
                 </span>
                 <span className={`text-[11px] shrink-0 w-16 text-right ${
                   f.status === 'bokfort' ? 'text-emerald-400' : f.status === 'granskas' ? 'text-blue-300' : 'text-gold-400'
@@ -622,6 +755,90 @@ export default function PersonPage() {
           onDeleted={() => router.push('/admin')}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Mejlarkivet, grupperat per Gmail-tråd med den senast aktiva tråden först.
+ * Den översta tråden står öppen, resten fälls ut vid klick.
+ */
+function MailThreads({ mail }: { mail: AdminMailMessage[] }) {
+  const threads = [...mail.reduce((acc, m) => {
+    const list = acc.get(m.threadId) ?? [];
+    list.push(m);
+    return acc.set(m.threadId, list);
+  }, new Map<string, AdminMailMessage[]>()).values()]
+    .sort((a, b) => b[b.length - 1].at.localeCompare(a[a.length - 1].at));
+
+  if (threads.length === 0) {
+    return (
+      <p className="text-warm-500 text-sm">
+        Inga mejl sparade än. Mejlen synkas från Gmail en gång i timmen.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {threads.map((messages, i) => {
+        const last = messages[messages.length - 1];
+        const subject = messages.find((m) => m.subject)?.subject || '(inget ämne)';
+        return (
+          <details key={last.threadId} open={i === 0} className="group bg-navy-800/40 border border-navy-600 rounded-lg">
+            <summary className="flex items-baseline justify-between gap-3 px-4 py-3 cursor-pointer list-none">
+              <span className="text-white text-sm font-medium truncate min-w-0">
+                <span className="text-warm-500 mr-1.5 inline-block transition group-open:rotate-90">›</span>
+                {subject}
+              </span>
+              <span className="text-warm-600 text-[11px] shrink-0">
+                {messages.length} mejl · {fullDate(last.at)}
+              </span>
+            </summary>
+
+            <div className="px-4 pb-4 space-y-3">
+              {messages.map((m) => {
+                const fromUs = m.direction === 'out';
+                const text = m.body.trim() || m.raw.trim();
+                return (
+                  <div key={m.id} className={`flex ${fromUs ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] min-w-0 rounded-lg px-3 py-2 ${
+                      fromUs ? 'bg-gold-500/10 border border-gold-500/20' : 'bg-navy-600/60'
+                    }`}>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className={`text-[11px] font-semibold ${fromUs ? 'text-gold-400' : 'text-warm-300'}`}>
+                          {fromUs ? 'Vi' : m.from || 'Kunden'}
+                        </span>
+                        <span className="text-warm-600 text-[11px] shrink-0">{fullDate(m.at)}</span>
+                      </div>
+                      <p className="mt-1 text-sm text-warm-100 whitespace-pre-wrap break-words">
+                        {text || <span className="text-warm-500 italic">(ingen text)</span>}
+                      </p>
+                      {m.attachments.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {m.attachments.map((name, j) => (
+                            <span key={j} className="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 text-[10px] font-semibold break-all">
+                              📎 {name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {m.body.trim() && m.raw.trim() !== m.body.trim() && (
+                        <details className="mt-1.5">
+                          <summary className="text-warm-600 text-[11px] cursor-pointer hover:text-warm-400">
+                            Visa hela mejlet
+                          </summary>
+                          <p className="mt-1 text-xs text-warm-400 whitespace-pre-wrap break-words">{m.raw}</p>
+                        </details>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </details>
+        );
+      })}
     </div>
   );
 }

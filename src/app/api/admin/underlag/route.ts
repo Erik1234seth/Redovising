@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import type { AdminUnderlag } from '@/lib/admin-types';
+import { importPendingSie, reimportAfterDelete } from '@/lib/sie/import';
 
 /**
  * Underlagen kunderna laddat upp i bokföringsfliken, och knapparna som för dem
@@ -33,9 +34,12 @@ export async function GET() {
   try {
     const supabase = getSupabase();
 
+    // SIE-filer som inte lagts in som verifikationer än, t.ex. från appen
+    await importPendingSie(supabase);
+
     const { data: rows, error } = await supabase
       .from('bokforing_underlag')
-      .select('id, user_id, sender_email, source, file_name, file_path, file_size, mime_type, status, created_at')
+      .select('id, user_id, sender_email, source, file_name, file_path, file_size, mime_type, status, created_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel')
       .order('created_at', { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -70,6 +74,12 @@ export async function GET() {
         status: r.status,
         at: r.created_at,
         source: r.source ?? 'app',
+        verifikationer: r.verifikationer_inlagda_at ? {
+          at: r.verifikationer_inlagda_at,
+          inlagda: r.verifikationer_antal ?? 0,
+          dubbletter: r.verifikationer_dubbletter ?? 0,
+          fel: r.verifikationer_fel,
+        } : null,
         url: signed[i],
         // Personvyn slår upp på vilken adress som helst, så mejlnyckeln räcker
         personKey: email ? `e:${email.toLowerCase()}` : null,
@@ -126,7 +136,7 @@ export async function DELETE(request: NextRequest) {
 
     const { data: row, error: fetchError } = await supabase
       .from('bokforing_underlag')
-      .select('file_path')
+      .select('file_path, user_id, sender_email, verifikationer_antal')
       .eq('id', id)
       .maybeSingle();
 
@@ -138,8 +148,17 @@ export async function DELETE(request: NextRequest) {
       if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 });
     }
 
+    // Filens verifikationer följer med i kaskaden
     const { error } = await supabase.from('bokforing_underlag').delete().eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Fanns samma verifikationer i en annan fil hos kunden tar den över dem
+    if (row.verifikationer_antal) {
+      await reimportAfterDelete(supabase, {
+        userId: row.user_id,
+        email: row.sender_email?.trim().toLowerCase() || null,
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

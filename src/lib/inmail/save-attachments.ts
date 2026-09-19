@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isSieFile } from '@/lib/sie/parse';
+import { importSieUnderlag } from '@/lib/sie/import';
 
 /**
  * Sparar bilagorna i inkommande mejl som underlag — alla, oavsett filtyp.
@@ -41,7 +43,7 @@ function normalize(info: MailFileInfo) {
   };
 }
 
-async function resolveUserId(supabase: SupabaseClient, email: string): Promise<string | null> {
+export async function resolveUserId(supabase: SupabaseClient, email: string): Promise<string | null> {
   const { data: profile } = await supabase
     .from('profiles')
     .select('id')
@@ -61,7 +63,7 @@ async function resolveUserId(supabase: SupabaseClient, email: string): Promise<s
 }
 
 /** Mappen följer kontot när det finns, annars adressen. */
-function folderFor(userId: string | null, email: string): string {
+export function folderFor(userId: string | null, email: string): string {
   return userId ?? `mejl/${email.replace(/[^a-z0-9.-]/g, '_')}`;
 }
 
@@ -129,7 +131,7 @@ async function insertRow(
   info: ReturnType<typeof normalize>,
   path: string,
 ): Promise<{ status: 'saved' | 'exists' }> {
-  const { error } = await supabase.from('bokforing_underlag').insert({
+  const { data: saved, error } = await supabase.from('bokforing_underlag').insert({
     user_id: userId,
     sender_email: info.email,
     source: 'mejl',
@@ -138,13 +140,20 @@ async function insertRow(
     file_path: path,
     file_size: info.size,
     mime_type: info.mimeType,
-  });
+  }).select('id').single();
 
   if (error) {
     // Dubblett: någon hann före. Filen vi just laddade upp behövs inte.
     await supabase.storage.from(UNDERLAG_BUCKET).remove([path]);
     if (error.code === '23505') return { status: 'exists' };
     throw new Error(`Kunde inte spara ${info.fileName}: ${error.message}`);
+  }
+
+  // SIE-filer tolkas med kod direkt, så verifikationerna hamnar hos kunden.
+  // Går det inte står felet på underlaget — filen är sparad oavsett.
+  if (isSieFile(info.fileName)) {
+    await importSieUnderlag(supabase, saved.id).catch((err) =>
+      console.error(`[inmail/underlag] SIE-import av ${info.fileName}:`, err instanceof Error ? err.message : err));
   }
 
   return { status: 'saved' };

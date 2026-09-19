@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import type { AdminUnderlag } from '@/lib/admin-types';
 import { relativeTime, fullDate } from '../_pipeline';
+import { isSieFile } from '@/lib/sie/parse';
 
 /**
  * Underlagen kunderna laddat upp, i väntan på genomgång.
@@ -177,6 +178,25 @@ export default function UnderlagPage() {
                         ✉ via mejl
                       </span>
                     )}
+                    {u.source === 'admin' && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border bg-gold-500/10 text-gold-400 border-gold-500/30">
+                        👤 uppladdat av oss
+                      </span>
+                    )}
+                    {u.verifikationer && (
+                      <span
+                        title={u.verifikationer.fel ?? undefined}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                          u.verifikationer.fel
+                            ? 'bg-red-500/10 text-red-400 border-red-500/30'
+                            : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                        }`}
+                      >
+                        {u.verifikationer.fel
+                          ? '⚠ verifikationerna kunde inte läggas in'
+                          : `✓ ${u.verifikationer.inlagda} verifikationer inlagda`}
+                      </span>
+                    )}
                   </div>
 
                   <p className="text-warm-400 text-sm mt-1.5">
@@ -199,6 +219,15 @@ export default function UnderlagPage() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  {/* SIE tolkas med kod, så verifikationerna går att läsa direkt */}
+                  {isSieFile(u.fileName) && (
+                    <Link
+                      href={`/admin/underlag/${u.id}`}
+                      className="px-4 py-2 bg-gold-500/15 hover:bg-gold-500/25 border border-gold-500/30 text-gold-400 rounded-xl text-sm font-medium transition"
+                    >
+                      Verifikationer
+                    </Link>
+                  )}
                   {u.url ? (
                     <a
                       href={u.url}

@@ -140,6 +140,8 @@ export interface AdminUnderlag {
   at: string;
   /** app = uppladdat i appen, mejl = bilaga i ett inkommande mejl. */
   source: string;
+  /** Vad en SIE-fil gav när den lades in hos kunden. */
+  verifikationer: UnderlagImport | null;
   /** Signerad nedladdningslänk. Bucketen är privat och länken lever en timme. */
   url: string | null;
   /** Nyckel till personvyn, när filen går att knyta till en profil. */
@@ -180,4 +182,64 @@ export interface AdminNotice {
   detail?: string;
   /** Nyckel till personvyn, när notisen går att knyta till någon. */
   personKey?: string | null;
+}
+
+/** Ett mejl i kundens mejlarkiv (mail_messages), synkat från Gmail. */
+export interface AdminMailMessage {
+  id: string;
+  threadId: string;
+  /** in = från kunden, out = från oss. */
+  direction: 'in' | 'out';
+  from: string | null;
+  subject: string | null;
+  /** Rensad från citat och signatur. Kan vara tom — då står allt i raw. */
+  body: string;
+  raw: string;
+  attachments: string[];
+  at: string;
+}
+
+/** Vad ett SIE-underlag gav när det lades in hos kunden. */
+export interface UnderlagImport {
+  at: string;
+  inlagda: number;
+  dubbletter: number;
+  fel: string | null;
+}
+
+/** Ett underlag i listan på personsidan. */
+export interface PersonUnderlag {
+  id: string;
+  fileName: string;
+  source: string;
+  status: string;
+  at: string;
+  /** Satt när filen är en SIE-fil som lagts in (eller försökts läggas in). */
+  verifikationer: UnderlagImport | null;
+}
+
+/** En verifikation hos kunden (tabellen verifikationer). */
+export interface AdminVerifikation {
+  id: string;
+  /** sie, ai eller manuell. */
+  kalla: string;
+  underlagId: string | null;
+  fileName: string | null;
+  serie: string;
+  nummer: string;
+  datum: string;
+  text: string;
+  registrerad: string;
+  signatur: string;
+  summa: number;
+  balanserad: boolean;
+  transaktioner: {
+    konto: string;
+    kontonamn: string;
+    belopp: number;
+    text: string;
+    objekt: { dimension: string; objekt: string }[];
+    borttagen: boolean;
+    tillagd: boolean;
+  }[];
 }
