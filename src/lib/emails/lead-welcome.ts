@@ -17,16 +17,19 @@
  * Därav också: inga <style>, inga inline-stilar, inga tabeller i själva texten.
  * Bara stycken. Gmail renderar då i mottagarens vanliga brödtext, precis som
  * ett skrivet mejl. `stripHtml` i Apps Script gör textversionen av samma
- * stycken.
+ * stycken. Av samma skäl är ämnesraden skriven som en människa skriver den:
+ * ingen tankstreckskonstruktion, inget säljspråk, bara vad mejlet innehåller.
  *
  * Undantaget är signaturen sist. Den är formgiven, och det är meningen: ett
  * skrivet mejl slutar med en signatur, det är frånvaron av en som ser konstig
  * ut. Gmail lägger inte på sin egen här, eftersom mejlet går via
- * `GmailApp.sendEmail` och inte via compose-fönstret.
+ * `GmailApp.sendEmail` och inte via compose-fönstret. Signaturen bär redan
+ * hälsningsfrasen och namnet, så brödtexten ska inte sluta med en egen.
  *
  * Uppmaningen är att svara på mejlet, inte att klicka på en länk. Svaret går
  * till mail-AI:n som ställer kvalificeringsfrågorna, så brödtexten innehåller
- * medvetet inga länkar alls. De två i signaturen är numret och domänen.
+ * medvetet inga länkar alls — uppladdningssidan nämns i ord, inte som länk.
+ * De två i signaturen är numret och domänen.
  */
 
 import { SIGNATURE_HTML } from './signature';
@@ -34,34 +37,37 @@ import { SIGNATURE_HTML } from './signature';
 const PARAGRAPHS = [
   'Hej,',
 
-  'Du fyllde nyligen i vårt formulär för att få veta mer om EnklaBokslut.',
+  'Kul att du är intresserad av EnklaBokslut.',
 
-  'Vi hjälper mindre enskilda firmor med löpande bokföring, momsredovisning, '
-    + 'bokslut och deklaration. Tanken är att det ska vara så enkelt som möjligt '
-    + 'för dig. Du mejlar in dina kvitton, fakturor, kontoutdrag och andra '
-    + 'underlag, så sköter vi bokföringen och hör av oss om det är något vi '
-    + 'behöver fråga om.',
+  'Jag tänker att jag beskriver lite kort hur EnklaBokslut funkar och om du '
+    + 'tycker det låter intressant så kan vi gå in mer på detaljer senare.',
 
-  'Priset är 299 kr per månad exklusive moms. Om du börjar under året betalar '
-    + 'du också för de månader som redan har gått, eftersom vi då tar hand om '
-    + 'bokföringen för hela året. Om du hellre vill betala årsvis går det också '
-    + 'bra. Då är priset 3 999 kr exklusive moms för året.',
+  'Vi får ofta frågan hur vi kan hålla ett så lågt pris och om vi verkligen gör '
+    + 'samma sak som traditionella byråer. Det handlar om att vi har fokuserat '
+    + 'på just enskilda mindre firmor utan anställda som oftast har relativt få '
+    + 'transaktioner och byggt hela vårt system kring det. Vi följer samma regler '
+    + 'och gör samma sak men inte på samma sätt 😊.',
 
-  'Vi tar in ett begränsat antal kunder så om du funderar på att komma igång är '
-    + 'det bra om du hör av dig snabbt. Det gör också att vi kan få in underlagen '
-    + 'och komma igång i lugn och ro, istället för att allt behöver göras nära '
-    + 'bokslut och deklaration. Det är bättre för både dig och oss!',
+  'Tjänsten fungerar så att ni skickar in alla underlag (kvitton, fakturor, '
+    + 'kontoutdrag eller annat) via mail eller direkt på vår uppladdningssida. '
+    + 'Om vi har frågor på det ni laddat upp så hör vi av oss. När vi sätter ihop '
+    + 'bokslutet kan det hända att vi har någon mer fråga men bara kring '
+    + 'verksamheten, aldrig om bokföring.',
+
+  'Jag vill att ni ska känna er trygga med att er del i arbetet är att ladda upp '
+    + 'underlagen så sköter vi resten. Vi har koll på reglerna så det behöver ni '
+    + 'inte ha.',
 
   'När året är slut gör vi klart bokslutet, momsdeklarationen och '
-    + 'inkomstdeklarationen och lämnar in det som ska lämnas in till Skatteverket.',
+    + 'inkomstdeklarationen och lämnar in det som ska lämnas in till Skatteverket. '
+    + 'Alla delar ingår i priset (299 per månad eller 3999 per år) och vi har inga '
+    + '"tillval" som kostar extra.',
 
-  'Låter det intressant? Svara bara ja på mejlet så skickar jag några enkla '
-    + 'frågor för att se om det passar din verksamhet. Om du undrar över något '
-    + 'är det bara att svara på mejlet med din fråga.',
+  'Har du någon annan fundering?',
 ];
 
 export function leadWelcomeEmail(): { subject: string; html: string } {
   const html = PARAGRAPHS.map((p) => `<p>${p}</p>`).join('\n') + '\n' + SIGNATURE_HTML;
 
-  return { subject: 'Du fyllde i vårt formulär – här är lite mer info', html };
+  return { subject: 'Lite kort om hur EnklaBokslut funkar', html };
 }

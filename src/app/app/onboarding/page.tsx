@@ -10,14 +10,25 @@ import { useMainSiteUrl } from '@/lib/useMainSiteUrl';
 const NAV_BG = '#173b57';
 const CORAL = '#E95C63';
 
-const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: CURRENT_YEAR - 1989 }, (_, i) => CURRENT_YEAR - i);
-
 const MOMS_OPTIONS: { value: 'månadsvis' | 'kvartalsvis' | 'helår' | 'ingen-moms'; label: string; desc: string }[] = [
   { value: 'helår', label: 'En gång per år', desc: 'Redovisar moms en gång om året' },
   { value: 'kvartalsvis', label: 'Kvartalsvis', desc: 'Redovisar moms var 3:e månad' },
   { value: 'månadsvis', label: 'Månadsvis', desc: 'Redovisar moms varje månad' },
   { value: 'ingen-moms', label: 'Betalar inte moms', desc: 'Verksamheten är inte momspliktig' },
+];
+
+type KontoTyp = 'foretagskonto' | 'privatkonto' | 'bada';
+
+// Frågan ställdes tidigare som ja/nej. Gamla svar finns kvar på ett fåtal
+// profiler och förfylls som närmaste motsvarighet i den nya frågan.
+const KONTO_LEGACY: Partial<Record<string, KontoTyp>> = {
+  ja: 'foretagskonto',
+  nej: 'privatkonto',
+};
+
+const FORSTA_DEKLARATION_OPTIONS: { value: boolean; label: string; desc: string }[] = [
+  { value: true, label: 'Ja', desc: 'Firman är ny — jag har inte deklarerat för den tidigare' },
+  { value: false, label: 'Nej', desc: 'Jag har deklarerat för firman minst en gång förut' },
 ];
 
 type BokforingMetod = 'excel-kalkylark' | 'hemsidan' | 'maila-underlag';
@@ -85,11 +96,16 @@ export default function OnboardingPage() {
   const [orgNr, setOrgNr] = useState('');
   const [verksamhet, setVerksamhet] = useState('');
   const [momsPeriod, setMomsPeriod] = useState<'månadsvis' | 'kvartalsvis' | 'helår' | 'ingen-moms' | null>(null);
-  const [startAr, setStartAr] = useState<number | null>(null);
-  const [saljerTill, setSaljerTill] = useState<'privat' | 'foretag' | null>(null);
-  const [saljerI, setSaljerI] = useState<'sverige' | 'eu' | 'utanfor-eu' | null>(null);
-  const [koperI, setKoperI] = useState<'sverige' | 'eu' | 'import' | null>(null);
-  const [harForetagskonto, setHarForetagskonto] = useState<'ja' | 'nej' | null>(null);
+  // Startaret fragas inte langre har. Det ligger kvar pa profilen for befintliga
+  // kunder och gar att fylla i under Mitt konto, men onboardingen fragar i stallet
+  // om det ar kundens forsta deklarationsar - det ar det som styr hur vi svarar dem.
+  const [forstaDeklaration, setForstaDeklaration] = useState<boolean | null>(null);
+  const [harForetagskonto, setHarForetagskonto] = useState<KontoTyp | null>(null);
+  // Intygandet sparas inte på profilen — det är en spärr i flödet, inte en uppgift
+  // om företaget. Därför förfylls det inte heller vid återbesök: den som går
+  // tillbaka i flödet får kryssa i det på nytt, vilket är själva poängen med ett
+  // intygande.
+  const [intygat, setIntygat] = useState(false);
   // Bokföringsmetod är numera alltid "maila-underlag" — inget steg för det längre
   const bokforingMetod: BokforingMetod = 'maila-underlag';
   const skickaInMetod: SkickaInMetod | null = null;
@@ -104,11 +120,11 @@ export default function OnboardingPage() {
     if (profile.org_nr) setOrgNr(profile.org_nr);
     if (profile.verksamhet) setVerksamhet(profile.verksamhet);
     if (profile.moms_period) setMomsPeriod(profile.moms_period);
-    if (profile.start_ar) setStartAr(profile.start_ar);
-    if (profile.saljer_till) setSaljerTill(profile.saljer_till);
-    if (profile.saljer_i) setSaljerI(profile.saljer_i);
-    if (profile.koper_i) setKoperI(profile.koper_i);
-    if (profile.har_foretagskonto) setHarForetagskonto(profile.har_foretagskonto);
+    if (profile.forsta_deklarationsar !== null) setForstaDeklaration(profile.forsta_deklarationsar);
+    if (profile.har_foretagskonto) {
+      const lagrat = profile.har_foretagskonto;
+      setHarForetagskonto(KONTO_LEGACY[lagrat] ?? (lagrat as KontoTyp));
+    }
     setHydrated(true);
   }, [profile, hydrated]);
 
@@ -127,10 +143,7 @@ export default function OnboardingPage() {
           org_nr: orgNr || null,
           verksamhet,
           moms_period: momsPeriod,
-          start_ar: startAr,
-          saljer_till: saljerTill,
-          saljer_i: saljerI,
-          koper_i: koperI,
+          forsta_deklarationsar: forstaDeklaration,
           har_foretagskonto: harForetagskonto,
           bokforing_metod: bokforingMetod,
           skicka_in_metod: skickaInMetod,
@@ -284,32 +297,20 @@ export default function OnboardingPage() {
               style={{ '--tw-ring-color': NAV_BG } as React.CSSProperties}
             />
 
-            {/* Chip-frågor */}
+            {/* Följdfråga */}
             <div className="flex flex-col gap-5 mt-6">
               <ChipQuestion
-                label="Har du ett företagskonto?"
-                hint="Ett bankkonto som bara används till företaget, skilt från din privatekonomi."
-                options={[{ value: 'ja', label: 'Ja' }, { value: 'nej', label: 'Nej' }]}
+                label="Använder du företagskonto eller privatkonto?"
+                hint="Ett företagskonto är ett bankkonto som bara används till företaget, skilt från din privatekonomi. Välj Båda om företagets utgifter betalas från båda hållen."
+                options={[
+                  { value: 'foretagskonto', label: 'Företagskonto' },
+                  { value: 'privatkonto', label: 'Privatkonto' },
+                  { value: 'bada', label: 'Båda' },
+                ]}
                 value={harForetagskonto}
-                onChange={v => setHarForetagskonto(v as 'ja' | 'nej')}
-              />
-              <ChipQuestion
-                label="Jag säljer mest till"
-                options={[{ value: 'privat', label: 'Privat' }, { value: 'foretag', label: 'Företag' }]}
-                value={saljerTill}
-                onChange={v => setSaljerTill(v as 'privat' | 'foretag')}
-              />
-              <ChipQuestion
-                label="Jag säljer mest i"
-                options={[{ value: 'sverige', label: 'Sverige' }, { value: 'eu', label: 'EU' }, { value: 'utanfor-eu', label: 'Utanför EU' }]}
-                value={saljerI}
-                onChange={v => setSaljerI(v as 'sverige' | 'eu' | 'utanfor-eu')}
-              />
-              <ChipQuestion
-                label="Jag köper mina produkter mest i"
-                options={[{ value: 'sverige', label: 'Sverige' }, { value: 'eu', label: 'EU' }, { value: 'import', label: 'Import / utanför EU' }]}
-                value={koperI}
-                onChange={v => setKoperI(v as 'sverige' | 'eu' | 'import')}
+                // ChipQuestion skickar tom sträng när man klickar bort sitt val.
+                // Den ska bli null, annars sparas '' i databasen i stället för inget svar.
+                onChange={v => setHarForetagskonto((v || null) as KontoTyp | null)}
               />
             </div>
 
@@ -322,6 +323,42 @@ export default function OnboardingPage() {
               </p>
             </div>
 
+            {/* Intygandet är en spärr, inte ett sparat fält. Den som inte kan kryssa
+                i det är inte en kund vi kan ta emot, så Nästa är låst tills den är
+                ikryssad. */}
+            <label
+              className="w-full flex items-start gap-3 px-4 py-4 rounded-2xl border-2 mt-6 cursor-pointer transition-all duration-100"
+              style={{
+                borderColor: intygat ? NAV_BG : '#e2e8f0',
+                backgroundColor: intygat ? '#F8FAFC' : 'white',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={intygat}
+                onChange={e => setIntygat(e.target.checked)}
+                className="sr-only"
+              />
+              <span
+                className="w-5 h-5 mt-0.5 rounded-md flex-shrink-0 flex items-center justify-center border-2 transition-colors"
+                style={{
+                  borderColor: intygat ? NAV_BG : '#cbd5e1',
+                  backgroundColor: intygat ? NAV_BG : 'white',
+                }}
+              >
+                {intygat && (
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </span>
+              <span className="text-xs text-slate-600 leading-relaxed">
+                Jag intygar att jag driver en enskild firma utan anställda som omsätter
+                under 3 miljoner kronor per år, och att verksamheten varken är skogsbruk,
+                lantbruk eller persontransport som till exempel taxi.
+              </span>
+            </label>
+
             <div className="flex gap-3 mt-8">
               <button
                 type="button"
@@ -333,7 +370,7 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 onClick={() => setStep(3)}
-                disabled={verksamhet.trim().length < 5}
+                disabled={verksamhet.trim().length < 5 || !intygat}
                 className="flex-1 py-3 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-40"
                 style={{ backgroundColor: NAV_BG }}
               >
@@ -448,32 +485,44 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Steg 4 — Startår */}
+        {/* Steg 4 — Första deklarationsåret */}
         {step === 4 && (
           <div>
             <StepBadge current={4} total={totalSteps} />
             <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-2">
-              Vilket år startade du?
+              Är det första året du deklarerar för din enskilda firma?
             </h1>
             <p className="text-slate-400 text-sm mb-8 leading-relaxed">
-              Välj det år du registrerade din enskilda firma hos Skatteverket.
+              Svaret avgör om vi behöver ta hänsyn till tidigare års bokföring.
             </p>
 
-            <div className="grid grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-1">
-              {YEARS.map(year => (
+            {/* Samma kortform som momsstegets alternativ, så de två sista stegen
+                ser ut att höra ihop. */}
+            <div className="flex flex-col gap-3">
+              {FORSTA_DEKLARATION_OPTIONS.map(opt => (
                 <button
-                  key={year}
+                  key={String(opt.value)}
                   type="button"
-                  onClick={() => setStartAr(year)}
-                  className="py-3 rounded-xl text-sm font-semibold border-2 transition-all duration-100"
+                  onClick={() => setForstaDeklaration(opt.value)}
+                  className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border-2 text-left transition-all duration-100"
                   style={{
-                    borderColor: startAr === year ? NAV_BG : '#e2e8f0',
-                    backgroundColor: startAr === year ? NAV_BG : 'white',
-                    color: startAr === year ? 'white' : '#475569',
-                    boxShadow: startAr === year ? `0 0 0 1px ${NAV_BG}` : undefined,
+                    borderColor: forstaDeklaration === opt.value ? NAV_BG : '#e2e8f0',
+                    backgroundColor: forstaDeklaration === opt.value ? NAV_BG : 'white',
                   }}
                 >
-                  {year}
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: forstaDeklaration === opt.value ? 'white' : '#1e293b' }}>
+                      {opt.label}
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: forstaDeklaration === opt.value ? 'rgba(255,255,255,0.7)' : '#94a3b8' }}>
+                      {opt.desc}
+                    </p>
+                  </div>
+                  {forstaDeklaration === opt.value && (
+                    <svg className="w-5 h-5 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
                 </button>
               ))}
             </div>
@@ -493,7 +542,7 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 onClick={handleFinish}
-                disabled={startAr === null || saving}
+                disabled={forstaDeklaration === null || saving}
                 className="flex-1 py-3 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-40"
                 style={{ backgroundColor: NAV_BG }}
               >

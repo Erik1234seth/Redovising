@@ -104,7 +104,7 @@ async function buildCustomerContext(
   try {
     const { data: p } = await supabase
       .from('profiles')
-      .select('full_name, company_name, verksamhet, ort, moms_period, bokforing_metod, start_ar, subscription_status')
+      .select('full_name, company_name, verksamhet, ort, moms_period, bokforing_metod, start_ar, forsta_deklarationsar, subscription_status')
       .eq('id', userId)
       .single();
 
@@ -118,6 +118,8 @@ async function buildCustomerContext(
     if (p.moms_period) lines.push(`- Momsperiod: ${MOMS_PERIOD_TEXT[p.moms_period] ?? p.moms_period}`);
     if (p.bokforing_metod) lines.push(`- Bokföringsmetod: ${p.bokforing_metod}`);
     if (p.start_ar) lines.push(`- Startår: ${p.start_ar}`);
+    if (p.forsta_deklarationsar === true) lines.push('- Första deklarationsåret för firman — ingen tidigare bokföring');
+    if (p.forsta_deklarationsar === false) lines.push('- Kunden har deklarerat för firman tidigare år');
 
     return `
 

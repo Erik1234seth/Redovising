@@ -14,11 +14,21 @@ export interface Profile {
   order_count: number;
   verksamhet: string | null;
   start_ar: number | null;
+  /**
+   * Om det är kundens första år att deklarera för sin enskilda firma. Frågas i
+   * onboardingen; null på alla profiler som skapades innan frågan fanns.
+   */
+  forsta_deklarationsar: boolean | null;
   moms_period: 'månadsvis' | 'kvartalsvis' | 'helår' | 'ingen-moms' | null;
   saljer_till: 'privat' | 'foretag' | null;
   saljer_i: 'sverige' | 'eu' | 'utanfor-eu' | null;
   koper_i: 'sverige' | 'eu' | 'import' | null;
-  har_foretagskonto: 'ja' | 'nej' | null;
+  /**
+   * Vilket konto företagets utgifter betalas från. Frågan var tidigare ja/nej
+   * ("har du företagskonto?"), så 'ja' och 'nej' ligger kvar på ett fåtal
+   * profiler och läses fortfarande — nya svar skrivs alltid som kontotyp.
+   */
+  har_foretagskonto: 'foretagskonto' | 'privatkonto' | 'bada' | 'ja' | 'nej' | null;
   bokforing_metod: 'excel-kalkylark' | 'hemsidan' | 'maila-underlag' | null;
   /** Kontantmetoden eller faktureringsmetoden — inte samma sak som raden ovan. */
   redovisningsmetod: 'faktureringsmetoden' | 'kontantmetoden' | null;

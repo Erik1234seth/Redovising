@@ -6,7 +6,8 @@
 
 export const KUND_KOLUMNER =
   'id, full_name, email, company_name, org_nr, momsnr, verksamhet, ort, ' +
-  'moms_period, bokforing_metod, saljer_till, saljer_i, koper_i, har_foretagskonto, start_ar';
+  'moms_period, bokforing_metod, saljer_till, saljer_i, koper_i, har_foretagskonto, start_ar, ' +
+  'forsta_deklarationsar';
 
 export interface Kund {
   id: string;
@@ -24,6 +25,7 @@ export interface Kund {
   koper_i: string | null;
   har_foretagskonto: string | null;
   start_ar: number | null;
+  forsta_deklarationsar: boolean | null;
 }
 
 const MOMS_PERIOD: Record<string, string> = {
@@ -39,6 +41,16 @@ const MOMS_PERIOD: Record<string, string> = {
 const SALJER_TILL: Record<string, string> = {
   privat: 'privatpersoner',
   foretag: 'företag',
+};
+
+// Frågan var tidigare ja/nej, numera vilket konto som faktiskt används. Båda
+// formerna finns i databasen, så båda översätts här.
+const KONTO: Record<string, string> = {
+  foretagskonto: 'eget företagskonto',
+  privatkonto: 'privatkonto',
+  bada: 'både företagskonto och privatkonto',
+  ja: 'eget företagskonto',
+  nej: 'privatkonto',
 };
 
 const OMRADE: Record<string, string> = {
@@ -67,8 +79,10 @@ export function byggKundkontext(k: Kund | null): string {
   if (k.saljer_till) rader.push(`- Säljer till: ${SALJER_TILL[k.saljer_till] ?? k.saljer_till}`);
   if (k.saljer_i) rader.push(`- Säljer i: ${OMRADE[k.saljer_i] ?? k.saljer_i}`);
   if (k.koper_i) rader.push(`- Köper i: ${OMRADE[k.koper_i] ?? k.koper_i}`);
-  if (k.har_foretagskonto) rader.push(`- Har eget företagskonto: ${k.har_foretagskonto === 'ja' ? 'ja' : 'nej — betalar via privatkonto'}`);
+  if (k.har_foretagskonto) rader.push(`- Betalar företagets utgifter via: ${KONTO[k.har_foretagskonto] ?? k.har_foretagskonto}`);
   if (k.start_ar) rader.push(`- Startår: ${k.start_ar}`);
+  if (k.forsta_deklarationsar === true) rader.push('- Första deklarationsåret för firman — det finns ingen tidigare bokföring att ta hänsyn till');
+  if (k.forsta_deklarationsar === false) rader.push('- Kunden har deklarerat för firman tidigare år');
 
   if (rader.length === 0) return '';
 

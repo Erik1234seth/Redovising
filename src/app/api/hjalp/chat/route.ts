@@ -253,6 +253,8 @@ function buildUserContext(ctx: Record<string, unknown> | null): string {
     if (p.full_name) lines.push(`**Namn:** ${p.full_name}`);
     if (p.verksamhet) lines.push(`**Verksamhet:** ${p.verksamhet}`);
     if (p.start_ar) lines.push(`**Startår:** ${p.start_ar}`);
+    if (p.forsta_deklarationsar === true) lines.push('**Första deklarationsåret:** ja — ingen tidigare bokföring');
+    if (p.forsta_deklarationsar === false) lines.push('**Första deklarationsåret:** nej — har deklarerat tidigare år');
     if (p.moms_period) lines.push(`**Momsredovisning:** ${p.moms_period}`);
   }
 

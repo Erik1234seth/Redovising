@@ -12,6 +12,7 @@ interface UserContext {
     company_name: string | null;
     verksamhet: string | null;
     start_ar: number | null;
+    forsta_deklarationsar: boolean | null;
     moms_period: string | null;
   };
   recentTransactions: {
@@ -114,6 +115,7 @@ export default function HjalpChat() {
           company_name: profile?.company_name ?? null,
           verksamhet: profile?.verksamhet ?? null,
           start_ar: profile?.start_ar ?? null,
+          forsta_deklarationsar: profile?.forsta_deklarationsar ?? null,
           moms_period: profile?.moms_period ?? null,
         },
         recentTransactions: txRes.data ?? [],
