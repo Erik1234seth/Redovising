@@ -114,6 +114,48 @@ export default function BetalningPage() {
     }
   };
 
+  // Efterdebiteringen för månaderna innan kunden kom in är det enda i upplägget
+  // som kan kännas som en överraskning när fakturan kommer. Därför visas den
+  // framme, inte bakom en utfällning eller i villkoren — den som klickar vidare
+  // ska redan ha läst den.
+  //
+  // Innehållet bor här som en konstant eftersom det renderas på två ställen: som
+  // en ruta bredvid kortet när skärmen är bred nog, och under kortet när den inte
+  // är det. Texten ska finnas på ett ställe även om placeringen är två.
+  const prisforklaring = (
+    <div
+      className="rounded-2xl bg-white border border-slate-200 px-5 py-5"
+      style={{ boxShadow: '0 12px 32px rgba(23,59,87,0.10)' }}
+    >
+      <div className="flex items-center gap-2.5 mb-3">
+        <span className="w-1 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: CORAL }} />
+        <p className="text-sm font-bold" style={{ color: NAV_BG }}>Prisförklaring</p>
+      </div>
+
+      <div className="flex flex-col gap-2.5">
+        <p className="text-xs leading-relaxed text-slate-500">
+          Månadspriset är {pkg.price.toLocaleString('sv')} kr exklusive moms.
+        </p>
+        <p className="text-xs leading-relaxed text-slate-500">
+          Eftersom bokslutet och deklarationen gäller kalenderåret, januari till december,
+          tar vi ansvar för hela årets bokföring när du blir kund under året.
+        </p>
+        <p className="text-xs leading-relaxed text-slate-600 rounded-xl px-3.5 py-3" style={{ backgroundColor: '#F8FAFC' }}>
+          <span className="font-semibold" style={{ color: NAV_BG }}>Exempel:</span> Om du blir kund
+          i september och vi tar hand om bokföringen från januari, debiteras du även för
+          januari–augusti.
+        </p>
+        <p className="text-xs leading-relaxed text-slate-500">
+          Avgiften för de tidigare månaderna faktureras i samband med att bokslutet och
+          deklarationen lämnas in.
+        </p>
+        <p className="text-xs leading-relaxed text-slate-500">
+          Bokslut, NE-bilaga och deklaration ingår i priset.
+        </p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
 
@@ -143,79 +185,104 @@ export default function BetalningPage() {
             <p className="text-slate-500 text-sm">Allt inkluderat, ingen bindningstid. Avsluta när du vill.</p>
           </div>
 
-          <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: NAV_BG, boxShadow: `0 24px 64px ${NAV_BG}30` }}>
-            <div className="p-7 sm:p-8">
+          {/* På smala skärmar står förklaringen före kortet. Den som scrollar
+              nerifrån och upp mot köpknappen har då redan passerat den — hade den
+              legat under kortet hade knappen kommit först. */}
+          {billing === 'monthly' && (
+            <div className="xl:hidden mb-6">{prisforklaring}</div>
+          )}
 
-              {/* Billing toggle */}
-              <div className="flex items-center gap-1 p-1 rounded-xl mb-6" style={{ backgroundColor: 'rgba(255,255,255,0.07)' }}>
-                <button
-                  onClick={() => chooseBilling('monthly')}
-                  className="flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200"
-                  style={billing === 'monthly' ? { backgroundColor: 'white', color: NAV_BG } : { color: 'rgba(255,255,255,0.5)' }}
-                >
-                  Månadsvis
-                </button>
-                <button
-                  onClick={() => chooseBilling('yearly')}
-                  className="flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5"
-                  style={billing === 'yearly' ? { backgroundColor: 'white', color: NAV_BG } : { color: 'rgba(255,255,255,0.5)' }}
-                >
-                  Årsvis
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: billing === 'yearly' ? `${CORAL}20` : `${CORAL}40`, color: billing === 'yearly' ? CORAL : 'rgba(233,92,99,0.9)' }}>
-                    Betala efter bokslut
-                  </span>
-                </button>
-              </div>
+          {/* Från xl och uppåt finns det plats vid sidan, och då hänger rutan där
+              i stället, fäst vid kortet med en pil. Kortet självt har
+              overflow-hidden för sina rundade hörn, så omslutningen här är det som
+              rutan kan positioneras mot. */}
+          <div className="relative">
+            <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: NAV_BG, boxShadow: `0 24px 64px ${NAV_BG}30` }}>
+              <div className="p-7 sm:p-8">
 
-              {preselected && (
-                <p className="text-xs text-white/45 -mt-3 mb-5 text-center">
-                  Vi har förvalt upplägget du valde på webbplatsen — du kan byta här.
-                </p>
-              )}
-
-              <div className="mb-6 pb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                <div className="flex items-end gap-1.5">
-                  <span className="text-5xl font-extrabold tracking-tight text-white">
-                    {(billing === 'monthly' ? pkg.price : pkg.yearlyPrice).toLocaleString('sv')}
-                  </span>
-                  <div className="mb-1">
-                    <p className="text-sm font-semibold leading-none" style={{ color: CORAL }}>
-                      {billing === 'monthly' ? 'kr/månad' : 'kr/år'}
-                    </p>
-                    <p className="text-xs text-white/40 mt-1">(exkl. moms)</p>
-                  </div>
+                {/* Billing toggle */}
+                <div className="flex items-center gap-1 p-1 rounded-xl mb-6" style={{ backgroundColor: 'rgba(255,255,255,0.07)' }}>
+                  <button
+                    onClick={() => chooseBilling('monthly')}
+                    className="flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200"
+                    style={billing === 'monthly' ? { backgroundColor: 'white', color: NAV_BG } : { color: 'rgba(255,255,255,0.5)' }}
+                  >
+                    Månadsvis
+                  </button>
+                  <button
+                    onClick={() => chooseBilling('yearly')}
+                    className="flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5"
+                    style={billing === 'yearly' ? { backgroundColor: 'white', color: NAV_BG } : { color: 'rgba(255,255,255,0.5)' }}
+                  >
+                    Årsvis
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: billing === 'yearly' ? `${CORAL}20` : `${CORAL}40`, color: billing === 'yearly' ? CORAL : 'rgba(233,92,99,0.9)' }}>
+                      Betala efter bokslut
+                    </span>
+                  </button>
                 </div>
-                {billing === 'yearly'
-                  ? <p className="text-xs mt-2 text-white/35">Betala inget nu — vi fakturerar dig först när vi lämnat in ditt årsbokslut</p>
-                  : <p className="text-xs mt-1 text-white/40">Ingen bindningstid — avsluta när du vill</p>}
-              </div>
 
-              <ul className="space-y-3 mb-8">
-                {features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: `${CORAL}35` }}>
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
+                {preselected && (
+                  <p className="text-xs text-white/45 -mt-3 mb-5 text-center">
+                    Vi har förvalt upplägget du valde på webbplatsen — du kan byta här.
+                  </p>
+                )}
+
+                <div className="mb-6 pb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                  <div className="flex items-end gap-1.5">
+                    <span className="text-5xl font-extrabold tracking-tight text-white">
+                      {(billing === 'monthly' ? pkg.price : pkg.yearlyPrice).toLocaleString('sv')}
+                    </span>
+                    <div className="mb-1">
+                      <p className="text-sm font-semibold leading-none" style={{ color: CORAL }}>
+                        {billing === 'monthly' ? 'kr/månad' : 'kr/år'}
+                      </p>
+                      <p className="text-xs text-white/40 mt-1">(exkl. moms)</p>
                     </div>
-                    <span className="text-sm leading-relaxed text-white/75">{feature}</span>
-                  </li>
-                ))}
-              </ul>
+                  </div>
+                  {billing === 'yearly'
+                    ? <p className="text-xs mt-2 text-white/35">Betala inget nu — vi fakturerar dig först när vi lämnat in ditt årsbokslut</p>
+                    : <p className="text-xs mt-1 text-white/40">Ingen bindningstid — avsluta när du vill</p>}
+                </div>
 
-              {error && <p className="text-sm text-red-300 text-center mb-4">{error}</p>}
+                <ul className="space-y-3 mb-8">
+                  {features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: `${CORAL}35` }}>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <span className="text-sm leading-relaxed text-white/75">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
 
-              <button
-                onClick={handlePay}
-                disabled={submitting}
-                className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 hover:scale-[1.02] text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 24px ${CORAL}50` }}
-              >
-                {submitting
-                  ? (billing === 'yearly' ? 'Aktiverar...' : 'Öppnar betalning...')
-                  : (billing === 'yearly' ? 'Kom igång — betala efter bokslut →' : 'Gå till betalning →')}
-              </button>
+                {error && <p className="text-sm text-red-300 text-center mb-4">{error}</p>}
+
+                <button
+                  onClick={handlePay}
+                  disabled={submitting}
+                  className="block w-full text-center font-bold py-4 rounded-xl transition-all duration-200 hover:scale-[1.02] text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  style={{ backgroundColor: CORAL, color: 'white', boxShadow: `0 8px 24px ${CORAL}50` }}
+                >
+                  {submitting
+                    ? (billing === 'yearly' ? 'Aktiverar...' : 'Öppnar betalning...')
+                    : (billing === 'yearly' ? 'Kom igång — betala efter bokslut →' : 'Gå till betalning →')}
+                </button>
+              </div>
             </div>
+
+            {billing === 'monthly' && (
+              <div className="hidden xl:block absolute top-0 left-full ml-7 w-[20rem]">
+                <div className="relative">
+                  <span
+                    className="absolute -left-[7px] top-8 w-3.5 h-3.5 rotate-45 bg-white border-l border-b border-slate-200"
+                    aria-hidden="true"
+                  />
+                  {prisforklaring}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-center gap-2 mt-6 text-xs text-slate-400">
