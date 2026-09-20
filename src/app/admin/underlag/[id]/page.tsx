@@ -108,7 +108,7 @@ export default function SieFilPage() {
             )}
           </p>
           {personHref && !imp.fel && (
-            <Link href={`${personHref}/verifikationer`} className="text-gold-500 hover:text-gold-400 text-xs transition">
+            <Link href={`${personHref}#verifikationer`} className="text-gold-500 hover:text-gold-400 text-xs transition">
               Kundens verifikationer →
             </Link>
           )}

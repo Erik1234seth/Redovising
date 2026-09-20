@@ -3,24 +3,34 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import type { AdminMailMessage, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
+import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
 import { STAGES, EVENT_STYLE, REDOVISNINGSMETODER, fullDate } from '../../_pipeline';
 import DeletePerson from '../../_delete-person';
 import SmsComposer from '../../_sms-composer';
 import { formatPhone } from '@/lib/sms/phone';
 import { isSieFile } from '@/lib/sie/parse';
+import { VerifikationLista } from '../../_verifikationer';
+import { TransaktionsLista } from '../../_transaktioner';
+import { kanLasasAvAi } from '@/lib/underlag/filtyp';
 
 /**
- * Flikarna i personkortet. Kundkontext, bokföringsmetod och adresser läses
- * sällan men tog tre kort i höjd innan tidslinjen ens började — som flikar
- * kostar de en rad, och det man faktiskt kommer hit för syns direkt.
+ * Flikarna i personkortet — en per fråga man kommer hit med.
+ *
+ * Kundkontext samlar allt om personen: verksamheten, bokföringsmetoden och
+ * tidslinjen. Metoden och verksamheten läses sällan och tog var sitt kort i
+ * höjd innan tidslinjen ens började; som rubriker i samma flik kostar de
+ * ingenting. Adresserna bor under Mejl, där mejlen de hör till finns, och
+ * filerna under Underlag — dit går det också att dra och släppa nya.
+ *
+ * Vald flik läggs i adressen som #flik, så att en länk hit kan peka på en
+ * bestämd flik och en omladdning landar på samma ställe.
  */
 const TABS = [
-  { id: 'historik', label: 'Historik' },
-  { id: 'konversationer', label: 'Mejl' },
   { id: 'kontext', label: 'Kundkontext' },
-  { id: 'metod', label: 'Bokföringsmetod' },
-  { id: 'mejl', label: 'Mejladresser' },
+  { id: 'konversationer', label: 'Mejl' },
+  { id: 'underlag', label: 'Underlag' },
+  { id: 'transaktioner', label: 'Transaktioner' },
+  { id: 'verifikationer', label: 'Verifikationer' },
 ] as const;
 
 type Tab = (typeof TABS)[number]['id'];
@@ -35,6 +45,14 @@ export default function PersonPage() {
   const [other, setOther] = useState<{ emails: string[]; phones: string[] }>({ emails: [], phones: [] });
   const [underlag, setUnderlag] = useState<PersonUnderlag[]>([]);
   const [verifikationerCount, setVerifikationerCount] = useState(0);
+  const [verifikationer, setVerifikationer] = useState<AdminVerifikation[] | null>(null);
+  const [verifikationerError, setVerifikationerError] = useState('');
+  const [transaktionerCount, setTransaktionerCount] = useState(0);
+  const [transaktioner, setTransaktioner] = useState<AdminTransaktion[] | null>(null);
+  const [transaktionerError, setTransaktionerError] = useState('');
+  // Filerna som är ikryssade för AI-avläsning, och vilken som läses just nu
+  const [valda, setValda] = useState<string[]>([]);
+  const [laser, setLaser] = useState<string | null>(null);
   const [mail, setMail] = useState<AdminMailMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -44,7 +62,7 @@ export default function PersonPage() {
   const [savingEmail, setSavingEmail] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [messaging, setMessaging] = useState(false);
-  const [tab, setTab] = useState<Tab>('historik');
+  const [tab, setTab] = useState<Tab>('kontext');
   const [uploading, setUploading] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -64,6 +82,7 @@ export default function PersonPage() {
           setUnderlag(data.underlag ?? []);
           setMail(data.mail ?? []);
           setVerifikationerCount(data.verifikationerCount ?? 0);
+          setTransaktionerCount(data.transaktionerCount ?? 0);
         }
         setLoading(false);
       })
@@ -71,6 +90,44 @@ export default function PersonPage() {
   }, [rawKey]);
 
   useEffect(load, [load]);
+
+  // Länkar utifrån pekar ut en flik med #verifikationer
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (TABS.some((t) => t.id === hash)) setTab(hash as Tab);
+  }, []);
+
+  /**
+   * Verifikationerna hämtas först när fliken öppnas. De är tusentals rader hos
+   * en kund som skickat ett helt år, och personkortet ska öppnas snabbt.
+   */
+  useEffect(() => {
+    if (tab !== 'verifikationer' || verifikationer || verifikationerError || !rawKey) return;
+    fetch(`/api/admin/people?key=${encodeURIComponent(decodeURIComponent(rawKey))}&view=verifikationer`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) setVerifikationerError(data.error);
+        else setVerifikationer(data.verifikationer ?? []);
+      })
+      .catch(() => setVerifikationerError('Kunde inte hämta verifikationerna'));
+  }, [tab, verifikationer, verifikationerError, rawKey]);
+
+  /** Transaktionerna hämtas på samma sätt: först när fliken öppnas. */
+  useEffect(() => {
+    if (tab !== 'transaktioner' || transaktioner || transaktionerError || !rawKey) return;
+    fetch(`/api/admin/people?key=${encodeURIComponent(decodeURIComponent(rawKey))}&view=transaktioner`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) setTransaktionerError(data.error);
+        else setTransaktioner(data.transaktioner ?? []);
+      })
+      .catch(() => setTransaktionerError('Kunde inte hämta transaktionerna'));
+  }, [tab, transaktioner, transaktionerError, rawKey]);
+
+  const selectTab = (next: Tab) => {
+    setTab(next);
+    history.replaceState(null, '', next === 'kontext' ? window.location.pathname : `#${next}`);
+  };
 
   const setStage = async (stage: number) => {
     if (!person?.contactId || savingStage) return;
@@ -203,8 +260,57 @@ export default function PersonPage() {
     } finally {
       setUploading(null);
       if (fileInput.current) fileInput.current.value = '';
+      // En uppladdad SIE-fil lägger in verifikationer, så listan hämtas om
+      setVerifikationer(null);
+      setVerifikationerError('');
       load();
     }
+  };
+
+  /**
+   * Läser ut transaktionerna ur de ikryssade filerna, en i taget.
+   *
+   * Ett kontoutdrag på tjugo sidor tar en stund, och en fil som fallerar ska
+   * inte ta med sig de andra — därför ett anrop per fil, och felet skrivs på
+   * filen i stället för att stoppa körningen.
+   */
+  const lasUtTransaktioner = async () => {
+    if (laser || valda.length === 0) return;
+    setError('');
+    const filer = underlag.filter((f) => valda.includes(f.id));
+    for (const [i, f] of filer.entries()) {
+      setLaser(filer.length > 1 ? `${f.fileName} (${i + 1}/${filer.length})` : f.fileName);
+      try {
+        const res = await fetch(`/api/admin/underlag/${f.id}/transaktioner`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `${f.fileName} kunde inte läsas`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : `${f.fileName} kunde inte läsas`);
+      }
+    }
+    setLaser(null);
+    setValda([]);
+    setTransaktioner(null);
+    setTransaktionerError('');
+    load();
+  };
+
+  /**
+   * Stryker rader AI:n tagit med som inte hör hemma — en summarad, en dubblett
+   * ur ett överlappande kontoutdrag. Antalet på filen räknas om i routen.
+   */
+  const raderaTransaktioner = async (ids: string[]) => {
+    const res = await fetch('/api/admin/transaktioner', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { setError(data.error || 'Transaktionerna kunde inte raderas'); return; }
+    setError('');
+    setTransaktioner((list) => (list ? list.filter((t) => !ids.includes(t.id)) : list));
+    setTransaktionerCount((n) => Math.max(0, n - ids.length));
+    load();
   };
 
   if (loading) return <div className="text-center py-20 text-warm-400">Laddar...</div>;
@@ -222,6 +328,14 @@ export default function PersonPage() {
 
   // Utan konto och utan adress finns det inget att koppla filen till
   const canUpload = !!(person.profileId || person.email);
+
+  const verFiler = verifikationer
+    ? new Set(verifikationer.map((v) => v.underlagId).filter(Boolean)).size
+    : 0;
+
+  // SIE-filer läses med kod och hör hemma bland verifikationerna, så de går
+  // inte att kryssa i här
+  const lasbara = underlag.filter((f) => kanLasasAvAi(f.fileName, f.mimeType));
 
   return (
     <div className="space-y-8">
@@ -343,7 +457,7 @@ export default function PersonPage() {
             return (
               <button
                 key={t.id}
-                onClick={() => setTab(t.id)}
+                onClick={() => selectTab(t.id)}
                 aria-current={active ? 'true' : undefined}
                 className={`flex items-center gap-1.5 px-4 sm:px-5 py-3 text-xs font-semibold uppercase tracking-widest whitespace-nowrap border-b-2 -mb-px transition ${
                   active
@@ -352,10 +466,10 @@ export default function PersonPage() {
                 }`}
               >
                 {t.label}
-                {t.id === 'metod' && !person.redovisningsmetod && (
-                  <span title="Inte ifyllt än" className="w-1.5 h-1.5 rounded-full bg-warm-600 shrink-0" />
+                {t.id === 'kontext' && !person.redovisningsmetod && (
+                  <span title="Bokföringsmetoden är inte ifylld än" className="w-1.5 h-1.5 rounded-full bg-warm-600 shrink-0" />
                 )}
-                {t.id === 'historik' && (
+                {t.id === 'kontext' && (
                   <span className={`px-1.5 rounded text-[10px] font-bold shrink-0 normal-case tracking-normal ${
                     person.issues.length > 0 ? 'bg-red-500 text-white' : 'bg-navy-600 text-warm-300'
                   }`}>
@@ -367,9 +481,19 @@ export default function PersonPage() {
                     {mail.length}
                   </span>
                 )}
-                {t.id === 'mejl' && person.manualEmails.length > 0 && (
+                {t.id === 'underlag' && underlag.length > 0 && (
                   <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
-                    +{person.manualEmails.length}
+                    {underlag.length}
+                  </span>
+                )}
+                {t.id === 'transaktioner' && transaktionerCount > 0 && (
+                  <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
+                    {transaktionerCount.toLocaleString('sv-SE')}
+                  </span>
+                )}
+                {t.id === 'verifikationer' && verifikationerCount > 0 && (
+                  <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
+                    {verifikationerCount.toLocaleString('sv-SE')}
                   </span>
                 )}
               </button>
@@ -378,207 +502,421 @@ export default function PersonPage() {
         </div>
 
         <div className="p-6">
-          {/* Allt som hänt */}
-          {tab === 'historik' && (
-            events.length === 0 ? (
-              <p className="text-warm-500 text-sm">Inget registrerat ännu.</p>
-            ) : (
-              <>
-                <div className="space-y-0">
-                  {events.map((e, i) => {
-                    const style = EVENT_STYLE[e.type];
-                    const last = i === events.length - 1;
-                    return (
-                      <div key={`${e.at}-${i}`} className="flex gap-4">
-                        {/* Tidslinjens streck */}
-                        <div className="flex flex-col items-center shrink-0 pt-1.5">
-                          <span className={`w-2.5 h-2.5 rounded-full ${style.dot} shrink-0`} />
-                          {!last && <span className="w-px flex-1 bg-navy-600 my-1" />}
-                        </div>
-
-                        <div className={`min-w-0 flex-1 ${last ? '' : 'pb-5'} ${
-                          e.bad ? 'border-l-2 border-red-500 -ml-2 pl-2' : ''
-                        }`}>
-                          <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                            <span className={`text-sm font-medium ${e.bad ? 'text-red-400' : 'text-white'}`}>
-                              {e.bad && '⚠ '}{e.title}
-                            </span>
-                            <span className="text-warm-600 text-[11px] shrink-0">{fullDate(e.at)}</span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-warm-500 text-[11px]">{style.label}</span>
-                            {e.meta && (
-                              <span className={`text-[11px] ${e.bad ? 'text-red-400' : 'text-warm-600'}`}>· {e.meta}</span>
-                            )}
-                          </div>
-                          {e.detail && (
-                            <p className={`mt-2 text-sm whitespace-pre-wrap break-words rounded-lg px-3 py-2 ${
-                              e.bad
-                                ? 'bg-red-500/10 text-red-200'
-                                : e.type === 'sms_in'
-                                ? 'bg-navy-600/60 text-warm-100'
-                                : 'bg-navy-800/60 text-warm-300'
-                            }`}>
-                              {e.detail}
-                            </p>
-                          )}
-                          {e.issue && (
-                            <button
-                              onClick={() => setDismissed([{ channel: e.issue!.channel, id: e.issue!.id }], !e.issue!.dismissed)}
-                              disabled={savingIssue}
-                              className="mt-1.5 mr-3 text-[11px] text-warm-500 hover:text-white transition disabled:opacity-50"
-                            >
-                              {e.issue.dismissed ? '↺ Markera som fel igen' : '✓ Markera som hanterat'}
-                            </button>
-                          )}
-                          {e.technical && (
-                            <details className="mt-1.5">
-                              <summary className="text-warm-600 text-[11px] cursor-pointer hover:text-warm-400">
-                                Visa tekniskt fel
-                              </summary>
-                              <pre className="mt-1 text-[11px] text-warm-500 bg-navy-800/60 rounded-lg px-3 py-2 whitespace-pre-wrap break-all">
-                                {e.technical}
-                              </pre>
-                            </details>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <p className="text-warm-600 text-xs mt-5">
-                  Mejl loggas sedan 20 aug 2026. Äldre utskick finns inte registrerade.
-                </p>
-              </>
-            )
-          )}
-
-          {/* Hela mejlväxlingen med personen, tråd för tråd */}
-          {tab === 'konversationer' && <MailThreads mail={mail} />}
-
-          {/* Vad personen sagt om sin verksamhet — samma text AI:n får med sig */}
+          {/* Allt om kunden på ett ställe: vad personen sagt om sin verksamhet
+              (samma text AI:n får med sig), hur affärshändelserna bokförs, och
+              allt som hänt med personen i tidsordning. */}
           {tab === 'kontext' && (
-            person.verksamhet ? (
-              <p className="text-warm-100 text-sm whitespace-pre-wrap break-words">{person.verksamhet}</p>
-            ) : (
-              <p className="text-warm-500 text-sm">
-                Ingen verksamhetsbeskrivning ifylld{person.isCustomer ? '' : ' — personen har inget konto än'}.
-              </p>
-            )
-          )}
-
-          {/* Kontantmetoden eller faktureringsmetoden. Är inget valt står korten
-              tomma tills någon klickar i ett — vi gissar inte åt kunden. */}
-          {tab === 'metod' && (
-            person.profileId || person.contactId ? (
-              <>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {REDOVISNINGSMETODER.map((m) => {
-                    const chosen = person.redovisningsmetod === m.value;
-                    return (
-                      <button
-                        key={m.value}
-                        onClick={() => setMetod(m.value)}
-                        disabled={savingMetod}
-                        aria-pressed={chosen}
-                        title={chosen ? 'Klicka igen för att ta bort valet' : undefined}
-                        className={`text-left rounded-xl border p-4 transition disabled:opacity-60 ${
-                          chosen
-                            ? 'bg-gold-500/15 border-gold-500 ring-1 ring-gold-500/30'
-                            : 'bg-navy-800/40 border-navy-600 hover:border-warm-500'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
-                            chosen ? 'bg-gold-500 border-gold-500' : 'border-navy-500'
-                          }`}>
-                            {chosen && <span className="text-navy-900 text-[9px] font-bold leading-none">✓</span>}
-                          </span>
-                          <span className={`text-sm font-semibold ${chosen ? 'text-gold-400' : 'text-warm-200'}`}>
-                            {m.label}
-                          </span>
-                        </div>
-                        <p className="text-warm-500 text-xs mt-2 leading-relaxed">{m.hint}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-warm-600 text-xs mt-3">
-                  {person.profileId
-                    ? 'Sparas på kundens konto.'
-                    : 'Personen har inget konto än — valet sparas på kontaktförfrågan och följer med när kontot skapas.'}
-                </p>
-              </>
-            ) : (
-              <p className="text-warm-500 text-sm">
-                Varken konto eller kontaktförfrågan är kopplad, så det finns ingen rad att spara metoden
-                på. Personen syns här för att vi har mejlat eller messat numret.
-              </p>
-            )
-          )}
-
-          {/* Adresser som pekats ut för hand. Panelen slår ihop rader som delar
-              mejl eller telefon av sig själv — det här är för kunden som svarat
-              från en adress vi aldrig sett, där det inte finns något att haka i. */}
-          {tab === 'mejl' && (
-            <>
-              <div className="space-y-2">
-                {/* Huvudadressen är den vi hörde av senast, och det kan mycket väl
-                    vara den handpåkopplade. Då är det samma adress som raden nedan
-                    och ska inte stå två gånger. */}
-                {!person.manualEmails.some((m) => m.email === person.email) && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-warm-100 break-all">{person.email || '—'}</span>
-                    <span className="text-warm-600 text-[11px] shrink-0">huvudadress</span>
-                  </div>
+            <div className="space-y-8">
+              <section>
+                <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">Verksamhet</h3>
+                {person.verksamhet ? (
+                  <p className="text-warm-100 text-sm whitespace-pre-wrap break-words">{person.verksamhet}</p>
+                ) : (
+                  <p className="text-warm-500 text-sm">
+                    Ingen verksamhetsbeskrivning ifylld{person.isCustomer ? '' : ' — personen har inget konto än'}.
+                  </p>
                 )}
+              </section>
 
-                {person.manualEmails.map((m) => (
-                  <div key={m.id} className="flex items-center gap-2 text-sm">
-                    <span className="text-warm-100 break-all">{m.email}</span>
-                    <span className="text-warm-600 text-[11px] shrink-0">
-                      {m.email === person.email ? 'huvudadress · tillagd för hand' : 'tillagd för hand'}
-                    </span>
-                    <button
-                      onClick={() => removeEmail(m.id)}
-                      disabled={savingEmail}
-                      title="Ta bort kopplingen"
-                      className="ml-auto shrink-0 px-2 py-0.5 text-[11px] text-warm-600 hover:text-red-400 rounded transition disabled:opacity-40"
-                    >
-                      Ta bort
-                    </button>
-                  </div>
-                ))}
+              {/* Kontantmetoden eller faktureringsmetoden. Är inget valt står
+                  korten tomma tills någon klickar i ett — vi gissar inte åt kunden. */}
+              <section className="pt-6 border-t border-navy-600">
+                <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">Bokföringsmetod</h3>
+                {person.profileId || person.contactId ? (
+                  <>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {REDOVISNINGSMETODER.map((m) => {
+                        const chosen = person.redovisningsmetod === m.value;
+                        return (
+                          <button
+                            key={m.value}
+                            onClick={() => setMetod(m.value)}
+                            disabled={savingMetod}
+                            aria-pressed={chosen}
+                            title={chosen ? 'Klicka igen för att ta bort valet' : undefined}
+                            className={`text-left rounded-xl border p-4 transition disabled:opacity-60 ${
+                              chosen
+                                ? 'bg-gold-500/15 border-gold-500 ring-1 ring-gold-500/30'
+                                : 'bg-navy-800/40 border-navy-600 hover:border-warm-500'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                                chosen ? 'bg-gold-500 border-gold-500' : 'border-navy-500'
+                              }`}>
+                                {chosen && <span className="text-navy-900 text-[9px] font-bold leading-none">✓</span>}
+                              </span>
+                              <span className={`text-sm font-semibold ${chosen ? 'text-gold-400' : 'text-warm-200'}`}>
+                                {m.label}
+                              </span>
+                            </div>
+                            <p className="text-warm-500 text-xs mt-2 leading-relaxed">{m.hint}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-warm-600 text-xs mt-3">
+                      {person.profileId
+                        ? 'Sparas på kundens konto.'
+                        : 'Personen har inget konto än — valet sparas på kontaktförfrågan och följer med när kontot skapas.'}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-warm-500 text-sm">
+                    Varken konto eller kontaktförfrågan är kopplad, så det finns ingen rad att spara metoden
+                    på. Personen syns här för att vi har mejlat eller messat numret.
+                  </p>
+                )}
+              </section>
+
+              <section className="pt-6 border-t border-navy-600">
+                <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">Historik</h3>
+                {events.length === 0 ? (
+                  <p className="text-warm-500 text-sm">Inget registrerat ännu.</p>
+                ) : (
+                  <>
+                    <div className="space-y-0">
+                      {events.map((e, i) => {
+                        const style = EVENT_STYLE[e.type];
+                        const last = i === events.length - 1;
+                        return (
+                          <div key={`${e.at}-${i}`} className="flex gap-4">
+                            {/* Tidslinjens streck */}
+                            <div className="flex flex-col items-center shrink-0 pt-1.5">
+                              <span className={`w-2.5 h-2.5 rounded-full ${style.dot} shrink-0`} />
+                              {!last && <span className="w-px flex-1 bg-navy-600 my-1" />}
+                            </div>
+
+                            <div className={`min-w-0 flex-1 ${last ? '' : 'pb-5'} ${
+                              e.bad ? 'border-l-2 border-red-500 -ml-2 pl-2' : ''
+                            }`}>
+                              <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                                <span className={`text-sm font-medium ${e.bad ? 'text-red-400' : 'text-white'}`}>
+                                  {e.bad && '⚠ '}{e.title}
+                                </span>
+                                <span className="text-warm-600 text-[11px] shrink-0">{fullDate(e.at)}</span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-warm-500 text-[11px]">{style.label}</span>
+                                {e.meta && (
+                                  <span className={`text-[11px] ${e.bad ? 'text-red-400' : 'text-warm-600'}`}>· {e.meta}</span>
+                                )}
+                              </div>
+                              {e.detail && (
+                                <p className={`mt-2 text-sm whitespace-pre-wrap break-words rounded-lg px-3 py-2 ${
+                                  e.bad
+                                    ? 'bg-red-500/10 text-red-200'
+                                    : e.type === 'sms_in'
+                                    ? 'bg-navy-600/60 text-warm-100'
+                                    : 'bg-navy-800/60 text-warm-300'
+                                }`}>
+                                  {e.detail}
+                                </p>
+                              )}
+                              {e.issue && (
+                                <button
+                                  onClick={() => setDismissed([{ channel: e.issue!.channel, id: e.issue!.id }], !e.issue!.dismissed)}
+                                  disabled={savingIssue}
+                                  className="mt-1.5 mr-3 text-[11px] text-warm-500 hover:text-white transition disabled:opacity-50"
+                                >
+                                  {e.issue.dismissed ? '↺ Markera som fel igen' : '✓ Markera som hanterat'}
+                                </button>
+                              )}
+                              {e.technical && (
+                                <details className="mt-1.5">
+                                  <summary className="text-warm-600 text-[11px] cursor-pointer hover:text-warm-400">
+                                    Visa tekniskt fel
+                                  </summary>
+                                  <pre className="mt-1 text-[11px] text-warm-500 bg-navy-800/60 rounded-lg px-3 py-2 whitespace-pre-wrap break-all">
+                                    {e.technical}
+                                  </pre>
+                                </details>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <p className="text-warm-600 text-xs mt-5">
+                      Mejl loggas sedan 20 aug 2026. Äldre utskick finns inte registrerade.
+                    </p>
+                  </>
+                )}
+              </section>
+            </div>
+          )}
+
+          {/* Hela mejlväxlingen med personen, tråd för tråd, och adresserna
+              den kommer in på */}
+          {tab === 'konversationer' && (
+            <>
+              <MailThreads mail={mail} />
+
+              {/* Adresser som pekats ut för hand. Panelen slår ihop rader som
+                  delar mejl eller telefon av sig själv — det här är för kunden som
+                  svarat från en adress vi aldrig sett, där det inte finns något
+                  att haka i. */}
+              <div className="mt-8 pt-6 border-t border-navy-600">
+                <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">
+                  Mejladresser
+                </h3>
+
+                <div className="space-y-2">
+                  {/* Huvudadressen är den vi hörde av senast, och det kan mycket väl
+                      vara den handpåkopplade. Då är det samma adress som raden nedan
+                      och ska inte stå två gånger. */}
+                  {!person.manualEmails.some((m) => m.email === person.email) && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-warm-100 break-all">{person.email || '—'}</span>
+                      <span className="text-warm-600 text-[11px] shrink-0">huvudadress</span>
+                    </div>
+                  )}
+
+                  {person.manualEmails.map((m) => (
+                    <div key={m.id} className="flex items-center gap-2 text-sm">
+                      <span className="text-warm-100 break-all">{m.email}</span>
+                      <span className="text-warm-600 text-[11px] shrink-0">
+                        {m.email === person.email ? 'huvudadress · tillagd för hand' : 'tillagd för hand'}
+                      </span>
+                      <button
+                        onClick={() => removeEmail(m.id)}
+                        disabled={savingEmail}
+                        title="Ta bort kopplingen"
+                        className="ml-auto shrink-0 px-2 py-0.5 text-[11px] text-warm-600 hover:text-red-400 rounded transition disabled:opacity-40"
+                      >
+                        Ta bort
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2 mt-4">
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') addEmail(); }}
+                    placeholder="annan.adress@exempel.se"
+                    className="flex-1 min-w-0 bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-warm-600 focus:outline-none focus:border-gold-500 transition"
+                  />
+                  <button
+                    onClick={addEmail}
+                    disabled={savingEmail || !newEmail.trim()}
+                    className="shrink-0 px-4 py-2 text-sm bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Koppla
+                  </button>
+                </div>
+
+                <p className="text-warm-600 text-xs mt-3 leading-relaxed">
+                  Allt som redan kommit in på adressen flyttas hit när du kopplar den, och personen
+                  försvinner ur listan som en egen rad.{' '}
+                  {person.profileId
+                    ? 'Mail-AI:n känner igen adressen som kundens och svarar med kontots uppgifter.'
+                    : 'Personen har inget konto, så mail-AI:n har inga kontouppgifter att känna igen adressen med.'}
+                </p>
               </div>
+            </>
+          )}
 
-              <div className="flex gap-2 mt-4">
+          {/* Filerna personen skickat, så det syns att de hamnat på rätt person.
+              Går också att släppa filer i fliken för att ladda upp dem åt personen. */}
+          {tab === 'underlag' && (
+            <div
+              onDragOver={(e) => { if (canUpload) { e.preventDefault(); setDragging(true); } }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                if (canUpload) uploadFiles([...e.dataTransfer.files]);
+              }}
+              className={`-m-2 p-2 rounded-xl border border-dashed transition ${
+                dragging ? 'border-gold-500 bg-gold-500/5' : 'border-transparent'
+              }`}
+            >
+              <div className="flex items-center justify-end gap-3 mb-4 flex-wrap">
+                {underlag.length > 0 && (
+                  <Link href="/admin/underlag" className="text-gold-500 hover:text-gold-400 text-xs transition mr-auto">
+                    Öppna underlagen →
+                  </Link>
+                )}
+                {lasbara.length > 0 && (
+                  <>
+                    <button
+                      onClick={() => setValda(valda.length === lasbara.length ? [] : lasbara.map((f) => f.id))}
+                      disabled={!!laser}
+                      className="text-warm-500 hover:text-warm-300 text-xs transition disabled:opacity-40"
+                    >
+                      {valda.length === lasbara.length ? 'Avmarkera alla' : 'Markera alla'}
+                    </button>
+                    <button
+                      onClick={lasUtTransaktioner}
+                      disabled={valda.length === 0 || !!laser}
+                      title="Låter en AI skriva av transaktionerna i filerna. De konteras inte här."
+                      className="px-3 py-1.5 text-xs bg-gold-500/15 hover:bg-gold-500/25 border border-gold-500/30 text-gold-400 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {laser ? 'Läser…' : `Plocka ut transaktioner${valda.length ? ` (${valda.length})` : ''}`}
+                    </button>
+                  </>
+                )}
                 <input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') addEmail(); }}
-                  placeholder="annan.adress@exempel.se"
-                  className="flex-1 min-w-0 bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-warm-600 focus:outline-none focus:border-gold-500 transition"
+                  ref={fileInput}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => uploadFiles([...(e.target.files ?? [])])}
                 />
                 <button
-                  onClick={addEmail}
-                  disabled={savingEmail || !newEmail.trim()}
-                  className="shrink-0 px-4 py-2 text-sm bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => fileInput.current?.click()}
+                  disabled={!canUpload || !!uploading}
+                  title={canUpload ? 'Eller dra och släpp filer i fliken' : 'Personen har varken konto eller mejladress'}
+                  className="px-3 py-1.5 text-xs bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Koppla
+                  + Ladda upp
                 </button>
               </div>
 
-              <p className="text-warm-600 text-xs mt-3 leading-relaxed">
-                Allt som redan kommit in på adressen flyttas hit när du kopplar den, och personen
-                försvinner ur listan som en egen rad.{' '}
-                {person.profileId
-                  ? 'Mail-AI:n känner igen adressen som kundens och svarar med kontots uppgifter.'
-                  : 'Personen har inget konto, så mail-AI:n har inga kontouppgifter att känna igen adressen med.'}
-              </p>
-            </>
+              {uploading && (
+                <p className="text-gold-400 text-xs mb-3">Laddar upp {uploading}…</p>
+              )}
+
+              {laser && (
+                <p className="text-gold-400 text-xs mb-3">
+                  AI:n läser {laser}… Ett stort kontoutdrag kan ta ett par minuter.
+                </p>
+              )}
+
+              {underlag.length === 0 ? (
+                <p className="text-warm-500 text-sm">
+                  Inga filer mejlade eller uppladdade än.{canUpload && ' Dra hit filer eller klicka på Ladda upp.'}
+                </p>
+              ) : (
+                <ul className="divide-y divide-navy-600/60">
+                  {underlag.map((f) => (
+                    <li key={f.id} className="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
+                      <input
+                        type="checkbox"
+                        checked={valda.includes(f.id)}
+                        disabled={!kanLasasAvAi(f.fileName, f.mimeType) || !!laser}
+                        onChange={(e) => setValda((list) =>
+                          e.target.checked ? [...list, f.id] : list.filter((id) => id !== f.id))}
+                        title={kanLasasAvAi(f.fileName, f.mimeType)
+                          ? 'Markera för att plocka ut transaktioner'
+                          : 'Den här filtypen läser vi inte av med AI'}
+                        className="shrink-0 mt-1 accent-gold-500 disabled:opacity-30"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="text-warm-100 text-sm block truncate" title={f.fileName}>
+                          {f.fileName}
+                        </span>
+                        {/* Koden i sandlådan skrivs om varje körning — noteringen
+                            visar att den läste rätt ställe */}
+                        {f.transaktioner?.notering && (
+                          <span className="text-warm-600 text-[11px] block">{f.transaktioner.notering}</span>
+                        )}
+                      </span>
+                      {f.transaktioner && (
+                        <span
+                          title={f.transaktioner.fel ?? `Utläst ${fullDate(f.transaktioner.at)}`}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                            f.transaktioner.fel
+                              ? 'bg-red-500/15 text-red-400'
+                              : 'bg-blue-500/15 text-blue-300'
+                          }`}
+                        >
+                          {f.transaktioner.fel
+                            ? '⚠ AI kunde inte läsa filen'
+                            : `${f.transaktioner.antal} transaktioner utlästa`}
+                        </span>
+                      )}
+                      {isSieFile(f.fileName) && (
+                        <Link
+                          href={`/admin/underlag/${f.id}`}
+                          title={f.verifikationer?.fel ?? 'Visa verifikationerna i filen'}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 transition ${
+                            f.verifikationer?.fel
+                              ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+                              : f.verifikationer
+                              ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
+                              : 'bg-gold-500/15 text-gold-400 hover:bg-gold-500/25'
+                          }`}
+                        >
+                          {f.verifikationer?.fel
+                            ? '⚠ SIE kunde inte läggas in'
+                            : f.verifikationer
+                            ? `✓ ${f.verifikationer.inlagda} ver. inlagda${f.verifikationer.dubbletter ? ` · ${f.verifikationer.dubbletter} fanns redan` : ''}`
+                            : 'SIE · verifikationer →'}
+                        </Link>
+                      )}
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                        f.source === 'mejl' ? 'bg-blue-500/15 text-blue-300'
+                          : f.source === 'admin' ? 'bg-gold-500/15 text-gold-400'
+                          : 'bg-navy-600 text-warm-300'
+                      }`}>
+                        {f.source === 'mejl' ? '✉ mejl' : f.source === 'admin' ? '👤 admin' : '⬆ app'}
+                      </span>
+                      <span className={`text-[11px] shrink-0 w-16 text-right ${
+                        f.status === 'bokfort' ? 'text-emerald-400' : f.status === 'granskas' ? 'text-blue-300' : 'text-gold-400'
+                      }`}>
+                        {f.status === 'bokfort' ? 'Bokfört' : f.status === 'granskas' ? 'Granskas' : 'Inkommet'}
+                      </span>
+                      <span className="text-warm-600 text-[11px] shrink-0 hidden sm:inline">{fullDate(f.at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
+
+          {/* Det AI:n läst ur underlagen, innan någon konterat det. Bara
+              avskriften: datum, text och belopp som de stod på kvittot. */}
+          {tab === 'transaktioner' && (
+            transaktionerError ? (
+              <p className="text-red-400 text-sm">{transaktionerError}</p>
+            ) : !transaktioner ? (
+              <p className="text-warm-500 text-sm">Hämtar transaktionerna…</p>
+            ) : transaktioner.length === 0 ? (
+              <p className="text-warm-500 text-sm leading-relaxed">
+                Inga transaktioner utlästa än. Kryssa i filerna under Underlag och klicka på
+                &quot;Plocka ut transaktioner&quot; — AI:n läser av kvitton, fakturor, kontoutdrag
+                och Excel-listor.
+              </p>
+            ) : (
+              <>
+                <p className="text-warm-600 text-xs mb-4">
+                  Utläst ur underlagen med AI och inte konterat än — konteringen blir en
+                  verifikation i nästa steg.
+                </p>
+                <TransaktionsLista transaktioner={transaktioner} onDelete={raderaTransaktioner} />
+              </>
+            )
+          )}
+
+          {/* Allt kunden har bokfört hos oss. Just nu från SIE-filer, som tolkas
+              med kod när de kommer in — senare även AI-tolkade kvitton och
+              fakturor, och då syns det på varje verifikation var den kom ifrån. */}
+          {tab === 'verifikationer' && (
+            verifikationerError ? (
+              <p className="text-red-400 text-sm">{verifikationerError}</p>
+            ) : !verifikationer ? (
+              <p className="text-warm-500 text-sm">Hämtar verifikationerna…</p>
+            ) : verifikationer.length === 0 ? (
+              <p className="text-warm-500 text-sm leading-relaxed">
+                Inga verifikationer än. När kunden mejlar in eller du laddar upp en SIE-fil läggs
+                verifikationerna in här automatiskt.
+              </p>
+            ) : (
+              <>
+                <p className="text-warm-600 text-xs mb-4">
+                  {verifikationer.length.toLocaleString('sv-SE')} verifikationer från {verFiler}{' '}
+                  {verFiler === 1 ? 'fil' : 'filer'}.
+                </p>
+                <VerifikationLista verifikationer={verifikationer} showSource />
+              </>
+            )
+          )}
+
         </div>
       </div>
 
@@ -623,120 +961,6 @@ export default function PersonPage() {
             Ingen kontaktförfrågan kopplad, så det finns inget steg att flytta. Personen syns här
             för att vi har mejlat eller messat numret.
           </p>
-        )}
-      </div>
-
-      {/* Filerna personen skickat, så det syns att de hamnat på rätt person */}
-      {/* Kundens bokförda verifikationer — egen sida, listan kan bli lång */}
-      <Link
-        href={`/admin/person/${encodeURIComponent(person.key)}/verifikationer`}
-        className="flex items-center justify-between gap-3 bg-navy-700/50 hover:bg-navy-700 border border-navy-600 rounded-xl px-6 py-4 transition group"
-      >
-        <div>
-          <h2 className="text-xs font-semibold text-warm-400 uppercase tracking-widest">
-            Verifikationer{' '}
-            <span className="text-warm-600 font-normal normal-case tracking-normal">({verifikationerCount.toLocaleString('sv-SE')})</span>
-          </h2>
-          <p className="text-warm-600 text-xs mt-1">
-            {verifikationerCount > 0
-              ? 'Allt som lagts in från kundens SIE-filer.'
-              : 'Inga än. SIE-filer som kommer in läggs in här automatiskt.'}
-          </p>
-        </div>
-        <span className="text-gold-500 group-hover:text-gold-400 text-sm shrink-0 transition">Öppna →</span>
-      </Link>
-
-      {/* Går också att släppa filer på kortet för att ladda upp dem åt personen */}
-      <div
-        onDragOver={(e) => { if (canUpload) { e.preventDefault(); setDragging(true); } }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          if (canUpload) uploadFiles([...e.dataTransfer.files]);
-        }}
-        className={`bg-navy-700/50 border rounded-xl p-6 transition ${
-          dragging ? 'border-gold-500 ring-2 ring-gold-500/30' : 'border-navy-600'
-        }`}
-      >
-        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-          <h2 className="text-xs font-semibold text-warm-400 uppercase tracking-widest">
-            Underlag <span className="text-warm-600 font-normal normal-case tracking-normal">({underlag.length})</span>
-          </h2>
-          <div className="flex items-center gap-3">
-            {underlag.length > 0 && (
-              <Link href="/admin/underlag" className="text-gold-500 hover:text-gold-400 text-xs transition">
-                Öppna underlagen →
-              </Link>
-            )}
-            <input
-              ref={fileInput}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(e) => uploadFiles([...(e.target.files ?? [])])}
-            />
-            <button
-              onClick={() => fileInput.current?.click()}
-              disabled={!canUpload || !!uploading}
-              title={canUpload ? 'Eller dra och släpp filer på kortet' : 'Personen har varken konto eller mejladress'}
-              className="px-3 py-1.5 text-xs bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              + Ladda upp
-            </button>
-          </div>
-        </div>
-
-        {uploading && (
-          <p className="text-gold-400 text-xs mb-3">Laddar upp {uploading}…</p>
-        )}
-
-        {underlag.length === 0 ? (
-          <p className="text-warm-500 text-sm">
-            Inga filer mejlade eller uppladdade än.{canUpload && ' Dra hit filer eller klicka på Ladda upp.'}
-          </p>
-        ) : (
-          <ul className="divide-y divide-navy-600/60">
-            {underlag.map((f) => (
-              <li key={f.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
-                <span className="text-warm-100 text-sm truncate min-w-0 flex-1" title={f.fileName}>
-                  {f.fileName}
-                </span>
-                {isSieFile(f.fileName) && (
-                  <Link
-                    href={`/admin/underlag/${f.id}`}
-                    title={f.verifikationer?.fel ?? 'Visa verifikationerna i filen'}
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 transition ${
-                      f.verifikationer?.fel
-                        ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
-                        : f.verifikationer
-                        ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
-                        : 'bg-gold-500/15 text-gold-400 hover:bg-gold-500/25'
-                    }`}
-                  >
-                    {f.verifikationer?.fel
-                      ? '⚠ SIE kunde inte läggas in'
-                      : f.verifikationer
-                      ? `✓ ${f.verifikationer.inlagda} ver. inlagda${f.verifikationer.dubbletter ? ` · ${f.verifikationer.dubbletter} fanns redan` : ''}`
-                      : 'SIE · verifikationer →'}
-                  </Link>
-                )}
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
-                  f.source === 'mejl' ? 'bg-blue-500/15 text-blue-300'
-                    : f.source === 'admin' ? 'bg-gold-500/15 text-gold-400'
-                    : 'bg-navy-600 text-warm-300'
-                }`}>
-                  {f.source === 'mejl' ? '✉ mejl' : f.source === 'admin' ? '👤 admin' : '⬆ app'}
-                </span>
-                <span className={`text-[11px] shrink-0 w-16 text-right ${
-                  f.status === 'bokfort' ? 'text-emerald-400' : f.status === 'granskas' ? 'text-blue-300' : 'text-gold-400'
-                }`}>
-                  {f.status === 'bokfort' ? 'Bokfört' : f.status === 'granskas' ? 'Granskas' : 'Inkommet'}
-                </span>
-                <span className="text-warm-600 text-[11px] shrink-0 hidden sm:inline">{fullDate(f.at)}</span>
-              </li>
-            ))}
-          </ul>
         )}
       </div>
 

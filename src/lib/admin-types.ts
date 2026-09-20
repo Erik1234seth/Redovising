@@ -207,6 +207,15 @@ export interface UnderlagImport {
   fel: string | null;
 }
 
+/** Vad AI-avläsningen av ett underlag gav. */
+export interface UnderlagTransaktioner {
+  at: string;
+  antal: number;
+  /** Vad koden läste — blad, kolumn och antal rader. Tom för bilder och PDF. */
+  notering: string | null;
+  fel: string | null;
+}
+
 /** Ett underlag i listan på personsidan. */
 export interface PersonUnderlag {
   id: string;
@@ -214,8 +223,39 @@ export interface PersonUnderlag {
   source: string;
   status: string;
   at: string;
+  mimeType: string | null;
   /** Satt när filen är en SIE-fil som lagts in (eller försökts läggas in). */
   verifikationer: UnderlagImport | null;
+  /** Satt när någon kört AI-avläsningen på filen. */
+  transaktioner: UnderlagTransaktioner | null;
+}
+
+/**
+ * En transaktion som lästs ur ett underlag, innan den konterats.
+ *
+ * Steget före verifikationen: här står bara det som faktiskt stod på kvittot,
+ * fakturan eller kontoutdraget.
+ */
+export interface AdminTransaktion {
+  id: string;
+  underlagId: string;
+  fileName: string | null;
+  /** Ordningen i filen. */
+  radnr: number;
+  /** Tom när datumet inte framgick av underlaget. */
+  datum: string;
+  beskrivning: string;
+  motpart: string;
+  belopp: number;
+  moms: number | null;
+  valuta: string;
+  /** in = pengar in till företaget, ut = pengar ut. */
+  riktning: 'in' | 'ut';
+  /** AI:ns notering när något var oläsligt eller osäkert. */
+  anteckning: string;
+  /** ai eller manuell. */
+  kalla: string;
+  at: string;
 }
 
 /** En verifikation hos kunden (tabellen verifikationer). */

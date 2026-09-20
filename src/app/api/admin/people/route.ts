@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { normalizePhone } from '@/lib/sms/phone';
-import type { AdminMailMessage, AdminVerifikation, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
+import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
 import { importPendingSie } from '@/lib/sie/import';
 
 /**
@@ -155,7 +155,7 @@ async function build(): Promise<Map<string, Built>> {
     supabase.from('orders').select('id, user_id, guest_email, guest_name, guest_phone, guest_company, package_type, bank, status, created_at'),
     supabase.from('email_log').select('id, to_email, subject, kind, status, error, created_at, issue_dismissed_at'),
     supabase.from('contact_files').select('id, contact_id, stage, file_name, created_at'),
-    supabase.from('bokforing_underlag').select('id, user_id, sender_email, source, file_name, status, created_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel'),
+    supabase.from('bokforing_underlag').select('id, user_id, sender_email, source, file_name, mime_type, status, created_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel, transaktioner_utlasta_at, transaktioner_antal, transaktioner_notering, transaktioner_fel'),
     supabase.from('person_aliases').select('id, alias_email, person_key, created_at'),
   ]);
 
@@ -465,6 +465,13 @@ async function build(): Promise<Map<string, Built>> {
       dubbletter: r.verifikationer_dubbletter ?? 0,
       fel: r.verifikationer_fel,
     } : null;
+    const utlasta = r.transaktioner_utlasta_at ? {
+      at: r.transaktioner_utlasta_at,
+      antal: r.transaktioner_antal ?? 0,
+      notering: r.transaktioner_notering,
+      fel: r.transaktioner_fel,
+    } : null;
+
     if (root && at) {
       person(root).files.push({
         id: r.id,
@@ -472,7 +479,9 @@ async function build(): Promise<Map<string, Built>> {
         source: r.source ?? 'app',
         status: r.status ?? 'inkommet',
         at,
+        mimeType: r.mime_type ?? null,
         verifikationer: imported,
+        transaktioner: utlasta,
       });
     }
 
@@ -486,6 +495,22 @@ async function build(): Promise<Map<string, Built>> {
         detail: imported.fel ? `${r.file_name}: ${imported.fel}` : `Från ${r.file_name}`,
         meta: imported.dubbletter > 0 ? `${imported.dubbletter} fanns redan` : 'SIE',
         bad: !!imported.fel,
+      });
+    }
+
+    // Avläsningen startas för hand i adminpanelen och kostar pengar per fil —
+    // därför en egen händelse, så att det går att se vad som kördes och när
+    if (root && utlasta) {
+      add(root, utlasta.at, {
+        type: 'fil',
+        title: utlasta.fel
+          ? 'Transaktionerna kunde inte läsas ut'
+          : `${utlasta.antal} ${utlasta.antal === 1 ? 'transaktion utläst' : 'transaktioner utlästa'}`,
+        detail: utlasta.fel
+          ? `${r.file_name}: ${utlasta.fel}`
+          : [`Ur ${r.file_name}`, utlasta.notering].filter(Boolean).join(' — '),
+        meta: 'AI',
+        bad: !!utlasta.fel,
       });
     }
   }
@@ -587,8 +612,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ person: summary(match), verifikationer: await verifikationerFor(owner) });
     }
 
+    if (request.nextUrl.searchParams.get('view') === 'transaktioner') {
+      return NextResponse.json({ person: summary(match), transaktioner: await transaktionerFor(owner) });
+    }
+
     return NextResponse.json({
       verifikationerCount: await countVerifikationer(owner),
+      transaktionerCount: await countRader('transaktioner', owner),
       person: summary(match),
       events: match.events,
       other: otherContacts(match),
@@ -621,14 +651,62 @@ function ownerFilter(owner: Owner): string | null {
 }
 
 async function countVerifikationer(owner: Owner): Promise<number> {
+  return countRader('verifikationer', owner);
+}
+
+async function countRader(table: 'verifikationer' | 'transaktioner', owner: Owner): Promise<number> {
   const filter = ownerFilter(owner);
   if (!filter) return 0;
   const { count, error } = await getSupabase()
-    .from('verifikationer')
+    .from(table)
     .select('id', { count: 'exact', head: true })
     .or(filter);
-  if (error) throw new Error(`Kunde inte räkna verifikationer: ${error.message}`);
+  if (error) throw new Error(`Kunde inte räkna ${table}: ${error.message}`);
   return count ?? 0;
+}
+
+/**
+ * Transaktionerna som AI:n läst ur kundens underlag, i datumordning med de
+ * odaterade sist. De är inte konterade — det är steget efter.
+ */
+async function transaktionerFor(owner: Owner): Promise<AdminTransaktion[]> {
+  const filter = ownerFilter(owner);
+  if (!filter) return [];
+
+  const out: AdminTransaktion[] = [];
+  for (let from = 0; ; from += 500) {
+    const { data, error } = await getSupabase()
+      .from('transaktioner')
+      .select('id, underlag_id, radnr, datum, beskrivning, motpart, belopp, moms, valuta, riktning, anteckning, kalla, created_at, bokforing_underlag(file_name)')
+      .or(filter)
+      .order('datum', { ascending: true, nullsFirst: false })
+      .order('underlag_id')
+      .order('radnr')
+      .range(from, from + 499);
+    if (error) throw new Error(`Kunde inte läsa transaktioner: ${error.message}`);
+
+    for (const t of data ?? []) {
+      const file = t.bokforing_underlag as unknown as { file_name: string } | null;
+      out.push({
+        id: t.id,
+        underlagId: t.underlag_id,
+        fileName: file?.file_name ?? null,
+        radnr: t.radnr ?? 0,
+        datum: t.datum ?? '',
+        beskrivning: t.beskrivning ?? '',
+        motpart: t.motpart ?? '',
+        belopp: Number(t.belopp),
+        moms: t.moms === null ? null : Number(t.moms),
+        valuta: t.valuta ?? 'SEK',
+        riktning: t.riktning === 'in' ? 'in' : 'ut',
+        anteckning: t.anteckning ?? '',
+        kalla: t.kalla ?? 'ai',
+        at: toIso(t.created_at) ?? '',
+      });
+    }
+    if ((data ?? []).length < 500) break;
+  }
+  return out;
 }
 
 /**
@@ -913,6 +991,8 @@ async function planDeletion(persons: Built[]): Promise<DeletePlan> {
     // Verifikationer utan underlag (AI, manuella) följer inte med i kaskaden
     { table: 'verifikationer', column: 'user_id', values: profiles },
     { table: 'verifikationer', column: 'customer_email', values: emails },
+    { table: 'transaktioner', column: 'user_id', values: profiles },
+    { table: 'transaktioner', column: 'customer_email', values: emails },
     { table: 'bokforing_underlag', column: 'user_id', values: profiles },
     { table: 'bokforing_underlag', column: 'sender_email', values: emails },
     { table: 'manual_transactions', column: 'user_id', values: profiles },
