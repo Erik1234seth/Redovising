@@ -137,7 +137,7 @@ export default function IntegrationerPage() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-semibold text-slate-800 text-[15px]">Zettle by PayPal</p>
+                <p className="font-semibold text-slate-800 text-[15px]">Zettle</p>
                 {zettle?.kopplad && !utgangen && (
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Kopplad</span>
                 )}
