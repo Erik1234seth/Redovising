@@ -46,7 +46,7 @@ const PARAGRAPHS = [
     + 'samma sak som traditionella byråer. Det handlar om att vi har fokuserat '
     + 'på just enskilda mindre firmor utan anställda som oftast har relativt få '
     + 'transaktioner och byggt hela vårt system kring det. Vi följer samma regler '
-    + 'och gör samma sak men inte på samma sätt 😊.',
+    + 'och gör samma sak men inte på samma sätt.',
 
   'Tjänsten fungerar så att ni skickar in alla underlag (kvitton, fakturor, '
     + 'kontoutdrag eller annat) via mail eller direkt på vår uppladdningssida. '
