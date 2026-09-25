@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendSms } from '@/lib/sms/twilio';
 import { runLeadReminders, type ReminderRun } from '@/lib/leads/reminders';
+import { synkaAllaZettle } from '@/lib/zettle/sync';
 
 /**
  * Morgonens utskick: tömmer SMS-kön och skickar dagens lead-påminnelser.
@@ -11,7 +12,8 @@ import { runLeadReminders, type ReminderRun } from '@/lib/leads/reminders';
  * mötespåminnelserna. Lead-påminnelserna behöver bara väckas en gång om dygnet,
  * så de åker med här i stället för att få ett eget schema. Själva logiken bor i
  * `src/lib/leads/reminders.ts` och går även att trigga för hand via
- * /api/cron/lead-reminders.
+ * /api/cron/lead-reminders. Zettle-synken åker med av samma skäl (logiken i
+ * `src/lib/zettle/sync.ts`, för hand via /api/cron/zettle).
  *
  * Kön i sig är ett skyddsnät: sedan nattspärren togs bort går lead-SMS ut
  * direkt och inget nytt hamnar här, så den delen har normalt ingenting att
@@ -102,5 +104,14 @@ export async function GET(request: Request) {
     reminders = { error: message };
   }
 
-  return NextResponse.json({ sent, failed, skipped, reminders });
+  let zettle: Awaited<ReturnType<typeof synkaAllaZettle>> | { error: string };
+  try {
+    zettle = await synkaAllaZettle(supabase);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[sms-queue] Zettle-synken avbröts:', message);
+    zettle = { error: message };
+  }
+
+  return NextResponse.json({ sent, failed, skipped, reminders, zettle });
 }

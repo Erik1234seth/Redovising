@@ -55,3 +55,6 @@ public/*.csv
 .claude/settings.local.json
 public/image.png
 "public/Skärmbild 2026-03-04 084615.png"
+
+# Nedladdade API-nycklar
+client-credentials.json

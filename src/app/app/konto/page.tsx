@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
 import { PAYMENTS_ENABLED } from '@/lib/config';
@@ -449,6 +450,20 @@ export default function KontoPage() {
         >
           {saving ? 'Sparar...' : saved ? 'Sparat!' : 'Spara ändringar'}
         </button>
+
+        {/* Integrationer */}
+        <Link
+          href="/integrationer"
+          className="group flex items-center justify-between bg-white rounded-2xl border border-slate-200 p-6 hover:border-slate-300 hover:shadow-md transition-all duration-150"
+        >
+          <div>
+            <h2 className="font-bold text-slate-800 mb-1">Integrationer</h2>
+            <p className="text-xs text-slate-400">Koppla Zettle så hämtas din försäljning automatiskt</p>
+          </div>
+          <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
 
         {/* Prenumeration */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6">

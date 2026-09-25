@@ -242,7 +242,7 @@ export default function LaddaUppPage() {
               { name: 'Stripe', desc: 'Logga in på dashboard.stripe.com → Rapporter → Balanshistorik → Exportera CSV.', filnamn: 'balance_history.csv' },
               { name: 'PayPal', desc: 'Logga in på paypal.com → Aktivitet → Ladda ned aktiviteter → välj period och format CSV.', filnamn: 'Download.csv' },
               { name: 'Swish Företag', desc: 'Kontakta din bank för kontoutdrag som inkluderar Swish-betalningar, eller exportera via bankens internetbank.', filnamn: 'Kontoutdrag (varierar per bank)' },
-              { name: 'Zettle', desc: 'Logga in på zettle.com → Rapporter → Transaktioner → Exportera som Excel eller CSV.', filnamn: 'Zettle_Transactions.xlsx / .csv' },
+              { name: 'Zettle', desc: 'Enklast: koppla Zettle under Mitt konto → Integrationer, så hämtas försäljningen automatiskt. Annars: logga in på zettle.com → Rapporter → Transaktioner → Exportera som Excel eller CSV.', filnamn: 'Zettle_Transactions.xlsx / .csv' },
               { name: 'SumUp', desc: 'Logga in på me.sumup.com → Transaktioner → Exportera som CSV.', filnamn: 'sumup_transactions.csv' },
               { name: 'Bokadirekt', desc: 'Logga in på Bokadirekt → Ekonomi eller Rapporter → Exportera transaktioner.', filnamn: 'transactions.csv' },
               { name: 'Apple App Store', desc: 'Logga in på App Store Connect → Finance → Payments and Financial Reports → Ladda ned rapport.', filnamn: 'financial_report.csv' },
