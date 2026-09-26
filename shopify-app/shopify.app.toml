@@ -1,0 +1,30 @@
+# Shopify-appens inställningar. Nya Dev Dashboard kan inte lägga till
+# webhooks, så hela konfigurationen skickas upp härifrån:
+#   cd shopify-app
+#   npx @shopify/cli@latest app deploy
+# Ändringar gjorda direkt i Dev Dashboard skrivs över vid nästa deploy.
+# Koden bakom adresserna ligger i src/lib/shopify och src/app/api/shopify.
+
+client_id = "f9e1f64e59d42dec2bef851e4ae08f74"
+name = "Enkla Bokslut"
+application_url = "https://app.enklabokslut.se/shopify"
+embedded = true
+
+[access_scopes]
+# read_all_orders läggs till här (och i SHOPIFY_SCOPES i koden) när Shopify godkänt ansökan
+scopes = "read_orders,read_shopify_payments_accounts,read_shopify_payments_payouts"
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = ["https://app.enklabokslut.se/api/shopify/callback"]
+
+[webhooks]
+api_version = "2026-07"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "https://app.enklabokslut.se/api/shopify/webhooks"
+
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "https://app.enklabokslut.se/api/shopify/webhooks"

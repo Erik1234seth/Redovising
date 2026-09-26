@@ -1,5 +1,5 @@
-import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { ersattDagskassor, svenskDag, type NyDagskassa } from '../dagskassa';
 import { accessTokenFor } from './oauth';
 import { konteraDag, type Kontohandelse, type ZettlePurchase } from './kontering';
 
@@ -30,17 +30,6 @@ export interface ZettleSyncResult {
   handelser: number;
   dagar: number;
   ohanterade: number;
-}
-
-const stockholmDate = new Intl.DateTimeFormat('sv-SE', {
-  timeZone: 'Europe/Stockholm',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-/** Dagen i Sverige — ett köp kl 00:30 hör till den dagen, inte till gårdagen i UTC. */
-function svenskDag(d: Date): string {
-  return stockholmDate.format(d);
 }
 
 /** Zettle skriver "+0000" utan kolon och Finance-tider helt utan zon (de är UTC). */
@@ -213,14 +202,11 @@ async function byggDagskassor(supabase: SupabaseClient, userId: string, orgUuid:
   }
   for (const h of handelser) dag(h.datum).handelser.push({ typ: h.typ, belopp: Number(h.belopp) });
 
-  const registrerad = svenskDag(new Date());
-  const vers: object[] = [];
-  const rader: object[] = [];
+  const kassor: NyDagskassa[] = [];
   let ohanterade = 0;
 
   for (const [datum, d] of [...perDag.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     const kassa = konteraDag(d.kop, d.handelser);
-    if (kassa.rader.length === 0) continue;
     ohanterade += kassa.ohanterade.length;
 
     let text = `Zettle dagskassa ${datum} (${d.kop.length} köp)`;
@@ -230,69 +216,11 @@ async function byggDagskassor(supabase: SupabaseClient, userId: string, orgUuid:
     const utlandsk = [...d.valutor].filter((v) => v !== 'SEK');
     if (utlandsk.length) text += ` – valuta ${utlandsk.join(', ')}`;
 
-    const id = randomUUID();
-    vers.push({
-      id,
-      user_id: userId,
-      kalla: 'zettle',
-      extern_id: `zettle|${orgUuid}|${datum}`,
-      serie: 'Z',
-      nummer: datum.replace(/-/g, ''),
-      datum,
-      text,
-      registrerad,
-      signatur: 'Zettle',
-      summa: kassa.rader.filter((r) => r.belopp > 0).reduce((s, r) => s + r.belopp, 0),
-      balanserad: true,
-    });
-    kassa.rader.forEach((r, radnr) => rader.push({
-      verifikation_id: id,
-      radnr,
-      konto: r.konto,
-      kontonamn: r.kontonamn || null,
-      belopp: r.belopp,
-      datum,
-      text: null,
-      objekt: [],
-      borttagen: false,
-      tillagd: false,
-    }));
+    kassor.push({ datum, text, externId: `zettle|${orgUuid}|${datum}`, rader: kassa.rader });
   }
 
-  // De gamla dagskassorna tas bort först när de nya ligger på plats, så att
-  // ett fel halvvägs aldrig lämnar kunden utan verifikationer för dagarna
-  const { data: gamla, error: gamlaError } = await supabase
-    .from('verifikationer')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('kalla', 'zettle')
-    .gte('datum', fromDag);
-  if (gamlaError) throw new Error(`Kunde inte läsa gamla dagskassor: ${gamlaError.message}`);
-
-  const nyaIds = vers.map((v) => (v as { id: string }).id);
-  try {
-    for (let i = 0; i < vers.length; i += CHUNK) {
-      const { error } = await supabase.from('verifikationer').insert(vers.slice(i, i + CHUNK));
-      if (error) throw new Error(`Kunde inte spara dagskassor: ${error.message}`);
-    }
-    for (let i = 0; i < rader.length; i += CHUNK) {
-      const { error } = await supabase.from('verifikation_rader').insert(rader.slice(i, i + CHUNK));
-      if (error) throw new Error(`Kunde inte spara konteringsrader: ${error.message}`);
-    }
-  } catch (err) {
-    for (let i = 0; i < nyaIds.length; i += CHUNK) {
-      await supabase.from('verifikationer').delete().in('id', nyaIds.slice(i, i + CHUNK));
-    }
-    throw err;
-  }
-
-  const gamlaIds = (gamla ?? []).map((g) => g.id as string);
-  for (let i = 0; i < gamlaIds.length; i += CHUNK) {
-    const { error } = await supabase.from('verifikationer').delete().in('id', gamlaIds.slice(i, i + CHUNK));
-    if (error) throw new Error(`Kunde inte ta bort gamla dagskassor: ${error.message}`);
-  }
-
-  return { dagar: vers.length, ohanterade };
+  const dagar = await ersattDagskassor(supabase, userId, 'zettle', 'Z', 'Zettle', fromDag, kassor);
+  return { dagar, ohanterade };
 }
 
 /** För cron: synka alla aktiva kopplingar, en i taget. Ett fel stoppar inte de andra. */

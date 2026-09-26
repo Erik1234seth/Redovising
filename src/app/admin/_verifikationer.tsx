@@ -41,7 +41,7 @@ const PAGE = 100;
 
 export const kr = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const KALLA: Record<string, string> = { sie: 'SIE', ai: 'AI', manuell: 'Manuell', zettle: 'Zettle' };
+const KALLA: Record<string, string> = { sie: 'SIE', ai: 'AI', manuell: 'Manuell', zettle: 'Zettle', shopify: 'Shopify' };
 
 function matches(v: Ver, q: string): boolean {
   if (!q) return true;

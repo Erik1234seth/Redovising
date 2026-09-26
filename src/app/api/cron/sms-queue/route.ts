@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendSms } from '@/lib/sms/twilio';
 import { runLeadReminders, type ReminderRun } from '@/lib/leads/reminders';
 import { synkaAllaZettle } from '@/lib/zettle/sync';
+import { synkaAllaShopify } from '@/lib/shopify/sync';
 
 /**
  * Morgonens utskick: tömmer SMS-kön och skickar dagens lead-påminnelser.
@@ -13,7 +14,8 @@ import { synkaAllaZettle } from '@/lib/zettle/sync';
  * så de åker med här i stället för att få ett eget schema. Själva logiken bor i
  * `src/lib/leads/reminders.ts` och går även att trigga för hand via
  * /api/cron/lead-reminders. Zettle-synken åker med av samma skäl (logiken i
- * `src/lib/zettle/sync.ts`, för hand via /api/cron/zettle).
+ * `src/lib/zettle/sync.ts`, för hand via /api/cron/zettle), liksom Shopify-synken
+ * (`src/lib/shopify/sync.ts`, /api/cron/shopify).
  *
  * Kön i sig är ett skyddsnät: sedan nattspärren togs bort går lead-SMS ut
  * direkt och inget nytt hamnar här, så den delen har normalt ingenting att
@@ -113,5 +115,14 @@ export async function GET(request: Request) {
     zettle = { error: message };
   }
 
-  return NextResponse.json({ sent, failed, skipped, reminders, zettle });
+  let shopify: Awaited<ReturnType<typeof synkaAllaShopify>> | { error: string };
+  try {
+    shopify = await synkaAllaShopify(supabase);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[sms-queue] Shopify-synken avbröts:', message);
+    shopify = { error: message };
+  }
+
+  return NextResponse.json({ sent, failed, skipped, reminders, zettle, shopify });
 }

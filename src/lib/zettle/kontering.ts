@@ -14,6 +14,8 @@
  * belopp i Zettle och vänder därmed tecknen av sig själva.
  */
 
+import { MOMSKONTON, Summor, type Konteringsrad } from '../dagskassa';
+
 export interface ZettleProduct {
   type?: string;
   quantity?: string;
@@ -41,36 +43,7 @@ export interface Kontohandelse {
   belopp: number;
 }
 
-export interface Konteringsrad {
-  konto: string;
-  kontonamn: string;
-  /** Kronor, debet positivt och kredit negativt — samma som SIE-importen. */
-  belopp: number;
-}
-
-const KONTONAMN: Record<string, string> = {
-  '1510': 'Kundfordringar',
-  '1580': 'Fordringar för kontokort och kuponger',
-  '1910': 'Kassa',
-  '1930': 'Företagskonto',
-  '2420': 'Förskott från kunder',
-  '2611': 'Utgående moms på försäljning inom Sverige, 25 %',
-  '2621': 'Utgående moms på försäljning inom Sverige, 12 %',
-  '2631': 'Utgående moms på försäljning inom Sverige, 6 %',
-  '2890': 'Övriga kortfristiga skulder',
-  '3001': 'Försäljning inom Sverige, 25 % moms',
-  '3002': 'Försäljning inom Sverige, 12 % moms',
-  '3003': 'Försäljning inom Sverige, 6 % moms',
-  '3004': 'Försäljning inom Sverige, momsfri',
-  '3740': 'Öres- och kronutjämning',
-  '6570': 'Bankkostnader',
-};
-
-const MOMSKONTON: Record<number, { intakt: string; moms: string }> = {
-  25: { intakt: '3001', moms: '2611' },
-  12: { intakt: '3002', moms: '2621' },
-  6: { intakt: '3003', moms: '2631' },
-};
+export type { Konteringsrad };
 
 /** Vart pengarna tar vägen för varje betalsätt. */
 function betalkonto(typ: string): string {
@@ -109,28 +82,6 @@ const HANDELSEKONTO: Record<string, string | null> = {
 
 /** Dricks är personalens pengar, inte försäljning. */
 const DRICKSKONTO = '2890';
-
-class Summor {
-  private ore = new Map<string, number>();
-  add(konto: string, belopp: number) {
-    if (!belopp) return;
-    this.ore.set(konto, (this.ore.get(konto) ?? 0) + belopp);
-  }
-  get(konto: string) {
-    return this.ore.get(konto) ?? 0;
-  }
-  total() {
-    let sum = 0;
-    for (const v of this.ore.values()) sum += v;
-    return sum;
-  }
-  rader(): Konteringsrad[] {
-    return [...this.ore.entries()]
-      .filter(([, v]) => v !== 0)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([konto, v]) => ({ konto, kontonamn: KONTONAMN[konto] ?? '', belopp: v / 100 }));
-  }
-}
 
 function konteraKop(p: ZettlePurchase, s: Summor) {
   // Debet: det kunden betalade, per betalsätt. Betalningarna räknas med

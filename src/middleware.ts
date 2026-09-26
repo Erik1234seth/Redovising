@@ -79,6 +79,8 @@ export async function middleware(request: NextRequest) {
     url.pathname.startsWith('/_next') ||
     url.pathname.startsWith('/api') ||
     url.pathname.startsWith('/app') ||
+    // Appsidan inne i Shopify-admin är en egen route utan appens skal
+    url.pathname === '/shopify' ||
     url.pathname.startsWith('/favicon')
   ) {
     return NextResponse.next();
