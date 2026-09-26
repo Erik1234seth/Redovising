@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
-import { STAGES, EVENT_STYLE, REDOVISNINGSMETODER, fullDate } from '../../_pipeline';
+import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, MomsPeriod, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
+import { STAGES, EVENT_STYLE, REDOVISNINGSMETODER, MOMSPERIODER, fullDate } from '../../_pipeline';
 import DeletePerson from '../../_delete-person';
 import SmsComposer from '../../_sms-composer';
 import { formatPhone } from '@/lib/sms/phone';
@@ -58,6 +58,7 @@ export default function PersonPage() {
   const [error, setError] = useState('');
   const [savingStage, setSavingStage] = useState(false);
   const [savingMetod, setSavingMetod] = useState(false);
+  const [savingMoms, setSavingMoms] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [savingEmail, setSavingEmail] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -171,6 +172,27 @@ export default function PersonPage() {
     if (!res.ok) {
       setPerson((p) => (p ? { ...p, redovisningsmetod: previous } : p));
       setError('Bokföringsmetoden kunde inte sparas');
+    }
+  };
+
+  /**
+   * Byter momsperiod, t.ex. när kunden valt fel i onboardingen. Till skillnad
+   * från metoden går valet inte att ta bort — kunden har alltid svarat något.
+   */
+  const setMoms = async (value: MomsPeriod) => {
+    if (!person?.profileId || savingMoms || person.momsPeriod === value) return;
+    const previous = person.momsPeriod;
+    setPerson({ ...person, momsPeriod: value });
+    setSavingMoms(true);
+    const res = await fetch('/api/admin/people', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: person.profileId, momsPeriod: value }),
+    });
+    setSavingMoms(false);
+    if (!res.ok) {
+      setPerson((p) => (p ? { ...p, momsPeriod: previous } : p));
+      setError('Momsperioden kunde inte sparas');
     }
   };
 
@@ -565,6 +587,52 @@ export default function PersonPage() {
                   <p className="text-warm-500 text-sm">
                     Varken konto eller kontaktförfrågan är kopplad, så det finns ingen rad att spara metoden
                     på. Personen syns här för att vi har mejlat eller messat numret.
+                  </p>
+                )}
+              </section>
+
+              <section className="pt-6 border-t border-navy-600">
+                <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">Momsperiod</h3>
+                {person.profileId ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-3">
+                      {MOMSPERIODER.map((m) => {
+                        const chosen = person.momsPeriod === m.value;
+                        return (
+                          <button
+                            key={m.value}
+                            onClick={() => setMoms(m.value)}
+                            disabled={savingMoms}
+                            aria-pressed={chosen}
+                            className={`flex items-center gap-2 rounded-xl border px-4 py-3 transition disabled:opacity-60 ${
+                              chosen
+                                ? 'bg-gold-500/15 border-gold-500 ring-1 ring-gold-500/30'
+                                : 'bg-navy-800/40 border-navy-600 hover:border-warm-500'
+                            }`}
+                          >
+                            <span className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                              chosen ? 'bg-gold-500 border-gold-500' : 'border-navy-500'
+                            }`}>
+                              {chosen && <span className="text-navy-900 text-[9px] font-bold leading-none">✓</span>}
+                            </span>
+                            <span className={`text-sm font-semibold ${chosen ? 'text-gold-400' : 'text-warm-200'}`}>
+                              {m.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-warm-600 text-xs mt-3">
+                      {person.momsPeriod === 'ingen-moms'
+                        ? 'Kunden angav att de inte redovisar moms. Välj en period ovan om det var fel.'
+                        : person.momsPeriod
+                          ? 'Sparas på kundens konto.'
+                          : 'Kunden har inte valt någon momsperiod än.'}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-warm-500 text-sm">
+                    Personen har inget konto än — momsperioden väljs i onboardingen.
                   </p>
                 )}
               </section>

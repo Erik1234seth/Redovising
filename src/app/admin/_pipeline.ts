@@ -1,4 +1,4 @@
-import type { EventType, Redovisningsmetod } from '@/lib/admin-types';
+import type { EventType, MomsPeriod, Redovisningsmetod } from '@/lib/admin-types';
 
 /** Stegen en kund går igenom, i ordning. Speglar contact_requests.stage. */
 export const STAGES = [
@@ -34,6 +34,16 @@ export const REDOVISNINGSMETODER: {
     short: 'Kontant',
     hint: 'Bokförs när pengarna rör sig. Obetalda fakturor tas först vid årets slut.',
   },
+];
+
+/**
+ * Momsperioderna som går att välja i adminpanelen. "Ingen moms" står inte med
+ * som val, men en kund som valt det i onboardingen syns ändå som det.
+ */
+export const MOMSPERIODER: { value: MomsPeriod; label: string }[] = [
+  { value: 'helår', label: 'Årsvis' },
+  { value: 'kvartalsvis', label: 'Kvartalsvis' },
+  { value: 'månadsvis', label: 'Månadsvis' },
 ];
 
 /** Hur varje händelsetyp visas i tidslinjen. */

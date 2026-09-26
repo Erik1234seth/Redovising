@@ -46,6 +46,9 @@ export interface DeliveryIssue {
  */
 export type Redovisningsmetod = 'faktureringsmetoden' | 'kontantmetoden';
 
+/** Hur ofta kunden redovisar moms (`profiles.moms_period`). "helår" betyder årsvis. */
+export type MomsPeriod = 'månadsvis' | 'kvartalsvis' | 'helår' | 'ingen-moms';
+
 export interface Person {
   key: string;
   name: string | null;
@@ -62,6 +65,8 @@ export interface Person {
   profileId: string | null;
   /** Kontantmetoden eller faktureringsmetoden. Null tills någon valt. */
   redovisningsmetod: Redovisningsmetod | null;
+  /** Momsperioden kunden valde i onboardingen. Finns bara när personen har konto. */
+  momsPeriod: MomsPeriod | null;
   /**
    * Adresser som kopplats hit för hand, för att personen svarat från en annan
    * mejl än den vi kände till. Skiljda från de sammanslagna adresserna i

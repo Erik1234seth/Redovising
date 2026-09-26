@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { normalizePhone } from '@/lib/sms/phone';
-import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
+import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, MomsPeriod, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
 import { importPendingSie } from '@/lib/sie/import';
 
 /**
@@ -147,7 +147,7 @@ async function build(): Promise<Map<string, Built>> {
   ] = await Promise.all([
     supabase.from('contact_requests').select('id, name, email, phone, ref, stage, notes, package_type, contact_method, qualification_answers, redovisningsmetod, created_at'),
     supabase.from('meetings').select('id, name, email, phone, date, time, message, created_at'),
-    supabase.from('profiles').select('id, email, full_name, phone, company_name, verksamhet, redovisningsmetod, created_at, onboarding_done, subscription_status'),
+    supabase.from('profiles').select('id, email, full_name, phone, company_name, verksamhet, redovisningsmetod, moms_period, created_at, onboarding_done, subscription_status'),
     supabase.from('pending_registrations').select('id, email, source, created_at, expires_at, used_at'),
     supabase.from('email_threads').select('id, user_id, state, created_at, updated_at'),
     supabase.from('sms_messages').select('id, phone, direction, body, status, error, kind, created_at, issue_dismissed_at').order('created_at'),
@@ -228,7 +228,7 @@ async function build(): Promise<Map<string, Built>> {
       found = {
         key: root, name: null, email: null, phone: null, company: null,
         verksamhet: null, source: null, stage: null, contactId: null, profileId: null,
-        redovisningsmetod: null, manualEmails: [], isCustomer: false,
+        redovisningsmetod: null, momsPeriod: null, manualEmails: [], isCustomer: false,
         optedOut: false, emailCount: 0, smsCount: 0, issues: [],
         firstSeen: '', lastActivity: '', events: [], aliases: [], seen: [], files: [],
       };
@@ -314,6 +314,7 @@ async function build(): Promise<Map<string, Built>> {
       if (r.verksamhet?.trim()) p.verksamhet = r.verksamhet.trim();
       if (r.id) p.profileId = r.id;
       if (r.redovisningsmetod) p.redovisningsmetod = r.redovisningsmetod as Redovisningsmetod;
+      if (r.moms_period) p.momsPeriod = r.moms_period as MomsPeriod;
     }
   }
 
@@ -802,10 +803,11 @@ async function mailFor(p: Built): Promise<AdminMailMessage[]> {
 }
 
 const METODER: Redovisningsmetod[] = ['faktureringsmetoden', 'kontantmetoden'];
+const MOMSPERIODER: MomsPeriod[] = ['månadsvis', 'kvartalsvis', 'helår', 'ingen-moms'];
 
 /**
- * Ändrar det Erik själv får bestämma om en person: steget i pipelinen och
- * bokföringsmetoden. Allt annat på raderna är insamlad data och rörs inte.
+ * Ändrar det Erik själv får bestämma om en person: steget i pipelinen,
+ * bokföringsmetoden och momsperioden. Allt annat på raderna är insamlad data och rörs inte.
  *
  * Metoden bor på två ställen eftersom personen gör det: en prospekt har bara
  * en kontaktförfrågan, en kund har en profil, och samma människa hinner vara
@@ -815,8 +817,24 @@ const METODER: Redovisningsmetod[] = ['faktureringsmetoden', 'kontantmetoden'];
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const { contactId, profileId, stage, redovisningsmetod } = await request.json();
+    const { contactId, profileId, stage, redovisningsmetod, momsPeriod } = await request.json();
     const supabase = getSupabase();
+
+    // Momsperioden bor bara på profilen — kunden väljer den i onboardingen
+    if (momsPeriod !== undefined) {
+      if (!MOMSPERIODER.includes(momsPeriod)) {
+        return NextResponse.json(
+          { error: `momsPeriod måste vara ${MOMSPERIODER.join(', ')}` },
+          { status: 400 },
+        );
+      }
+      if (!profileId) {
+        return NextResponse.json({ error: 'Personen har inget konto att spara momsperioden på' }, { status: 400 });
+      }
+      const { error } = await supabase.from('profiles').update({ moms_period: momsPeriod }).eq('id', profileId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
 
     if (redovisningsmetod !== undefined) {
       // null betyder "ta bort valet" — annars måste det vara en av de två.
