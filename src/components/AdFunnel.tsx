@@ -139,7 +139,7 @@ function TopControl({ onClick, label, dark, children }: { onClick: () => void; l
   );
 }
 
-type Stage = 'hook' | 'how' | 'questions' | 'contact' | 'meeting' | 'done' | 'fail';
+type Stage = 'hook' | 'how' | 'questions' | 'choose' | 'contact' | 'meeting' | 'done' | 'fail';
 
 // "Så funkar det"-steget är tillfälligt avstängt: hooken tappade sex gånger
 // fler besökare än kontaktformuläret, och ett mellansteg till innan frågorna
@@ -153,9 +153,13 @@ const SHOW_HOW_STAGE = false;
 const CONTACT_PROGRESS = ['opened', 'name', 'email', 'method', 'phone', 'notes'] as const;
 type ContactProgress = (typeof CONTACT_PROGRESS)[number];
 
-export default function AdFunnel({ refCode, onClose, source = 'annons', visitId = null, skipHook = false }: { refCode: string | null; onClose?: () => void; source?: 'annons' | 'brev' | 'organic'; visitId?: number | null; skipHook?: boolean }) {
+export default function AdFunnel({ refCode, onClose, source = 'annons', visitId = null, skipHook = false, offerSignup = false }: { refCode: string | null; onClose?: () => void; source?: 'annons' | 'brev' | 'organic'; visitId?: number | null; skipHook?: boolean; offerSignup?: boolean }) {
   // skipHook: besökaren klickade sig hit från "Kom igång" i hero:n och har redan
   // läst kroken på sidan bakom — att visa den igen hade bara blivit ett klick till.
+  // offerSignup: efter frågorna får besökaren välja själv — skapa konto direkt,
+  // boka ett möte eller få mer info på mailen. Den som klickat "Kom igång" vill
+  // ofta köra hela vägen, och ska inte behöva gå via ett samtal för att få det.
+  const afterQuestions: Stage = offerSignup ? 'choose' : 'contact';
   const [stage, setStage] = useState<Stage>(skipHook ? 'questions' : 'hook');
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, boolean | 'unknown'>>({});
@@ -240,6 +244,8 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', visitId 
   const freeTimesOn = (dateStr: string) => TIME_SLOTS.filter(t => !isSlotBooked(dateStr, t, bookedSlots));
 
   const bookingMeeting = wantsMeeting && !!meetingTime;
+  // Besökaren valde "mer info på mailen" i valsteget — då är kontaktsteget sista steget.
+  const mailOnly = offerSignup && !wantsMeeting;
 
   // Förvälj första lediga tiden på vald dag — annars vore "boka möte" ett
   // extra klick jämfört med att bara lämna sina uppgifter.
@@ -257,7 +263,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', visitId 
       setStage('fail');
       return;
     }
-    if (step + 1 >= questions.length) setStage('contact');
+    if (step + 1 >= questions.length) setStage(afterQuestions);
     else setStep(step + 1);
   };
 
@@ -266,12 +272,28 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', visitId 
   const answerUnknown = () => {
     const q = questions[step];
     setAnswers({ ...answers, [q.id]: 'unknown' });
-    if (step + 1 >= questions.length) setStage('contact');
+    if (step + 1 >= questions.length) setStage(afterQuestions);
     else setStep(step + 1);
+  };
+
+  // Valet gjordes redan i 'choose', så mejlvägen skickar direkt från
+  // kontaktsteget i stället för att gå via tidsvalet och dess växel.
+  const choose = (meeting: boolean) => {
+    setWantsMeeting(meeting);
+    setStage('contact');
+  };
+
+  // Skapa konto lämnar popupen: /skaffa väljer upplägg och skickar vidare till
+  // registreringen, samma väg som /kvalificera redan tar.
+  const startSignup = () => {
+    track({ stage: 'signup' });
+    window.location.href = '/skaffa';
   };
 
   const back = () => {
     if (stage === 'meeting') setStage('contact');
+    else if (stage === 'contact' && offerSignup) setStage('choose');
+    else if (stage === 'choose') setStage('questions');
     else if (stage === 'how') setStage('hook');
     // Utan kroken finns inget steg bakom första frågan att gå tillbaka till.
     else if (stage === 'questions' && step === 0) { if (!skipHook) setStage(SHOW_HOW_STAGE ? 'how' : 'hook'); }
@@ -282,7 +304,8 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', visitId 
   // det steg som faktiskt postar leadet.
   const goToMeeting = (e: React.FormEvent) => {
     e.preventDefault();
-    setStage('meeting');
+    if (mailOnly) submit(e);
+    else setStage('meeting');
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -319,7 +342,7 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', visitId 
     }
   };
 
-  const showBack = stage === 'meeting' || stage === 'how' || (stage === 'questions' && !(skipHook && step === 0));
+  const showBack = stage === 'meeting' || stage === 'how' || stage === 'choose' || (stage === 'contact' && offerSignup) || (stage === 'questions' && !(skipHook && step === 0));
   const onPhoto = stage === 'hook';
   const variant: Variant = { ...DEFAULT_VARIANT, ...((refCode && VARIANTS[refCode]) || {}) };
 
@@ -564,6 +587,74 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', visitId 
         );
       })()}
 
+      {/* ── Valet: kör hela vägen själv, eller prata med oss först ── */}
+      {stage === 'choose' && (
+        <div className="px-6 sm:px-9 pt-14 sm:pt-16 pb-7 sm:pb-9 sm:flex-1 sm:flex sm:flex-col sm:justify-center">
+          <div className="flex items-center gap-3 mb-3 sm:mb-4">
+            <span
+              className="flex-shrink-0 w-9 h-9 sm:w-12 sm:h-12 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: '#ECFDF5' }}
+            >
+              <Check className="w-4 h-4 sm:w-6 sm:h-6 text-emerald-500" />
+            </span>
+            <h2 className="text-xl sm:text-3xl font-extrabold leading-tight" style={{ color: NAV_BG }}>Du passar!</h2>
+          </div>
+
+          <p className="text-sm sm:text-base leading-relaxed mb-5 sm:mb-7 text-slate-500">
+            Hur vill du gå vidare?
+          </p>
+
+          {/* Tre likvärdiga val — ingen av dem ska trycka undan de andra. */}
+          <div className="space-y-2.5 sm:space-y-3">
+            {[
+              {
+                onClick: startSignup,
+                title: 'Skapa konto',
+                desc: 'Kom igång direkt — tar under en minut',
+                icon: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z',
+              },
+              {
+                onClick: () => choose(true),
+                title: 'Boka ett möte',
+                desc: 'Vi ringer och går igenom allt — kostnadsfritt',
+                icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z',
+              },
+              {
+                onClick: () => choose(false),
+                title: 'Mer info via mail',
+                desc: 'Vi mejlar hur det funkar och vad det kostar',
+                icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+              },
+            ].map((o) => (
+              <button
+                key={o.title}
+                type="button"
+                onClick={o.onClick}
+                className="w-full flex items-center gap-4 text-left rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 bg-white border-2 border-slate-200 transition-colors hover:border-slate-300 hover:bg-slate-50"
+              >
+                <span
+                  className="flex-shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: NAV_TINT, color: NAV_BG }}
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d={o.icon} />
+                  </svg>
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[15px] sm:text-base font-bold leading-snug" style={{ color: NAV_BG }}>{o.title}</span>
+                  <span className="block text-xs sm:text-sm text-slate-500 leading-snug mt-0.5">{o.desc}</span>
+                </span>
+                <span className="text-lg font-bold flex-shrink-0 text-slate-300">→</span>
+              </button>
+            ))}
+          </div>
+
+          <p className="text-center text-xs sm:text-sm mt-5 sm:mt-6 text-slate-400">
+            Ingen betalning nu · Ingen bindningstid
+          </p>
+        </div>
+      )}
+
       {/* ── Kontaktuppgifter ── */}
       {stage === 'contact' && (
         <div className="px-6 sm:px-9 pt-10 sm:pt-16 pb-5 sm:pb-9 sm:flex-1 sm:flex sm:flex-col sm:justify-center">
@@ -574,11 +665,15 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', visitId 
             >
               <Check className="w-4 h-4 sm:w-6 sm:h-6 text-emerald-500" />
             </span>
-            <h2 className="text-xl sm:text-3xl font-extrabold leading-tight" style={{ color: NAV_BG }}>Du passar!</h2>
+            <h2 className="text-xl sm:text-3xl font-extrabold leading-tight" style={{ color: NAV_BG }}>
+              {!offerSignup ? 'Du passar!' : mailOnly ? 'Vart ska vi mejla?' : 'Vem ringer vi?'}
+            </h2>
           </div>
 
           <p className="text-sm sm:text-base leading-relaxed mb-3 sm:mb-7 text-slate-500">
-            Lämna dina uppgifter först — sen väljer du en tid när vi ringer upp dig. Kostnadsfritt, och du bestämmer i lugn och ro efteråt.
+            {mailOnly
+              ? 'Du får ett mejl med hur allt fungerar och vad det kostar för just din firma. Inget säljsamtal.'
+              : 'Lämna dina uppgifter först — sen väljer du en tid när vi ringer upp dig. Kostnadsfritt, och du bestämmer i lugn och ro efteråt.'}
           </p>
 
           <form onSubmit={goToMeeting} className="space-y-2.5 sm:space-y-4">
@@ -637,12 +732,14 @@ export default function AdFunnel({ refCode, onClose, source = 'annons', visitId 
             </div>
 
             <div className="sticky bottom-0 z-10 pt-2 pb-1 space-y-2 bg-white border-t border-slate-100 sm:static sm:pt-0 sm:pb-0 sm:space-y-0 sm:bg-transparent sm:border-t-0">
+              {mailOnly && sendError && <p className="text-sm text-center sm:mb-2" style={{ color: CORAL }}>{sendError}</p>}
               <button
                 type="submit"
-                className="w-full py-3.5 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90"
+                disabled={sending}
+                className="w-full py-3.5 sm:py-5 rounded-xl font-bold text-white text-[15px] sm:text-base transition-all duration-200 hover:opacity-90 disabled:opacity-50"
                 style={{ backgroundColor: NAV_BG, boxShadow: `0 10px 24px ${NAV_BG}40` }}
               >
-                Fortsätt — välj en tid
+                {!mailOnly ? 'Fortsätt — välj en tid' : sending ? 'Skickar…' : 'Skicka — så mejlar vi dig'}
               </button>
             </div>
           </form>

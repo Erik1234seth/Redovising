@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Coarse popup stages we care about — mirrors AdFunnel's `Stage` type.
-const STAGES = ['hook', 'how', 'questions', 'contact', 'done', 'fail'];
+const STAGES = ['hook', 'how', 'questions', 'choose', 'signup', 'contact', 'done', 'fail'];
 
 // How far into the contact form a visitor got before leaving. Ordered, but the
 // client is what enforces the ordering — the server only checks membership.

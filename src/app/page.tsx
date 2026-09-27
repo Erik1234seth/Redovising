@@ -1028,13 +1028,13 @@ export default function Home() {
 
           <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto animate-[popIn_0.28s_cubic-bezier(0.16,1,0.3,1)]">
             {showHeroPopup ? (
-              <AdFunnel refCode={null} onClose={dismissHeroPopup} source="organic" skipHook visitId={popupVisitId} />
+              <AdFunnel refCode={null} onClose={dismissHeroPopup} source="organic" skipHook offerSignup visitId={popupVisitId} />
             ) : showBrevPopup ? (
               <AdFunnel refCode={brevRef} onClose={dismissBrevPopup} source="brev" visitId={popupVisitId} />
             ) : showFbPopup ? (
               <AdFunnel refCode={fbRef} onClose={dismissFbPopup} source="annons" visitId={popupVisitId} />
             ) : (
-              <AdFunnel refCode={null} onClose={dismissOrganicPopup} source="organic" visitId={popupVisitId} />
+              <AdFunnel refCode={null} onClose={dismissOrganicPopup} source="organic" offerSignup visitId={popupVisitId} />
             )}
           </div>
 
