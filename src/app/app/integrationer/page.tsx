@@ -395,10 +395,12 @@ function BankKort({ meddela }: { meddela: Meddela }) {
                 value={valdBank}
                 onChange={(e) => setValdBank(e.target.value)}
                 disabled={!banker}
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                // Listan ritas av webbläsaren och följer annars datorns mörka läge
+                style={{ colorScheme: 'light' }}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200"
               >
-                <option value="">{banker ? 'Välj bank' : 'Hämtar banker…'}</option>
-                {banker?.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
+                <option value="" className="bg-white text-slate-500">{banker ? 'Välj bank' : 'Hämtar banker…'}</option>
+                {banker?.map((b) => <option key={b.name} value={b.name} className="bg-white text-slate-800">{b.name}</option>)}
               </select>
               <div className="flex gap-2 text-sm">
                 {(['business', 'personal'] as const).map((t) => (
