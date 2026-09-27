@@ -1,38 +1,40 @@
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
 
-const steps = [
+const APP_URL = 'https://app.enklabokslut.se/integrationer';
+
+type Step = { number: number; action: string; detail: string; highlight?: string };
+
+const steps: Step[] = [
   {
     number: 1,
-    action: 'Logga in på Zettle',
-    detail: 'Gå till Zettles webbportal och logga in med dina uppgifter.',
+    action: 'Logga in i Enkla Bokslut',
+    detail: 'Gå till app.enklabokslut.se och logga in på ditt konto.',
   },
   {
     number: 2,
-    action: 'Gå till Rapporter → Översikt',
-    detail: 'I vänstermenyn hittar du "Rapporter". Klicka där och välj "Översikt" — det är härifrån du når all försäljningsdata och bokföringsinformation.',
+    action: 'Öppna Integrationer',
+    detail: 'Under Integrationer hittar du allt du kan koppla: kassa, webbutik och bank.',
   },
   {
     number: 3,
-    action: 'Välj datumintervall',
-    detail: 'Välj den period du vill exportera — en månad, ett kvartal, eller ett specifikt intervall vi bett om. Exempel: 1 januari – 31 januari.',
+    action: 'Klicka på "Koppla Zettle"',
+    detail: 'Du skickas vidare till Zettle. Logga in med dina vanliga Zettle-uppgifter och godkänn att Enkla Bokslut får läsa din försäljning.',
+    highlight: 'Vi får bara läsa. Vi kan inte ändra något i din Zettle, flytta pengar eller se dina kunders kortuppgifter.',
   },
   {
     number: 4,
-    action: 'Klicka på "Exportera"',
-    detail: 'Knappen finns uppe på sidan, synlig när du har valt din period.',
+    action: 'Klart, försäljningen hämtas direkt',
+    detail: 'När du kommer tillbaka hämtar vi all försäljning sedan årets början. Efter det hämtas nya köp automatiskt varje morgon.',
   },
-  {
-    number: 5,
-    action: 'Välj "Rådata Excel"',
-    detail: null,
-    highlight: 'Välj "Rådata Excel" — inte PDF. Rådata-exporten innehåller mest information och fungerar bäst för bokföring.',
-  },
-  {
-    number: 6,
-    action: 'Maila filen till oss',
-    detail: 'Excel-filen laddas ner till din dator. Skicka den till oss via e-post så tar vi hand om resten.',
-  },
+];
+
+const bokfors = [
+  'Försäljning per momssats (25, 12 och 6 %)',
+  'Betalsätt: kort, kontant, Swish, faktura och presentkort',
+  'Zettles avgifter',
+  'Utbetalningar från Zettle till ditt bankkonto',
+  'Återbetalningar och returer',
 ];
 
 export default function ZettleGuidePage() {
@@ -43,9 +45,9 @@ export default function ZettleGuidePage() {
       <div className="py-14 sm:py-20 text-center px-4" style={{ backgroundColor: NAV_BG }}>
         <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Kassasystem</p>
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white mb-3">
-          Exportera från Zettle
+          Koppla Zettle
         </h1>
-        <p className="text-white/65 text-base sm:text-lg">Hämta dina försäljningsdata direkt ur Zettles webbportal</p>
+        <p className="text-white/65 text-base sm:text-lg">Din försäljning bokförs automatiskt, varje dag</p>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 space-y-10">
@@ -53,7 +55,7 @@ export default function ZettleGuidePage() {
         {/* Intro card */}
         <div className="rounded-2xl p-6 sm:p-8" style={{ backgroundColor: `${NAV_BG}06`, border: `1px solid ${NAV_BG}15` }}>
           <p className="text-sm text-slate-600 leading-relaxed">
-            <strong style={{ color: NAV_BG }}>Zettle by PayPal</strong> har en inbyggd rapportfunktion som samlar all din försäljning, moms och transaktionsdata på ett ställe. Genom att exportera rådata som Excel-fil får vi precis det vi behöver — utan att du behöver plocka ihop något manuellt.
+            Kör du <strong style={{ color: NAV_BG }}>Zettle by PayPal</strong> kan du koppla det direkt till Enkla Bokslut. Du behöver inte exportera eller maila något: vi hämtar din försäljning från Zettle och bokför varje dag som en dagskassa. Det tar ungefär en minut att koppla.
           </p>
         </div>
 
@@ -76,9 +78,7 @@ export default function ZettleGuidePage() {
                 </div>
                 <div className="pb-7 flex-1">
                   <p className="font-bold text-slate-800 leading-snug">{step.action}</p>
-                  {step.detail && (
-                    <p className="text-sm text-slate-500 mt-1 leading-relaxed">{step.detail}</p>
-                  )}
+                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">{step.detail}</p>
                   {step.highlight && (
                     <div className="mt-2 rounded-xl px-4 py-3 flex items-start gap-2.5" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}18` }}>
                       <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: NAV_BG }}>
@@ -91,39 +91,36 @@ export default function ZettleGuidePage() {
               </div>
             ))}
           </div>
+
+          <a
+            href={APP_URL}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition hover:opacity-90"
+            style={{ backgroundColor: CORAL }}
+          >
+            Koppla Zettle nu
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </a>
         </div>
 
-        {/* Send + warning */}
-        <div className="space-y-4">
-          <div className="rounded-2xl p-6 sm:p-8" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}20` }}>
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: NAV_BG }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              <div>
-                <p className="font-bold text-sm mb-1" style={{ color: NAV_BG }}>Skicka Excel-filen till oss via e-post</p>
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  Maila filen direkt till oss. Vi tar emot den, går igenom transaktionerna och bokför allt — du behöver inte göra något mer.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl p-6 sm:p-8 bg-amber-50" style={{ border: '1px solid #FCD34D' }}>
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div>
-                <p className="font-bold text-sm mb-1 text-amber-800">Lägg inte in dessa transaktioner i kalkylarket</p>
-                <p className="text-sm text-amber-700 leading-relaxed">
-                  Zettle-exporten ersätter kalkylarket för de försäljningar som gått via Zettle. Om du lägger in dem manuellt i kalkylarket också bokförs de dubbelt. Skicka antingen Excel-filen <em>eller</em> fyll i kalkylarket — aldrig båda för samma transaktioner.
-                </p>
-              </div>
-            </div>
-          </div>
+        {/* What gets booked */}
+        <div>
+          <h2 className="text-xl font-extrabold mb-4" style={{ color: NAV_BG }}>Det här bokför vi åt dig</h2>
+          <ul className="space-y-2.5">
+            {bokfors.map((rad) => (
+              <li key={rad} className="flex items-start gap-3 text-sm text-slate-600">
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: CORAL }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                {rad}
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-slate-500 mt-4 leading-relaxed">
+            Varje dag med försäljning blir en egen verifikation. Du ser dem under Bokföring och kan när som helst hämta om manuellt från Integrationer.
+          </p>
         </div>
-
       </div>
     </div>
   );
