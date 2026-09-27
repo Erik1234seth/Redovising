@@ -83,7 +83,6 @@ export default function Footer() {
             <ul className="space-y-3">
               {[
                 { href: '/#faq', label: 'Vanliga frågor' },
-                { href: '/artiklar', label: 'Blogg' },
                 { href: '/ordlista', label: 'Ordlista' },
               ].map(({ href, label }) => (
                 <li key={href}>
