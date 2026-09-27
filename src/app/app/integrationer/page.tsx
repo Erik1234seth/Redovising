@@ -226,6 +226,249 @@ function ShopifyKort({ meddela }: { meddela: Meddela }) {
   );
 }
 
+interface BankKoppling {
+  session_id: string;
+  aspsp_name: string;
+  status: 'aktiv' | 'utgangen';
+  giltig_till: string | null;
+  kopplad_at: string;
+  senast_synkad_at: string | null;
+  senaste_fel: string | null;
+  konton: { konto_hash: string; iban: string | null; namn: string | null; valuta: string | null }[];
+}
+
+interface BankStatus {
+  kopplingar: BankKoppling[];
+  senaste: { transaktion_id: string; bokforingsdag: string; belopp_ore: number; valuta: string; text: string | null; motpart: string | null }[];
+}
+
+const BANK_RESULTAT: Record<string, { text: string; ok: boolean }> = {
+  kopplad: { text: 'Banken är kopplad! Vi hämtar transaktionerna nu.', ok: true },
+  avbruten: { text: 'Bankkopplingen avbröts. Du kan försöka igen när du vill.', ok: false },
+  fel: { text: 'Något gick fel när banken skulle kopplas. Försök igen.', ok: false },
+};
+
+function formatBelopp(ore: number, valuta: string) {
+  return (ore / 100).toLocaleString('sv-SE', { style: 'currency', currency: valuta || 'SEK' });
+}
+
+function BankKort({ meddela }: { meddela: Meddela }) {
+  const [bank, setBank] = useState<BankStatus | null>(null);
+  const [banker, setBanker] = useState<{ name: string; psu_types: string[] }[] | null>(null);
+  const [valdBank, setValdBank] = useState('');
+  const [psuType, setPsuType] = useState<'business' | 'personal'>('business');
+  const [visaVal, setVisaVal] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const startad = useRef(false);
+
+  const laddaStatus = useCallback(async () => {
+    const res = await api('/api/bank');
+    if (res.ok) setBank(await res.json());
+  }, []);
+
+  const synka = useCallback(async () => {
+    setBusy('synka');
+    try {
+      const res = await api('/api/bank', { method: 'POST' });
+      const data = await res.json();
+      meddela(!res.ok
+        ? { text: data.error ?? 'Hämtningen misslyckades.', ok: false }
+        : data.fel?.length
+          ? { text: data.fel.join(' '), ok: false }
+          : { text: `Klart! ${data.transaktioner} transaktioner hämtade.`, ok: true });
+    } catch {
+      meddela({ text: 'Hämtningen misslyckades.', ok: false });
+    }
+    setBusy(null);
+    laddaStatus();
+  }, [laddaStatus, meddela]);
+
+  useEffect(() => {
+    if (startad.current) return;
+    startad.current = true;
+    // Tillbaka från banken: visa utfallet, rensa adressraden och gör första hämtningen
+    const resultat = new URLSearchParams(window.location.search).get('bank');
+    if (resultat && BANK_RESULTAT[resultat]) {
+      window.history.replaceState(null, '', window.location.pathname);
+      meddela(BANK_RESULTAT[resultat]);
+      if (resultat === 'kopplad') {
+        laddaStatus().then(synka);
+        return;
+      }
+    }
+    laddaStatus();
+  }, [laddaStatus, synka, meddela]);
+
+  async function oppnaVal() {
+    setVisaVal(true);
+    if (banker) return;
+    const res = await api('/api/bank/banker');
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) setBanker(data.banker);
+    else meddela({ text: data.error ?? 'Kunde inte hämta bankerna.', ok: false });
+  }
+
+  async function koppla() {
+    setBusy('koppla');
+    const res = await api('/api/bank/koppla', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bank: valdBank, psu_type: psuType }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.url) {
+      window.location.href = data.url;
+      return;
+    }
+    meddela({ text: data.error ?? 'Kunde inte starta kopplingen.', ok: false });
+    setBusy(null);
+  }
+
+  async function kopplaBort(k: BankKoppling) {
+    if (!window.confirm(`Koppla bort ${k.aspsp_name}? Transaktioner som redan hämtats ligger kvar.`)) return;
+    setBusy(k.session_id);
+    await api('/api/bank/koppla', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: k.session_id }),
+    });
+    meddela(null);
+    setBusy(null);
+    laddaStatus();
+  }
+
+  const aktiva = bank?.kopplingar.filter((k) => k.status === 'aktiv') ?? [];
+  const valdaBanken = banker?.find((b) => b.name === valdBank);
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-extrabold text-lg" style={{ backgroundColor: NAV_BG }}>
+          B
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-semibold text-slate-800 text-[15px]">Bankkonto</p>
+            {aktiva.length > 0 && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Kopplad</span>}
+          </div>
+          <p className="text-sm text-slate-400 mt-0.5 leading-snug">
+            Vi läser kontots transaktioner varje morgon. Vi kan aldrig flytta pengar eller göra betalningar.
+          </p>
+
+          {bank?.kopplingar.map((k) => (
+            <div key={k.session_id} className="mt-4 rounded-xl border border-slate-100 p-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-semibold text-slate-700 text-sm">{k.aspsp_name}</p>
+                {k.status === 'utgangen' && (
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Behöver kopplas om</span>
+                )}
+              </div>
+              <ul className="mt-1 text-sm text-slate-500">
+                {k.konton.map((a) => (
+                  <li key={a.konto_hash} className="truncate">{[a.namn, a.iban].filter(Boolean).join(' · ') || 'Konto'}</li>
+                ))}
+              </ul>
+              <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <dt className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Senast hämtad</dt>
+                  <dd className="text-slate-700 mt-0.5">{formatTid(k.senast_synkad_at)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Medgivande till</dt>
+                  <dd className="text-slate-700 mt-0.5">{k.giltig_till ? new Date(k.giltig_till).toLocaleDateString('sv-SE') : '–'}</dd>
+                </div>
+              </dl>
+              {k.senaste_fel && <p className="mt-3 text-sm text-rose-600">{k.senaste_fel}</p>}
+              <button
+                onClick={() => kopplaBort(k)}
+                disabled={busy !== null}
+                className="mt-3 px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 disabled:opacity-60 transition"
+              >
+                Koppla bort
+              </button>
+            </div>
+          ))}
+
+          {visaVal && (
+            <div className="mt-4 flex flex-col gap-3">
+              <select
+                value={valdBank}
+                onChange={(e) => setValdBank(e.target.value)}
+                disabled={!banker}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+              >
+                <option value="">{banker ? 'Välj bank' : 'Hämtar banker…'}</option>
+                {banker?.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
+              </select>
+              <div className="flex gap-2 text-sm">
+                {(['business', 'personal'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setPsuType(t)}
+                    disabled={!!valdaBanken?.psu_types.length && !valdaBanken.psu_types.includes(t)}
+                    className={`px-4 py-2 rounded-xl font-semibold border transition disabled:opacity-40 ${psuType === t ? 'border-slate-700 text-slate-800' : 'border-slate-200 text-slate-400'}`}
+                  >
+                    {t === 'business' ? 'Företagskonto' : 'Privatkonto'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {visaVal ? (
+              <button
+                onClick={koppla}
+                disabled={busy !== null || !valdBank}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60 transition hover:opacity-90"
+                style={{ backgroundColor: CORAL }}
+              >
+                {busy === 'koppla' ? 'Skickar dig till banken…' : 'Fortsätt till banken'}
+              </button>
+            ) : (
+              <button
+                onClick={oppnaVal}
+                disabled={busy !== null || bank === null}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60 transition hover:opacity-90"
+                style={{ backgroundColor: CORAL }}
+              >
+                {bank?.kopplingar.length ? 'Koppla en bank till' : 'Koppla bank'}
+              </button>
+            )}
+            {aktiva.length > 0 && (
+              <button
+                onClick={synka}
+                disabled={busy !== null}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60 transition hover:opacity-90"
+                style={{ backgroundColor: NAV_BG }}
+              >
+                {busy === 'synka' ? 'Hämtar…' : 'Hämta nu'}
+              </button>
+            )}
+          </div>
+
+          {!!bank?.senaste.length && (
+            <div className="mt-5">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Senaste transaktioner</p>
+              <ul className="mt-2 divide-y divide-slate-100 text-sm">
+                {bank.senaste.map((t) => (
+                  <li key={t.transaktion_id} className="py-2 flex items-baseline gap-3">
+                    <span className="text-slate-400 tabular-nums flex-shrink-0">{t.bokforingsdag}</span>
+                    <span className="text-slate-600 truncate flex-1">{t.motpart || t.text || '–'}</span>
+                    <span className={`tabular-nums flex-shrink-0 ${t.belopp_ore < 0 ? 'text-slate-700' : 'text-emerald-700'}`}>
+                      {formatBelopp(t.belopp_ore, t.valuta)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function IntegrationerPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -310,7 +553,7 @@ export default function IntegrationerPage() {
       <div className="px-8 pt-12 pb-6">
         <p className="text-sm font-medium text-slate-400 mb-1">Integrationer</p>
         <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Koppla dina system</h1>
-        <p className="text-slate-400 text-sm mt-2">Koppla din kassa eller webbutik så hämtar vi försäljningen automatiskt varje morgon.</p>
+        <p className="text-slate-400 text-sm mt-2">Koppla din kassa, webbutik eller bank så hämtar vi uppgifterna automatiskt varje morgon.</p>
       </div>
 
       <div className="px-8 pb-12 max-w-2xl flex flex-col gap-5">
@@ -391,6 +634,8 @@ export default function IntegrationerPage() {
         </div>
 
         <ShopifyKort meddela={setMeddelande} />
+
+        <BankKort meddela={setMeddelande} />
 
         {zettle?.kopplad && !utgangen && (
           <p className="text-xs text-slate-400 leading-relaxed px-1">
