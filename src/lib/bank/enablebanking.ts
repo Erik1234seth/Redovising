@@ -1,4 +1,4 @@
-import { createSign } from 'crypto';
+import { createPrivateKey, createSign, type KeyObject } from 'crypto';
 
 /**
  * Enable Banking: kopplar kundens bankkonto via PSD2 och läser transaktioner.
@@ -19,9 +19,16 @@ const API = 'https://api.enablebanking.com';
 export class BankSessionUtgangen extends Error {}
 
 function credentials() {
-  const appId = process.env.ENABLE_BANKING_APP_ID;
-  const key = process.env.ENABLE_BANKING_PRIVATE_KEY?.replace(/\\n/g, '\n');
-  if (!appId || !key) throw new Error('ENABLE_BANKING_APP_ID eller ENABLE_BANKING_PRIVATE_KEY saknas');
+  const appId = process.env.ENABLE_BANKING_APP_ID?.trim();
+  // Tål citattecken och \n från en inklistrad .env-rad lika väl som riktiga radbrytningar
+  const pem = process.env.ENABLE_BANKING_PRIVATE_KEY?.trim().replace(/^["']|["']$/g, '').replace(/\\n/g, '\n');
+  if (!appId || !pem) throw new Error('ENABLE_BANKING_APP_ID eller ENABLE_BANKING_PRIVATE_KEY saknas');
+  let key: KeyObject;
+  try {
+    key = createPrivateKey(pem);
+  } catch {
+    throw new Error('ENABLE_BANKING_PRIVATE_KEY går inte att läsa — klistra in hela pem-filen');
+  }
   return { appId, key };
 }
 

@@ -16,6 +16,6 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     console.error('[bank/banker]', err);
-    return NextResponse.json({ error: 'Kunde inte hämta bankerna' }, { status: 500 });
+    return NextResponse.json({ error: `Kunde inte hämta bankerna: ${err instanceof Error ? err.message : err}` }, { status: 500 });
   }
 }

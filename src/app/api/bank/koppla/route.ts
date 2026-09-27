@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: await startaAuth({ aspsp, psuType, state }) });
   } catch (err) {
     console.error('[bank/koppla]', err);
-    return NextResponse.json({ error: 'Kunde inte starta bankkopplingen' }, { status: 500 });
+    return NextResponse.json({ error: `Kunde inte starta bankkopplingen: ${err instanceof Error ? err.message : err}` }, { status: 500 });
   }
 }
 
