@@ -37,6 +37,11 @@ interface Built extends Person {
   seen: { at: string; email?: string; phone?: string }[];
   /** Underlagen personen mejlat in eller laddat upp, för listan på personsidan. */
   files: PersonUnderlag[];
+  /**
+   * Alla konton som slagits ihop till personen. profileId är bara ett av dem,
+   * men kvitton, verifikationer och bankrader kan ligga på vilket som helst.
+   */
+  profileIds: string[];
 }
 
 /**
@@ -230,7 +235,7 @@ async function build(): Promise<Map<string, Built>> {
         verksamhet: null, source: null, stage: null, contactId: null, profileId: null,
         redovisningsmetod: null, momsPeriod: null, manualEmails: [], isCustomer: false,
         optedOut: false, emailCount: 0, smsCount: 0, issues: [],
-        firstSeen: '', lastActivity: '', events: [], aliases: [], seen: [], files: [],
+        firstSeen: '', lastActivity: '', events: [], aliases: [], seen: [], files: [], profileIds: [],
       };
       people.set(root, found);
     }
@@ -312,7 +317,10 @@ async function build(): Promise<Map<string, Built>> {
       if (r.full_name?.trim()) p.name = r.full_name.trim();
       if (r.company_name?.trim()) p.company = r.company_name.trim();
       if (r.verksamhet?.trim()) p.verksamhet = r.verksamhet.trim();
-      if (r.id) p.profileId = r.id;
+      if (r.id) {
+        p.profileId = r.id;
+        if (!p.profileIds.includes(r.id)) p.profileIds.push(r.id);
+      }
       if (r.redovisningsmetod) p.redovisningsmetod = r.redovisningsmetod as Redovisningsmetod;
       if (r.moms_period) p.momsPeriod = r.moms_period as MomsPeriod;
     }
@@ -638,7 +646,7 @@ type Owner = { userIds: string[]; emails: string[] };
 /** Kontona och adresserna personens verifikationer kan ligga på. */
 function ownerOf(p: Built): Owner {
   return {
-    userIds: p.profileId ? [p.profileId] : [],
+    userIds: p.profileIds,
     emails: [...new Set(p.aliases.filter((a) => a.startsWith('e:')).map((a) => a.slice(2)))],
   };
 }
