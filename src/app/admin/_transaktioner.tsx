@@ -12,12 +12,20 @@ import { kr } from './_verifikationer';
  * som faktiskt stod på kvittot, fakturan eller kontoutdraget. Listan visar
  * vilken fil varje rad kom ur, så att en siffra som ser konstig ut går att
  * jämföra med originalet.
+ *
+ * Rader från banken (kalla='bank') ligger bland de andra. En bankrad som
+ * troligen är samma köp som ett kvitto, eller en utbetalning som redan finns i
+ * en dagskassa, flaggas som dubblett och räknas inte med i in/ut.
  */
 
 // Ett kontoutdrag för ett år kan ge tusentals rader. Alla på en gång gör sidan seg.
 const PAGE = 200;
 
 type Riktning = 'alla' | 'in' | 'ut';
+
+function arDublett(t: AdminTransaktion) {
+  return !!(t.dublettAv || t.dublettOrsak);
+}
 
 function matches(t: AdminTransaktion, q: string): boolean {
   if (!q) return true;
@@ -45,6 +53,7 @@ export function TransaktionsLista({
   const [query, setQuery] = useState('');
   const [fil, setFil] = useState('');
   const [riktning, setRiktning] = useState<Riktning>('alla');
+  const [baraDubbletter, setBaraDubbletter] = useState(false);
   const [shown, setShown] = useState(PAGE);
   const [valda, setValda] = useState<string[]>([]);
   // Radera kräver två klick: första visar "Säker?", andra raderar
@@ -60,16 +69,25 @@ export function TransaktionsLista({
     return [...seen].map(([id, name]) => ({ id, name }));
   }, [transaktioner]);
 
+  const perId = useMemo(() => new Map(transaktioner.map((t) => [t.id, t])), [transaktioner]);
+  // Underlagsrader som en bankrad pekar på — de hör till dubbletterna också
+  const iBanken = useMemo(
+    () => new Set(transaktioner.map((t) => t.dublettAv).filter(Boolean) as string[]),
+    [transaktioner],
+  );
+  const antalDubbletter = useMemo(() => transaktioner.filter(arDublett).length, [transaktioner]);
+
   const filtered = useMemo(
     () => transaktioner
       .filter((t) => (!fil || t.underlagId === fil)
         && (riktning === 'alla' || t.riktning === riktning)
+        && (!baraDubbletter || arDublett(t) || iBanken.has(t.id))
         && matches(t, query.trim()))
       .sort(compare),
-    [transaktioner, fil, riktning, query],
+    [transaktioner, fil, riktning, baraDubbletter, iBanken, query],
   );
 
-  useEffect(() => setShown(PAGE), [query, fil, riktning]);
+  useEffect(() => setShown(PAGE), [query, fil, riktning, baraDubbletter]);
 
   // En rad som filtrerats bort ska inte kunna raderas av misstag
   useEffect(() => {
@@ -94,6 +112,7 @@ export function TransaktionsLista({
   const summering = useMemo(() => {
     const per = new Map<string, { in: number; ut: number }>();
     for (const t of filtered) {
+      if (arDublett(t)) continue;
       const rad = per.get(t.valuta) ?? { in: 0, ut: 0 };
       if (t.riktning === 'in') rad.in += t.belopp;
       else rad.ut += t.belopp;
@@ -128,6 +147,23 @@ export function TransaktionsLista({
           </div>
         ))}
       </div>
+
+      {antalDubbletter > 0 && (
+        <div className="bg-gold-500/10 border border-gold-500/30 rounded-xl p-4 text-sm text-gold-300 flex items-center gap-3 flex-wrap">
+          <span className="flex-1">
+            {antalDubbletter === 1
+              ? 'En banktransaktion är troligen en dubblett'
+              : `${antalDubbletter} banktransaktioner är troligen dubbletter`}
+            {' '}av ett kvitto eller en dagskassa. De räknas inte med i in/ut.
+          </span>
+          <button
+            onClick={() => setBaraDubbletter((v) => !v)}
+            className="px-3 py-1.5 text-xs border border-gold-500/40 rounded-lg hover:bg-gold-500/10 transition"
+          >
+            {baraDubbletter ? 'Visa alla' : 'Visa dubbletterna'}
+          </button>
+        </div>
+      )}
 
       {utanDatum > 0 && (
         <div className="bg-gold-500/10 border border-gold-500/30 rounded-xl p-4 text-sm text-gold-300">
@@ -234,7 +270,7 @@ export function TransaktionsLista({
               </thead>
               <tbody className="divide-y divide-navy-600/60">
                 {filtered.slice(0, shown).map((t) => (
-                  <tr key={t.id} className={`transition ${valda.includes(t.id) ? 'bg-gold-500/5' : 'hover:bg-navy-700/40'}`}>
+                  <tr key={t.id} className={`transition ${valda.includes(t.id) ? 'bg-gold-500/5' : 'hover:bg-navy-700/40'} ${arDublett(t) ? 'opacity-60' : ''}`}>
                     {onDelete && (
                       <td className="px-4 py-2.5 align-top">
                         <input
@@ -254,19 +290,35 @@ export function TransaktionsLista({
                       {t.motpart && t.motpart !== t.beskrivning && (
                         <span className="text-warm-500"> · {t.motpart}</span>
                       )}
+                      {t.dublettAv && (
+                        <span className="block text-gold-400 text-xs mt-0.5">
+                          Trolig dubblett av {perId.get(t.dublettAv)?.fileName ?? 'ett underlag'}
+                          {perId.get(t.dublettAv)?.datum ? ` (${perId.get(t.dublettAv)!.datum})` : ''}
+                        </span>
+                      )}
+                      {t.dublettOrsak && (
+                        <span className="block text-gold-400 text-xs mt-0.5">Trolig dubblett: {t.dublettOrsak}</span>
+                      )}
+                      {iBanken.has(t.id) && (
+                        <span className="block text-warm-500 text-xs mt-0.5">Finns också i banken</span>
+                      )}
                       {t.anteckning && (
                         <span className="block text-gold-400/80 text-xs mt-0.5">{t.anteckning}</span>
                       )}
                       <span className="block md:hidden text-warm-600 text-[11px] mt-0.5">{t.fileName}</span>
                     </td>
                     <td className="px-4 py-2.5 align-top hidden md:table-cell">
-                      <Link
-                        href={`/admin/underlag/${t.underlagId}`}
-                        title={t.fileName ?? undefined}
-                        className="text-warm-500 hover:text-gold-400 text-xs transition break-all"
-                      >
-                        {t.fileName ?? 'Okänd fil'}
-                      </Link>
+                      {t.kalla === 'bank' ? (
+                        <span className="text-warm-500 text-xs break-all">{t.fileName ?? 'Bank'}</span>
+                      ) : (
+                        <Link
+                          href={`/admin/underlag/${t.underlagId}`}
+                          title={t.fileName ?? undefined}
+                          className="text-warm-500 hover:text-gold-400 text-xs transition break-all"
+                        >
+                          {t.fileName ?? 'Okänd fil'}
+                        </Link>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-warm-500 tabular-nums text-right whitespace-nowrap align-top hidden sm:table-cell">
                       {t.moms ? kr.format(t.moms) : ''}

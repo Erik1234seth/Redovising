@@ -1,10 +1,12 @@
 import { createHash } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { markeraDubbletter } from '../transaktioner/dubbletter';
 import { BankSessionUtgangen, hamtaSession, hamtaTransaktioner, type EbKonto, type EbSession, type EbTransaktion } from './enablebanking';
 
 /**
  * Hämtar bokförda transaktioner från kundens kopplade bankkonton till
- * bank_transaktioner. Ingenting bokförs än — transaktionerna är underlag.
+ * bank_transaktioner, och lägger in dem som vanliga rader i transaktioner
+ * (kalla='bank') med troliga dubbletter flaggade. Ingenting bokförs än.
  *
  * Varje körning hämtar från några dagar före förra hämtningen, eftersom banker
  * ibland bokför med eftersläpning. Samma transaktion skrivs över, inte dubbelt.
@@ -71,6 +73,23 @@ function rad(userId: string, kontoHash: string, id: string, t: EbTransaktion) {
     motpart: (inkommande ? t.debtor?.name : t.creditor?.name) || null,
     data: t,
     hamtad_at: new Date().toISOString(),
+  };
+}
+
+/** Bankraden som en vanlig transaktion. Belopp i kronor och riktning, som AI:ns rader. */
+function transaktionsrad(r: ReturnType<typeof rad>) {
+  return {
+    user_id: r.user_id,
+    bank_konto_hash: r.konto_hash,
+    bank_transaktion_id: r.transaktion_id,
+    radnr: 0,
+    datum: r.bokforingsdag,
+    beskrivning: r.text ?? r.motpart ?? '',
+    motpart: r.motpart,
+    belopp: Math.abs(r.belopp_ore) / 100,
+    valuta: r.valuta,
+    riktning: r.belopp_ore >= 0 ? 'in' : 'ut',
+    kalla: 'bank',
   };
 }
 
@@ -144,6 +163,15 @@ async function synkaKonto(supabase: SupabaseClient, userId: string, konto: { kon
     if (error) throw new Error(`Kunde inte spara transaktionerna: ${error.message}`);
   }
 
+  // Samma rader i transaktioner, bredvid det AI:n läst ur underlagen
+  const vanliga = rader.map(transaktionsrad);
+  for (let i = 0; i < vanliga.length; i += 500) {
+    const { error } = await supabase
+      .from('transaktioner')
+      .upsert(vanliga.slice(i, i + 500), { onConflict: 'user_id,bank_konto_hash,bank_transaktion_id' });
+    if (error) throw new Error(`Kunde inte lägga in transaktionerna: ${error.message}`);
+  }
+
   await supabase
     .from('bank_konton')
     .update({ synkad_till: datum(new Date()) })
@@ -189,6 +217,12 @@ export async function synkaBank(supabase: SupabaseClient, userId: string) {
         .update({ senaste_fel: text.slice(0, 500), ...(utgangen ? { status: 'utgangen' } : {}) })
         .eq('session_id', k.session_id);
     }
+  }
+
+  try {
+    await markeraDubbletter(supabase, userId);
+  } catch (err) {
+    fel.push(err instanceof Error ? err.message : String(err));
   }
   return { transaktioner, fel };
 }

@@ -243,6 +243,7 @@ export interface PersonUnderlag {
  */
 export interface AdminTransaktion {
   id: string;
+  /** Underlagets id, eller bank:<konto> för rader som hämtats från banken. */
   underlagId: string;
   fileName: string | null;
   /** Ordningen i filen. */
@@ -258,8 +259,12 @@ export interface AdminTransaktion {
   riktning: 'in' | 'ut';
   /** AI:ns notering när något var oläsligt eller osäkert. */
   anteckning: string;
-  /** ai eller manuell. */
+  /** ai, manuell eller bank. */
   kalla: string;
+  /** Bankrad: den transaktion ur underlagen som troligen är samma köp. */
+  dublettAv: string | null;
+  /** Bankrad: varför den troligen redan är bokförd, t.ex. en Zettle-utbetalning. */
+  dublettOrsak: string | null;
   at: string;
 }
 

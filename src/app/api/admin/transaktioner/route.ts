@@ -52,7 +52,8 @@ export async function DELETE(request: Request) {
         .select('underlag_id')
         .in('id', del);
       if (readError) return NextResponse.json({ error: readError.message }, { status: 500 });
-      for (const r of data ?? []) berorda.push(r.underlag_id as string);
+      // Bankrader hör inte till någon fil
+      for (const r of data ?? []) if (r.underlag_id) berorda.push(r.underlag_id as string);
     }
 
     for (const del of portioner(ids as string[])) {

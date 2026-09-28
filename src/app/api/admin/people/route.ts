@@ -675,10 +675,11 @@ async function transaktionerFor(owner: Owner): Promise<AdminTransaktion[]> {
   if (!filter) return [];
 
   const out: AdminTransaktion[] = [];
+  const bankNamn = new Map<string, string>();
   for (let from = 0; ; from += 500) {
     const { data, error } = await getSupabase()
       .from('transaktioner')
-      .select('id, underlag_id, radnr, datum, beskrivning, motpart, belopp, moms, valuta, riktning, anteckning, kalla, created_at, bokforing_underlag(file_name)')
+      .select('id, underlag_id, bank_konto_hash, radnr, datum, beskrivning, motpart, belopp, moms, valuta, riktning, anteckning, kalla, dublett_av, dublett_orsak, created_at, bokforing_underlag(file_name)')
       .or(filter)
       .order('datum', { ascending: true, nullsFirst: false })
       .order('underlag_id')
@@ -688,10 +689,11 @@ async function transaktionerFor(owner: Owner): Promise<AdminTransaktion[]> {
 
     for (const t of data ?? []) {
       const file = t.bokforing_underlag as unknown as { file_name: string } | null;
+      if (t.bank_konto_hash) bankNamn.set(t.bank_konto_hash, 'Bank');
       out.push({
         id: t.id,
-        underlagId: t.underlag_id,
-        fileName: file?.file_name ?? null,
+        underlagId: t.underlag_id ?? `bank:${t.bank_konto_hash}`,
+        fileName: t.bank_konto_hash ? null : file?.file_name ?? null,
         radnr: t.radnr ?? 0,
         datum: t.datum ?? '',
         beskrivning: t.beskrivning ?? '',
@@ -702,10 +704,31 @@ async function transaktionerFor(owner: Owner): Promise<AdminTransaktion[]> {
         riktning: t.riktning === 'in' ? 'in' : 'ut',
         anteckning: t.anteckning ?? '',
         kalla: t.kalla ?? 'ai',
+        dublettAv: t.dublett_av ?? null,
+        dublettOrsak: t.dublett_orsak ?? null,
         at: toIso(t.created_at) ?? '',
       });
     }
     if ((data ?? []).length < 500) break;
+  }
+
+  // Bankraderna har ingen fil — de visas med bankens och kontots namn i stället
+  if (bankNamn.size) {
+    const { data: konton } = await getSupabase()
+      .from('bank_konton')
+      .select('konto_hash, namn, iban, session_id')
+      .in('konto_hash', [...bankNamn.keys()]);
+    const sessioner = [...new Set((konton ?? []).map((k) => k.session_id).filter(Boolean))];
+    const { data: kopplingar } = sessioner.length
+      ? await getSupabase().from('bank_kopplingar').select('session_id, aspsp_name').in('session_id', sessioner)
+      : { data: [] };
+    const bankPer = new Map((kopplingar ?? []).map((k) => [k.session_id, k.aspsp_name as string]));
+    for (const k of konton ?? []) {
+      bankNamn.set(k.konto_hash, [bankPer.get(k.session_id) ?? 'Bank', k.namn || k.iban].filter(Boolean).join(' · '));
+    }
+    for (const t of out) {
+      if (t.underlagId.startsWith('bank:')) t.fileName = bankNamn.get(t.underlagId.slice(5)) ?? 'Bank';
+    }
   }
   return out;
 }

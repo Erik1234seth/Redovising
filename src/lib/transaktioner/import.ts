@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { markeraDubbletter } from './dubbletter';
 import { extraheraTransaktioner, kanLasasAvAi } from './extract';
 
 /**
@@ -114,6 +115,11 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
       await supabase.from('transaktioner').delete().eq('underlag_id', row.id);
       throw new Error(`Kunde inte spara transaktionerna: ${insertError.message}`);
     }
+  }
+
+  // Nya kvitton kan vara samma köp som redan hämtats från banken
+  if (row.user_id) {
+    await markeraDubbletter(supabase, row.user_id).catch((err) => console.error('[transaktioner] dubblettkollen misslyckades:', err));
   }
 
   return { antal: rows.length, notering };
