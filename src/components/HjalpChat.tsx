@@ -47,7 +47,7 @@ const SUGGESTED = [
 const PAGE_LABELS: Record<string, string> = {
   '/': 'Startsidan',
   '/bokforing': 'Bokföring',
-  '/fakturor': 'Fakturor',
+  '/fakturor': 'Faktura & offert',
   '/rapporter/ne-bilaga': 'NE-bilaga',
   '/rapporter/moms': 'Momsrapport',
   '/lager': 'Lager & Tillgångar',

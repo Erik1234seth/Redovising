@@ -13,15 +13,18 @@ interface Faktura {
   faktura_nr: string;
   kund_namn: string;
   belopp_inkl_moms: number;
+  husavdrag: { typ: 'rot' | 'rut'; att_betala: number } | null;
   forfallo_datum: string;
   faktura_datum: string;
   status: string;
+  dokumenttyp: 'faktura' | 'offert';
 }
 
 const STATUS_LABEL: Record<string, { label: string; bg: string; color: string }> = {
   obetald:  { label: 'Obetald',  bg: '#FEF9C3', color: '#A16207' },
   betald:   { label: 'Betald',   bg: '#DCFCE7', color: '#166534' },
   forsenad: { label: 'Försenad', bg: '#FEE2E2', color: '#991B1B' },
+  offert:   { label: 'Offert',   bg: '#E0E7FF', color: '#3730A3' },
 };
 
 export default function FakturorPage() {
@@ -41,7 +44,7 @@ export default function FakturorPage() {
     const supabase = createClient();
     supabase
       .from('fakturor')
-      .select('id,faktura_nr,kund_namn,belopp_inkl_moms,forfallo_datum,faktura_datum,status')
+      .select('id,faktura_nr,kund_namn,belopp_inkl_moms,husavdrag,forfallo_datum,faktura_datum,status,dokumenttyp')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         if (data) setFakturor(data);
@@ -70,8 +73,8 @@ export default function FakturorPage() {
       {/* Header */}
       <div className="px-8 pt-12 pb-4 flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Fakturor</h1>
-          <p className="text-slate-400 text-sm mt-2">Skapa och hantera dina kundfakturor</p>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Faktura & offert</h1>
+          <p className="text-slate-400 text-sm mt-2">Skapa och hantera dina fakturor och offerter</p>
         </div>
         <Link
           href="/fakturor/ny"
@@ -81,7 +84,7 @@ export default function FakturorPage() {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
           </svg>
-          Ny faktura
+          Skapa ny
         </Link>
       </div>
 
@@ -98,16 +101,16 @@ export default function FakturorPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <p className="font-bold text-slate-700 mb-1">Inga fakturor ännu</p>
+              <p className="font-bold text-slate-700 mb-1">Inga fakturor eller offerter ännu</p>
               <p className="text-sm text-slate-400 max-w-xs mb-6 leading-relaxed">
-                Skapa din första faktura med knappen uppe till höger
+                Skapa din första faktura eller offert med knappen uppe till höger
               </p>
               <Link
                 href="/fakturor/ny"
                 className="px-5 py-2.5 text-sm font-bold text-white rounded-xl hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: NAV_BG }}
               >
-                Skapa faktura
+                Skapa faktura eller offert
               </Link>
             </div>
           ) : (
@@ -116,10 +119,10 @@ export default function FakturorPage() {
                 className="grid px-6 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100"
                 style={{ gridTemplateColumns: '110px 1fr 170px 150px 120px 80px' }}
               >
-                <span>Faktura nr</span>
+                <span>Nummer</span>
                 <span>Kund</span>
                 <span className="text-right">Belopp inkl. moms</span>
-                <span className="pl-4">Förfallodatum</span>
+                <span className="pl-4">Förfaller / giltig</span>
                 <span className="pl-4">Status</span>
                 <span />
               </div>
@@ -137,7 +140,8 @@ export default function FakturorPage() {
                     <span className="text-sm font-semibold text-slate-700">{f.faktura_nr}</span>
                     <span className="text-sm text-slate-600 truncate">{f.kund_namn}</span>
                     <span className="text-sm font-semibold text-slate-700 text-right">
-                      {Number(f.belopp_inkl_moms).toLocaleString('sv-SE')} kr
+                      {f.husavdrag && <span className="mr-1.5 text-[10px] font-bold uppercase text-emerald-600">{f.husavdrag.typ}</span>}
+                      {Number(f.husavdrag?.att_betala ?? f.belopp_inkl_moms).toLocaleString('sv-SE')} kr
                     </span>
                     <span className="text-sm text-slate-500 pl-4">
                       {new Date(f.forfallo_datum).toLocaleDateString('sv-SE')}
@@ -149,7 +153,7 @@ export default function FakturorPage() {
                       >
                         {forfallen ? 'Försenad' : effectiveSt.label}
                       </span>
-                      {f.status === 'betald' ? (
+                      {f.status === 'offert' ? null : f.status === 'betald' ? (
                         <span className="w-7 h-7 rounded-full flex items-center justify-center text-green-600 border-2 border-green-400 bg-green-50">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -171,7 +175,7 @@ export default function FakturorPage() {
                       <button
                         onClick={() => setDeleteConfirmId(f.id)}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                        title="Radera faktura"
+                        title="Radera"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -180,7 +184,7 @@ export default function FakturorPage() {
                       <Link
                         href={`/fakturor/${f.id}`}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 bg-slate-200 hover:text-slate-800 hover:bg-slate-300 transition-all"
-                        title="Öppna faktura"
+                        title="Öppna"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -206,9 +210,9 @@ export default function FakturorPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </div>
-              <h2 className="text-lg font-bold text-slate-800 text-center mb-1">Radera faktura?</h2>
+              <h2 className="text-lg font-bold text-slate-800 text-center mb-1">{f?.dokumenttyp === 'offert' ? 'Radera offert?' : 'Radera faktura?'}</h2>
               <p className="text-sm text-slate-500 text-center mb-6">
-                Faktura <span className="font-semibold text-slate-700">{f?.faktura_nr}</span> till <span className="font-semibold text-slate-700">{f?.kund_namn}</span> raderas permanent och kan inte återställas.
+                {f?.dokumenttyp === 'offert' ? 'Offert' : 'Faktura'} <span className="font-semibold text-slate-700">{f?.faktura_nr}</span> till <span className="font-semibold text-slate-700">{f?.kund_namn}</span> raderas permanent och kan inte återställas.
               </p>
               <div className="flex gap-3">
                 <button

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { husavdragEtikett, type Husavdrag } from '@/lib/husavdrag';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -19,6 +20,8 @@ interface EmailBody {
   totalExkl: number;
   totalInkl: number;
   betalningsinfo?: string | null;
+  husavdrag?: Husavdrag | null;
+  dokumenttyp?: 'faktura' | 'offert';
 }
 
 function fmt(n: number) {
@@ -28,7 +31,8 @@ function fmt(n: number) {
 export async function POST(request: Request) {
   try {
     const body: EmailBody = await request.json();
-    const { to, pdfBase64, fakturaName, fakturaInfo, säljarInfo, kundInfo, rader, momsByRate, totalExkl, totalInkl, betalningsinfo } = body;
+    const { to, pdfBase64, fakturaName, fakturaInfo, säljarInfo, kundInfo, rader, momsByRate, totalExkl, totalInkl, betalningsinfo, husavdrag, dokumenttyp } = body;
+    const offert = dokumenttyp === 'offert';
 
     if (!to || !pdfBase64 || !fakturaName) {
       return NextResponse.json({ error: 'Saknar e-post, PDF eller fakturanummer' }, { status: 400 });
@@ -68,7 +72,7 @@ export async function POST(request: Request) {
 
         <!-- Header -->
         <tr><td style="background:#173b57;border-radius:16px 16px 0 0;padding:32px 40px;">
-          <div style="font-size:11px;font-weight:700;color:#93c5fd;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">FAKTURA</div>
+          <div style="font-size:11px;font-weight:700;color:#93c5fd;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">${offert ? "OFFERT" : "FAKTURA"}</div>
           <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">Nr ${fakturaInfo.faktura_nr}</div>
         </td></tr>
 
@@ -103,19 +107,19 @@ export async function POST(request: Request) {
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td style="width:25%;vertical-align:top;padding-right:12px;">
-                <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Fakturadatum</div>
+                <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">${offert ? "Offertdatum" : "Fakturadatum"}</div>
                 <div style="font-size:13px;color:#1e293b;">${fakturaInfo.faktura_datum}</div>
               </td>
               <td style="width:25%;vertical-align:top;padding-right:12px;">
-                <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Förfallodatum</div>
+                <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">${offert ? "Giltig till" : "Förfallodatum"}</div>
                 <div style="font-size:13px;color:#1e293b;">${fakturaInfo.forfallo_datum}</div>
               </td>
               <td style="width:25%;vertical-align:top;padding-right:12px;">
-                <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Fakturanummer</div>
+                <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">${offert ? "Offertnummer" : "Fakturanummer"}</div>
                 <div style="font-size:13px;color:#1e293b;">${fakturaInfo.faktura_nr}</div>
               </td>
               <td style="width:25%;vertical-align:top;">
-                <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Betalningsvillkor</div>
+                <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">${offert ? "Giltighetstid" : "Betalningsvillkor"}</div>
                 <div style="font-size:13px;color:#1e293b;">${fakturaInfo.betalningsdagar} dagar</div>
               </td>
             </tr>
@@ -150,14 +154,34 @@ export async function POST(request: Request) {
                 <tr>
                   <td colspan="2" style="padding:4px 0;border-top:1px solid #e2e8f0;"></td>
                 </tr>
+                ${husavdrag ? `
                 <tr>
-                  <td style="padding:6px 0;font-size:15px;font-weight:800;color:#173b57;">Totalt att betala</td>
-                  <td style="padding:6px 0;font-size:15px;font-weight:800;color:#173b57;text-align:right;">${fmt(totalInkl)}</td>
+                  <td style="padding:5px 0;font-size:13px;color:#64748b;">Totalt inkl. moms</td>
+                  <td style="padding:5px 0;font-size:13px;color:#1e293b;text-align:right;">${fmt(totalInkl)}</td>
                 </tr>
+                <tr>
+                  <td style="padding:5px 0;font-size:13px;color:#059669;">${husavdragEtikett(husavdrag.typ)} ${husavdrag.procent}%</td>
+                  <td style="padding:5px 0;font-size:13px;font-weight:700;color:#059669;text-align:right;">−${fmt(husavdrag.avdrag)}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:15px;font-weight:800;color:#173b57;">Att betala</td>
+                  <td style="padding:6px 0;font-size:15px;font-weight:800;color:#173b57;text-align:right;">${fmt(husavdrag.att_betala)}</td>
+                </tr>` : `
+                <tr>
+                  <td style="padding:6px 0;font-size:15px;font-weight:800;color:#173b57;">${offert ? "Totalt" : "Totalt att betala"}</td>
+                  <td style="padding:6px 0;font-size:15px;font-weight:800;color:#173b57;text-align:right;">${fmt(totalInkl)}</td>
+                </tr>`}
               </table>
             </td></tr>
           </table>
         </td></tr>
+
+        ${husavdrag ? `
+        <!-- ROT/RUT -->
+        <tr><td style="background:#ecfdf5;padding:16px 40px;border-top:1px solid #e2e8f0;">
+          <div style="font-size:10px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">${husavdragEtikett(husavdrag.typ)}</div>
+          <div style="font-size:13px;color:#065f46;line-height:1.7;white-space:pre-line;">Du betalar ${fmt(husavdrag.att_betala)}. Resterande ${fmt(husavdrag.avdrag)} begärs från Skatteverket.${husavdrag.info ? `\n${husavdrag.info}` : ''}</div>
+        </td></tr>` : ''}
 
         ${betalningsinfo ? `
         <!-- Betalningsinfo -->
@@ -169,7 +193,7 @@ export async function POST(request: Request) {
         <!-- Footer -->
         <tr><td style="background:#f8fafc;border-radius:0 0 16px 16px;padding:20px 40px;border-top:1px solid #e2e8f0;">
           <p style="font-size:12px;color:#94a3b8;margin:0 0 4px;text-align:center;">
-            ${säljarInfo.email ? `Frågor om fakturan? Maila till <a href="mailto:${säljarInfo.email}" style="color:#64748b;">${säljarInfo.email}</a>` : ''}
+            ${säljarInfo.email ? `Frågor om ${offert ? "offerten" : "fakturan"}? Maila till <a href="mailto:${säljarInfo.email}" style="color:#64748b;">${säljarInfo.email}</a>` : ''}
           </p>
           <p style="font-size:12px;color:#94a3b8;margin:0;text-align:center;">
             Skickat via <strong style="color:#64748b;">Enkla Bokslut</strong>

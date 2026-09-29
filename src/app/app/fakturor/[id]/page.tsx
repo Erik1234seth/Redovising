@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
+import { husavdragEtikett, type Husavdrag } from '@/lib/husavdrag';
 
 const NAV_BG = '#173b57';
 
@@ -35,6 +36,8 @@ interface Faktura {
   betalningsinfo: string | null;
   meddelande: string | null;
   status: string;
+  husavdrag: Husavdrag | null;
+  dokumenttyp: 'faktura' | 'offert';
 }
 
 function fmt(n: number) {
@@ -82,7 +85,7 @@ export default function FakturaVyPage() {
   if (!faktura) {
     return (
       <div className="flex-1 flex items-center justify-center h-screen bg-slate-50">
-        <p className="text-slate-400">Fakturan hittades inte.</p>
+        <p className="text-slate-400">Dokumentet hittades inte.</p>
       </div>
     );
   }
@@ -95,6 +98,9 @@ export default function FakturaVyPage() {
     belopp: rader.filter(r => r.momssats === sats).reduce((acc, r) => acc + r.antal * r.apris * (sats / 100), 0),
   })).filter(m => m.belopp > 0);
   const totalInkl = totalExkl + momsByRate.reduce((s, m) => s + m.belopp, 0);
+
+  const arOffert = faktura.dokumenttyp === 'offert';
+  const dokNamn = arOffert ? 'Offert' : 'Faktura';
 
   const betalningsDagar = Math.round(
     (new Date(faktura.forfallo_datum).getTime() - new Date(faktura.faktura_datum).getTime()) / 86400000
@@ -131,10 +137,28 @@ export default function FakturaVyPage() {
         kund_land: faktura!.kund_land,
         kund_org_nr: faktura!.kund_org_nr,
         rader: faktura!.rader,
+        husavdrag: faktura!.husavdrag,
+        dokumenttyp: faktura!.dokumenttyp,
       },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any);
     return pdfDoc.toBlob();
+  }
+
+  // Offerten blir en faktura med dagens datum och 30 dagars betalningsvillkor
+  async function gorOmTillFaktura() {
+    const idag = new Date();
+    const forfaller = new Date();
+    forfaller.setDate(forfaller.getDate() + 30);
+    const uppdatering = {
+      dokumenttyp: 'faktura' as const,
+      status: 'obetald',
+      faktura_datum: idag.toISOString().split('T')[0],
+      forfallo_datum: forfaller.toISOString().split('T')[0],
+    };
+    const supabase = createClient();
+    const { error } = await supabase.from('fakturor').update(uppdatering).eq('id', faktura!.id);
+    if (!error) setFaktura({ ...faktura!, ...uppdatering });
   }
 
   async function handleDownload() {
@@ -142,7 +166,7 @@ export default function FakturaVyPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Faktura-${faktura!.faktura_nr}-${faktura!.kund_namn}.pdf`;
+    a.download = `${dokNamn}-${faktura!.faktura_nr}-${faktura!.kund_namn}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -162,7 +186,7 @@ export default function FakturaVyPage() {
         body: JSON.stringify({
           to: sendEmail.trim(),
           pdfBase64: base64,
-          fakturaName: `Faktura-${faktura!.faktura_nr}`,
+          fakturaName: `${dokNamn}-${faktura!.faktura_nr}`,
           fakturaId: faktura!.id,
           fakturaInfo: {
             faktura_nr: faktura!.faktura_nr,
@@ -193,6 +217,8 @@ export default function FakturaVyPage() {
           totalExkl,
           totalInkl,
           betalningsinfo: faktura!.betalningsinfo,
+          husavdrag: faktura!.husavdrag,
+          dokumenttyp: faktura!.dokumenttyp,
         }),
       });
       const data = await res.json();
@@ -222,6 +248,16 @@ export default function FakturaVyPage() {
               </svg>
               Tillbaka
             </button>
+            <div className="flex items-center gap-2">
+            {arOffert && (
+              <button
+                onClick={gorOmTillFaktura}
+                className="px-5 py-2.5 text-sm font-bold rounded-xl border-2 hover:bg-white transition-colors"
+                style={{ borderColor: NAV_BG, color: NAV_BG }}
+              >
+                Gör om till faktura
+              </button>
+            )}
             <button
               onClick={handleDownload}
               className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white rounded-xl hover:opacity-90 transition-opacity"
@@ -232,11 +268,12 @@ export default function FakturaVyPage() {
               </svg>
               Ladda ner PDF
             </button>
+            </div>
           </div>
 
           {/* Skicka via e-post */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 max-w-3xl mx-auto">
-            <p className="text-xs font-semibold text-slate-500 mb-3">Skicka faktura via e-post <span className="font-normal text-slate-400">(valfritt)</span></p>
+            <p className="text-xs font-semibold text-slate-500 mb-3">Skicka {dokNamn.toLowerCase()} via e-post <span className="font-normal text-slate-400">(valfritt)</span></p>
             <div className="flex gap-2">
               <input
                 type="email"
@@ -304,12 +341,13 @@ function FakturaInnehall({
   betalningsDagar: number;
   profile: { full_name: string | null; company_name: string | null; org_nr: string | null; phone: string | null; email: string; adress: string | null; postnummer: string | null; ort: string | null; momsnr: string | null } | null;
 }) {
+  const offert = faktura.dokumenttyp === 'offert';
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', color: '#1e293b' }}>
 
       {/* Header */}
       <div style={{ marginBottom: 40 }}>
-        <div style={{ fontSize: 28, fontWeight: 800, color: NAV_BG, letterSpacing: '-0.5px' }}>FAKTURA</div>
+        <div style={{ fontSize: 28, fontWeight: 800, color: NAV_BG, letterSpacing: '-0.5px' }}>{offert ? 'OFFERT' : 'FAKTURA'}</div>
         <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>Nr {faktura.faktura_nr}</div>
       </div>
 
@@ -355,10 +393,10 @@ function FakturaInnehall({
       {/* Datumrad */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, marginBottom: 28, borderTop: `2px solid ${NAV_BG}`, paddingTop: 12 }}>
         {([
-          ['Fakturadatum', fmtDatum(faktura.faktura_datum)],
-          ['Förfallodatum', fmtDatum(faktura.forfallo_datum)],
-          ['Fakturanummer', faktura.faktura_nr],
-          ['Betalningsvillkor', `${betalningsDagar} dagar`],
+          [offert ? 'Offertdatum' : 'Fakturadatum', fmtDatum(faktura.faktura_datum)],
+          [offert ? 'Giltig till' : 'Förfallodatum', fmtDatum(faktura.forfallo_datum)],
+          [offert ? 'Offertnummer' : 'Fakturanummer', faktura.faktura_nr],
+          [offert ? 'Giltighetstid' : 'Betalningsvillkor', `${betalningsDagar} dagar`],
         ] as [string, string][]).map(([label, val]) => (
           <div key={label}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>{label}</div>
@@ -405,12 +443,39 @@ function FakturaInnehall({
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 12, color: '#64748b', borderTop: '1px solid #E2E8F0', marginTop: 4, paddingTop: 6 }}>
             <span>Totalt exkl. moms</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{fmt(totalExkl)}</span>
           </div>
-          <div style={{ borderTop: `2px solid ${NAV_BG}`, marginTop: 6, paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color: NAV_BG }}>Totalt att betala</span>
-            <span style={{ fontSize: 14, fontWeight: 800, color: NAV_BG }}>{fmt(totalInkl)}</span>
-          </div>
+          {faktura.husavdrag ? (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 12, color: '#64748b' }}>
+                <span>Totalt inkl. moms</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{fmt(totalInkl)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12, color: '#059669' }}>
+                <span>{husavdragEtikett(faktura.husavdrag.typ)} {faktura.husavdrag.procent}%</span><span style={{ fontWeight: 700 }}>−{fmt(faktura.husavdrag.avdrag)}</span>
+              </div>
+              <div style={{ borderTop: `2px solid ${NAV_BG}`, marginTop: 6, paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 14, fontWeight: 800, color: NAV_BG }}>Att betala</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: NAV_BG }}>{fmt(faktura.husavdrag.att_betala)}</span>
+              </div>
+            </>
+          ) : (
+            <div style={{ borderTop: `2px solid ${NAV_BG}`, marginTop: 6, paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 14, fontWeight: 800, color: NAV_BG }}>{offert ? 'Totalt' : 'Totalt att betala'}</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: NAV_BG }}>{fmt(totalInkl)}</span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ROT/RUT-uppgifter */}
+      {faktura.husavdrag && (
+        <div style={{ backgroundColor: '#ECFDF5', borderRadius: 10, padding: 16, marginBottom: 24, fontSize: 12, color: '#065F46', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>
+            {husavdragEtikett(faktura.husavdrag.typ)}
+          </div>
+          <div>Personnummer: {faktura.husavdrag.personnummer}</div>
+          {faktura.husavdrag.fastighet && <div>Fastighet: {faktura.husavdrag.fastighet}</div>}
+          {faktura.husavdrag.info && <div style={{ whiteSpace: 'pre-line', marginTop: 4 }}>{faktura.husavdrag.info}</div>}
+        </div>
+      )}
 
       {/* Betalning + meddelande */}
       {(faktura.betalningsinfo || faktura.meddelande) && (
@@ -445,7 +510,7 @@ function FakturaInnehall({
           ? <span style={{ fontSize: 12, color: '#64748b' }}>Frågor om fakturan? Maila till {profile.email}</span>
           : <span />
         }
-        <span style={{ fontSize: 10, color: '#CBD5E1' }}>Faktura {faktura.faktura_nr}</span>
+        <span style={{ fontSize: 10, color: '#CBD5E1' }}>{offert ? 'Offert' : 'Faktura'} {faktura.faktura_nr}</span>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { Document, Page, Text, View, StyleSheet, Svg, Path } from '@react-pdf/renderer';
+import { husavdragEtikett, type Husavdrag } from '@/lib/husavdrag';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,8 @@ export interface FakturaPDFData {
   kund_org_nr: string | null;
   // Rader
   rader: FakturaRad[];
+  husavdrag?: Husavdrag | null;
+  dokumenttyp?: 'faktura' | 'offert';
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -123,6 +126,7 @@ function fmtDatum(s: string) {
 // ─── PDF Component ────────────────────────────────────────────────────────────
 
 export function FakturaPDF({ data }: { data: FakturaPDFData }) {
+  const offert = data.dokumenttyp === 'offert';
   const radSummor = data.rader.map(r => {
     const exkl = r.antal * r.apris;
     const moms = exkl * (r.momssats / 100);
@@ -154,7 +158,7 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
             </Text>
           </View>
           <View style={s.headerRight}>
-            <Text style={s.fakturaNr}>FAKTURA</Text>
+            <Text style={s.fakturaNr}>{offert ? 'OFFERT' : 'FAKTURA'}</Text>
             <Text style={{ fontSize: 9, color: '#64748b', marginBottom: 6 }}>Nr {data.faktura_nr}</Text>
           </View>
         </View>
@@ -198,7 +202,7 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
         {/* Datum */}
         <View style={s.datumRow}>
           <View style={s.datumBox}>
-            <Text style={s.datumLabel}>Fakturadatum</Text>
+            <Text style={s.datumLabel}>{offert ? 'Offertdatum' : 'Fakturadatum'}</Text>
             <Text style={s.datumVärde}>{fmtDatum(data.faktura_datum)}</Text>
           </View>
           {data.leverans_datum && (
@@ -208,15 +212,15 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
             </View>
           )}
           <View style={s.datumBox}>
-            <Text style={s.datumLabel}>Förfallodatum</Text>
+            <Text style={s.datumLabel}>{offert ? 'Giltig till' : 'Förfallodatum'}</Text>
             <Text style={s.datumVärde}>{fmtDatum(data.forfallo_datum)}</Text>
           </View>
           <View style={s.datumBox}>
-            <Text style={s.datumLabel}>Fakturanummer</Text>
+            <Text style={s.datumLabel}>{offert ? 'Offertnummer' : 'Fakturanummer'}</Text>
             <Text style={s.datumVärde}>{data.faktura_nr}</Text>
           </View>
           <View style={s.datumBox}>
-            <Text style={s.datumLabel}>Betalningsvillkor</Text>
+            <Text style={s.datumLabel}>{offert ? 'Giltighetstid' : 'Betalningsvillkor'}</Text>
             <Text style={s.datumVärde}>
               {Math.round((new Date(data.forfallo_datum).getTime() - new Date(data.faktura_datum).getTime()) / 86400000)} dagar
             </Text>
@@ -262,13 +266,49 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
               <Text style={s.sumLabel}>Totalt exkl. moms</Text>
               <Text style={s.sumVal}>{fmt(totalExkl)}</Text>
             </View>
-            <View style={s.sumDivider} />
-            <View style={s.sumLine}>
-              <Text style={s.sumTotalLabel}>Totalt att betala</Text>
-              <Text style={s.sumTotalVal}>{fmt(totalInkl)}</Text>
-            </View>
+            {data.husavdrag ? (
+              <>
+                <View style={s.sumLine}>
+                  <Text style={s.sumLabel}>Totalt inkl. moms</Text>
+                  <Text style={s.sumVal}>{fmt(totalInkl)}</Text>
+                </View>
+                <View style={s.sumLine}>
+                  <Text style={[s.sumLabel, { color: '#059669' }]}>{husavdragEtikett(data.husavdrag.typ)} {data.husavdrag.procent}%</Text>
+                  <Text style={[s.sumVal, { color: '#059669' }]}>−{fmt(data.husavdrag.avdrag)}</Text>
+                </View>
+                <View style={s.sumDivider} />
+                <View style={s.sumLine}>
+                  <Text style={s.sumTotalLabel}>Att betala</Text>
+                  <Text style={s.sumTotalVal}>{fmt(data.husavdrag.att_betala)}</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={s.sumDivider} />
+                <View style={s.sumLine}>
+                  <Text style={s.sumTotalLabel}>{offert ? 'Totalt' : 'Totalt att betala'}</Text>
+                  <Text style={s.sumTotalVal}>{fmt(totalInkl)}</Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
+
+        {/* ROT/RUT-uppgifter */}
+        {data.husavdrag && (
+          <View style={{ marginTop: 20, backgroundColor: '#ECFDF5', borderRadius: 6, padding: 10 }}>
+            <Text style={[s.footerLabel, { color: '#059669' }]}>
+              {husavdragEtikett(data.husavdrag.typ)}
+            </Text>
+            <Text style={[s.footerText, { color: '#065F46' }]}>Personnummer: {data.husavdrag.personnummer}</Text>
+            {data.husavdrag.fastighet && (
+              <Text style={[s.footerText, { color: '#065F46' }]}>Fastighet: {data.husavdrag.fastighet}</Text>
+            )}
+            {data.husavdrag.info && (
+              <Text style={[s.footerText, { color: '#065F46', marginTop: 3 }]}>{data.husavdrag.info}</Text>
+            )}
+          </View>
+        )}
 
         {/* Betalning + meddelande */}
         <View style={s.footer}>

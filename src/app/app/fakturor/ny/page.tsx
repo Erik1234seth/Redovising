@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
+import {
+  HUSAVDRAG_PROCENT, beraknaAvdrag, husavdragEtikett, type Husavdrag, type HusavdragTyp,
+} from '@/lib/husavdrag';
 
 const NAV_BG = '#173b57';
 
@@ -89,6 +92,8 @@ export default function NyFakturaPage() {
   const [valdKundId, setValdKundId] = useState<string>('');
   const [kund, setKund] = useState<KundForm>({ namn: '', email: '', adress: '', postnummer: '', ort: '', land: 'Sverige', org_nr: '' });
 
+  const [dokumenttyp, setDokumenttyp] = useState<'faktura' | 'offert'>('faktura');
+  const arOffert = dokumenttyp === 'offert';
   const [fakturaNr, setFakturaNr] = useState('');
   const [fakturaDatum, setFakturaDatum] = useState(datePlus(0));
   const [leveransDatum, setLeveransDatum] = useState(datePlus(0));
@@ -102,6 +107,11 @@ export default function NyFakturaPage() {
   const [swish, setSwish] = useState('');
   const [anpassatBetal, setAnpassatBetal] = useState('');
   const [meddelande, setMeddelande] = useState('');
+
+  const [husavdragTyp, setHusavdragTyp] = useState<HusavdragTyp | null>(null);
+  const [personnummer, setPersonnummer] = useState('');
+  const [fastighet, setFastighet] = useState('');
+  const [husavdragInfo, setHusavdragInfo] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +165,10 @@ export default function NyFakturaPage() {
       return;
     }
     const k = sparadeKunder.find(k => k.id === id);
-    if (k) setKund({ namn: k.namn, email: k.email ?? '', adress: k.adress ?? '', postnummer: k.postnummer ?? '', ort: k.ort ?? '', land: k.land ?? 'Sverige', org_nr: k.org_nr ?? '' });
+    if (k) {
+      setKund({ namn: k.namn, email: k.email ?? '', adress: k.adress ?? '', postnummer: k.postnummer ?? '', ort: k.ort ?? '', land: k.land ?? 'Sverige', org_nr: k.org_nr ?? '' });
+      if (!personnummer && k.org_nr) setPersonnummer(k.org_nr);
+    }
   }
 
   async function sparaNyKund() {
@@ -252,10 +265,28 @@ export default function NyFakturaPage() {
     belopp: radSummor.filter(r => r.momssats === s).reduce((acc, r) => acc + r.moms, 0),
   })).filter(m => m.belopp > 0);
 
+  // Vid ROT/RUT antas hela beloppet vara arbete
+  const arbetskostnad = husavdragTyp ? totalInkl : 0;
+  const avdrag = husavdragTyp ? beraknaAvdrag(husavdragTyp, arbetskostnad) : 0;
+  const attBetala = totalInkl - avdrag;
+
   async function spara() {
     if (!user) return;
     if (!valdKundId) { setError('Välj en kund'); return; }
     if (rader.some(r => !r.produktId)) { setError('Alla rader måste ha en produkt vald'); return; }
+    if (husavdragTyp && totalInkl <= 0) { setError('Fakturan saknar belopp att dra av'); return; }
+    if (husavdragTyp && !personnummer.trim()) { setError('Fyll i köparens personnummer'); return; }
+
+    const husavdrag: Husavdrag | null = husavdragTyp ? {
+      typ: husavdragTyp,
+      procent: HUSAVDRAG_PROCENT[husavdragTyp],
+      personnummer: personnummer.trim(),
+      fastighet: husavdragTyp === 'rot' ? fastighet.trim() || null : null,
+      info: husavdragInfo.trim() || null,
+      arbetskostnad: Math.round(arbetskostnad * 100) / 100,
+      avdrag,
+      att_betala: Math.round(attBetala * 100) / 100,
+    } : null;
 
     setSaving(true);
     setError(null);
@@ -286,7 +317,9 @@ export default function NyFakturaPage() {
           betalsatt === 'anpassat' && anpassatBetal ? anpassatBetal :
           null,
         meddelande: meddelande || null,
-        status: 'obetald',
+        husavdrag,
+        dokumenttyp,
+        status: arOffert ? 'offert' : 'obetald',
       }).select('id').single();
       if (dbErr) throw dbErr;
       if (betalsatt === 'bankgiro' && bankgiro) {
@@ -319,8 +352,21 @@ export default function NyFakturaPage() {
           Tillbaka
         </button>
       </div>
-      <div className="px-8 pb-6">
-        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Ny faktura</h1>
+      <div className="px-8 pb-6 flex items-center gap-4">
+        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">{arOffert ? 'Ny offert' : 'Ny faktura'}</h1>
+        <div className="flex items-center gap-1 bg-slate-200/70 rounded-xl p-1">
+          {(['faktura', 'offert'] as const).map(t => (
+            <button key={t} type="button" onClick={() => setDokumenttyp(t)}
+              className="px-3.5 py-1.5 text-sm font-semibold rounded-lg transition-all"
+              style={{
+                backgroundColor: dokumenttyp === t ? 'white' : 'transparent',
+                color: dokumenttyp === t ? NAV_BG : '#64748b',
+                boxShadow: dokumenttyp === t ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              }}>
+              {t === 'faktura' ? 'Faktura' : 'Offert'}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="px-8 pb-16 max-w-3xl flex flex-col gap-5">
@@ -407,15 +453,15 @@ export default function NyFakturaPage() {
         </Section>
 
         {/* ── Fakturadetaljer ── */}
-        <Section title="Fakturadetaljer">
+        <Section title={arOffert ? "Offertdetaljer" : "Fakturadetaljer"}>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className={labelCls}>Fakturanummer</label>
+              <label className={labelCls}>{arOffert ? "Offertnummer" : "Fakturanummer"}</label>
               <input type="text" value={fakturaNr} onChange={e => setFakturaNr(e.target.value)}
                 className={inputCls} style={ringStyle} />
             </div>
             <div>
-              <label className={labelCls}>Fakturadatum</label>
+              <label className={labelCls}>{arOffert ? "Offertdatum" : "Fakturadatum"}</label>
               <input type="date" value={fakturaDatum} onChange={e => setFakturaDatum(e.target.value)}
                 className={inputCls} style={ringStyle} />
             </div>
@@ -425,7 +471,7 @@ export default function NyFakturaPage() {
                 className={inputCls} style={ringStyle} />
             </div>
             <div>
-              <label className={labelCls}>Betalningsvillkor</label>
+              <label className={labelCls}>{arOffert ? "Giltig i" : "Betalningsvillkor"}</label>
               <select value={forfalloTyp} onChange={e => setForfalloTyp(e.target.value as typeof forfalloTyp)}
                 className={inputCls} style={ringStyle}>
                 <option value="10">10 dagar</option>
@@ -436,14 +482,14 @@ export default function NyFakturaPage() {
             </div>
             {forfalloTyp === 'custom' && (
               <div>
-                <label className={labelCls}>Förfallodatum</label>
+                <label className={labelCls}>{arOffert ? "Giltig till" : "Förfallodatum"}</label>
                 <input type="date" value={forfalloDatum} onChange={e => setForfalloDatum(e.target.value)}
                   className={inputCls} style={ringStyle} />
               </div>
             )}
           </div>
           {forfalloTyp !== 'custom' && (
-            <p className="text-xs text-slate-400 mt-2">Förfaller: {new Date(forfalloDatum).toLocaleDateString('sv-SE')}</p>
+            <p className="text-xs text-slate-400 mt-2">{arOffert ? 'Giltig till' : 'Förfaller'}: {new Date(forfalloDatum).toLocaleDateString('sv-SE')}</p>
           )}
         </Section>
 
@@ -554,6 +600,7 @@ export default function NyFakturaPage() {
                           {summa > 0 ? summa.toLocaleString('sv-SE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—'}
                         </p>
 
+
                         <button onClick={() => taBortRad(rad.id)} disabled={rader.length === 1}
                           className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors disabled:opacity-0">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -582,6 +629,54 @@ export default function NyFakturaPage() {
           )}
         </Section>
 
+        {/* ── ROT & RUT ── */}
+        <Section title="ROT- & RUT-avdrag" optional>
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              { key: null, label: 'Inget avdrag', sub: '' },
+              { key: 'rot', label: 'ROT', sub: `${HUSAVDRAG_PROCENT.rot}% av arbetet` },
+              { key: 'rut', label: 'RUT', sub: `${HUSAVDRAG_PROCENT.rut}% av arbetet` },
+            ] as const).map(({ key, label, sub }) => (
+              <button key={label} type="button" onClick={() => setHusavdragTyp(key)}
+                className="py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all flex flex-col items-center"
+                style={{
+                  borderColor: husavdragTyp === key ? NAV_BG : '#e2e8f0',
+                  backgroundColor: husavdragTyp === key ? NAV_BG : 'transparent',
+                  color: husavdragTyp === key ? 'white' : '#475569',
+                }}>
+                {label}
+                {sub && <span className="text-[11px] font-medium opacity-70">{sub}</span>}
+              </button>
+            ))}
+          </div>
+
+          {husavdragTyp && (
+            <div className="flex flex-col gap-4 mt-5">
+              <div className={husavdragTyp === 'rot' ? 'grid grid-cols-2 gap-3' : ''}>
+                <div>
+                  <label className={labelCls}>Personnummer</label>
+                  <input type="text" value={personnummer} onChange={e => setPersonnummer(e.target.value)}
+                    placeholder="ÅÅÅÅMMDD-XXXX" className={inputCls} style={ringStyle} />
+                </div>
+                {husavdragTyp === 'rot' && (
+                  <div>
+                    <label className={labelCls}>Fastighet / lägenhet</label>
+                    <input type="text" value={fastighet} onChange={e => setFastighet(e.target.value)}
+                      placeholder="T.ex. Solna Råsunda 1:23" className={inputCls} style={ringStyle} />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className={labelCls}>Övrig info <span className="normal-case font-normal text-slate-400">(valfritt)</span></label>
+                <textarea rows={2} value={husavdragInfo} onChange={e => setHusavdragInfo(e.target.value)}
+                  placeholder="T.ex. fler köpare, BRF-nummer eller vad arbetet gällde"
+                  className="w-full px-3 py-2.5 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 resize-none transition"
+                  style={ringStyle} />
+              </div>
+            </div>
+          )}
+        </Section>
+
         {/* ── Summering ── */}
         <Section title="Summering">
           <div className="flex flex-col gap-2">
@@ -599,6 +694,18 @@ export default function NyFakturaPage() {
               <span className="font-bold text-slate-800">Totalt inkl. moms</span>
               <span className="font-bold text-slate-800 text-lg tabular-nums">{totalInkl.toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr</span>
             </div>
+            {husavdragTyp && (
+              <>
+                <div className="flex justify-between text-sm" style={{ color: '#059669' }}>
+                  <span>{husavdragEtikett(husavdragTyp)} {HUSAVDRAG_PROCENT[husavdragTyp]}%</span>
+                  <span className="font-semibold tabular-nums">−{avdrag.toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr</span>
+                </div>
+                <div className="flex justify-between pt-3 border-t border-slate-100 mt-1">
+                  <span className="font-bold text-slate-800">Kunden betalar</span>
+                  <span className="font-bold text-lg tabular-nums" style={{ color: NAV_BG }}>{attBetala.toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr</span>
+                </div>
+              </>
+            )}
           </div>
         </Section>
 
@@ -692,7 +799,7 @@ export default function NyFakturaPage() {
         <button onClick={spara} disabled={saving}
           className="w-full py-3.5 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-50"
           style={{ backgroundColor: NAV_BG }}>
-          {saving ? 'Sparar...' : 'Spara faktura'}
+          {saving ? 'Sparar...' : arOffert ? 'Spara offert' : 'Spara faktura'}
         </button>
       </div>
 
