@@ -15,7 +15,7 @@ import { normalizePhone } from './phone';
 export const MAIL_NOTICE_SMS_KIND = 'mejl_notis';
 
 export const MAIL_NOTICE_SMS =
-  'Hej! Erik på EnklaBokslut här. Jag skickade precis ett mejl till dig, ' +
+  'Hej! Jag skickade precis ett mail till dig, ' +
   'kika i inkorgen (eller skräpposten om du inte hittar det).\n\n' +
   'Hälsningar\nErik på EnklaBokslut';
 
