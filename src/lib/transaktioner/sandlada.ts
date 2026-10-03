@@ -1,4 +1,4 @@
-import { normaliseraRader, type ExtraheradTransaktion } from './normalisera';
+import { tolkaSvar, type TolkatSvar } from './normalisera';
 
 /**
  * Läser ett kalkylblad eller en textlista genom att låta modellen köra Python
@@ -16,13 +16,22 @@ import { normaliseraRader, type ExtraheradTransaktion } from './normalisera';
  */
 
 const MODELL = 'gpt-5.5';
-const UTFIL = 'transaktioner.json';
+const UTFIL = 'resultat.json';
 
-const INSTRUKTION = `Du läser underlag åt en svensk bokföringsbyrå. Den bifogade filen är ett kontoutdrag, en transaktionslista eller ett kalkylblad.
+const INSTRUKTION = `Du läser underlag åt en svensk bokföringsbyrå. Den bifogade filen är ett kalkylblad eller en textlista.
 
 Läs filen med pandas (openpyxl för xlsx). Gå igenom ALLA blad och ALLA rader — korta aldrig ner, sampla aldrig, hoppa aldrig över rader.
 
-Skriv resultatet till /mnt/data/${UTFIL} som en JSON-lista med ett objekt per transaktion:
+Avgör först vad filen är:
+- "transaktioner": ett kontoutdrag eller en transaktionslista. Det är det vanliga. Raderna säger vad som betalats, men inte hur det bokförts.
+- "verifikationer": en export som REDAN är bokförd — verifikationslista, grundbok, dagbok eller huvudbok ur ett bokföringsprogram. Kännetecknet är en kolumn med kontonummer (t.ex. 1930, 2641, 3001) och belopp i debet och kredit.
+Välj "verifikationer" bara när kontonumren faktiskt står i filen. Hitta aldrig på konton själv.
+
+Skriv resultatet till /mnt/data/${UTFIL} som ett JSON-objekt:
+{ "typ": "transaktioner" eller "verifikationer", "transaktioner": [...], "verifikationer": [...] }
+Fyll bara listan som hör till typen. Den andra är tom.
+
+Varje transaktion:
 {
   "datum": "YYYY-MM-DD" (tom sträng om datumet inte framgår),
   "beskrivning": "texten som står på raden",
@@ -34,17 +43,32 @@ Skriv resultatet till /mnt/data/${UTFIL} som en JSON-lista med ett objekt per tr
   "anteckning": "kort notering när något är oklart, annars tom sträng"
 }
 
-Regler:
+Varje verifikation:
+{
+  "serie": "verifikationsserien, tom sträng om den saknas",
+  "nummer": "verifikationsnumret, tom sträng om det saknas",
+  "datum": "YYYY-MM-DD",
+  "text": "verifikationstexten",
+  "rader": [ { "konto": "kontonumret", "kontonamn": "namnet om det står, annars tom sträng", "debet": tal, "kredit": tal, "text": "radens egen text, annars tom sträng" } ]
+}
+
+Regler för transaktioner:
 - Du ska INTE kontera. Inga konton, ingen bokföringsmässig bedömning — skriv bara av det som står.
 - En kolumn med löpande saldo eller balans är inte beloppet. Använd beloppskolumnen. Är du osäker: saldot ändras med beloppet mellan raderna, det kan du kontrollera i koden.
 - Hoppa över rubriker, adresser, summarader, saldobesked och tomma rader.
 - Gissa inte datum som saknas. Lämna fältet tomt och skriv varför i "anteckning".
-- Skriv filen med json.dump(..., ensure_ascii=False).
 
-Svara sedan med EN kort rad på svenska om vad du gjorde: vilka blad du läste, vilken kolumn du använde som belopp och hur många rader det blev. Ingen annan text.`;
+Regler för verifikationer:
+- Gruppera raderna på verifikationsnummer (och serie). En huvudbok är ordnad per konto — samla raderna för samma verifikation från alla konton.
+- Debet och kredit är positiva tal i var sin kolumn. Har filen en enda beloppskolumn med tecken är positivt debet och negativt kredit.
+- Hoppa över ingående och utgående saldon, kontosummor och periodsummor.
+- Kontrollera i koden att varje verifikation går jämnt ut (summa debet = summa kredit). Gör den inte det har du valt fel kolumner — rätta och kör om.
 
-export interface SandladaResultat {
-  transaktioner: ExtraheradTransaktion[];
+Skriv filen med json.dump(..., ensure_ascii=False).
+
+Svara sedan med EN kort rad på svenska om vad du gjorde: vilken typ du valde, vilka blad och kolumner du läste och hur många rader eller verifikationer det blev. Ingen annan text.`;
+
+export interface SandladaResultat extends TolkatSvar {
   /** Modellens egen rad om vad den läste — sparas på underlaget. */
   notering: string;
   modell: string;
@@ -133,9 +157,9 @@ export async function lasMedSandlada(file: {
     } catch {
       throw new Error('Resultatfilen från AI:n var inte giltig JSON');
     }
-    if (!Array.isArray(parsed)) throw new Error('Resultatfilen från AI:n innehöll ingen lista');
+    if (!parsed || typeof parsed !== 'object') throw new Error('Resultatfilen från AI:n innehöll inget resultat');
 
-    return { transaktioner: normaliseraRader(parsed), notering, modell: MODELL };
+    return { ...tolkaSvar(parsed), notering, modell: MODELL };
   } finally {
     // Kundens underlag ska inte bli liggande hos OpenAI
     await api(`/files/${fileId}`, apiKey, { method: 'DELETE' })

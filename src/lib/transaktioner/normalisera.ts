@@ -58,3 +58,94 @@ export function normaliseraRader(rader: unknown[]): ExtraheradTransaktion[] {
   // Rader utan både belopp och text säger ingenting — de är oftast rubriker
   }).filter((t) => t.belopp > 0 || t.beskrivning);
 }
+
+/** En konteringsrad som den står i underlaget. */
+export interface ExtraheradRad {
+  konto: string;
+  kontonamn: string;
+  /** Debet positivt, kredit negativt — samma tecken som i SIE. */
+  belopp: number;
+  text: string;
+}
+
+/**
+ * En verifikation ur ett underlag som redan är bokfört — en verifikationslista,
+ * grundbok eller huvudbok. Kontona kommer från underlaget, inte från AI:n.
+ */
+export interface ExtraheradVerifikation {
+  serie: string;
+  nummer: string;
+  datum: string;
+  text: string;
+  rader: ExtraheradRad[];
+  /** Summan av raderna. Noll när verifikationen går jämnt ut. */
+  summa: number;
+  balanserad: boolean;
+}
+
+const avrunda = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * AI:n skriver debet och kredit i var sin kolumn, som i underlaget. Här blir
+ * de ett belopp med tecken, och varje verifikation summeras — det är den
+ * summan som avgör om den sparas.
+ */
+export function normaliseraVerifikationer(lista: unknown[]): ExtraheradVerifikation[] {
+  return lista.map((item) => {
+    const v = (item ?? {}) as Record<string, unknown>;
+    const rader = (Array.isArray(v.rader) ? v.rader : []).map((r) => {
+      const rad = (r ?? {}) as Record<string, unknown>;
+      // Ett ensamt belopp med tecken går också bra, om debet och kredit saknas
+      const belopp = 'debet' in rad || 'kredit' in rad
+        ? tolkaTal(rad.debet) - tolkaTal(rad.kredit)
+        : tolkaTal(rad.belopp);
+      return {
+        konto: rensa(String(rad.konto ?? '')).replace(/\s/g, ''),
+        kontonamn: rensa(rad.kontonamn),
+        belopp: avrunda(belopp),
+        text: rensa(rad.text),
+      } satisfies ExtraheradRad;
+    }).filter((r) => r.konto || r.belopp !== 0);
+
+    const summa = avrunda(rader.reduce((s, r) => s + r.belopp, 0));
+    return {
+      serie: rensa(String(v.serie ?? '')),
+      nummer: rensa(String(v.nummer ?? '')),
+      datum: tolkaDatum(v.datum),
+      text: rensa(v.text),
+      rader,
+      summa,
+      // Minst två rader med riktiga konton, och de ska ta ut varandra
+      balanserad: Math.abs(summa) < 0.005
+        && rader.length >= 2
+        && rader.every((r) => /^\d{3,6}$/.test(r.konto)),
+    } satisfies ExtraheradVerifikation;
+  }).filter((v) => v.rader.length > 0);
+}
+
+export type Underlagstyp = 'transaktioner' | 'verifikationer';
+
+export interface TolkatSvar {
+  typ: Underlagstyp;
+  transaktioner: ExtraheradTransaktion[];
+  verifikationer: ExtraheradVerifikation[];
+}
+
+/**
+ * Tolkar svaret från båda vägarna — synen och sandlådan. Ett svar med
+ * verifikationer men utan typ räknas som verifikationer: listan säger mer än
+ * ett saknat fält.
+ */
+export function tolkaSvar(parsed: unknown): TolkatSvar {
+  // Äldre form: bara en lista med transaktioner
+  if (Array.isArray(parsed)) return { typ: 'transaktioner', transaktioner: normaliseraRader(parsed), verifikationer: [] };
+
+  const svar = (parsed ?? {}) as { typ?: unknown; transaktioner?: unknown; verifikationer?: unknown };
+  const verifikationer = Array.isArray(svar.verifikationer) ? normaliseraVerifikationer(svar.verifikationer) : [];
+  const transaktioner = Array.isArray(svar.transaktioner) ? normaliseraRader(svar.transaktioner) : [];
+
+  if (svar.typ === 'verifikationer' || (verifikationer.length > 0 && transaktioner.length === 0)) {
+    return { typ: 'verifikationer', transaktioner: [], verifikationer };
+  }
+  return { typ: 'transaktioner', transaktioner, verifikationer: [] };
+}

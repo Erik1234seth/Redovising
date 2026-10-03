@@ -1,17 +1,25 @@
 import { buildImageParts } from '@/lib/underlag/fil-delar';
 import { arBildEllerPdf, arTabellfil, kanLasasAvAi } from '@/lib/underlag/filtyp';
-import { normaliseraRader, type ExtraheradTransaktion } from './normalisera';
+import {
+  tolkaSvar,
+  type ExtraheradTransaktion, type ExtraheradVerifikation, type TolkatSvar,
+} from './normalisera';
 import { lasMedSandlada } from './sandlada';
 
 export { kanLasasAvAi };
-export type { ExtraheradTransaktion };
+export type { ExtraheradTransaktion, ExtraheradVerifikation };
 
 /**
- * Läser ut transaktionerna ur ett underlag med hjälp av en AI.
+ * Läser av ett underlag med hjälp av en AI.
  *
- * Det här är steget före konteringen: AI:n skriver bara av det som står på
- * kvittot, fakturan eller kontoutdraget. Inga konton, inga gissningar om vad
- * affärshändelsen betyder — det avgörs senare, och blir då en verifikation.
+ * Först avgör AI:n vad underlaget är:
+ *
+ * - Ett kvitto, en faktura eller ett kontoutdrag ger transaktioner. Det är
+ *   steget före konteringen: AI:n skriver bara av det som står, utan konton.
+ *   Konteringen görs senare och blir då en verifikation.
+ * - Ett underlag som redan är bokfört — en verifikationslista, grundbok eller
+ *   huvudbok — har konteringen i sig. Då skrivs verifikationerna av med sina
+ *   konton, i stället för att kontona kastas bort och jobbet görs om.
  *
  * Två vägar, efter vad filen är:
  *
@@ -21,8 +29,7 @@ export type { ExtraheradTransaktion };
  * - Kalkylblad och textlistor går till sandlådan (se `sandlada.ts`), där
  *   filen läses med pandas i stället för att skrivas av.
  *
- * SIE-filer går ingen av vägarna. De är redan bokförda och tolkas med kod i
- * `@/lib/sie/parse`.
+ * SIE-filer går ingen av vägarna. De tolkas med kod i `@/lib/sie/parse`.
  */
 
 const MODELL = 'gpt-5.5';
@@ -31,11 +38,24 @@ const MODELL = 'gpt-5.5';
 // ska få plats i ett svar — och modellens eget tänkande ryms i samma budget.
 const MAX_TOKENS = 100000;
 
-const SYSTEM_PROMPT = `Du läser av underlag åt en svensk bokföringsbyrå. Underlaget är ett kvitto, en faktura eller ett kontoutdrag, som bild eller PDF.
+const SYSTEM_PROMPT = `Du läser av underlag åt en svensk bokföringsbyrå, som bild eller PDF.
 
-Din uppgift är att skriva av transaktionerna. Du ska INTE kontera: inga konton, ingen bedömning av vad affärshändelsen betyder bokföringsmässigt. Det görs i ett senare steg.
+Börja med att avgöra vilken sorts underlag det är:
 
-Returnera ett JSON-objekt med nyckeln "transaktioner" som innehåller en array. Varje transaktion ska ha exakt dessa fält:
+- "transaktioner": ett kvitto, en faktura eller ett kontoutdrag. Det är det vanliga. Underlaget säger vad som köpts, sålts eller betalats, men inte hur det bokförts.
+- "verifikationer": ett underlag som REDAN är bokfört — en verifikationslista, grundbok, dagbok eller huvudbok ur ett bokföringsprogram. Kännetecknet är att raderna har kontonummer (t.ex. 1930, 2641, 3001) med belopp i debet eller kredit.
+
+Välj "verifikationer" bara när kontonumren faktiskt står i underlaget. Hitta aldrig på konton själv.
+
+Returnera ett JSON-objekt:
+{
+  "typ": "transaktioner" eller "verifikationer",
+  "transaktioner": [...],
+  "verifikationer": [...]
+}
+Fyll bara listan som hör till typen. Den andra är tom.
+
+Varje transaktion har exakt dessa fält:
 {
   "datum": "YYYY-MM-DD" (tom sträng om datumet inte framgår),
   "beskrivning": "det som står på raden — butik, text, fakturanummer",
@@ -47,18 +67,37 @@ Returnera ett JSON-objekt med nyckeln "transaktioner" som innehåller en array. 
   "anteckning": "kort notering när något är oläsligt eller osäkert, annars tom sträng"
 }
 
-Regler:
+Varje verifikation har exakt dessa fält:
+{
+  "serie": "verifikationsserien, t.ex. A — tom sträng om den inte framgår",
+  "nummer": "verifikationsnumret som det står, tom sträng om det inte framgår",
+  "datum": "YYYY-MM-DD",
+  "text": "verifikationstexten",
+  "rader": [
+    { "konto": "kontonumret", "kontonamn": "kontots namn om det står, annars tom sträng", "debet": number, "kredit": number, "text": "radens egen text, annars tom sträng" }
+  ]
+}
+
+Regler för transaktioner:
 - VIKTIGAST: varje transaktionsrad i underlaget ska ge exakt en transaktion i svaret. Gå igenom hela underlaget, sida för sida, uppifrån och ner. Slå aldrig ihop rader, hoppa aldrig över rader och korta aldrig ner listan — även om den är lång och raderna liknar varandra.
+- Du ska INTE kontera: inga konton, ingen bedömning av vad affärshändelsen betyder bokföringsmässigt. Det görs i ett senare steg.
 - Ett kvitto eller en faktura är oftast EN transaktion: totalbeloppet. Artikelraderna på kvittot är inte egna transaktioner. Flera transaktioner blir det bara när underlaget är en lista med flera betalningar eller köp.
 - Ett negativt belopp i underlaget betyder "ut", ett positivt betyder "in". Fältet "belopp" är alltid ett positivt tal.
 - En kolumn med löpande saldo eller balans är INTE transaktionens belopp — använd beloppskolumnen.
 - Skippa rader som är rubriker, adresser, summor, saldobesked eller tomma.
-- Skriv av det som står. Framgår inte datumet lämnar du fältet tomt i stället för att gissa, och skriver varför i "anteckning".
-- Innehåller underlaget inga transaktioner alls returnerar du en tom array.
-- Returnera BARA JSON, ingen annan text.`;
+- Framgår inte datumet lämnar du fältet tomt i stället för att gissa, och skriver varför i "anteckning".
 
-export interface ExtraktionsResultat {
-  transaktioner: ExtraheradTransaktion[];
+Regler för verifikationer:
+- Ta med VARJE verifikation i underlaget, och varje konteringsrad i den. Korta aldrig ner.
+- Skriv av konton och belopp exakt som de står. Debet och kredit är positiva tal i var sin kolumn; den kolumn som är tom blir 0.
+- En huvudbok är ordnad per konto, inte per verifikation. Samla raderna med samma verifikationsnummer från alla konton till en verifikation.
+- Ingående och utgående saldon, kontosummor och periodsummor är inte verifikationer — hoppa över dem.
+- En verifikation ska gå jämnt ut: summa debet = summa kredit. Gör den inte det har du läst fel — läs om den.
+
+Innehåller underlaget ingenting av detta returnerar du typ "transaktioner" med två tomma listor.
+Returnera BARA JSON, ingen annan text.`;
+
+export interface ExtraktionsResultat extends TolkatSvar {
   modell: string;
   /** Sandlådans rad om vad den läste. Tom för bilder och PDF. */
   notering: string;
@@ -68,11 +107,11 @@ export interface ExtraktionsResultat {
 function pdfDel(buffer: Buffer, fileName: string): unknown[] {
   return [
     { type: 'file', file: { filename: fileName, file_data: `data:application/pdf;base64,${buffer.toString('base64')}` } },
-    { type: 'text', text: `Underlag: ${fileName}. Läs av varje transaktionsrad, sida för sida, uppifrån och ner. Ta med alla rader.` },
+    { type: 'text', text: `Underlag: ${fileName}. Läs av varje rad, sida för sida, uppifrån och ner. Ta med allt.` },
   ];
 }
 
-async function las(content: unknown, apiKey: string, fileName: string): Promise<ExtraheradTransaktion[]> {
+async function las(content: unknown, apiKey: string, fileName: string): Promise<TolkatSvar> {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
@@ -99,13 +138,13 @@ async function las(content: unknown, apiKey: string, fileName: string): Promise<
   if (choice?.message?.refusal) throw new Error(`AI:n kunde inte läsa ${fileName}`);
   if (choice?.finish_reason === 'length') {
     // Ett kapat svar är halv JSON — ingenting går att rädda ur det
-    throw new Error(`Svaret för ${fileName} kapades: underlaget innehåller fler transaktioner än som får plats i ett svar`);
+    throw new Error(`Svaret för ${fileName} kapades: underlaget innehåller mer än som får plats i ett svar`);
   }
 
   const raw = (choice?.message?.content ?? '').trim();
-  if (!raw) return [];
+  if (!raw) return tolkaSvar({});
 
-  let parsed: { transaktioner?: unknown[] };
+  let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
@@ -113,7 +152,7 @@ async function las(content: unknown, apiKey: string, fileName: string): Promise<
     if (!match) throw new Error('AI:n svarade inte med JSON');
     parsed = JSON.parse(match[0]);
   }
-  return normaliseraRader(parsed.transaktioner ?? []);
+  return tolkaSvar(parsed);
 }
 
 export async function extraheraTransaktioner(file: {
@@ -136,5 +175,5 @@ export async function extraheraTransaktioner(file: {
     ? pdfDel(file.buffer, file.fileName)
     : buildImageParts(file.buffer, file.mimeType ?? '', file.fileName)[0];
 
-  return { transaktioner: await las(del, apiKey, file.fileName), modell: MODELL, notering: '' };
+  return { ...(await las(del, apiKey, file.fileName)), modell: MODELL, notering: '' };
 }

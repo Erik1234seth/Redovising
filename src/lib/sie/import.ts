@@ -92,9 +92,15 @@ async function importRow(
     if ((data ?? []).length < 1000) break;
   }
 
+  // Verifikationer som AI:n läst ur en PDF eller ett kalkylblad har inget
+  // organisationsnummer att bygga extern_id av — de känns igen på nummer och datum
+  const lastaAvAi = await befintligaVerifikationsnycklar(supabase, owner, 'ai');
+
   const fresh = sie.verifikationer.filter((v) => {
     const key = externId(v);
     if (existing.has(key)) return false;
+    const aiKey = verifikationsnyckel({ ...v, datum: asDate(v.datum) ?? '' });
+    if (aiKey && lastaAvAi.has(aiKey)) return false;
     existing.add(key); // samma nummer två gånger i samma fil räknas också som dubblett
     return true;
   });
@@ -160,6 +166,47 @@ async function importRow(
 }
 
 /**
+ * Nyckeln som säger att två verifikationer är samma, när de inte kommer ur
+ * samma sorts fil: serie, nummer och datum. Utan nummer går det inte att
+ * avgöra — då blir nyckeln tom och verifikationen räknas alltid som ny.
+ *
+ * Datumet ingår eftersom numreringen börjar om varje räkenskapsår.
+ */
+export function verifikationsnyckel(v: { serie?: string | null; nummer?: string | null; datum?: string | null }): string | null {
+  const nummer = v.nummer?.trim();
+  const datum = v.datum?.trim();
+  if (!nummer || !datum) return null;
+  return `${(v.serie ?? '').trim().toUpperCase()}|${nummer}|${datum}`;
+}
+
+/** Nycklarna för det kunden redan har, eventuellt bara från en viss källa. */
+export async function befintligaVerifikationsnycklar(
+  supabase: SupabaseClient,
+  owner: { column: string; value: string | null },
+  kalla?: string,
+): Promise<Set<string>> {
+  const nycklar = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    let query = supabase
+      .from('verifikationer')
+      .select('serie, nummer, datum')
+      .eq(owner.column, owner.value)
+      .not('nummer', 'is', null)
+      .order('id')
+      .range(from, from + 999);
+    if (kalla) query = query.eq('kalla', kalla);
+    const { data, error } = await query;
+    if (error) throw new Error(`Kunde inte läsa verifikationer: ${error.message}`);
+    for (const r of data ?? []) {
+      const key = verifikationsnyckel(r);
+      if (key) nycklar.add(key);
+    }
+    if ((data ?? []).length < 1000) break;
+  }
+  return nycklar;
+}
+
+/**
  * Efter att ett underlag raderats: filer hos samma kund som hade dubbletter
  * kan nu innehålla verifikationer som ingen fil äger längre. De körs om, så
  * att verifikationerna finns kvar så länge någon fil har dem.
@@ -176,7 +223,7 @@ export async function reimportAfterDelete(
 
   const { data, error } = await supabase
     .from('bokforing_underlag')
-    .select('id')
+    .select('id, file_name')
     .or(parts.join(','))
     .gt('verifikationer_dubbletter', 0)
     .order('created_at');
@@ -186,6 +233,9 @@ export async function reimportAfterDelete(
   }
 
   for (const row of data ?? []) {
+    // Bara SIE-filer går att köra om gratis. En fil som lästs med AI behåller
+    // sina siffror — den körs om för hand om det behövs.
+    if (!isSieFile(row.file_name)) continue;
     await supabase.from('bokforing_underlag').update({ verifikationer_inlagda_at: null }).eq('id', row.id);
     await importSieUnderlag(supabase, row.id).catch((err) =>
       console.error('[sie/import] omkörning:', err instanceof Error ? err.message : err));

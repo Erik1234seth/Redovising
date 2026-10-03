@@ -187,14 +187,16 @@ export default function UnderlagPage() {
                       <span
                         title={u.verifikationer.fel ?? undefined}
                         className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
-                          u.verifikationer.fel
+                          u.verifikationer.fel && !u.verifikationer.inlagda
                             ? 'bg-red-500/10 text-red-400 border-red-500/30'
+                            : u.verifikationer.fel
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
                             : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
                         }`}
                       >
-                        {u.verifikationer.fel
+                        {u.verifikationer.fel && !u.verifikationer.inlagda
                           ? '⚠ verifikationerna kunde inte läggas in'
-                          : `✓ ${u.verifikationer.inlagda} verifikationer inlagda`}
+                          : `${u.verifikationer.fel ? '⚠' : '✓'} ${u.verifikationer.inlagda} verifikationer inlagda${u.verifikationer.fel ? ' · alla gick inte ihop' : ''}`}
                       </span>
                     )}
                   </div>
@@ -236,6 +238,14 @@ export default function UnderlagPage() {
                       className="px-4 py-2 bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-xl text-sm font-medium transition"
                     >
                       Öppna filen
+                    </a>
+                  ) : null}
+                  {u.url ? (
+                    <a
+                      href={`/api/admin/underlag/${u.id}/ladda-ner`}
+                      className="px-4 py-2 bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-xl text-sm font-medium transition"
+                    >
+                      Ladda ner
                     </a>
                   ) : (
                     <span className="text-red-400 text-xs">Filen saknas i lagringen</span>
