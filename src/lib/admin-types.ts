@@ -83,6 +83,38 @@ export interface Person {
   lastActivity: string;
 }
 
+/**
+ * Hur en punkt i bokslutschecklistan står.
+ *
+ * klart = finns, saknas = måste in innan bokslutet, kolla = något finns men
+ * behöver ses över (eller vi vet inte om det behövs), ej = gäller inte kunden.
+ */
+export type BokslutStatus = 'klart' | 'saknas' | 'kolla' | 'ej';
+
+export type BokslutPunktId =
+  | 'orgnr' | 'momsnr' | 'verksamhet' | 'metod' | 'moms'
+  | 'ne' | 'lager' | 'underlag';
+
+/** Det som sparats för hand på en punkt (`profiles.bokslut_checklista`). */
+export interface BokslutManuell {
+  status: BokslutStatus | null;
+  /** Underlaget som laddats upp på punkten, t.ex. förra årets NE-bilaga. */
+  underlagId?: string | null;
+  at: string;
+}
+
+/** Underlaget checklistan räknas fram ur. Uppgifterna som redan finns på Person står inte här. */
+export interface BokslutData {
+  orgNr: string | null;
+  momsNr: string | null;
+  /** true = första året, false = har deklarerat förut, null = inte besvarat. */
+  forstaAret: boolean | null;
+  startAr: number | null;
+  inventarier: number;
+  lagerposter: number;
+  manuellt: Partial<Record<BokslutPunktId, BokslutManuell>>;
+}
+
 /** Hur en enskild kontroll gick i systemstatusen. */
 export type StatusLevel = 'ok' | 'fail' | 'unknown';
 
@@ -210,6 +242,8 @@ export interface UnderlagImport {
   inlagda: number;
   dubbletter: number;
   fel: string | null;
+  /** Sandlådans rad om vad den läste, när AI:n läst ut verifikationerna ur ett kalkylblad. */
+  notering?: string | null;
 }
 
 /** Vad AI-avläsningen av ett underlag gav. */

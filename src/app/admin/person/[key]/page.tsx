@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, MomsPeriod, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
-import { STAGES, EVENT_STYLE, REDOVISNINGSMETODER, MOMSPERIODER, fullDate } from '../../_pipeline';
+import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, BokslutData, MomsPeriod, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
+import { EVENT_STYLE, REDOVISNINGSMETODER, MOMSPERIODER, fullDate } from '../../_pipeline';
 import DeletePerson from '../../_delete-person';
 import SmsComposer from '../../_sms-composer';
 import { formatPhone } from '@/lib/sms/phone';
@@ -12,6 +12,7 @@ import { isSieFile } from '@/lib/sie/parse';
 import { VerifikationLista } from '../../_verifikationer';
 import { TransaktionsLista } from '../../_transaktioner';
 import { kanLasasAvAi } from '@/lib/underlag/filtyp';
+import { BokslutChecklista, bokslutPunkter, type UppladdningsPunkt } from '../../_bokslut';
 
 /**
  * Flikarna i personkortet — en per fråga man kommer hit med.
@@ -21,12 +22,14 @@ import { kanLasasAvAi } from '@/lib/underlag/filtyp';
  * höjd innan tidslinjen ens började; som rubriker i samma flik kostar de
  * ingenting. Adresserna bor under Mejl, där mejlen de hör till finns, och
  * filerna under Underlag — dit går det också att dra och släppa nya.
+ * Bokslut är checklistan över vad som finns och vad som saknas inför bokslutet.
  *
  * Vald flik läggs i adressen som #flik, så att en länk hit kan peka på en
  * bestämd flik och en omladdning landar på samma ställe.
  */
 const TABS = [
   { id: 'kontext', label: 'Kundkontext' },
+  { id: 'bokslut', label: 'Bokslut' },
   { id: 'konversationer', label: 'Mejl' },
   { id: 'underlag', label: 'Underlag' },
   { id: 'transaktioner', label: 'Transaktioner' },
@@ -54,9 +57,9 @@ export default function PersonPage() {
   const [valda, setValda] = useState<string[]>([]);
   const [laser, setLaser] = useState<string | null>(null);
   const [mail, setMail] = useState<AdminMailMessage[]>([]);
+  const [bokslut, setBokslut] = useState<BokslutData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [savingStage, setSavingStage] = useState(false);
   const [savingMetod, setSavingMetod] = useState(false);
   const [savingMoms, setSavingMoms] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -66,6 +69,9 @@ export default function PersonPage() {
   const [tab, setTab] = useState<Tab>('kontext');
   const [uploading, setUploading] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  // Radera kräver två klick: första visar "Ja, radera", andra raderar på riktigt
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [raderar, setRaderar] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   // Ligger i en useCallback för att kunna köras om efter ett manuellt SMS —
@@ -83,6 +89,7 @@ export default function PersonPage() {
           setOther(data.other ?? { emails: [], phones: [] });
           setUnderlag(data.underlag ?? []);
           setMail(data.mail ?? []);
+          setBokslut(data.bokslut ?? null);
           setVerifikationerCount(data.verifikationerCount ?? 0);
           setTransaktionerCount(data.transaktionerCount ?? 0);
         }
@@ -129,25 +136,6 @@ export default function PersonPage() {
   const selectTab = (next: Tab) => {
     setTab(next);
     history.replaceState(null, '', next === 'kontext' ? window.location.pathname : `#${next}`);
-  };
-
-  const setStage = async (stage: number) => {
-    if (!person?.contactId || savingStage) return;
-    const previous = person.stage;
-    setPerson({ ...person, stage });
-    setSavingStage(true);
-    const res = await fetch('/api/admin/people', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contactId: person.contactId, stage }),
-    });
-    setSavingStage(false);
-    // Rulla tillbaka om det inte gick — annars visar panelen ett steg
-    // som databasen inte känner till
-    if (!res.ok) {
-      setPerson((p) => (p ? { ...p, stage: previous } : p));
-      setError('Steget kunde inte sparas');
-    }
   };
 
   /**
@@ -253,10 +241,14 @@ export default function PersonPage() {
    * Laddar upp underlag åt personen. Filen går direkt till lagringen med en
    * engångslänk, så storleken begränsas inte av Vercel. En fil i taget, och
    * första felet stoppar resten — då syns det vilken som inte kom fram.
+   *
+   * `efter` får id:na på filerna som kom fram och körs innan personen laddas
+   * om, så att det den sparar finns med i omladdningen.
    */
-  const uploadFiles = async (files: File[]) => {
+  const uploadFiles = async (files: File[], efter?: (ids: string[]) => Promise<void>) => {
     if (!person || uploading || !files.length) return;
     const owner = { profileId: person.profileId, email: person.email };
+    const ids: string[] = [];
     setError('');
     try {
       for (const [i, file] of files.entries()) {
@@ -276,11 +268,13 @@ export default function PersonPage() {
         const { path, signedUrl } = await post('prepare');
         const put = await fetch(signedUrl, { method: 'PUT', headers: { 'Content-Type': meta.mimeType }, body: file });
         if (!put.ok) throw new Error(`${file.name} kom inte fram till lagringen (${put.status})`);
-        await post('confirm', { path });
+        const { id } = await post('confirm', { path });
+        ids.push(id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Uppladdningen misslyckades');
     } finally {
+      if (efter && ids.length) await efter(ids).catch(() => setError('Filen laddades upp men kunde inte kopplas'));
       setUploading(null);
       if (fileInput.current) fileInput.current.value = '';
       // En uppladdad SIE-fil lägger in verifikationer, så listan hämtas om
@@ -291,7 +285,34 @@ export default function PersonPage() {
   };
 
   /**
-   * Läser ut transaktionerna ur de ikryssade filerna, en i taget.
+   * Uppladdning från bokslutsfliken. NE-bilagan och lagerlistan får sin sort
+   * först i filnamnet, så att de går att känna igen bland underlagen, och
+   * kopplas till sin punkt i checklistan när personen har konto.
+   */
+  const laddaUppBokslut = (punkt: UppladdningsPunkt, files: File[]) => {
+    const prefix = { ne: 'NE-bilaga', lager: 'Lager-inventarielista', underlag: null }[punkt];
+    const namngivna = prefix
+      ? files.map((f) => (f.name.toLowerCase().startsWith(prefix.toLowerCase())
+        ? f
+        : new File([f], `${prefix} - ${f.name}`, { type: f.type })))
+      : files;
+    const koppla = prefix && person?.profileId
+      ? async ([id]: string[]) => {
+        const res = await fetch('/api/admin/people/bokslut', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileId: person.profileId, punkt, underlagId: id }),
+        });
+        if (!res.ok) throw new Error();
+      }
+      : undefined;
+    return uploadFiles(namngivna, koppla);
+  };
+
+  /**
+   * Läser av de ikryssade filerna med AI, en i taget. AI:n avgör per fil om
+   * det blir transaktioner eller — för ett redan bokfört underlag —
+   * verifikationer, så båda listorna hämtas om efteråt.
    *
    * Ett kontoutdrag på tjugo sidor tar en stund, och en fil som fallerar ska
    * inte ta med sig de andra — därför ett anrop per fil, och felet skrivs på
@@ -315,6 +336,8 @@ export default function PersonPage() {
     setValda([]);
     setTransaktioner(null);
     setTransaktionerError('');
+    setVerifikationer(null);
+    setVerifikationerError('');
     load();
   };
 
@@ -333,6 +356,32 @@ export default function PersonPage() {
     setError('');
     setTransaktioner((list) => (list ? list.filter((t) => !ids.includes(t.id)) : list));
     setTransaktionerCount((n) => Math.max(0, n - ids.length));
+    load();
+  };
+
+  /**
+   * Raderar ett underlag — filen i lagringen och raden. Verifikationerna och
+   * transaktionerna som lästs ur filen följer med, så de flikarna hämtas om.
+   */
+  const raderaUnderlag = async (id: string) => {
+    if (raderar) return;
+    setRaderar(id);
+    setError('');
+    const res = await fetch('/api/admin/underlag', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }).catch(() => null);
+    const data = await res?.json().catch(() => ({}));
+    setRaderar(null);
+    setConfirmDelete(null);
+    if (!res?.ok) { setError(data?.error || 'Underlaget kunde inte raderas'); return; }
+    setUnderlag((list) => list.filter((f) => f.id !== id));
+    setValda((list) => list.filter((v) => v !== id));
+    setVerifikationer(null);
+    setVerifikationerError('');
+    setTransaktioner(null);
+    setTransaktionerError('');
     load();
   };
 
@@ -359,6 +408,10 @@ export default function PersonPage() {
   // SIE-filer läses med kod och hör hemma bland verifikationerna, så de går
   // inte att kryssa i här
   const lasbara = underlag.filter((f) => kanLasasAvAi(f.fileName, f.mimeType));
+
+  const punkter = bokslutPunkter(person, bokslut, underlag, verifikationerCount, transaktionerCount);
+  const saknas = punkter.filter((p) => p.status === 'saknas').length;
+  const kolla = punkter.filter((p) => p.status === 'kolla').length;
 
   return (
     <div className="space-y-8">
@@ -497,6 +550,18 @@ export default function PersonPage() {
                     person.issues.length > 0 ? 'bg-red-500 text-white' : 'bg-navy-600 text-warm-300'
                   }`}>
                     {events.length}
+                  </span>
+                )}
+                {/* Rött med antalet som saknas, gult när bara saker att kolla
+                    är kvar, grön bock när allt finns */}
+                {t.id === 'bokslut' && (
+                  <span
+                    title={saknas ? `${saknas} saknas inför bokslutet` : kolla ? `${kolla} att kolla` : 'Allt finns'}
+                    className={`px-1.5 rounded text-[10px] font-bold shrink-0 normal-case tracking-normal ${
+                      saknas ? 'bg-red-500 text-white' : kolla ? 'bg-amber-400 text-navy-900' : 'bg-emerald-500 text-white'
+                    }`}
+                  >
+                    {saknas || kolla || '✓'}
                   </span>
                 )}
                 {t.id === 'konversationer' && mail.length > 0 && (
@@ -716,6 +781,22 @@ export default function PersonPage() {
             </div>
           )}
 
+          {tab === 'bokslut' && (
+            <BokslutChecklista
+              person={person}
+              data={bokslut}
+              punkter={punkter}
+              onData={setBokslut}
+              onVerksamhet={(verksamhet) => setPerson({ ...person, verksamhet })}
+              onMetod={setMetod}
+              onMoms={setMoms}
+              onError={setError}
+              onUpload={laddaUppBokslut}
+              uploading={uploading}
+              canUpload={canUpload}
+            />
+          )}
+
           {/* Hela mejlväxlingen med personen, tråd för tråd, och adresserna
               den kommer in på */}
           {tab === 'konversationer' && (
@@ -822,10 +903,10 @@ export default function PersonPage() {
                     <button
                       onClick={lasUtTransaktioner}
                       disabled={valda.length === 0 || !!laser}
-                      title="Låter en AI skriva av transaktionerna i filerna. De konteras inte här."
+                      title="Låter en AI läsa filerna. Kvitton och kontoutdrag blir transaktioner. Redan bokförda underlag med konton blir verifikationer."
                       className="px-3 py-1.5 text-xs bg-gold-500/15 hover:bg-gold-500/25 border border-gold-500/30 text-gold-400 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {laser ? 'Läser…' : `Plocka ut transaktioner${valda.length ? ` (${valda.length})` : ''}`}
+                      {laser ? 'Läser…' : `Läs av med AI${valda.length ? ` (${valda.length})` : ''}`}
                     </button>
                   </>
                 )}
@@ -871,7 +952,7 @@ export default function PersonPage() {
                         onChange={(e) => setValda((list) =>
                           e.target.checked ? [...list, f.id] : list.filter((id) => id !== f.id))}
                         title={kanLasasAvAi(f.fileName, f.mimeType)
-                          ? 'Markera för att plocka ut transaktioner'
+                          ? 'Markera för att läsa av filen med AI'
                           : 'Den här filtypen läser vi inte av med AI'}
                         className="shrink-0 mt-1 accent-gold-500 disabled:opacity-30"
                       />
@@ -881,8 +962,10 @@ export default function PersonPage() {
                         </span>
                         {/* Koden i sandlådan skrivs om varje körning — noteringen
                             visar att den läste rätt ställe */}
-                        {f.transaktioner?.notering && (
-                          <span className="text-warm-600 text-[11px] block">{f.transaktioner.notering}</span>
+                        {(f.transaktioner?.notering || f.verifikationer?.notering) && (
+                          <span className="text-warm-600 text-[11px] block">
+                            {f.transaktioner?.notering || f.verifikationer?.notering}
+                          </span>
                         )}
                       </span>
                       {f.transaktioner && (
@@ -898,6 +981,23 @@ export default function PersonPage() {
                             ? '⚠ AI kunde inte läsa filen'
                             : `${f.transaktioner.antal} transaktioner utlästa`}
                         </span>
+                      )}
+                      {!isSieFile(f.fileName) && f.verifikationer && (
+                        <button
+                          onClick={() => selectTab('verifikationer')}
+                          title={f.verifikationer.fel ?? 'Bokfört underlag — AI:n läste ut verifikationerna med kontona i filen'}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 transition ${
+                            f.verifikationer.fel && !f.verifikationer.inlagda
+                              ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+                              : f.verifikationer.fel
+                              ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+                              : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
+                          }`}
+                        >
+                          {f.verifikationer.fel && !f.verifikationer.inlagda
+                            ? '⚠ Inga verifikationer inlagda'
+                            : `${f.verifikationer.fel ? '⚠' : '✓'} ${f.verifikationer.inlagda} ver. inlagda${f.verifikationer.dubbletter ? ` · ${f.verifikationer.dubbletter} fanns redan` : ''}${f.verifikationer.fel ? ' · alla gick inte ihop' : ''}`}
+                        </button>
                       )}
                       {isSieFile(f.fileName) && (
                         <Link
@@ -931,6 +1031,40 @@ export default function PersonPage() {
                         {f.status === 'bokfort' ? 'Bokfört' : f.status === 'granskas' ? 'Granskas' : 'Inkommet'}
                       </span>
                       <span className="text-warm-600 text-[11px] shrink-0 hidden sm:inline">{fullDate(f.at)}</span>
+                      <a
+                        href={`/api/admin/underlag/${f.id}/ladda-ner`}
+                        title={`Ladda ner ${f.fileName}`}
+                        className="text-gold-500 hover:text-gold-400 text-[11px] shrink-0 transition"
+                      >
+                        Ladda ner
+                      </a>
+                      {confirmDelete === f.id ? (
+                        <span className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => raderaUnderlag(f.id)}
+                            disabled={!!raderar}
+                            className="px-2 py-0.5 bg-red-600 hover:bg-red-500 text-white font-semibold rounded text-[11px] transition disabled:opacity-50"
+                          >
+                            {raderar === f.id ? 'Raderar…' : 'Ja, radera'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelete(null)}
+                            disabled={!!raderar}
+                            className="text-warm-500 hover:text-warm-300 text-[11px] transition disabled:opacity-50"
+                          >
+                            Avbryt
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDelete(f.id)}
+                          disabled={!!raderar || !!laser}
+                          title="Radera filen och allt som lästs ur den"
+                          className="text-red-400/70 hover:text-red-400 text-[11px] shrink-0 transition disabled:opacity-40"
+                        >
+                          Radera
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -948,7 +1082,7 @@ export default function PersonPage() {
             ) : transaktioner.length === 0 ? (
               <p className="text-warm-500 text-sm leading-relaxed">
                 Inga transaktioner utlästa än. Kryssa i filerna under Underlag och klicka på
-                &quot;Plocka ut transaktioner&quot; — AI:n läser av kvitton, fakturor, kontoutdrag
+                &quot;Läs av med AI&quot; — AI:n läser av kvitton, fakturor, kontoutdrag
                 och Excel-listor.
               </p>
             ) : (
@@ -962,9 +1096,9 @@ export default function PersonPage() {
             )
           )}
 
-          {/* Allt kunden har bokfört hos oss. Just nu från SIE-filer, som tolkas
-              med kod när de kommer in — senare även AI-tolkade kvitton och
-              fakturor, och då syns det på varje verifikation var den kom ifrån. */}
+          {/* Allt kunden har bokfört hos oss. SIE-filer tolkas med kod när de
+              kommer in, och redan bokförda PDF:er och kalkylblad läses av med AI
+              — det syns på varje verifikation var den kom ifrån. */}
           {tab === 'verifikationer' && (
             verifikationerError ? (
               <p className="text-red-400 text-sm">{verifikationerError}</p>
@@ -973,7 +1107,8 @@ export default function PersonPage() {
             ) : verifikationer.length === 0 ? (
               <p className="text-warm-500 text-sm leading-relaxed">
                 Inga verifikationer än. När kunden mejlar in eller du laddar upp en SIE-fil läggs
-                verifikationerna in här automatiskt.
+                verifikationerna in här automatiskt. En bokförd PDF eller Excel-export — verifikationslista,
+                grundbok, huvudbok — läses in med &quot;Läs av med AI&quot; under Underlag.
               </p>
             ) : (
               <>
@@ -987,50 +1122,6 @@ export default function PersonPage() {
           )}
 
         </div>
-      </div>
-
-      {/* Var i flödet personen står */}
-      <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-6">
-        <h2 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-5">Flöde</h2>
-        {person.contactId ? (
-          <div className="flex items-start">
-            {STAGES.map((s, i) => {
-              const current = person.stage ?? 1;
-              const done = current > s.step;
-              const active = current === s.step;
-              return (
-                <div key={s.step} className="flex items-center flex-1 min-w-0">
-                  <button
-                    onClick={() => setStage(s.step)}
-                    disabled={savingStage}
-                    className="flex flex-col items-center gap-1.5 group shrink-0 disabled:opacity-60"
-                  >
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
-                      done ? 'bg-gold-500 border-gold-500 text-navy-900'
-                        : active ? 'bg-gold-500/20 border-gold-500 text-gold-400 ring-4 ring-gold-500/20'
-                        : 'bg-navy-700 border-navy-500 text-warm-500 group-hover:border-warm-400'
-                    }`}>
-                      {done ? '✓' : s.step}
-                    </div>
-                    <span className={`text-xs max-w-[68px] text-center leading-tight ${
-                      active ? 'text-gold-400' : done ? 'text-gold-500/70' : 'text-warm-500'
-                    }`}>
-                      {s.label}
-                    </span>
-                  </button>
-                  {i < STAGES.length - 1 && (
-                    <div className={`flex-1 h-0.5 mx-1 mb-5 ${done ? 'bg-gold-500' : 'bg-navy-600'}`} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-warm-500 text-sm">
-            Ingen kontaktförfrågan kopplad, så det finns inget steg att flytta. Personen syns här
-            för att vi har mejlat eller messat numret.
-          </p>
-        )}
       </div>
 
       {messaging && person.phone && (

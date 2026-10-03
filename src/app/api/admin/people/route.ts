@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { normalizePhone } from '@/lib/sms/phone';
-import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, MomsPeriod, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
+import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, BokslutData, MomsPeriod, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
 import { importPendingSie } from '@/lib/sie/import';
 
 /**
@@ -473,6 +473,7 @@ async function build(): Promise<Map<string, Built>> {
       inlagda: r.verifikationer_antal ?? 0,
       dubbletter: r.verifikationer_dubbletter ?? 0,
       fel: r.verifikationer_fel,
+      notering: r.transaktioner_notering,
     } : null;
     const utlasta = r.transaktioner_utlasta_at ? {
       at: r.transaktioner_utlasta_at,
@@ -498,11 +499,13 @@ async function build(): Promise<Map<string, Built>> {
     if (root && imported) {
       add(root, imported.at, {
         type: 'fil',
-        title: imported.fel
+        // En AI-avläsning kan ha lagt in en del och lämnat de som inte gick ihop
+        title: imported.fel && !imported.inlagda
           ? 'Verifikationerna kunde inte läggas in'
           : `${imported.inlagda} ${imported.inlagda === 1 ? 'verifikation inlagd' : 'verifikationer inlagda'}`,
         detail: imported.fel ? `${r.file_name}: ${imported.fel}` : `Från ${r.file_name}`,
-        meta: imported.dubbletter > 0 ? `${imported.dubbletter} fanns redan` : 'SIE',
+        meta: imported.dubbletter > 0 ? `${imported.dubbletter} fanns redan`
+          : /.(se|si|sie)$/i.test(r.file_name ?? '') ? 'SIE' : 'AI',
         bad: !!imported.fel,
       });
     }
@@ -633,6 +636,7 @@ export async function GET(request: NextRequest) {
       other: otherContacts(match),
       underlag: match.files,
       mail: await mailFor(match),
+      bokslut: await bokslutFor(match),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internt fel';
@@ -799,6 +803,38 @@ async function verifikationerFor(owner: Owner): Promise<AdminVerifikation[]> {
   return out.sort((a, b) =>
     a.datum.localeCompare(b.datum) || a.serie.localeCompare(b.serie)
     || num(a.nummer) - num(b.nummer) || a.nummer.localeCompare(b.nummer));
+}
+
+/**
+ * Det bokslutschecklistan räknas fram ur som inte redan står på Person:
+ * organisations- och momsnumret, om det är första året, kundens lager och
+ * inventarier i appen, och det som satts för hand på punkterna.
+ *
+ * Läses från huvudprofilen. Lagret räknas över alla sammanslagna konton —
+ * en kund som registrerat sig två gånger kan ha lagt in sakerna på vilket som.
+ */
+async function bokslutFor(p: Built): Promise<BokslutData | null> {
+  if (!p.profileId) return null;
+  const supabase = getSupabase();
+  const [{ data: profil, error }, { data: tillgangar }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('org_nr, momsnr, forsta_deklarationsar, start_ar, bokslut_checklista')
+      .eq('id', p.profileId)
+      .maybeSingle(),
+    supabase.from('lagertillgangar').select('typ').in('user_id', p.profileIds),
+  ]);
+  if (error) throw new Error(`Kunde inte läsa profilen: ${error.message}`);
+
+  return {
+    orgNr: profil?.org_nr?.trim() || null,
+    momsNr: profil?.momsnr?.trim() || null,
+    forstaAret: profil?.forsta_deklarationsar ?? null,
+    startAr: profil?.start_ar ?? null,
+    inventarier: (tillgangar ?? []).filter((t) => t.typ === 'inventarie').length,
+    lagerposter: (tillgangar ?? []).filter((t) => t.typ === 'lager').length,
+    manuellt: profil?.bokslut_checklista ?? {},
+  };
 }
 
 /**
