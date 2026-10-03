@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
+import { sendMailNotices } from '@/lib/sms/mail-notice';
 import { createClient } from '@supabase/supabase-js';
 import { cleanBody } from '@/lib/inmail/clean-body';
 import { isNoReplyAddress } from '@/lib/inmail/no-reply';
@@ -9,6 +10,9 @@ import { isNoReplyAddress } from '@/lib/inmail/no-reply';
 //
 // Upsert på gmail_message_id, så samma mejl kan skickas upp hur många gånger
 // som helst. Skriptet tar därför med marginal bakåt i tiden varje körning.
+//
+// Ett nytt utgående mejl som Erik skrivit för hand ger kunden ett SMS om att
+// vi nyss mejlat — se sms/mail-notice.ts.
 
 interface IncomingMessage {
   messageId: string;
@@ -74,7 +78,17 @@ export async function POST(request: Request) {
     const skipped = messages.length - rows.length;
     if (rows.length === 0) return NextResponse.json({ imported: 0, skipped });
 
-    const { error } = await getSupabase()
+    const supabase = getSupabase();
+
+    // Vilka utgående som är nya behöver vi veta före upserten — ett mejl som
+    // redan låg här har redan fått sitt SMS (eller var för gammalt för ett).
+    const outIds = rows.filter((r) => r.direction === 'out').map((r) => r.gmail_message_id);
+    const { data: known } = outIds.length
+      ? await supabase.from('mail_messages').select('gmail_message_id').in('gmail_message_id', outIds)
+      : { data: [] };
+    const knownIds = new Set((known ?? []).map((k) => k.gmail_message_id as string));
+
+    const { error } = await supabase
       .from('mail_messages')
       .upsert(rows, { onConflict: 'gmail_message_id' });
 
@@ -82,6 +96,9 @@ export async function POST(request: Request) {
       console.error('[inmail/messages] upsert misslyckades:', error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    const newlySent = rows.filter((r) => r.direction === 'out' && !knownIds.has(r.gmail_message_id));
+    if (newlySent.length) after(() => sendMailNotices(getSupabase(), newlySent));
 
     return NextResponse.json({ imported: rows.length, skipped });
   } catch (err) {

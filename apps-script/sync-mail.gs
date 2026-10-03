@@ -11,6 +11,10 @@
 //
 //   syncMailRecent()    Tidsstyrd trigger varje timme. Söker på DATUM och tar
 //                       med två dygns marginal.
+//   syncSentRecent()    Tidsstyrd trigger var 5:e minut. Bara det vi skickat
+//                       senaste timmen, så att kunden får SMS:et om att vi
+//                       mejlat (se sms/mail-notice.ts) inom några minuter
+//                       istället för upp till en timme senare.
 //   syncMailBackfill()  Körs för hand, om och om igen, tills den säger KLART.
 //                       Söker på OFFSET och minns var den slutade i
 //                       MAIL_SYNC_OFFSET.
@@ -21,6 +25,7 @@
 // Utkasten sorteras bort per meddelande i collectMailMessages i stället.
 var MAIL_SYNC_FILTER = '-in:spam -in:trash -category:promotions -category:social';
 var MAIL_SYNC_RECENT_QUERY = 'newer_than:2d ' + MAIL_SYNC_FILTER;
+var MAIL_SYNC_SENT_QUERY = 'in:sent newer_than:1h';
 var MAIL_SYNC_BACKFILL_QUERY = 'newer_than:2y ' + MAIL_SYNC_FILTER;
 var MAIL_SYNC_THREADS_PER_RUN = 50;
 var MAIL_SYNC_MAX_THREADS_RECENT = 200;
@@ -74,6 +79,14 @@ function syncMailRecent() {
   );
 }
 
+// Lätt variant av syncMailRecent: bara skickat, bara senaste timmen.
+function syncSentRecent() {
+  var threads = GmailApp.search(MAIL_SYNC_SENT_QUERY, 0, MAIL_SYNC_THREADS_PER_RUN);
+  if (threads.length === 0) return;
+  var res = flushMailMessages(getConfig(), collectMailMessages(threads, getMailSyncOwners()));
+  console.log('syncSentRecent: ' + threads.length + ' trådar. Sparade ' + res.imported + ', misslyckades ' + res.failed + '.');
+}
+
 // ─── Engångsimport av historiken (körs för hand) ──────────────────────────────
 // 50 trådar per körning, eftersom Apps Script bryter efter 6 minuter. Kör den
 // om och om igen tills den säger KLART. resetMailSync() börjar om.
@@ -117,18 +130,20 @@ function resetMailSync() {
 function setUpMailSync() {
   var removed = removeMailSyncTriggers();
   ScriptApp.newTrigger('syncMailRecent').timeBased().everyHours(1).create();
-  console.log('Mejlsynk uppsatt, körs varje timme.' + (removed ? ' Tog bort ' + removed + ' tidigare trigger(s).' : ''));
+  ScriptApp.newTrigger('syncSentRecent').timeBased().everyMinutes(5).create();
+  console.log('Mejlsynk uppsatt: allt varje timme, skickat var 5:e minut.' + (removed ? ' Tog bort ' + removed + ' tidigare trigger(s).' : ''));
 }
 
 function removeMailSync() {
-  console.log('Tog bort ' + removeMailSyncTriggers() + ' trigger(s) för syncMailRecent.');
+  console.log('Tog bort ' + removeMailSyncTriggers() + ' trigger(s) för syncMailRecent och syncSentRecent.');
 }
 
 function removeMailSyncTriggers() {
   var triggers = ScriptApp.getProjectTriggers();
   var removed = 0;
   for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'syncMailRecent') {
+    var fn = triggers[i].getHandlerFunction();
+    if (fn === 'syncMailRecent' || fn === 'syncSentRecent') {
       ScriptApp.deleteTrigger(triggers[i]);
       removed++;
     }
