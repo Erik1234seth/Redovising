@@ -4,6 +4,7 @@ import { validateTwilioSignature, resolveWebhookUrl, sendSms, emptyTwiml } from 
 import { normalizePhone } from '@/lib/sms/phone';
 import { identifySender } from '@/lib/sms/identify';
 import { generateSmsReply } from '@/lib/sms/answer';
+import { notifyIncomingSms } from '@/lib/sms/notify';
 
 // o3 plus två vektorsökningar tar längre tid än Twilios webhook-timeout på 15 s.
 // Därför kvitteras webhooken direkt och svaret genereras efteråt, via Twilios
@@ -118,6 +119,10 @@ export async function POST(request: Request) {
     twilio_sid: messageSid,
     user_id: sender.userId,
   });
+
+  // Mejla oss om varje inkommande SMS, även STOPP och START
+  after(() => notifyIncomingSms({ from, body, sender }).catch((err) =>
+    console.error('[sms] notismejlet kastade:', err)));
 
   // Avregistrering och återregistrering hanteras här, aldrig av AI:n
   const normalized = body.toLowerCase().replace(/[.!?]/g, '').trim();

@@ -78,7 +78,8 @@ export default function PersonPage() {
         if (data.error) setError(data.error);
         else {
           setPerson(data.person);
-          setEvents(data.events ?? []);
+          // Servern skickar äldst först; nyast överst läses lättare.
+          setEvents([...(data.events ?? [])].reverse());
           setOther(data.other ?? { emails: [], phones: [] });
           setUnderlag(data.underlag ?? []);
           setMail(data.mail ?? []);
