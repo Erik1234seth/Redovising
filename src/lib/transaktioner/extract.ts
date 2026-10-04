@@ -1,7 +1,7 @@
 import { buildImageParts } from '@/lib/underlag/fil-delar';
 import { arBildEllerPdf, arTabellfil, kanLasasAvAi } from '@/lib/underlag/filtyp';
 import {
-  tolkaSvar,
+  DETALJREGEL, MEJLREGEL, tolkaSvar,
   type ExtraheradTransaktion, type ExtraheradVerifikation, type TolkatSvar,
 } from './normalisera';
 import { lasMedSandlada } from './sandlada';
@@ -64,7 +64,8 @@ Varje transaktion har exakt dessa fält:
   "moms": number (momsbeloppet, 0 om det inte framgår),
   "valuta": "SEK" eller valutan som står på underlaget,
   "riktning": "in" (pengar in till företaget) eller "ut" (pengar ut från företaget),
-  "anteckning": "kort notering när något är oläsligt eller osäkert, annars tom sträng"
+  "anteckning": "kort notering när något är oläsligt eller osäkert, annars tom sträng",
+  "detaljer": "allt annat som står om transaktionen på underlaget, se nedan"
 }
 
 Varje verifikation har exakt dessa fält:
@@ -85,7 +86,9 @@ Regler för transaktioner:
 - Ett negativt belopp i underlaget betyder "ut", ett positivt betyder "in". Fältet "belopp" är alltid ett positivt tal.
 - En kolumn med löpande saldo eller balans är INTE transaktionens belopp — använd beloppskolumnen.
 - Skippa rader som är rubriker, adresser, summor, saldobesked eller tomma.
+${DETALJREGEL}
 - Framgår inte datumet lämnar du fältet tomt i stället för att gissa, och skriver varför i "anteckning".
+${MEJLREGEL}
 
 Regler för verifikationer:
 - Ta med VARJE verifikation i underlaget, och varje konteringsrad i den. Korta aldrig ner.
@@ -155,10 +158,23 @@ async function las(content: unknown, apiKey: string, fileName: string): Promise<
   return tolkaSvar(parsed);
 }
 
+/** Det som står om filen i kundens mejl, som en del efter själva underlaget. */
+function mejlDel(file: { lagradSom?: string; mejl?: string }): unknown[] {
+  if (!file.mejl) return [];
+  return [{
+    type: 'text',
+    text: `Filen är lagrad som ${file.lagradSom ?? '(okänt)'}.\n\n${file.mejl}`,
+  }];
+}
+
 export async function extraheraTransaktioner(file: {
   buffer: Buffer;
   fileName: string;
   mimeType: string | null;
+  /** Filens namn i lagringen — samma som bilagan heter i mejlen. */
+  lagradSom?: string;
+  /** Kundens mejlväxling (se `@/lib/mejlkontext`), när den finns. */
+  mejl?: string;
 }): Promise<ExtraktionsResultat> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
@@ -173,7 +189,7 @@ export async function extraheraTransaktioner(file: {
 
   const del = file.fileName.toLowerCase().endsWith('.pdf') || file.mimeType === 'application/pdf'
     ? pdfDel(file.buffer, file.fileName)
-    : buildImageParts(file.buffer, file.mimeType ?? '', file.fileName)[0];
+    : buildImageParts(file.buffer, file.mimeType ?? '', file.fileName)[0] as unknown[];
 
-  return { ...(await las(del, apiKey, file.fileName)), modell: MODELL, notering: '' };
+  return { ...(await las([...del, ...mejlDel(file)], apiKey, file.fileName)), modell: MODELL, notering: '' };
 }

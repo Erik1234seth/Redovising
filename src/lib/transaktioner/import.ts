@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { befintligaVerifikationsnycklar, verifikationsnyckel } from '@/lib/sie/import';
+import { byggMejlkontext } from '@/lib/mejlkontext';
 import { markeraDubbletter } from './dubbletter';
 import { extraheraTransaktioner, kanLasasAvAi, type ExtraheradTransaktion, type ExtraheradVerifikation } from './extract';
 import type { Underlagstyp } from './normalisera';
@@ -107,13 +108,24 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
     throw new Error(`Filen saknas i lagringen: ${downloadError?.message ?? 'okänt fel'}`);
   }
 
+  const email = row.sender_email?.trim().toLowerCase() || null;
+
+  // Kundens mejl följer med, så att det kunden skrivit om filen — ofta ett
+  // datum som saknas på kvittot — kommer med i avläsningen
+  let kontoEmail: string | null = null;
+  if (row.user_id) {
+    const { data: profil } = await supabase.from('profiles').select('email').eq('id', row.user_id).maybeSingle();
+    kontoEmail = profil?.email ?? null;
+  }
+  const mejl = await byggMejlkontext(supabase, { userId: row.user_id, emails: [email, kontoEmail] });
+
   const svar = await extraheraTransaktioner({
     buffer: Buffer.from(await file.arrayBuffer()),
     fileName: row.file_name,
     mimeType: row.mime_type,
+    lagradSom: row.file_path.split('/').pop(),
+    mejl: mejl || undefined,
   });
-
-  const email = row.sender_email?.trim().toLowerCase() || null;
   // Samma ägarskap som SIE-verifikationerna: kontot när det finns, adressen
   // när filen bara hör ihop med en mejladress
   if (!row.user_id && !email) throw new Error('Underlaget hör varken till ett konto eller en adress');
@@ -160,6 +172,7 @@ async function sparaTransaktioner(
     valuta: t.valuta,
     riktning: t.riktning,
     anteckning: t.anteckning || null,
+    detaljer: t.detaljer || null,
     kalla: 'ai',
     modell,
   }));

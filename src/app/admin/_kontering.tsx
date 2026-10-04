@@ -414,10 +414,18 @@ function Detalj({
       motkonto: betalsatt === 'bada' ? motkonto : undefined,
     });
 
+  const detaljer = r.detaljer ? (
+    <details>
+      <summary className="text-warm-500 hover:text-warm-300 text-xs cursor-pointer">Detaljer från underlaget</summary>
+      <p className="text-warm-400 text-xs whitespace-pre-wrap mt-1 max-w-3xl">{r.detaljer}</p>
+    </details>
+  ) : null;
+
   if (s === 'bokford') {
     const v = r.verifikation!;
     return (
       <div className="space-y-3">
+        {detaljer}
         <table className="text-xs">
           <tbody>
             {v.rader.map((x, i) => (
@@ -454,6 +462,7 @@ function Detalj({
 
   return (
     <div className="space-y-4">
+      {detaljer}
       {r.konteringar.length > 0 ? (
         <div className="grid md:grid-cols-2 gap-3">
           {r.konteringar.map((k) => (

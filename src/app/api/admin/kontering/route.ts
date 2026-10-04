@@ -39,7 +39,7 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string): P
   for (let from = 0; ; from += 1000) {
     let q = supabase
       .from('transaktioner')
-      .select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, kalla, bokforing_underlag(file_name)')
+      .select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, kalla, detaljer, bokforing_underlag(file_name)')
       .eq('user_id', userId)
       .is('dublett_av', null)
       .gt('belopp', 0)
@@ -108,6 +108,7 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string): P
       riktning: t.riktning as 'in' | 'ut',
       kalla: t.kalla as string,
       fileName: underlag?.file_name ?? null,
+      detaljer: (t.detaljer as string) ?? '',
       konteringar: konteringar.get(t.id as string) ?? [],
       verifikation: verifikationer.get(t.id as string) ?? null,
     };

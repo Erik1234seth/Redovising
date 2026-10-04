@@ -295,6 +295,8 @@ export interface AdminTransaktion {
   riktning: 'in' | 'ut';
   /** AI:ns notering när något var oläsligt eller osäkert. */
   anteckning: string;
+  /** Allt annat som stod om transaktionen på underlaget — kontext till konteringen. */
+  detaljer: string;
   /** ai, manuell eller bank. */
   kalla: string;
   /** Bankrad: den transaktion ur underlagen som troligen är samma köp. */
@@ -358,6 +360,8 @@ export interface AdminKonteringRad {
   riktning: 'in' | 'ut';
   kalla: string;
   fileName: string | null;
+  /** Allt annat som stod om transaktionen på underlaget. */
+  detaljer: string;
   konteringar: AdminKontering[];
   verifikation: {
     id: string;

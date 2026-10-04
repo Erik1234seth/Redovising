@@ -693,7 +693,7 @@ async function transaktionerFor(owner: Owner): Promise<AdminTransaktion[]> {
   for (let from = 0; ; from += 500) {
     const { data, error } = await getSupabase()
       .from('transaktioner')
-      .select('id, underlag_id, bank_konto_hash, radnr, datum, beskrivning, motpart, belopp, moms, valuta, riktning, anteckning, kalla, dublett_av, dublett_orsak, created_at, bokforing_underlag(file_name)')
+      .select('id, underlag_id, bank_konto_hash, radnr, datum, beskrivning, motpart, belopp, moms, valuta, riktning, anteckning, detaljer, kalla, dublett_av, dublett_orsak, created_at, bokforing_underlag(file_name)')
       .or(filter)
       .order('datum', { ascending: true, nullsFirst: false })
       .order('underlag_id')
@@ -717,6 +717,7 @@ async function transaktionerFor(owner: Owner): Promise<AdminTransaktion[]> {
         valuta: t.valuta ?? 'SEK',
         riktning: t.riktning === 'in' ? 'in' : 'ut',
         anteckning: t.anteckning ?? '',
+        detaljer: t.detaljer ?? '',
         kalla: t.kalla ?? 'ai',
         dublettAv: t.dublett_av ?? null,
         dublettOrsak: t.dublett_orsak ?? null,

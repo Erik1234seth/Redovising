@@ -30,7 +30,7 @@ function arDublett(t: AdminTransaktion) {
 function matches(t: AdminTransaktion, q: string): boolean {
   if (!q) return true;
   const hay = [
-    t.datum, t.beskrivning, t.motpart, t.fileName ?? '', t.anteckning,
+    t.datum, t.beskrivning, t.motpart, t.fileName ?? '', t.anteckning, t.detaljer,
     kr.format(t.belopp), String(t.belopp),
   ].join(' ').toLowerCase();
   return q.toLowerCase().split(/\s+/).every((word) => hay.includes(word));
@@ -304,6 +304,12 @@ export function TransaktionsLista({
                       )}
                       {t.anteckning && (
                         <span className="block text-gold-400/80 text-xs mt-0.5">{t.anteckning}</span>
+                      )}
+                      {t.detaljer && (
+                        <details className="mt-0.5">
+                          <summary className="text-warm-500 hover:text-warm-300 text-xs cursor-pointer">Detaljer</summary>
+                          <p className="text-warm-400 text-xs whitespace-pre-wrap mt-1 max-w-2xl">{t.detaljer}</p>
+                        </details>
                       )}
                       <span className="block md:hidden text-warm-600 text-[11px] mt-0.5">{t.fileName}</span>
                     </td>

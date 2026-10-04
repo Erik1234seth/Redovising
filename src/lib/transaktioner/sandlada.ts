@@ -1,4 +1,4 @@
-import { tolkaSvar, type TolkatSvar } from './normalisera';
+import { DETALJREGEL, MEJLREGEL, tolkaSvar, type TolkatSvar } from './normalisera';
 
 /**
  * Läser ett kalkylblad eller en textlista genom att låta modellen köra Python
@@ -40,7 +40,8 @@ Varje transaktion:
   "moms": tal, 0 om momsen inte framgår,
   "valuta": "SEK" eller valutan som står i filen,
   "riktning": "in" eller "ut",
-  "anteckning": "kort notering när något är oklart, annars tom sträng"
+  "anteckning": "kort notering när något är oklart, annars tom sträng",
+  "detaljer": "allt annat som står om transaktionen i filen, se nedan"
 }
 
 Varje verifikation:
@@ -56,7 +57,9 @@ Regler för transaktioner:
 - Du ska INTE kontera. Inga konton, ingen bokföringsmässig bedömning — skriv bara av det som står.
 - En kolumn med löpande saldo eller balans är inte beloppet. Använd beloppskolumnen. Är du osäker: saldot ändras med beloppet mellan raderna, det kan du kontrollera i koden.
 - Hoppa över rubriker, adresser, summarader, saldobesked och tomma rader.
+${DETALJREGEL}
 - Gissa inte datum som saknas. Lämna fältet tomt och skriv varför i "anteckning".
+${MEJLREGEL}
 
 Regler för verifikationer:
 - Gruppera raderna på verifikationsnummer (och serie). En huvudbok är ordnad per konto — samla raderna för samma verifikation från alla konton.
@@ -94,6 +97,8 @@ export async function lasMedSandlada(file: {
   buffer: Buffer;
   fileName: string;
   mimeType: string | null;
+  lagradSom?: string;
+  mejl?: string;
 }): Promise<SandladaResultat> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
@@ -117,7 +122,9 @@ export async function lasMedSandlada(file: {
       body: JSON.stringify({
         model: MODELL,
         tools: [{ type: 'code_interpreter', container: { type: 'auto', file_ids: [fileId] } }],
-        input: INSTRUKTION,
+        input: file.mejl
+          ? `${INSTRUKTION}\n\nFilen är lagrad som ${file.lagradSom ?? '(okänt)'}.\n\n${file.mejl}`
+          : INSTRUKTION,
       }),
     });
     if (!res.ok) throw new Error(`AI-tjänsten svarade inte: ${await felText(res)}`);
