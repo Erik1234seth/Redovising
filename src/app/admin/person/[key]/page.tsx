@@ -13,6 +13,7 @@ import { VerifikationLista } from '../../_verifikationer';
 import { TransaktionsLista } from '../../_transaktioner';
 import { kanLasasAvAi } from '@/lib/underlag/filtyp';
 import { BokslutChecklista, bokslutPunkter, type UppladdningsPunkt } from '../../_bokslut';
+import { KonteringsVy } from '../../_kontering';
 
 /**
  * Flikarna i personkortet — en per fråga man kommer hit med.
@@ -33,6 +34,7 @@ const TABS = [
   { id: 'konversationer', label: 'Mejl' },
   { id: 'underlag', label: 'Underlag' },
   { id: 'transaktioner', label: 'Transaktioner' },
+  { id: 'kontering', label: 'Kontering' },
   { id: 'verifikationer', label: 'Verifikationer' },
 ] as const;
 
@@ -134,6 +136,8 @@ export default function PersonPage() {
   }, [tab, transaktioner, transaktionerError, rawKey]);
 
   const selectTab = (next: Tab) => {
+    // Konteringen bokför verifikationer — de ska hämtas om nästa gång fliken öppnas
+    if (tab === 'kontering') setVerifikationer(null);
     setTab(next);
     history.replaceState(null, '', next === 'kontext' ? window.location.pathname : `#${next}`);
   };
@@ -182,6 +186,25 @@ export default function PersonPage() {
     if (!res.ok) {
       setPerson((p) => (p ? { ...p, momsPeriod: previous } : p));
       setError('Momsperioden kunde inte sparas');
+    }
+  };
+
+  /** Företagskonto eller privatkonto — avgör betalkontot när vi konterar. */
+  const [savingBetalsatt, setSavingBetalsatt] = useState(false);
+  const setBetalsatt = async (value: 'foretagskonto' | 'privatkonto') => {
+    if (!person?.profileId || savingBetalsatt || person.betalsatt === value) return;
+    const previous = person.betalsatt;
+    setPerson({ ...person, betalsatt: value });
+    setSavingBetalsatt(true);
+    const res = await fetch('/api/admin/people', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: person.profileId, betalsatt: value }),
+    });
+    setSavingBetalsatt(false);
+    if (!res.ok) {
+      setPerson((p) => (p ? { ...p, betalsatt: previous } : p));
+      setError('Betalsättet kunde inte sparas');
     }
   };
 
@@ -703,6 +726,55 @@ export default function PersonPage() {
                 )}
               </section>
 
+              {/* Vilket konto kunden betalar från. Konteringen bokför mot 1930
+                  vid företagskonto, och mot 2017/2013 vid privatkonto. */}
+              <section className="pt-6 border-t border-navy-600">
+                <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">Betalar via</h3>
+                {person.profileId ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 max-w-md">
+                      {([
+                        { value: 'foretagskonto', label: 'Företagskonto' },
+                        { value: 'privatkonto', label: 'Privatkonto' },
+                      ] as const).map((m) => {
+                        const chosen = person.betalsatt === m.value;
+                        return (
+                          <button
+                            key={m.value}
+                            onClick={() => setBetalsatt(m.value)}
+                            disabled={savingBetalsatt}
+                            aria-pressed={chosen}
+                            className={`flex items-center gap-2 rounded-xl border px-4 py-3 transition disabled:opacity-60 ${
+                              chosen
+                                ? 'bg-gold-500/15 border-gold-500 ring-1 ring-gold-500/30'
+                                : 'bg-navy-800/40 border-navy-600 hover:border-warm-500'
+                            }`}
+                          >
+                            <span className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                              chosen ? 'bg-gold-500 border-gold-500' : 'border-navy-500'
+                            }`}>
+                              {chosen && <span className="text-navy-900 text-[9px] font-bold leading-none">✓</span>}
+                            </span>
+                            <span className={`text-sm font-semibold ${chosen ? 'text-gold-400' : 'text-warm-200'}`}>
+                              {m.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-warm-600 text-xs mt-3">
+                      {person.betalsatt === 'bada'
+                        ? 'Kunden angav att de betalar från både företags- och privatkonto — betalkontot väljs per rad i konteringen. Välj ett ovan om det ska gälla alla.'
+                        : person.betalsatt
+                          ? 'Sparas på kundens konto och styr betalkontot i konteringen.'
+                          : 'Inte valt än — konteringen kan inte köras förrän det är valt.'}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-warm-500 text-sm">Personen har inget konto än — det väljs i onboardingen.</p>
+                )}
+              </section>
+
               <section className="pt-6 border-t border-navy-600">
                 <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">Historik</h3>
                 {events.length === 0 ? (
@@ -1093,6 +1165,17 @@ export default function PersonPage() {
                 </p>
                 <TransaktionsLista transaktioner={transaktioner} onDelete={raderaTransaktioner} />
               </>
+            )
+          )}
+
+          {/* Konteringen enligt K1: båda modellernas förslag per transaktion,
+              och det som bokförts. Kräver ett konto — kundkontexten och
+              betalsättet ligger på profilen. */}
+          {tab === 'kontering' && (
+            person.profileId ? (
+              <KonteringsVy userId={person.profileId} betalsatt={person.betalsatt} />
+            ) : (
+              <p className="text-warm-500 text-sm">Personen har inget konto än, så det finns inget att kontera.</p>
             )
           )}
 

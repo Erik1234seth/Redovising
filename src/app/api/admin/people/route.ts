@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { normalizePhone } from '@/lib/sms/phone';
 import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, BokslutData, MomsPeriod, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
 import { importPendingSie } from '@/lib/sie/import';
+import { tolkaBetalsatt } from '@/lib/kontering/betalsatt';
 
 /**
  * Allt adminpanelen visar, samlat per person.
@@ -152,7 +153,7 @@ async function build(): Promise<Map<string, Built>> {
   ] = await Promise.all([
     supabase.from('contact_requests').select('id, name, email, phone, ref, stage, notes, package_type, contact_method, qualification_answers, redovisningsmetod, created_at'),
     supabase.from('meetings').select('id, name, email, phone, date, time, message, created_at'),
-    supabase.from('profiles').select('id, email, full_name, phone, company_name, verksamhet, redovisningsmetod, moms_period, created_at, onboarding_done, subscription_status'),
+    supabase.from('profiles').select('id, email, full_name, phone, company_name, verksamhet, redovisningsmetod, moms_period, har_foretagskonto, created_at, onboarding_done, subscription_status'),
     supabase.from('pending_registrations').select('id, email, source, created_at, expires_at, used_at'),
     supabase.from('email_threads').select('id, user_id, state, created_at, updated_at'),
     supabase.from('sms_messages').select('id, phone, direction, body, status, error, kind, created_at, issue_dismissed_at').order('created_at'),
@@ -233,7 +234,7 @@ async function build(): Promise<Map<string, Built>> {
       found = {
         key: root, name: null, email: null, phone: null, company: null,
         verksamhet: null, source: null, stage: null, contactId: null, profileId: null,
-        redovisningsmetod: null, momsPeriod: null, manualEmails: [], isCustomer: false,
+        redovisningsmetod: null, momsPeriod: null, betalsatt: null, manualEmails: [], isCustomer: false,
         optedOut: false, emailCount: 0, smsCount: 0, issues: [],
         firstSeen: '', lastActivity: '', events: [], aliases: [], seen: [], files: [], profileIds: [],
       };
@@ -323,6 +324,7 @@ async function build(): Promise<Map<string, Built>> {
       }
       if (r.redovisningsmetod) p.redovisningsmetod = r.redovisningsmetod as Redovisningsmetod;
       if (r.moms_period) p.momsPeriod = r.moms_period as MomsPeriod;
+      if (r.har_foretagskonto) p.betalsatt = tolkaBetalsatt(r.har_foretagskonto);
     }
   }
 
@@ -884,8 +886,21 @@ const MOMSPERIODER: MomsPeriod[] = ['månadsvis', 'kvartalsvis', 'helår', 'inge
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const { contactId, profileId, stage, redovisningsmetod, momsPeriod } = await request.json();
+    const { contactId, profileId, stage, redovisningsmetod, momsPeriod, betalsatt } = await request.json();
     const supabase = getSupabase();
+
+    // Betalsättet bor på profilen och avgör betalkontot när vi konterar
+    if (betalsatt !== undefined) {
+      if (betalsatt !== 'foretagskonto' && betalsatt !== 'privatkonto') {
+        return NextResponse.json({ error: 'betalsatt måste vara foretagskonto eller privatkonto' }, { status: 400 });
+      }
+      if (!profileId) {
+        return NextResponse.json({ error: 'Personen har inget konto att spara betalsättet på' }, { status: 400 });
+      }
+      const { error } = await supabase.from('profiles').update({ har_foretagskonto: betalsatt }).eq('id', profileId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
 
     // Momsperioden bor bara på profilen — kunden väljer den i onboardingen
     if (momsPeriod !== undefined) {

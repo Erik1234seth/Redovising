@@ -67,6 +67,8 @@ export interface Person {
   redovisningsmetod: Redovisningsmetod | null;
   /** Momsperioden kunden valde i onboardingen. Finns bara när personen har konto. */
   momsPeriod: MomsPeriod | null;
+  /** Företagskonto eller privatkonto. Null tills kunden eller vi valt. */
+  betalsatt: Betalsatt | null;
   /**
    * Adresser som kopplats hit för hand, för att personen svarat från en annan
    * mejl än den vi kände till. Skiljda från de sammanslagna adresserna i
@@ -326,4 +328,40 @@ export interface AdminVerifikation {
     borttagen: boolean;
     tillagd: boolean;
   }[];
+}
+
+/** Hur kunden betalar sina affärshändelser (`profiles.har_foretagskonto`). Avgör betalkontot i konteringen. */
+export type Betalsatt = 'foretagskonto' | 'privatkonto' | 'bada';
+
+/** En modells kontering av en transaktion (tabellen konteringar). */
+export interface AdminKontering {
+  modell: string;
+  konto: string | null;
+  kontonamn: string | null;
+  momssats: number | null;
+  motivering: string;
+  /** Granskningens svar, när kontot fanns att pröva. */
+  granskning: { stammer?: boolean; battre_konto?: string | null; granskning_kravs?: boolean; motivering?: string; forstaKonto?: string; svarade?: string } | null;
+  flaggor: { typ: string; allvar: 'stopp' | 'granskning'; text: string }[];
+  omdome: 'gron' | 'gul' | 'rod';
+}
+
+/** En transaktion i konteringsfliken: modellernas förslag och, när den bokförts, verifikationen. */
+export interface AdminKonteringRad {
+  id: string;
+  datum: string;
+  beskrivning: string;
+  motpart: string;
+  belopp: number;
+  moms: number | null;
+  valuta: string;
+  riktning: 'in' | 'ut';
+  kalla: string;
+  fileName: string | null;
+  konteringar: AdminKontering[];
+  verifikation: {
+    id: string;
+    signatur: string | null;
+    rader: { konto: string; kontonamn: string | null; belopp: number }[];
+  } | null;
 }

@@ -10,12 +10,15 @@
     "lint": "next lint",
     "index-knowledge": "node --env-file=.env.local scripts/index-knowledge.mjs",
     "ai-test": "node --env-file=.env.local ai-test/run.mjs",
-    "index-basdokument": "node --env-file=.env.local ai-test/index-basdokument.mjs"
+    "index-basdokument": "node --env-file=.env.local ai-test/index-basdokument.mjs",
+    "k1": "node scripts/k1-till-json.mjs",
+    "provkontera": "npx -y tsx --env-file=.env.local scripts/provkontera.mts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@napi-rs/canvas": "^1.0.8",
     "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.8.0",
