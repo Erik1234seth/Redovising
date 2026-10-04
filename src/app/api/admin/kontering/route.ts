@@ -12,7 +12,8 @@ import { slaUppKonto } from '@/lib/kontering/regelverk';
  *   POST    kontera EN transaktion med båda modellerna (en per anrop, så att
  *           anropet hinner klart inom fem minuter — fliken kör flera parallellt)
  *   PUT     bokför ett förslag eller ett eget konto för hand
- *   DELETE  ångra en AI-bokföring, så att transaktionen kan konteras om
+ *   DELETE  radera bokföringen, eller hela konteringen (förslag och bokföring),
+ *           för en eller flera transaktioner — de kan då konteras om
  */
 
 export const maxDuration = 300;
@@ -34,7 +35,7 @@ function fel(err: unknown, status = 500) {
 const CHUNK = 200;
 
 /** Raderna för fliken. Dubbletter och rader på 0 kr tas inte med — de konteras inte. */
-async function rader(supabase: SupabaseClient, userId: string, bara?: string): Promise<AdminKonteringRad[]> {
+async function rader(supabase: SupabaseClient, userId: string, bara?: string[]): Promise<AdminKonteringRad[]> {
   const transaktioner: Record<string, unknown>[] = [];
   for (let from = 0; ; from += 1000) {
     let q = supabase
@@ -47,7 +48,7 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string): P
       .order('underlag_id')
       .order('radnr')
       .range(from, from + 999);
-    if (bara) q = q.eq('id', bara);
+    if (bara) q = q.in('id', bara);
     const { data, error } = await q;
     if (error) throw new Error(`Kunde inte läsa transaktionerna: ${error.message}`);
     transaktioner.push(...(data ?? []));
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabase();
     const [utfall] = await konteraTransaktioner(supabase, userId, [transaktionId]);
     if (utfall?.fel) return fel(utfall.fel, 502);
-    const [rad] = await rader(supabase, userId, transaktionId);
+    const [rad] = await rader(supabase, userId, [transaktionId]);
     return NextResponse.json({ rad: rad ?? null });
   } catch (err) {
     return fel(err);
@@ -147,7 +148,7 @@ export async function PUT(request: NextRequest) {
   try {
     const supabase = getSupabase();
     await bokforManuellt(supabase, userId, transaktionId, String(konto).trim(), Number(momssats) || 0, motkonto || undefined);
-    const [rad] = await rader(supabase, userId, transaktionId);
+    const [rad] = await rader(supabase, userId, [transaktionId]);
     return NextResponse.json({ rad: rad ?? null });
   } catch (err) {
     return fel(err, 400);
@@ -155,18 +156,30 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const userId = request.nextUrl.searchParams.get('userId');
-  const transaktionId = request.nextUrl.searchParams.get('transaktionId');
-  if (!userId || !transaktionId) return NextResponse.json({ error: 'userId och transaktionId behövs' }, { status: 400 });
+  const { userId, transaktionIds, bara } = await request.json().catch(() => ({})) as {
+    userId?: string;
+    transaktionIds?: string[];
+    /** 'bokforing' tar bara bort verifikationen och låter förslagen ligga kvar. */
+    bara?: 'bokforing';
+  };
+  if (!userId || !Array.isArray(transaktionIds) || transaktionIds.length === 0) {
+    return NextResponse.json({ error: 'userId och transaktionIds behövs' }, { status: 400 });
+  }
   try {
     const supabase = getSupabase();
-    // Bara AI-konteringens verifikationer — SIE-importen och dagskassorna rörs aldrig härifrån
-    const { error } = await supabase
-      .from('verifikationer').delete()
-      .eq('transaktion_id', transaktionId).eq('user_id', userId).eq('kalla', 'ai');
-    if (error) throw new Error(`Kunde inte ta bort verifikationen: ${error.message}`);
-    const [rad] = await rader(supabase, userId, transaktionId);
-    return NextResponse.json({ rad: rad ?? null });
+    for (let i = 0; i < transaktionIds.length; i += CHUNK) {
+      const del = transaktionIds.slice(i, i + CHUNK);
+      // Bara AI-konteringens verifikationer — SIE-importen och dagskassorna rörs aldrig härifrån
+      const { error } = await supabase
+        .from('verifikationer').delete()
+        .in('transaktion_id', del).eq('user_id', userId).eq('kalla', 'ai');
+      if (error) throw new Error(`Kunde inte ta bort verifikationerna: ${error.message}`);
+      if (bara !== 'bokforing') {
+        const { error: kFel } = await supabase.from('konteringar').delete().in('transaktion_id', del).eq('user_id', userId);
+        if (kFel) throw new Error(`Kunde inte ta bort konteringarna: ${kFel.message}`);
+      }
+    }
+    return NextResponse.json({ rader: await rader(supabase, userId, transaktionIds) });
   } catch (err) {
     return fel(err);
   }

@@ -60,6 +60,9 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
   const [radfel, setRadfel] = useState<Record<string, string>>({});
   const [ko, setKo] = useState<{ klara: number; totalt: number } | null>(null);
   const avbryt = useRef(false);
+  // Radera kräver två klick: första visar "Ja, radera", andra raderar
+  const [bekrafta, setBekrafta] = useState(false);
+  const [raderar, setRaderar] = useState(false);
 
   useEffect(() => {
     fetch(`/api/admin/kontering?userId=${encodeURIComponent(userId)}`)
@@ -82,17 +85,43 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
     [rader, filter, query],
   );
   useEffect(() => setShown(PAGE), [filter, query]);
-  // Bokförda rader går inte att kontera om utan att ångra först
-  const valbara = useMemo(() => filtered.filter((r) => status(r) !== 'bokford'), [filtered]);
+  // En rad som filtrerats bort ska inte kunna konteras eller raderas av misstag
   useEffect(() => {
-    const kvar = new Set(valbara.map((r) => r.id));
+    const kvar = new Set(filtered.map((r) => r.id));
     setValda((list) => (list.every((id) => kvar.has(id)) ? list : list.filter((id) => kvar.has(id))));
-  }, [valbara]);
+    setBekrafta(false);
+  }, [filtered]);
+
+  const perId = useMemo(() => new Map((rader ?? []).map((r) => [r.id, r])), [rader]);
+  // Bokförda rader konteras inte om förrän konteringen raderats
+  const konterbara = valda.filter((id) => perId.get(id) && status(perId.get(id)!) !== 'bokford');
+  const raderbara = valda.filter((id) => perId.get(id) && status(perId.get(id)!) !== 'okonterad');
+
+  /** Raderar förslag och bokföring för de markerade raderna, så att de blir okonterade igen. */
+  const radera = async () => {
+    if (raderar || raderbara.length === 0) return;
+    setRaderar(true);
+    const res = await fetch('/api/admin/kontering', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, transaktionIds: raderbara }),
+    }).catch(() => null);
+    const data = await res?.json().catch(() => ({}));
+    setRaderar(false);
+    setBekrafta(false);
+    if (!res?.ok) {
+      setLaddfel(data?.error || 'Konteringarna kunde inte raderas');
+      return;
+    }
+    const nya = new Map(((data.rader ?? []) as AdminKonteringRad[]).map((r) => [r.id, r]));
+    setRader((list) => list && list.map((r) => nya.get(r.id) ?? r));
+    setValda([]);
+  };
 
   /** Konterar de markerade raderna, några i taget, och visar varje rad så fort den är klar. */
   const kontera = async () => {
-    if (ko || valda.length === 0) return;
-    const lista = [...valda];
+    if (ko || konterbara.length === 0) return;
+    const lista = [...konterbara];
     avbryt.current = false;
     setValda([]);
     setRadfel({});
@@ -141,7 +170,7 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
     );
   }
 
-  const allaValda = valbara.length > 0 && valda.length === valbara.length;
+  const allaValda = filtered.length > 0 && valda.length === filtered.length;
   const flikar: { id: Filter; label: string; n: number }[] = [
     { id: 'alla', label: 'Alla', n: rader.length },
     { id: 'okonterad', label: 'Okonterade', n: antal.okonterad },
@@ -199,13 +228,44 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
               <span className="text-warm-200 text-sm">
                 {valda.length.toLocaleString('sv-SE')} {valda.length === 1 ? 'markerad' : 'markerade'}
               </span>
-              <button
-                onClick={kontera}
-                className="px-3 py-1.5 bg-gold-500 hover:bg-gold-400 text-navy-900 font-bold rounded-lg text-xs transition"
-              >
-                Kontera {valda.length.toLocaleString('sv-SE')}
-              </button>
-              <span className="text-warm-600 text-xs">Tar runt en halv minut per rad, {SAMTIDIGA} åt gången.</span>
+              {konterbara.length > 0 && (
+                <button
+                  onClick={kontera}
+                  className="px-3 py-1.5 bg-gold-500 hover:bg-gold-400 text-navy-900 font-bold rounded-lg text-xs transition"
+                  title="Bokförda rader konteras inte om — radera konteringen först"
+                >
+                  Kontera {konterbara.length.toLocaleString('sv-SE')}
+                </button>
+              )}
+              {raderbara.length > 0 && (bekrafta ? (
+                <>
+                  <button
+                    onClick={radera}
+                    disabled={raderar}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-xs transition disabled:opacity-50"
+                  >
+                    {raderar ? 'Raderar…' : `Ja, radera ${raderbara.length.toLocaleString('sv-SE')}`}
+                  </button>
+                  <button
+                    onClick={() => setBekrafta(false)}
+                    disabled={raderar}
+                    className="text-warm-500 hover:text-warm-300 text-xs transition disabled:opacity-50"
+                  >
+                    Avbryt
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setBekrafta(true)}
+                  className="px-3 py-1.5 text-xs text-red-400/80 hover:text-red-400 border border-red-500/30 rounded-lg transition"
+                  title="Tar bort förslagen och bokföringen — raderna blir okonterade"
+                >
+                  Radera kontering ({raderbara.length.toLocaleString('sv-SE')})
+                </button>
+              ))}
+              {konterbara.length > 0 && (
+                <span className="text-warm-600 text-xs">Tar runt en halv minut per rad, {SAMTIDIGA} åt gången.</span>
+              )}
               <button onClick={() => setValda([])} className="text-warm-500 hover:text-warm-300 text-xs transition ml-auto">
                 Avmarkera
               </button>
@@ -228,9 +288,9 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
                     <input
                       type="checkbox"
                       checked={allaValda}
-                      disabled={!!ko || valbara.length === 0}
-                      onChange={(e) => setValda(e.target.checked ? valbara.map((r) => r.id) : [])}
-                      title={allaValda ? 'Avmarkera alla' : 'Markera alla som inte är bokförda'}
+                      disabled={!!ko}
+                      onChange={(e) => setValda(e.target.checked ? filtered.map((r) => r.id) : [])}
+                      title={allaValda ? 'Avmarkera alla' : 'Markera alla i filtret'}
                       className="accent-gold-500 align-middle"
                     />
                   </th>
@@ -303,15 +363,13 @@ function Rad({
         className={`cursor-pointer transition ${open ? 'bg-navy-700/60' : vald ? 'bg-gold-500/5' : 'hover:bg-navy-700/40'}`}
       >
         <td className="px-4 py-2.5 align-top" onClick={(e) => e.stopPropagation()}>
-          {s !== 'bokford' && (
-            <input
-              type="checkbox"
-              checked={vald}
-              disabled={lasta || kor}
-              onChange={(e) => onValj(e.target.checked)}
-              className="accent-gold-500 align-middle"
-            />
-          )}
+          <input
+            type="checkbox"
+            checked={vald}
+            disabled={lasta || kor}
+            onChange={(e) => onValj(e.target.checked)}
+            className="accent-gold-500 align-middle"
+          />
         </td>
         <td className="px-4 py-2.5 text-warm-300 tabular-nums whitespace-nowrap align-top">
           {r.datum || <span className="text-gold-400/80">utan datum</span>}
@@ -390,20 +448,47 @@ function Detalj({
   const [sats, setSats] = useState(String(forsta?.momssats ?? 0));
   const [motkonto, setMotkonto] = useState(r.riktning === 'ut' ? '2017' : '2013');
 
-  const anropa = async (method: 'PUT' | 'DELETE', body?: object) => {
+  const anropa = async (method: 'PUT' | 'DELETE', body: object) => {
     setArbetar(true);
     setFel('');
-    const res = await fetch(
-      method === 'DELETE'
-        ? `/api/admin/kontering?userId=${encodeURIComponent(userId)}&transaktionId=${r.id}`
-        : '/api/admin/kontering',
-      { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined },
-    ).catch(() => null);
+    const res = await fetch('/api/admin/kontering', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch(() => null);
     const data = await res?.json().catch(() => ({}));
     setArbetar(false);
+    setBekraftaRadera(false);
     if (!res?.ok) setFel(data?.error || 'Det gick inte');
-    else onRad(data.rad);
+    else onRad(method === 'DELETE' ? data.rader?.[0] ?? null : data.rad);
   };
+
+  // Ångra tar bara bort bokföringen och låter förslagen ligga kvar; radera tar bort allt
+  const angra = () => anropa('DELETE', { userId, transaktionIds: [r.id], bara: 'bokforing' });
+  const [bekraftaRadera, setBekraftaRadera] = useState(false);
+  const raderaKnapp = bekraftaRadera ? (
+    <>
+      <button
+        onClick={() => anropa('DELETE', { userId, transaktionIds: [r.id] })}
+        disabled={arbetar}
+        className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-xs transition disabled:opacity-50"
+      >
+        {arbetar ? 'Raderar…' : 'Ja, radera'}
+      </button>
+      <button onClick={() => setBekraftaRadera(false)} className="text-warm-500 hover:text-warm-300 text-xs transition">
+        Avbryt
+      </button>
+    </>
+  ) : (
+    <button
+      onClick={() => setBekraftaRadera(true)}
+      disabled={arbetar}
+      title="Tar bort modellernas förslag och bokföringen — raden blir okonterad"
+      className="px-3 py-1.5 text-xs text-red-400/80 hover:text-red-400 border border-red-500/30 rounded-lg transition disabled:opacity-50"
+    >
+      Radera konteringen
+    </button>
+  );
 
   const bokfor = (k: string, m: number | string) =>
     anropa('PUT', {
@@ -442,13 +527,17 @@ function Detalj({
           <span className="text-warm-600 text-xs">
             {v.signatur === 'AI' ? 'Bokförd direkt — båda modellerna var överens.' : `Bokförd av ${v.signatur ?? 'okänd'}.`}
           </span>
-          <button
-            onClick={() => anropa('DELETE')}
-            disabled={arbetar}
-            className="px-3 py-1.5 text-xs text-red-400/80 hover:text-red-400 border border-red-500/30 rounded-lg transition disabled:opacity-50"
-          >
-            {arbetar ? 'Ångrar…' : 'Ångra bokföringen'}
-          </button>
+          {r.konteringar.length > 0 && (
+            <button
+              onClick={angra}
+              disabled={arbetar}
+              title="Tar bort verifikationen men behåller modellernas förslag"
+              className="px-3 py-1.5 text-xs text-warm-300 hover:text-white border border-navy-500 rounded-lg transition disabled:opacity-50"
+            >
+              Ångra bokföringen
+            </button>
+          )}
+          {raderaKnapp}
           {fel && <span className="text-red-400 text-xs">{fel}</span>}
         </div>
         {r.konteringar.length > 0 && (
@@ -477,6 +566,7 @@ function Detalj({
       ) : (
         <p className="text-warm-500 text-xs">Inte konterad än. Markera raden och tryck Kontera, eller välj konto själv nedan.</p>
       )}
+      {r.konteringar.length > 0 && <div className="flex items-center gap-3">{raderaKnapp}</div>}
 
       {/* Eget konto: när ingen av modellerna har rätt. Kontot prövas mot K1 på servern. */}
       <div className="flex items-end gap-2 flex-wrap pt-3 border-t border-navy-600/60">
