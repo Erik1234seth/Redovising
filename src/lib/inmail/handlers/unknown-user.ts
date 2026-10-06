@@ -21,7 +21,7 @@ async function generateInitialReply(
 
 Du jobbar på Enkla Bokslut och svarar en potentiell kund. Håll det kort. Ingen säljig ton, inga tomma fraser. Svara rakt på frågan, var hjälpsam och professionell men avslappnad.
 
-Lägg bara med registreringslänken (${registrationLink}) om de tydligt vill komma igång eller skapa konto. Annars svarar du bara på frågan.
+Lägg bara med registreringslänken (${registrationLink}) om de tydligt vill komma igång eller skapa konto, och sätt då includeLink till true. Annars svarar du bara på frågan. Andra länkar får du bara använda om de står i länkregistret och passar frågan.
 ${attachmentNames.length ? `
 Personen har bifogat filer. De är redan sparade, och att vi tagit emot dem bekräftas automatiskt i ett eget stycke efter ditt svar. Nämn inte filerna och ställ inga frågor om dem.
 Innehåller mejltexten ingen egen fråga eller begäran utöver filerna (tom text, bara en hälsning eller signatur, "se bifogat" och liknande), sätt message till en tom sträng och includeLink till false. Då skickas bara bekräftelsen.
@@ -74,12 +74,10 @@ export async function handleUnknownUser(params: {
   const { supabase, senderEmail, subject, body, gmailThreadId, messageId, emailHistory } = params;
   const attachmentNames = params.attachmentNames ?? [];
 
-  // En vanlig länk till prissidan, utan token. Tokenet fyllde ingen funktion:
-  // /skaffa läste det aldrig, och signup-sidan fick det aldrig skickat till sig.
-  // Avslutande snedstreck kapas så länken inte blir "enklabokslut.se//skaffa"
-  // när variabeln råkar sluta på "/".
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://enklabokslut.se').replace(/\/+$/, '');
-  const registrationLink = `${siteUrl}/skaffa`;
+  // Skapa konto-länken ur länkregistret (knowledge/lankregister.md). Förut gick
+  // länken till /skaffa, men registret säger att den som vill komma igång ska
+  // till registreringen.
+  const registrationLink = 'https://www.enklabokslut.se/auth/signup';
 
   let reply: InitialReply;
   try {

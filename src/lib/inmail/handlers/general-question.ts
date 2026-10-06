@@ -1,8 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, formatAmount } from '../openai-client';
-import { ENKLA_BOKSLUT_CONTEXT } from '../service-context';
 import { retrieveKnowledge, retrieveExamples, embedQuery } from '../retrieve';
-import { REPLY_RULES } from '../reply-rules';
+import { buildGeneralQuestionPrompt } from '../general-question-prompt';
 
 const MOMS_PERIOD_TEXT: Record<string, string> = {
   monthly: 'månadsvis',
@@ -19,12 +18,12 @@ function stripEmojis(text: string): string {
     .trim();
 }
 
-// Bygger ett kontext-block om avsändaren: kontouppgifter + senaste transaktioner,
-// så AI:n kan ge personliga och relevanta svar. Allt hämtas server-side.
+// Hämtar avsändarens kontouppgifter och senaste transaktioner, så AI:n kan ge
+// personliga och relevanta svar. Allt hämtas server-side.
 async function buildSenderContext(
   supabase: SupabaseClient,
   userId: string,
-): Promise<string> {
+): Promise<{ customerInfo: string; customerBookkeeping: string }> {
   try {
     const [{ data: p }, { data: txs }, { count }] = await Promise.all([
       supabase
@@ -69,17 +68,15 @@ async function buildSenderContext(
       txBlock = `Totalt ${count ?? txs.length} bokförda transaktioner. Senaste ${txs.length}:\n${txLines.join('\n')}`;
     }
 
-    return `
-
-OM AVSÄNDAREN (kunden du svarar):
-${lines.length ? lines.join('\n') : '- (inga kontouppgifter ifyllda ännu)'}
-
-AVSÄNDARENS BOKFÖRING:
-${txBlock}
-
-Använd uppgifterna ovan för att ge ett personligt och relevant svar när det passar. Hitta ALDRIG på siffror eller transaktioner som inte står här. Dela bara kundens egna uppgifter med kunden själv.`;
+    return {
+      customerInfo: lines.length ? lines.join('\n') : '- (inga kontouppgifter ifyllda ännu)',
+      customerBookkeeping: txBlock,
+    };
   } catch {
-    return '';
+    return {
+      customerInfo: '- (kunde inte hämta kontouppgifter)',
+      customerBookkeeping: '(kunde inte hämta bokföringen)',
+    };
   }
 }
 
@@ -107,19 +104,12 @@ export async function handleGeneralQuestion(params: {
     buildSenderContext(supabase, profile.id),
   ]);
 
-  const systemPrompt = `${ENKLA_BOKSLUT_CONTEXT}${senderContext}${knowledge}${examples}
-
-Du ÄR Erik på Enkla Bokslut och skriver mejlet själv. Skriv som en vanlig människa skriver ett mejl till en kund: vänligt, avslappnat och rakt på sak. Inte som en assistent, inte som en säljare, inte som en robot.
-
-Regler för innehållet:
-- Svara alltid på svenska
-- Håll det kort. Svara på det kunden faktiskt frågade och sluta där. Oftast räcker två till fyra korta stycken.
-- Förklara ordentligt när frågan kräver det, men skippa bakgrund, upprepningar och sådant kunden inte frågat om
-- Inga inledande artighetsfraser som "Tack för din fråga" och ingen sammanfattning på slutet
-- Inled med en naturlig hälsning med kundens förnamn, t.ex. "Hej Danne," Kundens namn finns under OM AVSÄNDAREN. Saknas namn, skriv bara "Hej,"
-- Om kunden vill beställa, bli kund eller komma igång: hänvisa till https://www.enklabokslut.se/ (INTE boka-mötes-sidan)
-${attachmentNames.length ? `- Kunden har bifogat filer (${attachmentNames.join(', ')}). De är redan sparade och tas om hand senare, och att vi tagit emot dem bekräftas automatiskt efter ditt svar. Svara bara på själva frågan. Nämn inte filerna, kommentera inte innehållet och ställ inga frågor om dem.
-` : ''}${REPLY_RULES}`;
+  const systemPrompt = buildGeneralQuestionPrompt({
+    ...senderContext,
+    knowledgeExcerpts: knowledge,
+    examples,
+    attachmentNames,
+  });
 
   const userContent = emailHistory
     ? `Mailkonversation:\n\n${emailHistory}`

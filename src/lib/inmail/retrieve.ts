@@ -30,7 +30,8 @@ interface KnowledgeMatch {
 
 /**
  * Hämtar de mest relevanta utdragen ur indexerade dokument (t.ex. K1-vägledningen)
- * för en given fråga och formaterar dem som ett kontextblock att bifoga prompten.
+ * för en given fråga. Bara själva utdragen, utan rubrik och instruktioner:
+ * prompten säger själv hur de ska användas (Del 3 i masterprompten).
  *
  * Returnerar tom sträng om inget relevant hittas eller vid fel — mailflödet ska
  * aldrig krascha på grund av sökningen.
@@ -65,14 +66,9 @@ export async function retrieveKnowledge(params: {
   const matches = (data ?? []) as KnowledgeMatch[];
   if (matches.length === 0) return '';
 
-  const excerpts = matches
+  return matches
     .map((m, i) => `[Utdrag ${i + 1} — ${m.source}]\n${m.content}`)
     .join('\n\n');
-
-  return `\n\nRELEVANTA UTDRAG UR REGELVERKET (hämtade ur interna dokument, t.ex. K1/BFN):
-Använd utdragen nedan om de är relevanta för frågan. Är de inte relevanta — ignorera dem och svara utifrån din allmänna kunskap. Hitta aldrig på regler.
-
-${excerpts}`;
 }
 
 interface ExampleMatch {
@@ -90,7 +86,7 @@ interface ExampleMatch {
  *
  * Exemplen är stilförebilder, inte facit: gamla svar kan innehålla priser och
  * rutiner som ändrats, och uppgifter som hör till en annan kund. Det står
- * uttryckligen i blocket nedan.
+ * uttryckligen i prompten (Del 4 i masterprompten).
  *
  * Returnerar tom sträng om inget hittas eller vid fel — mailflödet ska aldrig
  * krascha på grund av mailbanken.
@@ -135,7 +131,7 @@ export async function retrieveExamples(params: {
   const matches = (data ?? []) as ExampleMatch[];
   if (matches.length === 0) return '';
 
-  const examples = matches
+  return matches
     .map((m, i) => {
       const datum = m.sent_at ? m.sent_at.slice(0, 10) : 'okänt datum';
       return `[Exempel ${i + 1} — ${datum}]
@@ -146,20 +142,4 @@ Så här svarade Erik:
 ${m.answer.slice(0, 2000)}`;
     })
     .join('\n\n');
-
-  return `\n\nTIDIGARE SVAR PÅ LIKNANDE FRÅGOR (Eriks egna mail till andra kunder):
-Exemplen nedan finns här av ett enda skäl: så att du ska låta som Erik. Härma
-tonfall, meningsbyggnad, hur långt han skriver och hur han lägger upp ett svar.
-
-Men läs dem som stilprov, aldrig som facit:
-- Kopiera ALDRIG konkreta uppgifter ur ett exempel. Namn, belopp, datum, org.nr,
-  personnummer och företagsnamn där tillhör en ANNAN kund och får inte förekomma
-  i ditt svar. Kundens egna uppgifter finns under OM AVSÄNDAREN.
-- Nämn aldrig att tidigare mail eller andra kunder finns.
-- Priser, rutiner och regler kan ha ändrats sedan dess. Sakuppgifter tar du från
-  kontexten om tjänsten och regelverket, inte härifrån.
-- Handlar exemplen egentligen om något annat än det kunden frågar om, strunta i
-  dem och svara ändå i samma ton.
-
-${examples}`;
 }
