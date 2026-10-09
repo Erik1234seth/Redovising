@@ -19,6 +19,10 @@
  * fick dem aldrig.
  */
 export const REPLY_RULES = `
+Regel för längden. Håll svaret kort:
+- Svara på det kunden frågar om och inget mer. Ingen onödig bakgrund och inga upprepningar.
+- Hellre några få korta meningar än långa stycken.
+
 Regler för tecken. Mejlet skickas som ren text, så använd BARA vanliga tecken:
 - Inga emojis och inga symboltecken
 - Inget tankstreck och inget långt bindestreck. Skriv om meningen eller använd komma, punkt eller vanligt bindestreck.
