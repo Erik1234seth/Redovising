@@ -27,6 +27,8 @@ const asDate = (value: string) => (/^\d{4}-\d{2}-\d{2}$/.test(value) ? value : n
 export interface SieImportResult {
   inlagda: number;
   dubbletter: number;
+  /** Tolkningens varningar och det som inte gick att lägga in rent — sparas på underlaget. */
+  varningar?: string[];
   fel?: string;
 }
 
@@ -50,6 +52,7 @@ export async function importSieUnderlag(supabase: SupabaseClient, underlagId: st
     verifikationer_antal: result.inlagda,
     verifikationer_dubbletter: result.dubbletter,
     verifikationer_fel: result.fel ?? null,
+    varningar: result.varningar?.length ? result.varningar : null,
   }).eq('id', row.id);
 
   return result;
@@ -64,7 +67,7 @@ async function importRow(
 
   const sie = tolkaSie(new Uint8Array(await file.arrayBuffer()));
   if (sie.verifikationer.length === 0) {
-    return { inlagda: 0, dubbletter: 0, fel: sie.varningar[0] ?? 'Inga verifikationer i filen' };
+    return { inlagda: 0, dubbletter: 0, varningar: sie.varningar, fel: sie.varningar[0] ?? 'Inga verifikationer i filen' };
   }
 
   const email = row.sender_email?.trim().toLowerCase() || null;
@@ -162,7 +165,12 @@ async function importRow(
     .eq('underlag_id', row.id);
   if (countError) throw new Error(`Kunde inte räkna verifikationer: ${countError.message}`);
   const owned = count ?? vers.length;
-  return { inlagda: owned, dubbletter: sie.verifikationer.length - owned };
+  const varningar = [...sie.varningar];
+  const obalanserade = fresh.filter((v) => !v.balanserad).length;
+  if (obalanserade) varningar.push(`${obalanserade} ${obalanserade === 1 ? 'verifikation går' : 'verifikationer går'} inte jämnt ut`);
+  const utanDatum = fresh.filter((v) => !asDate(v.datum)).length;
+  if (utanDatum) varningar.push(`${utanDatum} ${utanDatum === 1 ? 'verifikation saknar' : 'verifikationer saknar'} giltigt datum`);
+  return { inlagda: owned, dubbletter: sie.verifikationer.length - owned, varningar };
 }
 
 /**

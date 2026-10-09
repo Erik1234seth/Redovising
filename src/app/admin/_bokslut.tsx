@@ -50,7 +50,7 @@ export interface BokslutPunkt {
 }
 
 const TOM: BokslutData = {
-  orgNr: null, momsNr: null, forstaAret: null, startAr: null, inventarier: 0, lagerposter: 0, manuellt: {},
+  orgNr: null, momsNr: null, forstaAret: null, startAr: null, inventarier: 0, lagerposter: 0, manuellt: {}, neUppgifter: {},
 };
 
 // Filnamn som ser ut att vara en NE-bilaga eller en deklaration, respektive en lager- eller inventarielista

@@ -39,7 +39,7 @@ export async function GET() {
 
     const { data: rows, error } = await supabase
       .from('bokforing_underlag')
-      .select('id, user_id, sender_email, source, file_name, file_path, file_size, mime_type, status, created_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel')
+      .select('id, user_id, sender_email, source, file_name, file_path, file_size, mime_type, status, created_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel, varningar')
       .order('created_at', { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -71,6 +71,7 @@ export async function GET() {
         fileName: r.file_name,
         fileSize: r.file_size,
         mimeType: r.mime_type,
+        varningar: r.varningar ?? [],
         status: r.status,
         at: r.created_at,
         source: r.source ?? 'app',

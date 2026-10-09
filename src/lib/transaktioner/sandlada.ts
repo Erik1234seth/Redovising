@@ -1,4 +1,4 @@
-import { DETALJREGEL, MEJLREGEL, tolkaSvar, type TolkatSvar } from './normalisera';
+import { DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, tolkaSvar, type TolkatSvar } from './normalisera';
 
 /**
  * Läser ett kalkylblad eller en textlista genom att låta modellen köra Python
@@ -18,9 +18,9 @@ import { DETALJREGEL, MEJLREGEL, tolkaSvar, type TolkatSvar } from './normaliser
 const MODELL = 'gpt-5.5';
 const UTFIL = 'resultat.json';
 
-const INSTRUKTION = `Du läser underlag åt en svensk bokföringsbyrå. Den bifogade filen är ett kalkylblad eller en textlista.
+const INSTRUKTION = `Du läser underlag åt en svensk bokföringsbyrå. Den bifogade filen är ett kalkylblad, en textlista eller en PDF ur ett bokförings- eller kassasystem.
 
-Läs filen med pandas (openpyxl för xlsx). Gå igenom ALLA blad och ALLA rader — korta aldrig ner, sampla aldrig, hoppa aldrig över rader.
+Läs filen med pandas (openpyxl för xlsx, pdfplumber för PDF — texten sida för sida). Gå igenom ALLA blad, ALLA sidor och ALLA rader — korta aldrig ner, sampla aldrig, hoppa aldrig över rader.
 
 Avgör först vad filen är:
 - "transaktioner": ett kontoutdrag eller en transaktionslista. Det är det vanliga. Raderna säger vad som betalats, men inte hur det bokförts.
@@ -63,6 +63,7 @@ ${MEJLREGEL}
 
 Regler för verifikationer:
 - Gruppera raderna på verifikationsnummer (och serie). En huvudbok är ordnad per konto — samla raderna för samma verifikation från alla konton.
+${GRUPPERINGSREGEL}
 - Debet och kredit är positiva tal i var sin kolumn. Har filen en enda beloppskolumn med tecken är positivt debet och negativt kredit.
 - Hoppa över ingående och utgående saldon, kontosummor och periodsummor.
 - Kontrollera i koden att varje verifikation går jämnt ut (summa debet = summa kredit). Gör den inte det har du valt fel kolumner — rätta och kör om.

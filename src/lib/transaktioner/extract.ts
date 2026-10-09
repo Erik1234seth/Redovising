@@ -1,7 +1,7 @@
 import { buildImageParts } from '@/lib/underlag/fil-delar';
 import { arBildEllerPdf, arTabellfil, kanLasasAvAi } from '@/lib/underlag/filtyp';
 import {
-  DETALJREGEL, MEJLREGEL, tolkaSvar,
+  DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, tolkaSvar,
   type ExtraheradTransaktion, type ExtraheradVerifikation, type TolkatSvar,
 } from './normalisera';
 import { lasMedSandlada } from './sandlada';
@@ -28,6 +28,9 @@ export type { ExtraheradTransaktion, ExtraheradVerifikation };
  *   tappas i skarvarna.
  * - Kalkylblad och textlistor går till sandlådan (se `sandlada.ts`), där
  *   filen läses med pandas i stället för att skrivas av.
+ * - En PDF som visar sig vara verifikationer läses om i sandlådan, som
+ *   grupperar raderna med kod. Synen klarar inte att samla ihop ett kvitto
+ *   vars rader ligger på tio olika sidor.
  *
  * SIE-filer går ingen av vägarna. De tolkas med kod i `@/lib/sie/parse`.
  */
@@ -94,6 +97,7 @@ Regler för verifikationer:
 - Ta med VARJE verifikation i underlaget, och varje konteringsrad i den. Korta aldrig ner.
 - Skriv av konton och belopp exakt som de står. Debet och kredit är positiva tal i var sin kolumn; den kolumn som är tom blir 0.
 - En huvudbok är ordnad per konto, inte per verifikation. Samla raderna med samma verifikationsnummer från alla konton till en verifikation.
+${GRUPPERINGSREGEL}
 - Ingående och utgående saldon, kontosummor och periodsummor är inte verifikationer — hoppa över dem.
 - En verifikation ska gå jämnt ut: summa debet = summa kredit. Gör den inte det har du läst fel — läs om den.
 
@@ -187,9 +191,32 @@ export async function extraheraTransaktioner(file: {
     throw new Error(`${file.fileName} är inte en filtyp vi kan läsa av`);
   }
 
-  const del = file.fileName.toLowerCase().endsWith('.pdf') || file.mimeType === 'application/pdf'
+  const arPdf = file.fileName.toLowerCase().endsWith('.pdf') || file.mimeType === 'application/pdf';
+  const del = arPdf
     ? pdfDel(file.buffer, file.fileName)
     : buildImageParts(file.buffer, file.mimeType ?? '', file.fileName)[0] as unknown[];
 
-  return { ...(await las([...del, ...mejlDel(file)], apiKey, file.fileName)), modell: MODELL, notering: '' };
+  const svar = await las([...del, ...mejlDel(file)], apiKey, file.fileName);
+
+  // En PDF med verifikationer är en export ur ett system och har text. Ordnad
+  // per konto ligger ett kvittos rader utspridda över många sidor, och synen
+  // tar då genvägen via sammanställningen på första sidan. Sandlådan läser
+  // texten med kod och grupperar på kvitto — den får göra om läsningen.
+  if (arPdf && svar.typ === 'verifikationer') {
+    let orsak: string;
+    try {
+      const omlast = await lasMedSandlada(file);
+      if (omlast.typ === 'verifikationer' && omlast.verifikationer.length > 0) return omlast;
+      orsak = 'den hittade inga verifikationer';
+    } catch (err) {
+      // Inskannad PDF eller annat fel i sandlådan — då gäller synens svar
+      console.error('[transaktioner] sandlådan kunde inte läsa PDF:en:', err);
+      orsak = err instanceof Error ? err.message : 'okänt fel';
+    }
+    svar.varningar.push(
+      `Sandlådan kunde inte läsa om PDF:en (${orsak}). Synens läsning användes — kontrollera att alla sidor kom med`,
+    );
+  }
+
+  return { ...svar, modell: MODELL, notering: '' };
 }

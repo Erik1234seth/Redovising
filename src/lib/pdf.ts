@@ -313,3 +313,94 @@ export function exportTransaktionslistaPDF(
   drawFooter(doc);
   doc.save(`Transaktionslista_${period.replace(/\s/g, '_')}.pdf`);
 }
+
+// ─── Förenklat årsbokslut (K1) ─────────────────────────────────────────────────
+/**
+ * Förenklat årsbokslut enligt BFNAR 2006:1 (K1). Uppställningen är NE-bilagans
+ * räkenskapsschema — K1 bygger på den — med resultaträkning, balansräkning och
+ * plats för näringsidkarens underskrift med datum, som bokföringslagen kräver.
+ */
+export interface ArsbokslutData {
+  ar: number;
+  namn: string;
+  personnummer: string;
+  verksamhet: string;
+  resultat: { rad: string; namn: string; belopp: number; intakt: boolean }[];
+  bokfortResultat: number;
+  tillgangar: { rad: string; namn: string; belopp: number }[];
+  summaTillgangar: number;
+  egetKapital: number;
+  skulder: { rad: string; namn: string; belopp: number }[];
+}
+
+export function exportArsbokslutPDF(data: ArsbokslutData) {
+  byggArsbokslutPDF(data).save(`Arsbokslut_${data.ar}_${data.personnummer}.pdf`);
+}
+
+/** Själva dokumentet — skilt från nedladdningen så att det går att prova. */
+export function byggArsbokslutPDF(data: ArsbokslutData): jsPDF {
+  // Intl skriver minus som U+2212, som Helvetica i jsPDF inte har — det blir ett citattecken
+  const kr = (n: number) => fmtKr(n).replace(/−/g, '-');
+  const doc = createDoc();
+  drawHeader(doc, 'Förenklat årsbokslut', `Räkenskapsår ${data.ar}-01-01 – ${data.ar}-12-31`);
+  const pnr = data.personnummer.replace(/^(\d{8})(\d{4})$/, '$1-$2');
+
+  let y = 36;
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...SLATE_700);
+  doc.text(data.namn || '—', 14, y + 4);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Personnummer ${pnr}`, 14, y + 10);
+  if (data.verksamhet) doc.text(`Verksamhet: ${data.verksamhet}`, 14, y + 15);
+  doc.text('Upprättat enligt BFNAR 2006:1 Förenklat årsbokslut (K1)', 196, y + 10, { align: 'right' });
+  y += 22;
+
+  const rad = (r: { rad: string; namn: string }) => `${r.rad.padEnd(4)} ${r.namn}`;
+  const sida = () => { if (y > 262) { doc.addPage(); y = 14; } };
+
+  y = drawSectionHeader(doc, 'Resultaträkning', y);
+  for (const r of data.resultat) {
+    sida();
+    y = drawTableRow(doc, rad(r), kr(r.intakt ? r.belopp : -r.belopp), y);
+  }
+  y = drawTotalRow(doc, 'R11  Bokfört resultat', kr(data.bokfortResultat), y + 1,
+    data.bokfortResultat >= 0 ? EMERALD : CORAL);
+
+  y += 8;
+  sida();
+  y = drawSectionHeader(doc, 'Balansräkning per ' + `${data.ar}-12-31`, y);
+  y = drawTableRow(doc, 'Tillgångar', '', y, { bold: true, shade: true });
+  for (const r of data.tillgangar) { sida(); y = drawTableRow(doc, rad(r), kr(r.belopp), y); }
+  y = drawTotalRow(doc, 'Summa tillgångar', kr(data.summaTillgangar), y + 1);
+
+  y += 4;
+  sida();
+  y = drawTableRow(doc, 'Eget kapital och skulder', '', y, { bold: true, shade: true });
+  y = drawTableRow(doc, rad({ rad: 'B10', namn: 'Eget kapital' }), kr(data.egetKapital), y);
+  for (const r of data.skulder) { sida(); y = drawTableRow(doc, rad(r), kr(r.belopp), y); }
+  y = drawTotalRow(doc, 'Summa eget kapital och skulder',
+    kr(data.egetKapital + data.skulder.reduce((s, r) => s + r.belopp, 0)), y + 1);
+
+  // Underskriften — årsbokslutet ska dateras och skrivas under av näringsidkaren
+  if (y > 240) { doc.addPage(); y = 14; }
+  y += 18;
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+  doc.setDrawColor(148, 163, 184);
+  doc.line(14, y, 90, y);
+  doc.line(110, y, 196, y);
+  doc.text('Ort och datum', 14, y + 5);
+  doc.text(`Namnteckning, ${data.namn || 'näringsidkaren'}`, 110, y + 5);
+
+  y += 16;
+  doc.setFontSize(7.5);
+  doc.setTextColor(...SLATE_400);
+  doc.text('Årsbokslutet har upprättats med biträde av Enkla Bokslut (Sethapp Innovation AB, 559555-3586).', 14, y);
+
+  drawFooter(doc);
+  return doc;
+}

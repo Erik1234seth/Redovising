@@ -31,6 +31,8 @@ export interface TransaktionResultat {
   dubbletter?: number;
   /** Sandlådans rad om vad den läste — tom för bilder och PDF. */
   notering?: string;
+  /** Det som sorterades bort eller inte gick att tolka — sparas på underlaget. */
+  varningar?: string[];
   fel?: string;
 }
 
@@ -84,6 +86,7 @@ export async function lasUtTransaktioner(
     verifikationer_antal: result.antal,
     verifikationer_dubbletter: result.dubbletter ?? 0,
     verifikationer_fel: result.fel ?? null,
+    varningar: result.varningar?.length ? result.varningar : null,
     transaktioner_utlasta_at: null,
     transaktioner_antal: null,
     transaktioner_notering: result.notering || null,
@@ -93,6 +96,7 @@ export async function lasUtTransaktioner(
     transaktioner_antal: result.antal,
     transaktioner_notering: result.notering || null,
     transaktioner_fel: result.fel ?? null,
+    varningar: result.varningar?.length ? result.varningar : null,
     verifikationer_inlagda_at: null,
     verifikationer_antal: null,
     verifikationer_dubbletter: null,
@@ -140,13 +144,13 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
 
   if (svar.typ === 'verifikationer') {
     const res = await sparaVerifikationer(supabase, row, email, svar.verifikationer);
-    return { typ: 'verifikationer', notering: svar.notering, ...res };
+    return { typ: 'verifikationer', notering: svar.notering, ...res, varningar: [...svar.varningar, ...res.varningar] };
   }
 
   const antal = await sparaTransaktioner(supabase, row, email, svar.transaktioner, svar.modell);
   return antal === 0
-    ? { typ: 'transaktioner', antal: 0, notering: svar.notering, fel: 'AI:n hittade inga transaktioner i filen' }
-    : { typ: 'transaktioner', antal, notering: svar.notering };
+    ? { typ: 'transaktioner', antal: 0, notering: svar.notering, varningar: svar.varningar, fel: 'AI:n hittade inga transaktioner i filen' }
+    : { typ: 'transaktioner', antal, notering: svar.notering, varningar: svar.varningar };
 }
 
 async function sparaTransaktioner(
@@ -210,9 +214,9 @@ async function sparaVerifikationer(
   row: UnderlagRad,
   email: string | null,
   verifikationer: ExtraheradVerifikation[],
-): Promise<Omit<TransaktionResultat, 'typ' | 'notering'>> {
+): Promise<Omit<TransaktionResultat, 'typ' | 'notering'> & { varningar: string[] }> {
   if (verifikationer.length === 0) {
-    return { antal: 0, dubbletter: 0, fel: 'AI:n hittade inga verifikationer i filen' };
+    return { antal: 0, dubbletter: 0, varningar: [], fel: 'AI:n hittade inga verifikationer i filen' };
   }
 
   const obalanserade = verifikationer.filter((v) => !v.balanserad);
@@ -279,5 +283,11 @@ async function sparaVerifikationer(
       + (obalanserade.length > 10 ? ' …' : '')
     : undefined;
 
-  return { antal: vers.length, dubbletter: balanserade.length - nya.length, fel };
+  // Utan nummer och datum går det inte att se om verifikationen redan finns
+  const okollade = nya.filter((v) => !verifikationsnyckel(v)).length;
+  const varningar = okollade
+    ? [`${okollade} ${okollade === 1 ? 'verifikation saknar' : 'verifikationer saknar'} nummer eller datum och kunde inte kollas mot dubbletter`]
+    : [];
+
+  return { antal: vers.length, dubbletter: balanserade.length - nya.length, fel, varningar };
 }

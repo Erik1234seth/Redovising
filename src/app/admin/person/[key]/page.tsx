@@ -14,6 +14,9 @@ import { TransaktionsLista } from '../../_transaktioner';
 import { kanLasasAvAi } from '@/lib/underlag/filtyp';
 import { BokslutChecklista, bokslutPunkter, type UppladdningsPunkt } from '../../_bokslut';
 import { KonteringsVy } from '../../_kontering';
+import { MomsFil } from '../../_momsfil';
+import { Varningar } from '../../_varningar';
+import { NeBilaga } from '../../_ne';
 
 /**
  * Flikarna i personkortet — en per fråga man kommer hit med.
@@ -39,6 +42,9 @@ const TABS = [
 ] as const;
 
 type Tab = (typeof TABS)[number]['id'];
+
+/** Flikarna som ligger i Bokföring-menyn i stället för på raden. */
+const BOKFORING: Tab[] = ['underlag', 'transaktioner', 'kontering', 'verifikationer'];
 
 export default function PersonPage() {
   const params = useParams<{ key: string }>();
@@ -69,6 +75,8 @@ export default function PersonPage() {
   const [deleting, setDeleting] = useState(false);
   const [messaging, setMessaging] = useState(false);
   const [tab, setTab] = useState<Tab>('kontext');
+  const [menyOppen, setMenyOppen] = useState(false);
+  const bokforingMeny = useRef<HTMLDivElement>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   // Radera kräver två klick: första visar "Ja, radera", andra raderar på riktigt
@@ -102,6 +110,16 @@ export default function PersonPage() {
 
   useEffect(load, [load]);
 
+  // Bokföring-menyn stängs när man klickar någon annanstans
+  useEffect(() => {
+    if (!menyOppen) return;
+    const stang = (e: MouseEvent) => {
+      if (!bokforingMeny.current?.contains(e.target as Node)) setMenyOppen(false);
+    };
+    document.addEventListener('mousedown', stang);
+    return () => document.removeEventListener('mousedown', stang);
+  }, [menyOppen]);
+
   // Länkar utifrån pekar ut en flik med #verifikationer
   useEffect(() => {
     const hash = window.location.hash.slice(1);
@@ -113,7 +131,8 @@ export default function PersonPage() {
    * en kund som skickat ett helt år, och personkortet ska öppnas snabbt.
    */
   useEffect(() => {
-    if (tab !== 'verifikationer' || verifikationer || verifikationerError || !rawKey) return;
+    // Bokslutet behöver dem också — NE-bilagan räknas ur verifikationerna
+    if ((tab !== 'verifikationer' && tab !== 'bokslut') || verifikationer || verifikationerError || !rawKey) return;
     fetch(`/api/admin/people?key=${encodeURIComponent(decodeURIComponent(rawKey))}&view=verifikationer`)
       .then((r) => r.json())
       .then((data) => {
@@ -436,6 +455,56 @@ export default function PersonPage() {
   const saknas = punkter.filter((p) => p.status === 'saknas').length;
   const kolla = punkter.filter((p) => p.status === 'kolla').length;
 
+  /** Små märken på fliknamnen: antal, och om något saknas eller behöver kollas. */
+  const markenFor = (id: Tab) => {
+    return (
+      <>
+        {id === 'kontext' && !person.redovisningsmetod && (
+          <span title="Bokföringsmetoden är inte ifylld än" className="w-1.5 h-1.5 rounded-full bg-warm-600 shrink-0" />
+        )}
+        {id === 'kontext' && (
+          <span className={`px-1.5 rounded text-[10px] font-bold shrink-0 normal-case tracking-normal ${
+            person.issues.length > 0 ? 'bg-red-500 text-white' : 'bg-navy-600 text-warm-300'
+          }`}>
+            {events.length}
+          </span>
+        )}
+        {/* Rött med antalet som saknas, gult när bara saker att kolla
+            är kvar, grön bock när allt finns */}
+        {id === 'bokslut' && (
+          <span
+            title={saknas ? `${saknas} saknas inför bokslutet` : kolla ? `${kolla} att kolla` : 'Allt finns'}
+            className={`px-1.5 rounded text-[10px] font-bold shrink-0 normal-case tracking-normal ${
+              saknas ? 'bg-red-500 text-white' : kolla ? 'bg-amber-400 text-navy-900' : 'bg-emerald-500 text-white'
+            }`}
+          >
+            {saknas || kolla || '✓'}
+          </span>
+        )}
+        {id === 'konversationer' && mail.length > 0 && (
+          <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
+            {mail.length}
+          </span>
+        )}
+        {id === 'underlag' && underlag.length > 0 && (
+          <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
+            {underlag.length}
+          </span>
+        )}
+        {id === 'transaktioner' && transaktionerCount > 0 && (
+          <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
+            {transaktionerCount.toLocaleString('sv-SE')}
+          </span>
+        )}
+        {id === 'verifikationer' && verifikationerCount > 0 && (
+          <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
+            {verifikationerCount.toLocaleString('sv-SE')}
+          </span>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -550,8 +619,8 @@ export default function PersonPage() {
       <div className="bg-navy-700/50 border border-navy-600 rounded-xl">
         {/* Fliknamnen bär små märken så att en tom bokföringsmetod eller en
             handpåkopplad adress syns utan att man öppnar fliken först. */}
-        <div className="flex overflow-x-auto border-b border-navy-600">
-          {TABS.map((t) => {
+        <div className="flex flex-wrap border-b border-navy-600">
+          {TABS.filter((t) => !BOKFORING.includes(t.id)).map((t) => {
             const active = tab === t.id;
             return (
               <button
@@ -565,51 +634,44 @@ export default function PersonPage() {
                 }`}
               >
                 {t.label}
-                {t.id === 'kontext' && !person.redovisningsmetod && (
-                  <span title="Bokföringsmetoden är inte ifylld än" className="w-1.5 h-1.5 rounded-full bg-warm-600 shrink-0" />
-                )}
-                {t.id === 'kontext' && (
-                  <span className={`px-1.5 rounded text-[10px] font-bold shrink-0 normal-case tracking-normal ${
-                    person.issues.length > 0 ? 'bg-red-500 text-white' : 'bg-navy-600 text-warm-300'
-                  }`}>
-                    {events.length}
-                  </span>
-                )}
-                {/* Rött med antalet som saknas, gult när bara saker att kolla
-                    är kvar, grön bock när allt finns */}
-                {t.id === 'bokslut' && (
-                  <span
-                    title={saknas ? `${saknas} saknas inför bokslutet` : kolla ? `${kolla} att kolla` : 'Allt finns'}
-                    className={`px-1.5 rounded text-[10px] font-bold shrink-0 normal-case tracking-normal ${
-                      saknas ? 'bg-red-500 text-white' : kolla ? 'bg-amber-400 text-navy-900' : 'bg-emerald-500 text-white'
-                    }`}
-                  >
-                    {saknas || kolla || '✓'}
-                  </span>
-                )}
-                {t.id === 'konversationer' && mail.length > 0 && (
-                  <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
-                    {mail.length}
-                  </span>
-                )}
-                {t.id === 'underlag' && underlag.length > 0 && (
-                  <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
-                    {underlag.length}
-                  </span>
-                )}
-                {t.id === 'transaktioner' && transaktionerCount > 0 && (
-                  <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
-                    {transaktionerCount.toLocaleString('sv-SE')}
-                  </span>
-                )}
-                {t.id === 'verifikationer' && verifikationerCount > 0 && (
-                  <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
-                    {verifikationerCount.toLocaleString('sv-SE')}
-                  </span>
-                )}
+                {markenFor(t.id)}
               </button>
             );
           })}
+
+          {/* Bokföringens fyra steg i en meny — som egna flikar tog de upp hela raden */}
+          <div className="relative" ref={bokforingMeny}>
+            <button
+              onClick={() => setMenyOppen((o) => !o)}
+              aria-expanded={menyOppen}
+              aria-current={BOKFORING.includes(tab) ? 'true' : undefined}
+              className={`flex items-center gap-1.5 px-4 sm:px-5 py-3 text-xs font-semibold uppercase tracking-widest whitespace-nowrap border-b-2 -mb-px transition ${
+                BOKFORING.includes(tab)
+                  ? 'border-gold-500 text-gold-400'
+                  : 'border-transparent text-warm-500 hover:text-warm-300'
+              }`}
+            >
+              {BOKFORING.includes(tab) ? TABS.find((t) => t.id === tab)?.label : 'Bokföring'}
+              {BOKFORING.includes(tab) && markenFor(tab)}
+              <span className={`text-[9px] transition ${menyOppen ? 'rotate-180' : ''}`}>▼</span>
+            </button>
+            {menyOppen && (
+              <div className="absolute left-0 top-full mt-1 z-20 min-w-[200px] bg-navy-800 border border-navy-600 rounded-lg shadow-xl py-1">
+                {TABS.filter((t) => BOKFORING.includes(t.id)).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { selectTab(t.id); setMenyOppen(false); }}
+                    className={`w-full flex items-center justify-between gap-3 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-left transition ${
+                      tab === t.id ? 'text-gold-400 bg-navy-700/60' : 'text-warm-400 hover:text-warm-200 hover:bg-navy-700/40'
+                    }`}
+                  >
+                    {t.label}
+                    <span className="flex items-center gap-1.5">{markenFor(t.id)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="p-6">
@@ -868,6 +930,11 @@ export default function PersonPage() {
               canUpload={canUpload}
             />
           )}
+          {tab === 'bokslut' && (
+            verifikationerError
+              ? <p className="text-red-400 text-sm mt-8">{verifikationerError}</p>
+              : <NeBilaga verifikationer={verifikationer} person={person} data={bokslut} onData={setBokslut} onError={setError} />
+          )}
 
           {/* Hela mejlväxlingen med personen, tråd för tråd, och adresserna
               den kommer in på */}
@@ -1039,6 +1106,18 @@ export default function PersonPage() {
                             {f.transaktioner?.notering || f.verifikationer?.notering}
                           </span>
                         )}
+                        {/* Felet på verifikationerna stod förut bara i en tooltip.
+                            Lades några in ändå är det en varning, inte ett stopp. */}
+                        <Varningar varningar={[
+                          ...(f.verifikationer?.fel && f.verifikationer.inlagda ? [f.verifikationer.fel] : []),
+                          ...f.varningar,
+                        ]} />
+                        {f.verifikationer?.fel && !f.verifikationer.inlagda && (
+                          <span className="block text-red-400 text-[11px]">{f.verifikationer.fel}</span>
+                        )}
+                        {f.transaktioner?.fel && (
+                          <span className="block text-red-400 text-[11px]">{f.transaktioner.fel}</span>
+                        )}
                       </span>
                       {f.transaktioner && (
                         <span
@@ -1090,18 +1169,6 @@ export default function PersonPage() {
                             : 'SIE · verifikationer →'}
                         </Link>
                       )}
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
-                        f.source === 'mejl' ? 'bg-blue-500/15 text-blue-300'
-                          : f.source === 'admin' ? 'bg-gold-500/15 text-gold-400'
-                          : 'bg-navy-600 text-warm-300'
-                      }`}>
-                        {f.source === 'mejl' ? '✉ mejl' : f.source === 'admin' ? '👤 admin' : '⬆ app'}
-                      </span>
-                      <span className={`text-[11px] shrink-0 w-16 text-right ${
-                        f.status === 'bokfort' ? 'text-emerald-400' : f.status === 'granskas' ? 'text-blue-300' : 'text-gold-400'
-                      }`}>
-                        {f.status === 'bokfort' ? 'Bokfört' : f.status === 'granskas' ? 'Granskas' : 'Inkommet'}
-                      </span>
                       <span className="text-warm-600 text-[11px] shrink-0 hidden sm:inline">{fullDate(f.at)}</span>
                       <a
                         href={`/api/admin/underlag/${f.id}/ladda-ner`}
@@ -1199,6 +1266,7 @@ export default function PersonPage() {
                   {verifikationer.length.toLocaleString('sv-SE')} verifikationer från {verFiler}{' '}
                   {verFiler === 1 ? 'fil' : 'filer'}.
                 </p>
+                <MomsFil verifikationer={verifikationer} orgNr={bokslut?.orgNr ?? null} momsPeriod={person.momsPeriod} />
                 <VerifikationLista verifikationer={verifikationer} showSource />
               </>
             )

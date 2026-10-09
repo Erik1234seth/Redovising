@@ -1,3 +1,4 @@
+import type { NeManuellt } from '@/lib/ne/ne';
 /**
  * Formen på det adminpanelen visar.
  *
@@ -115,6 +116,8 @@ export interface BokslutData {
   inventarier: number;
   lagerposter: number;
   manuellt: Partial<Record<BokslutPunktId, BokslutManuell>>;
+  /** Det som fyllts i för hand till NE-bilagan, per inkomstår ("2026"). */
+  neUppgifter: Record<string, NeManuellt>;
 }
 
 /** Hur en enskild kontroll gick i systemstatusen. */
@@ -174,6 +177,8 @@ export interface AdminUnderlag {
   fileName: string;
   fileSize: number | null;
   mimeType: string | null;
+  /** Det som sorterades bort eller inte gick att tolka när filen lästes in. Tom när allt kom med. */
+  varningar: string[];
   /** inkommet | granskas | bokfort */
   status: string;
   at: string;
@@ -265,6 +270,8 @@ export interface PersonUnderlag {
   status: string;
   at: string;
   mimeType: string | null;
+  /** Det som sorterades bort eller inte gick att tolka när filen lästes in. Tom när allt kom med. */
+  varningar: string[];
   /** Satt när filen är en SIE-fil som lagts in (eller försökts läggas in). */
   verifikationer: UnderlagImport | null;
   /** Satt när någon kört AI-avläsningen på filen. */

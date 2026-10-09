@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { AdminUnderlag } from '@/lib/admin-types';
 import { relativeTime, fullDate } from '../_pipeline';
 import { isSieFile } from '@/lib/sie/parse';
+import { Varningar } from '../_varningar';
 
 /**
  * Underlagen kunderna laddat upp, i väntan på genomgång.
@@ -218,6 +219,13 @@ export default function UnderlagPage() {
                   <p className="text-warm-600 text-xs mt-1" title={fullDate(u.at)}>
                     {relativeTime(u.at)}
                   </p>
+                  <Varningar
+                    className="mt-1"
+                    varningar={[
+                      ...(u.verifikationer?.fel ? [u.verifikationer.fel] : []),
+                      ...u.varningar,
+                    ]}
+                  />
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">

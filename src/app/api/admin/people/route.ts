@@ -161,7 +161,7 @@ async function build(): Promise<Map<string, Built>> {
     supabase.from('orders').select('id, user_id, guest_email, guest_name, guest_phone, guest_company, package_type, bank, status, created_at'),
     supabase.from('email_log').select('id, to_email, subject, kind, status, error, created_at, issue_dismissed_at'),
     supabase.from('contact_files').select('id, contact_id, stage, file_name, created_at'),
-    supabase.from('bokforing_underlag').select('id, user_id, sender_email, source, file_name, mime_type, status, created_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel, transaktioner_utlasta_at, transaktioner_antal, transaktioner_notering, transaktioner_fel'),
+    supabase.from('bokforing_underlag').select('id, user_id, sender_email, source, file_name, mime_type, status, created_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel, transaktioner_utlasta_at, transaktioner_antal, transaktioner_notering, transaktioner_fel, varningar'),
     supabase.from('person_aliases').select('id, alias_email, person_key, created_at'),
   ]);
 
@@ -492,6 +492,7 @@ async function build(): Promise<Map<string, Built>> {
         status: r.status ?? 'inkommet',
         at,
         mimeType: r.mime_type ?? null,
+        varningar: r.varningar ?? [],
         verifikationer: imported,
         transaktioner: utlasta,
       });
@@ -822,7 +823,7 @@ async function bokslutFor(p: Built): Promise<BokslutData | null> {
   const [{ data: profil, error }, { data: tillgangar }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('org_nr, momsnr, forsta_deklarationsar, start_ar, bokslut_checklista')
+      .select('org_nr, momsnr, forsta_deklarationsar, start_ar, bokslut_checklista, ne_uppgifter')
       .eq('id', p.profileId)
       .maybeSingle(),
     supabase.from('lagertillgangar').select('typ').in('user_id', p.profileIds),
@@ -837,6 +838,7 @@ async function bokslutFor(p: Built): Promise<BokslutData | null> {
     inventarier: (tillgangar ?? []).filter((t) => t.typ === 'inventarie').length,
     lagerposter: (tillgangar ?? []).filter((t) => t.typ === 'lager').length,
     manuellt: profil?.bokslut_checklista ?? {},
+    neUppgifter: profil?.ne_uppgifter ?? {},
   };
 }
 
@@ -887,8 +889,25 @@ const MOMSPERIODER: MomsPeriod[] = ['månadsvis', 'kvartalsvis', 'helår', 'inge
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const { contactId, profileId, stage, redovisningsmetod, momsPeriod, betalsatt } = await request.json();
+    const { contactId, profileId, stage, redovisningsmetod, momsPeriod, betalsatt, neUppgifter } = await request.json();
     const supabase = getSupabase();
+
+    // NE-uppgifterna för ett inkomstår ersätter det som fanns för just det året
+    if (neUppgifter !== undefined) {
+      const ar = String(neUppgifter?.ar ?? '');
+      if (!/^d{4}$/.test(ar) || typeof neUppgifter.data !== 'object' || neUppgifter.data === null) {
+        return NextResponse.json({ error: 'neUppgifter måste ha ar (ÅÅÅÅ) och data' }, { status: 400 });
+      }
+      if (!profileId) {
+        return NextResponse.json({ error: 'Personen har inget konto att spara NE-uppgifterna på' }, { status: 400 });
+      }
+      const { data: profil, error: lasFel } = await supabase.from('profiles').select('ne_uppgifter').eq('id', profileId).maybeSingle();
+      if (lasFel) return NextResponse.json({ error: lasFel.message }, { status: 500 });
+      const alla = { ...(profil?.ne_uppgifter ?? {}), [ar]: neUppgifter.data };
+      const { error } = await supabase.from('profiles').update({ ne_uppgifter: alla }).eq('id', profileId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
 
     // Betalsättet bor på profilen och avgör betalkontot när vi konterar
     if (betalsatt !== undefined) {

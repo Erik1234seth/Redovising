@@ -21,6 +21,16 @@ export const MEJLREGEL = `- Ibland följer kundens mejlväxling med. Saknas någ
  */
 export const DETALJREGEL = `- "detaljer": skriv av ALLT som står på underlaget om transaktionen, ord för ord, så att den som konterar aldrig behöver se originalet. Det är en fullständig avskrift, inte ett urval — välj inte ut det du tror är viktigt. All text som finns ska med: tryckt text, rubriker, logotyper, stämplar, handskrivna anteckningar och klotter, marginaltext, meddelanden till kunden, reklam, villkor, finstilt, text i QR- och streckkodsfält, kort sagt även det som verkar oviktigt eller slumpmässigt. Beskriv också kort det som inte är text men kan betyda något, t.ex. att något är överstruket, att en stämpel säger "betald" eller att underlaget är ett foto av en skärm. Behåll ordningen och strukturen från underlaget så gott det går, rad för rad. I en lista med många transaktioner (kontoutdrag, kalkylblad) tar du med radens alla kolumner och det som står i anslutning till raden. Står inget mer än det som redan finns i de andra fälten lämnar du det tomt.`;
 
+/**
+ * Kassasystemens redovisningsunderlag (t.ex. Bokadirekt) är ordnade per konto
+ * och saknar verifikationsnummer — det är kvittot som binder ihop raderna.
+ * Läses bara sammanställningen blir hela perioden en verifikation utan
+ * nummer, som dubblettkollen inte känner igen när samma kvitton kommer in
+ * från ett annat underlag. Gäller båda vägarna: synen och sandlådan.
+ */
+export const GRUPPERINGSREGEL = `- Ett underlag kan vara ordnat per konto utan verifikationsnummer, men med en kolumn för kvitto eller referens på varje rad — t.ex. ett redovisningsunderlag ur ett kassasystem. Då är det kvittot som är verifikationen: samla raderna med samma kvittonummer från alla konton till en verifikation, med kvittonumret som "nummer" och kvittots datum som "datum". Rader utan kvitto men med en referens (t.ex. ett utbetalnings-id) samlas på referensen på samma sätt. Ett löpnummer per konto, som kolumnen "Nr" bredvid kontot, är inte ett verifikationsnummer.
+- En sammanställning med en rad per konto och periodens summor — ofta första sidan — är inte en verifikation. Finns detaljraderna i underlaget är det de du skriver av, hur många sidor det än är. Gör aldrig en samlingsverifikation av hela perioden.`;
+
 export interface ExtraheradTransaktion {
   datum: string;
   beskrivning: string;
@@ -47,33 +57,67 @@ export function tolkaDatum(value: unknown): string {
 
 /**
  * Tal kommer som tal från sandlådan men kan komma som text från synen —
- * "1 250,00" och "-342.50" ska båda bli siffror.
+ * "1 250,00", "1.250,00", "-342.50" och "−342,50" ska alla bli siffror.
+ * Går texten inte att tolka blir det null, så att det kan varnas för i
+ * stället för att tyst bli noll.
  */
-function tolkaTal(value: unknown): number {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  const text = rensa(value).replace(/\s/g, '').replace(',', '.').replace(/[^\d.-]/g, '');
+function tolkaTal(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (value === null || value === undefined) return 0;
+  let text = rensa(String(value)).replace(/[\s ]/g, '').replace(/[−–]/g, '-').replace(/kr|sek/gi, '');
+  if (!text) return 0;
+  // Står både punkt och komma är det sista decimaltecknet och det andra tusental
+  const punkt = text.lastIndexOf('.');
+  const komma = text.lastIndexOf(',');
+  if (punkt >= 0 && komma >= 0) {
+    text = punkt > komma ? text.replace(/,/g, '') : text.replace(/\./g, '').replace(',', '.');
+  } else {
+    text = text.replace(',', '.');
+  }
+  if (!/^-?\d*\.?\d+$/.test(text)) return null;
   const n = Number(text);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? n : null;
 }
 
-export function normaliseraRader(rader: unknown[]): ExtraheradTransaktion[] {
-  return rader.map((row) => {
+/** "3 rader" / "1 rad" — för varningstexterna. */
+const st = (n: number, en: string, flera: string) => `${n} ${n === 1 ? en : flera}`;
+
+export function normaliseraRader(rader: unknown[]): { rader: ExtraheradTransaktion[]; varningar: string[] } {
+  let otolkadeBelopp = 0;
+  let otolkadeDatum = 0;
+  const alla = rader.map((row) => {
     const t = (row ?? {}) as Record<string, unknown>;
-    const belopp = tolkaTal(t.belopp);
+    const tal = tolkaTal(t.belopp);
+    if (tal === null) otolkadeBelopp++;
+    const belopp = tal ?? 0;
+    const datum = tolkaDatum(t.datum);
+    if (!datum && rensa(t.datum)) otolkadeDatum++;
     return {
-      datum: tolkaDatum(t.datum),
+      datum,
       beskrivning: rensa(t.beskrivning),
       motpart: rensa(t.motpart),
       belopp: Math.abs(belopp),
-      moms: Math.abs(tolkaTal(t.moms)),
+      moms: Math.abs(tolkaTal(t.moms) ?? 0),
       valuta: (rensa(t.valuta) || 'SEK').toUpperCase().slice(0, 8),
       // Ett negativt belopp betyder pengar ut, även när fältet säger något annat
       riktning: belopp < 0 ? 'ut' : t.riktning === 'in' ? 'in' : 'ut',
       anteckning: rensa(t.anteckning),
       detaljer: rensa(t.detaljer),
     } satisfies ExtraheradTransaktion;
+  });
   // Rader utan både belopp och text säger ingenting — de är oftast rubriker
-  }).filter((t) => t.belopp > 0 || t.beskrivning);
+  const kvar = alla.filter((t) => t.belopp > 0 || t.beskrivning);
+
+  const varningar: string[] = [];
+  const borta = alla.length - kvar.length;
+  if (borta) varningar.push(`${st(borta, 'rad', 'rader')} utan belopp och text togs bort`);
+  if (otolkadeBelopp) varningar.push(`${st(otolkadeBelopp, 'belopp', 'belopp')} gick inte att tolka och blev 0`);
+  if (otolkadeDatum) varningar.push(`${st(otolkadeDatum, 'datum', 'datum')} gick inte att tolka och lämnades tomma`);
+  const noll = kvar.filter((t) => t.belopp === 0).length;
+  if (noll) varningar.push(`${st(noll, 'transaktion', 'transaktioner')} har beloppet 0`);
+  const utanDatum = kvar.filter((t) => !t.datum).length;
+  if (utanDatum) varningar.push(`${st(utanDatum, 'transaktion', 'transaktioner')} saknar datum`);
+  return { rader: kvar, varningar };
 }
 
 /** En konteringsrad som den står i underlaget. */
@@ -107,28 +151,36 @@ const avrunda = (n: number) => Math.round(n * 100) / 100;
  * de ett belopp med tecken, och varje verifikation summeras — det är den
  * summan som avgör om den sparas.
  */
-export function normaliseraVerifikationer(lista: unknown[]): ExtraheradVerifikation[] {
-  return lista.map((item) => {
+export function normaliseraVerifikationer(lista: unknown[]): { verifikationer: ExtraheradVerifikation[]; varningar: string[] } {
+  let tommaRader = 0;
+  let otolkadeBelopp = 0;
+  let otolkadeDatum = 0;
+  const alla = lista.map((item) => {
     const v = (item ?? {}) as Record<string, unknown>;
-    const rader = (Array.isArray(v.rader) ? v.rader : []).map((r) => {
+    const radlista: unknown[] = Array.isArray(v.rader) ? v.rader : [];
+    const rader = radlista.map((r) => {
       const rad = (r ?? {}) as Record<string, unknown>;
       // Ett ensamt belopp med tecken går också bra, om debet och kredit saknas
-      const belopp = 'debet' in rad || 'kredit' in rad
-        ? tolkaTal(rad.debet) - tolkaTal(rad.kredit)
-        : tolkaTal(rad.belopp);
+      const [debet, kredit] = 'debet' in rad || 'kredit' in rad
+        ? [tolkaTal(rad.debet), tolkaTal(rad.kredit)]
+        : [tolkaTal(rad.belopp), 0];
+      if (debet === null || kredit === null) otolkadeBelopp++;
       return {
         konto: rensa(String(rad.konto ?? '')).replace(/\s/g, ''),
         kontonamn: rensa(rad.kontonamn),
-        belopp: avrunda(belopp),
+        belopp: avrunda((debet ?? 0) - (kredit ?? 0)),
         text: rensa(rad.text),
       } satisfies ExtraheradRad;
     }).filter((r) => r.konto || r.belopp !== 0);
+    tommaRader += radlista.length - rader.length;
 
+    const datum = tolkaDatum(v.datum);
+    if (!datum && rensa(v.datum)) otolkadeDatum++;
     const summa = avrunda(rader.reduce((s, r) => s + r.belopp, 0));
     return {
       serie: rensa(String(v.serie ?? '')),
       nummer: rensa(String(v.nummer ?? '')),
-      datum: tolkaDatum(v.datum),
+      datum,
       text: rensa(v.text),
       rader,
       summa,
@@ -137,7 +189,20 @@ export function normaliseraVerifikationer(lista: unknown[]): ExtraheradVerifikat
         && rader.length >= 2
         && rader.every((r) => /^\d{3,6}$/.test(r.konto)),
     } satisfies ExtraheradVerifikation;
-  }).filter((v) => v.rader.length > 0);
+  });
+  const kvar = alla.filter((v) => v.rader.length > 0);
+
+  const varningar: string[] = [];
+  const borta = alla.length - kvar.length;
+  if (borta) varningar.push(`${st(borta, 'verifikation', 'verifikationer')} utan konteringsrader togs bort`);
+  if (tommaRader) varningar.push(`${st(tommaRader, 'konteringsrad', 'konteringsrader')} utan konto och belopp togs bort`);
+  if (otolkadeBelopp) varningar.push(`${st(otolkadeBelopp, 'belopp', 'belopp')} gick inte att tolka och blev 0`);
+  if (otolkadeDatum) varningar.push(`${st(otolkadeDatum, 'datum', 'datum')} gick inte att tolka och lämnades tomma`);
+  const utanDatum = kvar.filter((v) => !v.datum).length;
+  if (utanDatum) varningar.push(`${st(utanDatum, 'verifikation', 'verifikationer')} saknar datum`);
+  const felKonto = kvar.filter((v) => v.rader.some((r) => !/^\d{3,6}$/.test(r.konto))).length;
+  if (felKonto) varningar.push(`${st(felKonto, 'verifikation', 'verifikationer')} har rader utan giltigt kontonummer`);
+  return { verifikationer: kvar, varningar };
 }
 
 export type Underlagstyp = 'transaktioner' | 'verifikationer';
@@ -146,6 +211,8 @@ export interface TolkatSvar {
   typ: Underlagstyp;
   transaktioner: ExtraheradTransaktion[];
   verifikationer: ExtraheradVerifikation[];
+  /** Det som sorterades bort eller inte gick att tolka. Tom när allt kom med. */
+  varningar: string[];
 }
 
 /**
@@ -155,14 +222,30 @@ export interface TolkatSvar {
  */
 export function tolkaSvar(parsed: unknown): TolkatSvar {
   // Äldre form: bara en lista med transaktioner
-  if (Array.isArray(parsed)) return { typ: 'transaktioner', transaktioner: normaliseraRader(parsed), verifikationer: [] };
+  if (Array.isArray(parsed)) {
+    const t = normaliseraRader(parsed);
+    return { typ: 'transaktioner', transaktioner: t.rader, verifikationer: [], varningar: t.varningar };
+  }
 
   const svar = (parsed ?? {}) as { typ?: unknown; transaktioner?: unknown; verifikationer?: unknown };
-  const verifikationer = Array.isArray(svar.verifikationer) ? normaliseraVerifikationer(svar.verifikationer) : [];
-  const transaktioner = Array.isArray(svar.transaktioner) ? normaliseraRader(svar.transaktioner) : [];
+  const v = Array.isArray(svar.verifikationer)
+    ? normaliseraVerifikationer(svar.verifikationer)
+    : { verifikationer: [], varningar: [] };
+  const t = Array.isArray(svar.transaktioner)
+    ? normaliseraRader(svar.transaktioner)
+    : { rader: [], varningar: [] };
 
-  if (svar.typ === 'verifikationer' || (verifikationer.length > 0 && transaktioner.length === 0)) {
-    return { typ: 'verifikationer', transaktioner: [], verifikationer };
+  // Bara en av listorna sparas. Fanns det något i den andra ska det synas.
+  if (svar.typ === 'verifikationer' || (v.verifikationer.length > 0 && t.rader.length === 0)) {
+    const varningar = [...v.varningar];
+    if (t.rader.length) {
+      varningar.push(`${st(t.rader.length, 'transaktion', 'transaktioner')} i svaret sparades inte — filen lästes som verifikationer`);
+    }
+    return { typ: 'verifikationer', transaktioner: [], verifikationer: v.verifikationer, varningar };
   }
-  return { typ: 'transaktioner', transaktioner, verifikationer: [] };
+  const varningar = [...t.varningar];
+  if (v.verifikationer.length) {
+    varningar.push(`${st(v.verifikationer.length, 'verifikation', 'verifikationer')} i svaret sparades inte — filen lästes som transaktioner`);
+  }
+  return { typ: 'transaktioner', transaktioner: t.rader, verifikationer: [], varningar };
 }
