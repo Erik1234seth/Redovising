@@ -13,6 +13,7 @@ import { usePathname } from 'next/navigation';
 
 const ITEMS: { href: string; label: string }[] = [
   { href: '/admin/arenden', label: 'Ärenden' },
+  { href: '/admin/kalender', label: 'Kalender' },
   { href: '/admin/inlamning', label: 'Inlämning' },
 ];
 

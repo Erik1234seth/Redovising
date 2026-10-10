@@ -65,8 +65,8 @@ function helgdagar(ar: number): Set<string> {
 }
 
 /** Flyttar fram till närmaste vardag som inte är helgdag. */
-function vardag(d: Date): string {
-  const x = new Date(d);
+export function vardag(d: Date | string): string {
+  const x = new Date(typeof d === 'string' ? `${d}T00:00:00Z` : d);
   while (x.getUTCDay() === 0 || x.getUTCDay() === 6 || helgdagar(x.getUTCFullYear()).has(iso(x))) {
     x.setUTCDate(x.getUTCDate() + 1);
   }

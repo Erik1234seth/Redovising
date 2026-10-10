@@ -387,6 +387,7 @@ export interface InlamningPeriod extends Deadlineperiod {
   /** Det som ser fel ut i bokföringen eller uppgifterna, i klartext. Visas rött. */
   flaggor: string[];
   antalVerifikationer?: number;
+  antalTransaktioner?: number;
 }
 
 export interface InlamningKund {
