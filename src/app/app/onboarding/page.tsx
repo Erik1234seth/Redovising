@@ -10,13 +10,6 @@ import { useMainSiteUrl } from '@/lib/useMainSiteUrl';
 const NAV_BG = '#173b57';
 const CORAL = '#E95C63';
 
-const MOMS_OPTIONS: { value: 'månadsvis' | 'kvartalsvis' | 'helår' | 'ingen-moms'; label: string; desc: string }[] = [
-  { value: 'helår', label: 'En gång per år', desc: 'Redovisar moms en gång om året' },
-  { value: 'kvartalsvis', label: 'Kvartalsvis', desc: 'Redovisar moms var 3:e månad' },
-  { value: 'månadsvis', label: 'Månadsvis', desc: 'Redovisar moms varje månad' },
-  { value: 'ingen-moms', label: 'Betalar inte moms', desc: 'Verksamheten är inte momspliktig' },
-];
-
 type KontoTyp = 'foretagskonto' | 'privatkonto' | 'bada';
 
 // Frågan ställdes tidigare som ja/nej. Gamla svar finns kvar på ett fåtal
@@ -26,33 +19,8 @@ const KONTO_LEGACY: Partial<Record<string, KontoTyp>> = {
   nej: 'privatkonto',
 };
 
-const FORSTA_DEKLARATION_OPTIONS: { value: boolean; label: string; desc: string }[] = [
-  { value: true, label: 'Ja', desc: 'Firman är ny — jag har inte deklarerat för den tidigare' },
-  { value: false, label: 'Nej', desc: 'Jag har deklarerat för firman minst en gång förut' },
-];
-
 type BokforingMetod = 'excel-kalkylark' | 'hemsidan' | 'maila-underlag';
 type SkickaInMetod = 'maila-fil' | 'ladda-upp';
-
-// Hjälptexter som visas när man klickar på frågetecknet vid ett momsalternativ
-const MOMS_HELP: Record<string, { title: string; body: string }> = {
-  kvartalsvis: {
-    title: 'Kvartalsvis moms',
-    body: 'Kvartalsvis moms innebär att du redovisar moms fyra gånger per år. Det är vanligt för företag som har högre omsättning än 1 miljon kronor men högst 40 miljoner kronor per år.',
-  },
-  helår: {
-    title: 'Årsvis moms',
-    body: 'Du kan normalt redovisa moms en gång per år om företagets beskattningsunderlag är högst 1 miljon kronor per år.',
-  },
-  månadsvis: {
-    title: 'Månadsvis moms',
-    body: 'Månadsvis moms innebär att du redovisar moms varje månad. Det är obligatoriskt om företagets beskattningsunderlag är högre än 40 miljoner kronor per år, men mindre företag kan också välja månadsvis redovisning om de vill ha tätare kontroll.',
-  },
-  'ingen-moms': {
-    title: 'Ingen moms',
-    body: 'Välj detta om företaget inte är momsregistrerat, till exempel om du omfattas av reglerna för momsbefrielse vid låg årsomsättning. Företag med årsomsättning i Sverige på högst 120 000 kronor kan i vissa fall vara undantagna från momsplikt. Det kräver bland annat att gränsen inte har överskridits under det aktuella kalenderåret eller något av de två föregående kalenderåren.',
-  },
-};
 
 // Formaterar org-/personnummer och lägger automatiskt in bindestreck före de fyra sista siffrorna
 function formatOrgNr(input: string): string {
@@ -95,11 +63,6 @@ export default function OnboardingPage() {
   const [companyName, setCompanyName] = useState('');
   const [orgNr, setOrgNr] = useState('');
   const [verksamhet, setVerksamhet] = useState('');
-  const [momsPeriod, setMomsPeriod] = useState<'månadsvis' | 'kvartalsvis' | 'helår' | 'ingen-moms' | null>(null);
-  // Startaret fragas inte langre har. Det ligger kvar pa profilen for befintliga
-  // kunder och gar att fylla i under Mitt konto, men onboardingen fragar i stallet
-  // om det ar kundens forsta deklarationsar - det ar det som styr hur vi svarar dem.
-  const [forstaDeklaration, setForstaDeklaration] = useState<boolean | null>(null);
   const [harForetagskonto, setHarForetagskonto] = useState<KontoTyp | null>(null);
   // Intygandet sparas inte på profilen — det är en spärr i flödet, inte en uppgift
   // om företaget. Därför förfylls det inte heller vid återbesök: den som går
@@ -119,8 +82,6 @@ export default function OnboardingPage() {
     if (profile.company_name) setCompanyName(profile.company_name);
     if (profile.org_nr) setOrgNr(profile.org_nr);
     if (profile.verksamhet) setVerksamhet(profile.verksamhet);
-    if (profile.moms_period) setMomsPeriod(profile.moms_period);
-    if (profile.forsta_deklarationsar !== null) setForstaDeklaration(profile.forsta_deklarationsar);
     if (profile.har_foretagskonto) {
       const lagrat = profile.har_foretagskonto;
       setHarForetagskonto(KONTO_LEGACY[lagrat] ?? (lagrat as KontoTyp));
@@ -128,7 +89,7 @@ export default function OnboardingPage() {
     setHydrated(true);
   }, [profile, hydrated]);
 
-  const totalSteps = 4;
+  const totalSteps = 2;
 
   async function handleFinish() {
     if (!user) return;
@@ -142,8 +103,6 @@ export default function OnboardingPage() {
           company_name: companyName || null,
           org_nr: orgNr || null,
           verksamhet,
-          moms_period: momsPeriod,
-          forsta_deklarationsar: forstaDeklaration,
           har_foretagskonto: harForetagskonto,
           bokforing_metod: bokforingMetod,
           skicka_in_metod: skickaInMetod,
@@ -359,6 +318,10 @@ export default function OnboardingPage() {
               </span>
             </label>
 
+            {error && (
+              <p className="mt-4 text-xs text-red-500 text-center">{error}</p>
+            )}
+
             <div className="flex gap-3 mt-8">
               <button
                 type="button"
@@ -369,180 +332,8 @@ export default function OnboardingPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setStep(3)}
-                disabled={verksamhet.trim().length < 5 || !intygat}
-                className="flex-1 py-3 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-40"
-                style={{ backgroundColor: NAV_BG }}
-              >
-                Nästa
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Steg 3 — Momsredovisning */}
-        {step === 3 && (
-          <div>
-            <StepBadge current={3} total={totalSteps} />
-            <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-2">
-              Hur ofta redovisar du moms?
-            </h1>
-            <p className="text-slate-400 text-sm mb-8 leading-relaxed">
-              Välj hur ofta du lämnar in momsdeklaration till Skatteverket.
-            </p>
-
-            <div className="flex flex-col gap-3">
-              {MOMS_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setMomsPeriod(opt.value)}
-                  className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border-2 text-left transition-all duration-100"
-                  style={{
-                    borderColor: momsPeriod === opt.value ? NAV_BG : '#e2e8f0',
-                    backgroundColor: momsPeriod === opt.value ? NAV_BG : 'white',
-                  }}
-                >
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-bold" style={{ color: momsPeriod === opt.value ? 'white' : '#1e293b' }}>
-                        {opt.label}
-                      </p>
-                      {MOMS_HELP[opt.value] && (
-                        <span className="relative inline-flex group">
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            aria-label={`Mer information om ${MOMS_HELP[opt.value].title}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold border cursor-help"
-                            style={{
-                              borderColor: momsPeriod === opt.value ? 'rgba(255,255,255,0.6)' : '#94a3b8',
-                              color: momsPeriod === opt.value ? 'white' : '#64748b',
-                            }}
-                          >
-                            ?
-                          </span>
-                          <span
-                            className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 scale-95 rounded-xl bg-white p-3 text-left opacity-0 shadow-xl border border-slate-200 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100"
-                          >
-                            <span className="block text-xs font-bold text-slate-800 mb-1">{MOMS_HELP[opt.value].title}</span>
-                            <span className="block text-xs leading-relaxed text-slate-500">{MOMS_HELP[opt.value].body}</span>
-                          </span>
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs mt-0.5" style={{ color: momsPeriod === opt.value ? 'rgba(255,255,255,0.7)' : '#94a3b8' }}>
-                      {opt.desc}
-                    </p>
-                  </div>
-                  {momsPeriod === opt.value && (
-                    <svg className="w-5 h-5 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-start gap-3 rounded-2xl px-4 py-3.5 mt-4" style={{ backgroundColor: '#F8FAFC' }}>
-              <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Är du osäker? Logga in med BankID på{' '}
-                <a
-                  href="https://www7.skatteverket.se/portal/minasidor/moms"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium underline"
-                  style={{ color: NAV_BG }}
-                >
-                  Skatteverkets Mina sidor
-                </a>{' '}
-                och öppna fliken moms. Där ser du &quot;Redovisningsperiod&quot; År–Kvartal–Månad. Vill du ändra period så kontaktar du oss så hjälper vi dig.
-              </p>
-            </div>
-
-            <div className="flex gap-3 mt-8">
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="flex-1 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-              >
-                Tillbaka
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep(4)}
-                disabled={momsPeriod === null}
-                className="flex-1 py-3 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-40"
-                style={{ backgroundColor: NAV_BG }}
-              >
-                Nästa
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Steg 4 — Första deklarationsåret */}
-        {step === 4 && (
-          <div>
-            <StepBadge current={4} total={totalSteps} />
-            <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-2">
-              Är det första året du deklarerar för din enskilda firma?
-            </h1>
-            <p className="text-slate-400 text-sm mb-8 leading-relaxed">
-              Svaret avgör om vi behöver ta hänsyn till tidigare års bokföring.
-            </p>
-
-            {/* Samma kortform som momsstegets alternativ, så de två sista stegen
-                ser ut att höra ihop. */}
-            <div className="flex flex-col gap-3">
-              {FORSTA_DEKLARATION_OPTIONS.map(opt => (
-                <button
-                  key={String(opt.value)}
-                  type="button"
-                  onClick={() => setForstaDeklaration(opt.value)}
-                  className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border-2 text-left transition-all duration-100"
-                  style={{
-                    borderColor: forstaDeklaration === opt.value ? NAV_BG : '#e2e8f0',
-                    backgroundColor: forstaDeklaration === opt.value ? NAV_BG : 'white',
-                  }}
-                >
-                  <div>
-                    <p className="text-sm font-bold" style={{ color: forstaDeklaration === opt.value ? 'white' : '#1e293b' }}>
-                      {opt.label}
-                    </p>
-                    <p className="text-xs mt-0.5" style={{ color: forstaDeklaration === opt.value ? 'rgba(255,255,255,0.7)' : '#94a3b8' }}>
-                      {opt.desc}
-                    </p>
-                  </div>
-                  {forstaDeklaration === opt.value && (
-                    <svg className="w-5 h-5 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {error && (
-              <p className="mt-4 text-xs text-red-500 text-center">{error}</p>
-            )}
-
-            <div className="flex gap-3 mt-8">
-              <button
-                type="button"
-                onClick={() => setStep(3)}
-                className="flex-1 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-              >
-                Tillbaka
-              </button>
-              <button
-                type="button"
                 onClick={handleFinish}
-                disabled={forstaDeklaration === null || saving}
+                disabled={verksamhet.trim().length < 5 || !intygat || saving}
                 className="flex-1 py-3 text-sm font-bold text-white rounded-xl transition-opacity disabled:opacity-40"
                 style={{ backgroundColor: NAV_BG }}
               >
