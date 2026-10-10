@@ -10,7 +10,7 @@ import { normalizePhone } from '@/lib/sms/phone';
 const SMS_MAX = 20;
 
 /** Telefonnumren vi känner till för en mejladress: profilen, formulären och mötena. */
-async function nummerFor(supabase: SupabaseClient, email: string): Promise<string[]> {
+export async function nummerFor(supabase: SupabaseClient, email: string): Promise<string[]> {
   const e = email.trim().toLowerCase();
   const [p, c, m] = await Promise.all([
     supabase.from('profiles').select('phone').ilike('email', e),

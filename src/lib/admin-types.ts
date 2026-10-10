@@ -482,4 +482,14 @@ export interface InkorgTrad {
   meddelanden: InkorgMeddelande[];
   utkast: InkorgUtkast[];
   arenden: Arende[];
+  /** Anteckningarna AI:n får med: de generella och de som gäller personen. */
+  anteckningar: AiAnteckning[];
+}
+
+/** En anteckning till AI:ns prompt (`ai_anteckningar`). */
+export interface AiAnteckning {
+  id: string;
+  text: string;
+  omfang: 'kund' | 'generell';
+  at: string;
 }

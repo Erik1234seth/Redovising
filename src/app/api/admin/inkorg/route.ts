@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { build, emailKey, locate, phoneKey, summary, type Built } from '@/lib/personer';
 import type {
-  Arende, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast, MomsPeriod, Redovisningsmetod,
+  AiAnteckning, Arende, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast, MomsPeriod, Redovisningsmetod,
 } from '@/lib/admin-types';
 import { callScript } from '@/lib/emails/send-via-gmail';
 import { identifySender } from '@/lib/sms/identify';
@@ -10,6 +10,7 @@ import { generateSmsReply } from '@/lib/sms/answer';
 import { handleGeneralQuestion } from '@/lib/inmail/handlers/general-question';
 import { handleUnknownUser } from '@/lib/inmail/handlers/unknown-user';
 import { smsKontextForMejl } from '@/lib/inkorg/kontext';
+import { normalizePhone } from '@/lib/sms/phone';
 
 /**
  * Inkorgen: mejl och SMS per person, med utkasten som väntar.
@@ -132,6 +133,15 @@ export async function GET(request: NextRequest) {
       const v = per.get(p.key);
       const profil = p.profileId ? data.profiler.find((x) => x.id === p.profileId) : null;
       const nycklar = [...new Set([...p.aliases.map((a) => a.slice(2)), p.email, p.phone].filter((x): x is string => !!x))];
+      const mejladresser = p.aliases.filter((a) => a.startsWith('e:')).map((a) => a.slice(2));
+      const telefoner = p.aliases.filter((a) => a.startsWith('p:')).map((a) => a.slice(2));
+      const { data: anteckningar } = await supabase.from('ai_anteckningar').select('id, text, omfang, created_at')
+        .or([
+          'omfang.eq.generell',
+          ...(mejladresser.length ? [`email.in.(${mejladresser.map((x) => `"${x}"`).join(',')})`] : []),
+          ...(telefoner.length ? [`telefon.in.(${telefoner.map((x) => `"${x}"`).join(',')})`] : []),
+        ].join(','))
+        .order('created_at');
       const { data: arenden } = await supabase.from('arenden')
         .select('id, titel, beskrivning, datum, status, person_key, person_namn, kalla, created_at, klar_at')
         .eq('status', 'oppen').in('person_key', nycklar).order('datum');
@@ -151,6 +161,7 @@ export async function GET(request: NextRequest) {
           id: r.id, titel: r.titel, beskrivning: r.beskrivning, datum: r.datum, status: r.status,
           personKey: r.person_key, personNamn: r.person_namn, kalla: r.kalla, skapad: r.created_at, klar: r.klar_at,
         })),
+        anteckningar: (anteckningar ?? []).map((a): AiAnteckning => ({ id: a.id, text: a.text, omfang: a.omfang, at: a.created_at })),
       };
       return NextResponse.json(trad);
     }
@@ -255,6 +266,37 @@ export async function POST(request: NextRequest) {
 
       case 'ai-utkast':
         return aiUtkast(supabase, String(body.key ?? ''), body.kanal === 'sms' ? 'sms' : 'mejl');
+
+      case 'skriv-om': {
+        // Nytt utkast först. Går det inte ligger det gamla kvar.
+        if (!body.id) return fel('id krävs');
+        const kanal = body.kanal === 'sms' ? 'sms' : 'mejl';
+        const svar = await aiUtkast(supabase, String(body.key ?? ''), kanal);
+        if (!svar.ok) return svar;
+        await (kanal === 'sms'
+          ? supabase.from('sms_messages').update({ status: 'discarded' }).eq('id', body.id).eq('status', 'draft')
+          : supabase.from('mejl_utkast').update({ status: 'discarded', updated_at: new Date().toISOString() }).eq('id', body.id).eq('status', 'draft'));
+        return NextResponse.json({ ok: true });
+      }
+
+      case 'anteckning-ny': {
+        if (!text) return fel('Anteckningen är tom');
+        const omfang = body.omfang === 'generell' ? 'generell' : 'kund';
+        let rad: Record<string, unknown> = { text, omfang };
+        if (omfang === 'kund') {
+          const p = locate(await build(), String(body.key ?? ''));
+          if (!p) return fel('Hittade ingen sådan person', 404);
+          rad = { ...rad, email: p.email?.toLowerCase() ?? null, telefon: normalizePhone(p.phone), person_namn: p.name || p.company || null };
+        }
+        const { error } = await supabase.from('ai_anteckningar').insert(rad);
+        return error ? fel(error.message, 500) : NextResponse.json({ ok: true });
+      }
+
+      case 'anteckning-bort': {
+        if (!body.id) return fel('id krävs');
+        const { error } = await supabase.from('ai_anteckningar').delete().eq('id', body.id);
+        return error ? fel(error.message, 500) : NextResponse.json({ ok: true });
+      }
 
       case 'ombud': {
         if (!body.profileId) return fel('profileId krävs');

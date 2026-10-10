@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type {
-  InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast, MomsPeriod, Redovisningsmetod,
+  AiAnteckning, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast, MomsPeriod, Redovisningsmetod,
 } from '@/lib/admin-types';
 
 /**
@@ -149,6 +149,7 @@ export default function InkorgPage() {
 
 function Trad({ personKey, onAndrat }: { personKey: string; onAndrat: () => void }) {
   const [trad, setTrad] = useState<InkorgTrad | null>(null);
+  const [visaAnteckning, setVisaAnteckning] = useState(false);
   const [fel, setFel] = useState('');
 
   const ladda = useCallback(() => {
@@ -185,12 +186,18 @@ function Trad({ personKey, onAndrat }: { personKey: string; onAndrat: () => void
           </h2>
           <p className="text-sm text-slate-500">{[p.company && p.company !== p.name ? p.company : null, p.email, p.phone].filter(Boolean).join(' · ')}</p>
         </div>
+        <button onClick={() => setVisaAnteckning(!visaAnteckning)}
+          className={`text-xs px-2 py-1 rounded-lg border transition ${visaAnteckning ? 'bg-violet-50 border-violet-300 text-violet-800' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
+          + Anteckning{trad.anteckningar.length ? ` (${trad.anteckningar.length})` : ''}
+        </button>
         <span className={`text-xs font-medium px-2 py-1 rounded-lg border ${
           trad.kategori === 'kund' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
             : trad.kategori === 'saknar' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
           {KATEGORI_NAMN[trad.kategori]}
         </span>
       </header>
+
+      {visaAnteckning && <Anteckningar personKey={personKey} anteckningar={trad.anteckningar} onAndrat={ladda} />}
 
       {trad.uppgifter && p.profileId && (
         <Ombudsuppgifter profileId={p.profileId} uppgifter={trad.uppgifter} onSparat={uppdatera} />
@@ -216,7 +223,7 @@ function Trad({ personKey, onAndrat }: { personKey: string; onAndrat: () => void
       </div>
 
       <div className="p-4 border-t border-slate-200 space-y-3 bg-slate-50/60 rounded-b-xl">
-        {trad.utkast.map((u) => <Utkast key={`${u.kanal}-${u.id}`} u={u} onKlar={uppdatera} />)}
+        {trad.utkast.map((u) => <Utkast key={`${u.kanal}-${u.id}`} u={u} personKey={personKey} onKlar={uppdatera} />)}
         <Skriv email={p.email} phone={p.phone} svarPa={senasteMejlIn?.gmailMessageId ?? null}
           amne={senasteAmne} onKlar={uppdatera} />
       </div>
@@ -259,9 +266,10 @@ const post = async (url: string, body: object, method = 'POST') => {
   return d;
 };
 
-function Utkast({ u, onKlar }: { u: InkorgUtkast; onKlar: () => void }) {
+function Utkast({ u, personKey, onKlar }: { u: InkorgUtkast; personKey: string; onKlar: () => void }) {
   const [text, setText] = useState(u.text);
   const [upptagen, setUpptagen] = useState(false);
+  const [skriverOm, setSkriverOm] = useState(false);
   const [fel, setFel] = useState(u.fel ?? '');
 
   const kor = async (fn: () => Promise<unknown>) => {
@@ -279,12 +287,26 @@ function Utkast({ u, onKlar }: { u: InkorgUtkast; onKlar: () => void }) {
     ? post('/api/admin/inkorg', { action: 'slang-mejl', id: u.id })
     : post('/api/admin/sms-drafts', { id: u.id }, 'DELETE'));
 
+  /** Låter AI:n skriva ett nytt utkast — med anteckningarna som lagts till sedan dess. */
+  const skrivOm = async () => {
+    setSkriverOm(true);
+    await kor(() => post('/api/admin/inkorg', { action: 'skriv-om', id: u.id, kanal: u.kanal, key: personKey }));
+    setSkriverOm(false);
+  };
+
   return (
     <div className="bg-white border-2 border-amber-300 rounded-xl p-3">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">UTKAST</span>
         <KanalMarke kanal={u.kanal} />
         <span className="text-xs text-slate-500 truncate">till {u.till}{u.kanal === 'mejl' && !u.svarPa ? ' · nytt mejl' : ''}</span>
+        {skriverOm && <span className="text-xs text-slate-500">AI:n skriver om… (kan ta en halvminut)</span>}
+        <button onClick={skrivOm} disabled={upptagen} title="Skriv om utkastet"
+          className="ml-auto w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-40">
+          <svg className={`w-4 h-4 ${skriverOm ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" />
+          </svg>
+        </button>
       </div>
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={Math.min(14, Math.max(4, text.split('\n').length + 1))}
         className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
@@ -294,7 +316,7 @@ function Utkast({ u, onKlar }: { u: InkorgUtkast; onKlar: () => void }) {
       <div className="flex items-center gap-2 mt-2">
         <button onClick={skicka} disabled={upptagen || !text.trim()}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50">
-          {upptagen ? 'Skickar…' : 'Skicka'}
+          {upptagen && !skriverOm ? 'Skickar…' : 'Skicka'}
         </button>
         {text !== u.text && <button onClick={spara} disabled={upptagen} className="px-3 py-2 text-sm text-slate-700 hover:text-slate-900">Spara ändring</button>}
         <button onClick={slang} disabled={upptagen} className="ml-auto px-3 py-2 text-sm text-slate-500 hover:text-red-600">Släng</button>
@@ -355,6 +377,60 @@ function Skriv({ email, phone, svarPa, amne, onKlar }: {
         <button onClick={skicka} disabled={skickar || !text.trim() || (nyttMejl && !rubrik.trim())}
           className="ml-auto px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg disabled:opacity-40">
           {skickar ? 'Skickar…' : 'Skicka'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Anteckningar({ personKey, anteckningar, onAndrat }: {
+  personKey: string; anteckningar: AiAnteckning[]; onAndrat: () => void;
+}) {
+  const [text, setText] = useState('');
+  const [omfang, setOmfang] = useState<'kund' | 'generell'>('kund');
+  const [upptagen, setUpptagen] = useState(false);
+  const [fel, setFel] = useState('');
+
+  const kor = async (body: object, efter?: () => void) => {
+    setUpptagen(true); setFel('');
+    try { await post('/api/admin/inkorg', body); efter?.(); onAndrat(); }
+    catch (e) { setFel(e instanceof Error ? e.message : 'Något gick fel'); }
+    finally { setUpptagen(false); }
+  };
+
+  return (
+    <div className="px-4 py-3 border-b border-slate-200 bg-violet-50/40">
+      <p className="text-sm font-semibold text-violet-900">Anteckningar till AI:n</p>
+      <p className="text-xs text-violet-800/70 mb-2">Följer med varje gång AI:n skriver ett svar. Tryck ↻ på utkastet efteråt för att få ett nytt.</p>
+      {anteckningar.length > 0 && (
+        <ul className="space-y-1 mb-3">
+          {anteckningar.map((a) => (
+            <li key={a.id} className="flex items-start gap-2 text-sm bg-white border border-violet-200 rounded-lg px-2.5 py-1.5">
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 mt-0.5 ${a.omfang === 'generell' ? 'bg-slate-100 text-slate-600' : 'bg-violet-100 text-violet-800'}`}>
+                {a.omfang === 'generell' ? 'ALLA' : 'KUNDEN'}
+              </span>
+              <span className="text-slate-800 whitespace-pre-wrap flex-1">{a.text}</span>
+              <button onClick={() => kor({ action: 'anteckning-bort', id: a.id })} disabled={upptagen} title="Ta bort"
+                className="text-slate-400 hover:text-red-600 shrink-0">✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={2}
+        placeholder="T.ex. Svara kortare. Nämn inte priset förrän de frågar."
+        className="w-full bg-white border border-violet-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400" />
+      <div className="flex items-center gap-3 mt-2 flex-wrap">
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input type="radio" checked={omfang === 'kund'} onChange={() => setOmfang('kund')} className="accent-violet-600" /> Bara den här kunden
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input type="radio" checked={omfang === 'generell'} onChange={() => setOmfang('generell')} className="accent-violet-600" /> Generellt (alla svar)
+        </label>
+        {fel && <span className="text-xs text-red-600">{fel}</span>}
+        <button onClick={() => kor({ action: 'anteckning-ny', key: personKey, text, omfang }, () => setText(''))}
+          disabled={upptagen || !text.trim()}
+          className="ml-auto px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-40">
+          Spara anteckning
         </button>
       </div>
     </div>

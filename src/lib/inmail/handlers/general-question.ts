@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, formatAmount } from '../openai-client';
 import { retrieveKnowledge, retrieveExamples, embedQuery } from '../retrieve';
 import { buildGeneralQuestionPrompt } from '../general-question-prompt';
+import { anteckningarForPrompt } from '../../inkorg/anteckningar';
 
 const MOMS_PERIOD_TEXT: Record<string, string> = {
   monthly: 'månadsvis',
@@ -100,10 +101,11 @@ export async function handleGeneralQuestion(params: {
   // Frågan embeddas en gång och återanvänds för båda sökningarna.
   const query = `${subject}\n${body}`.trim();
   const queryEmbedding = query ? await embedQuery(query) : null;
-  const [knowledge, examples, senderContext] = await Promise.all([
+  const [knowledge, examples, senderContext, anteckningar] = await Promise.all([
     retrieveKnowledge({ supabase, query, queryEmbedding }),
     retrieveExamples({ supabase, query, queryEmbedding }),
     buildSenderContext(supabase, profile.id),
+    anteckningarForPrompt(supabase, { email: profile.email }),
   ]);
 
   const systemPrompt = buildGeneralQuestionPrompt({
@@ -111,7 +113,7 @@ export async function handleGeneralQuestion(params: {
     knowledgeExcerpts: knowledge,
     examples,
     attachmentNames,
-  });
+  }) + anteckningar;
 
   const mejl = emailHistory
     ? `Mailkonversation:\n\n${emailHistory}`

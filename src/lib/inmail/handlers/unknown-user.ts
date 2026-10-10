@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, parseJSON } from '../openai-client';
 import { ENKLA_BOKSLUT_CONTEXT } from '../service-context';
 import { REPLY_RULES } from '../reply-rules';
+import { anteckningarForPrompt } from '../../inkorg/anteckningar';
 
 interface InitialReply {
   isInterested: boolean;
@@ -16,6 +17,7 @@ async function generateInitialReply(
   registrationLink: string,
   history?: string,
   attachmentNames: string[] = [],
+  anteckningar = '',
 ): Promise<InitialReply> {
   const systemPrompt = `${ENKLA_BOKSLUT_CONTEXT}
 
@@ -37,7 +39,7 @@ Returnera JSON:
   "isExistingCustomer": boolean,
   "includeLink": boolean,
   "message": "..."
-}`;
+}${anteckningar}`;
 
   const userContent = [
     `Ämne: ${subject || '(inget ämne)'}`,
@@ -84,7 +86,8 @@ export async function handleUnknownUser(params: {
 
   let reply: InitialReply;
   try {
-    reply = await generateInitialReply(body, subject, registrationLink, emailHistory, attachmentNames);
+    reply = await generateInitialReply(body, subject, registrationLink, emailHistory, attachmentNames,
+      await anteckningarForPrompt(supabase, { email: senderEmail }));
   } catch (err) {
     // Inget standardsvar här. Tidigare gick ett hårdkodat "registrera dig"-mejl ut
     // så fort AI:n fallerade — även till avsändare som aldrig frågat efter det, som

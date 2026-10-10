@@ -5,6 +5,7 @@ import { loadKnowledge } from '../inmail/knowledge';
 import { PROMPT_INTRO, SERVICE_INFO, KNOWLEDGE_RULES, EXAMPLE_RULES } from '../inmail/general-question-prompt';
 import type { Sender } from './identify';
 import { byggMejlkontext } from '../mejlkontext';
+import { anteckningarForPrompt } from '../inkorg/anteckningar';
 
 /** Hur många tidigare SMS i konversationen som skickas med som kontext. */
 const HISTORY_LIMIT = 10;
@@ -257,11 +258,12 @@ SMS klarar bara enkla tecken.
     ? `Tidigare SMS i konversationen:\n${history}\n\nNytt SMS att svara på:\n${message}`
     : `SMS att svara på:\n${message}`;
   const userContent = mejlkontext ? `${mejlkontext}\n\n${sms}` : sms;
+  const anteckningar = await anteckningarForPrompt(supabase, { email: sender.email, phone });
 
   const answer = await callOpenAI({
     model: 'o3',
     messages: [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: systemPrompt + anteckningar },
       { role: 'user', content: userContent },
     ],
     maxTokens: 6000,
