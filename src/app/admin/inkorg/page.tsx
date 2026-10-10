@@ -213,7 +213,7 @@ function Trad({ personKey, onAndrat }: { personKey: string; onAndrat: () => void
 
       <div className="p-4 border-t border-slate-200 space-y-3 bg-slate-50/60 rounded-b-xl">
         {trad.utkast.map((u) => <Utkast key={`${u.kanal}-${u.id}`} u={u} onKlar={uppdatera} />)}
-        <Skriv personKey={personKey} email={p.email} phone={p.phone} svarPa={senasteMejlIn?.gmailMessageId ?? null}
+        <Skriv email={p.email} phone={p.phone} svarPa={senasteMejlIn?.gmailMessageId ?? null}
           amne={senasteAmne} onKlar={uppdatera} />
       </div>
     </div>
@@ -299,63 +299,60 @@ function Utkast({ u, onKlar }: { u: InkorgUtkast; onKlar: () => void }) {
   );
 }
 
-function Skriv({ personKey, email, phone, svarPa, amne, onKlar }: {
-  personKey: string; email: string | null; phone: string | null; svarPa: string | null; amne: string | null; onKlar: () => void;
+function Skriv({ email, phone, svarPa, amne, onKlar }: {
+  email: string | null; phone: string | null; svarPa: string | null; amne: string | null; onKlar: () => void;
 }) {
   const [kanal, setKanal] = useState<'mejl' | 'sms'>(email ? 'mejl' : 'sms');
-  const [oppen, setOppen] = useState(false);
   const [text, setText] = useState('');
-  const [rubrik, setRubrik] = useState(amne ? (amne.startsWith('Re:') ? amne : `Re: ${amne}`) : '');
-  const [upptagen, setUpptagen] = useState<'' | 'ai' | 'skicka'>('');
+  const [rubrik, setRubrik] = useState('');
+  const [skickar, setSkickar] = useState(false);
   const [fel, setFel] = useState('');
 
-  const ai = async (k: 'mejl' | 'sms') => {
-    setUpptagen('ai'); setFel('');
-    try { await post('/api/admin/inkorg', { action: 'ai-utkast', key: personKey, kanal: k }); onKlar(); }
-    catch (e) { setFel(e instanceof Error ? e.message : 'AI:n kunde inte skriva'); }
-    finally { setUpptagen(''); }
-  };
+  if (!email && !phone) return null;
+  const nyttMejl = kanal === 'mejl' && !svarPa;
 
   const skicka = async () => {
-    setUpptagen('skicka'); setFel('');
+    setSkickar(true); setFel('');
     try {
-      if (kanal === 'mejl') await post('/api/admin/inkorg', { action: 'nytt-mejl', till: email, amne: svarPa ? undefined : rubrik, svarPa, text });
+      if (kanal === 'mejl') await post('/api/admin/inkorg', { action: 'nytt-mejl', till: email, amne: nyttMejl ? rubrik : amne, svarPa, text });
       else await post('/api/admin/sms-send', { phone, body: text });
-      setText(''); setOppen(false); onKlar();
+      setText(''); setRubrik(''); onKlar();
     } catch (e) { setFel(e instanceof Error ? e.message : 'Kunde inte skicka'); }
-    finally { setUpptagen(''); }
+    finally { setSkickar(false); }
   };
 
-  const knapp = 'px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50';
+  const flik = (k: 'mejl' | 'sms', namn: string) => (
+    <button type="button" onClick={() => setKanal(k)}
+      className={`px-2 py-0.5 text-[11px] rounded-md ${kanal === k ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
+      {namn}
+    </button>
+  );
 
   return (
-    <div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => setOppen(!oppen)} className={knapp}>{oppen ? 'Stäng' : 'Skriv själv'}</button>
-        {email && <button onClick={() => ai('mejl')} disabled={!!upptagen} className={knapp}>✨ AI-utkast mejl</button>}
-        {phone && <button onClick={() => ai('sms')} disabled={!!upptagen} className={knapp}>✨ AI-utkast SMS</button>}
-        {upptagen === 'ai' && <span className="text-xs text-slate-500">AI:n skriver… (kan ta en halvminut)</span>}
-      </div>
-      {fel && <p className="text-xs text-red-600 mt-2">{fel}</p>}
-      {oppen && (
-        <div className="mt-3 bg-white border border-slate-300 rounded-xl p-3 space-y-2">
-          <div className="flex gap-1">
-            {email && <button onClick={() => setKanal('mejl')} className={`px-2.5 py-1 text-xs rounded-lg ${kanal === 'mejl' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>Mejl</button>}
-            {phone && <button onClick={() => setKanal('sms')} className={`px-2.5 py-1 text-xs rounded-lg ${kanal === 'sms' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>SMS</button>}
-            <span className="text-xs text-slate-500 self-center ml-2">till {kanal === 'mejl' ? email : phone}{kanal === 'mejl' && svarPa ? ' · svar i tråden' : ''}</span>
-          </div>
-          {kanal === 'mejl' && !svarPa && (
-            <input value={rubrik} onChange={(e) => setRubrik(e.target.value)} placeholder="Ämne"
-              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500" />
-          )}
-          <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={5}
-            className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
-          <button onClick={skicka} disabled={!!upptagen || !text.trim() || (kanal === 'mejl' && !svarPa && !rubrik.trim())}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50">
-            {upptagen === 'skicka' ? 'Skickar…' : 'Skicka'}
-          </button>
-        </div>
+    <div className="bg-white border border-slate-300 rounded-xl focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition">
+      {nyttMejl && (
+        <input value={rubrik} onChange={(e) => setRubrik(e.target.value)} placeholder="Ämne"
+          className="w-full px-3 pt-2.5 pb-1 text-sm font-medium text-slate-900 bg-transparent border-b border-slate-100 focus:outline-none" />
       )}
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && text.trim()) skicka(); }}
+        placeholder={kanal === 'mejl' ? `Skriv ett mejl till ${email}…` : `Skriv ett SMS till ${phone}…`}
+        rows={Math.min(12, Math.max(3, text.split('\n').length + 1))}
+        className="w-full px-3 py-2.5 text-sm text-slate-900 bg-transparent resize-none focus:outline-none"
+      />
+      <div className="flex items-center gap-1 px-2 pb-2">
+        {email && flik('mejl', 'Mejl')}
+        {phone && flik('sms', 'SMS')}
+        {kanal === 'mejl' && svarPa && <span className="text-[11px] text-slate-400 ml-1">svar i tråden · signaturen läggs på</span>}
+        {kanal === 'sms' && text && <span className="text-[11px] text-slate-400 ml-1">{text.length} tecken</span>}
+        {fel && <span className="text-xs text-red-600 ml-2">{fel}</span>}
+        <button onClick={skicka} disabled={skickar || !text.trim() || (nyttMejl && !rubrik.trim())}
+          className="ml-auto px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg disabled:opacity-40">
+          {skickar ? 'Skickar…' : 'Skicka'}
+        </button>
+      </div>
     </div>
   );
 }
