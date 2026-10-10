@@ -16,10 +16,10 @@ export function Varningar({ varningar, className = '' }: { varningar: string[]; 
   if (varningar.length === 0) return null;
   const visade = alla ? varningar : varningar.slice(0, SYNLIGA);
   return (
-    <span className={`block text-amber-300 text-[11px] leading-snug ${className}`}>
+    <span className={`block text-amber-700 text-[11px] leading-snug ${className}`}>
       {visade.map((v, i) => <span key={i} className="block">⚠ {v}</span>)}
       {varningar.length > SYNLIGA && (
-        <button onClick={() => setAlla(!alla)} className="text-amber-400/80 hover:text-amber-300 underline">
+        <button onClick={() => setAlla(!alla)} className="text-amber-600 hover:text-amber-700 underline">
           {alla ? 'Visa färre' : `+ ${varningar.length - SYNLIGA} till`}
         </button>
       )}

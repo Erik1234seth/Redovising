@@ -154,17 +154,17 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
 
   if (!betalsatt) {
     return (
-      <div className="bg-gold-500/10 border border-gold-500/30 rounded-xl p-5 text-sm text-gold-300">
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 text-sm text-blue-800">
         Välj först om kunden betalar via företagskonto eller privatkonto under <strong>Kundkontext</strong>.
         Det avgör vilket konto pengarna bokförs mot.
       </div>
     );
   }
-  if (laddfel) return <p className="text-red-400 text-sm">{laddfel}</p>;
-  if (!rader) return <p className="text-warm-500 text-sm">Hämtar transaktionerna…</p>;
+  if (laddfel) return <p className="text-red-600 text-sm">{laddfel}</p>;
+  if (!rader) return <p className="text-slate-500 text-sm">Hämtar transaktionerna…</p>;
   if (rader.length === 0) {
     return (
-      <div className="bg-navy-700/50 border border-navy-600 rounded-xl text-center py-12 text-warm-400 text-sm">
+      <div className="bg-slate-50 border border-slate-200 rounded-xl text-center py-12 text-slate-600 text-sm">
         Inga transaktioner att kontera. Läs av underlag under fliken Underlag först.
       </div>
     );
@@ -180,10 +180,10 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
 
   return (
     <div className="space-y-5">
-      <p className="text-warm-500 text-xs">
+      <p className="text-slate-500 text-xs">
         Båda modellerna konterar varje rad enligt K1. Bokförs direkt när båda är gröna och överens om konto och
         moms — annars blir det förslag. Betalkonto:{' '}
-        <span className="text-warm-300">
+        <span className="text-slate-700">
           {betalsatt === 'foretagskonto' ? '1930 Företagskonto' : betalsatt === 'privatkonto' ? '2017 Egna insättningar / 2013 Egna uttag' : 'väljs per rad'}
         </span>
         .
@@ -195,7 +195,7 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
             key={f.id}
             onClick={() => setFilter(f.id)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
-              filter === f.id ? 'bg-gold-500/15 border-gold-500 text-gold-400' : 'border-navy-600 text-warm-400 hover:text-white'
+              filter === f.id ? 'bg-blue-50 border-blue-500 text-blue-700' : 'border-slate-200 text-slate-600 hover:text-slate-900'
             }`}
           >
             {f.label} <span className="tabular-nums opacity-70">{f.n.toLocaleString('sv-SE')}</span>
@@ -205,33 +205,33 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Sök text, belopp eller konto"
-          className="flex-1 min-w-[12rem] bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-warm-600 focus:outline-none focus:border-gold-500 transition"
+          className="flex-1 min-w-[12rem] bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition"
         />
       </div>
 
       {(valda.length > 0 || ko) && (
-        <div className="flex items-center gap-3 flex-wrap bg-navy-700/50 border border-navy-600 rounded-xl px-4 py-3">
+        <div className="flex items-center gap-3 flex-wrap bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
           {ko ? (
             <>
-              <span className="text-warm-200 text-sm">
+              <span className="text-slate-800 text-sm">
                 Konterar… {ko.klara.toLocaleString('sv-SE')} av {ko.totalt.toLocaleString('sv-SE')} klara
               </span>
               <button
                 onClick={() => { avbryt.current = true; }}
-                className="text-warm-500 hover:text-warm-300 text-xs transition ml-auto"
+                className="text-slate-500 hover:text-slate-700 text-xs transition ml-auto"
               >
                 Stoppa efter pågående
               </button>
             </>
           ) : (
             <>
-              <span className="text-warm-200 text-sm">
+              <span className="text-slate-800 text-sm">
                 {valda.length.toLocaleString('sv-SE')} {valda.length === 1 ? 'markerad' : 'markerade'}
               </span>
               {konterbara.length > 0 && (
                 <button
                   onClick={kontera}
-                  className="px-3 py-1.5 bg-gold-500 hover:bg-gold-400 text-navy-900 font-bold rounded-lg text-xs transition"
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition"
                   title="Bokförda rader konteras inte om — radera konteringen först"
                 >
                   Kontera {konterbara.length.toLocaleString('sv-SE')}
@@ -249,7 +249,7 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
                   <button
                     onClick={() => setBekrafta(false)}
                     disabled={raderar}
-                    className="text-warm-500 hover:text-warm-300 text-xs transition disabled:opacity-50"
+                    className="text-slate-500 hover:text-slate-700 text-xs transition disabled:opacity-50"
                   >
                     Avbryt
                   </button>
@@ -257,16 +257,16 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
               ) : (
                 <button
                   onClick={() => setBekrafta(true)}
-                  className="px-3 py-1.5 text-xs text-red-400/80 hover:text-red-400 border border-red-500/30 rounded-lg transition"
+                  className="px-3 py-1.5 text-xs text-red-600 hover:text-red-600 border border-red-500/30 rounded-lg transition"
                   title="Tar bort förslagen och bokföringen — raderna blir okonterade"
                 >
                   Radera kontering ({raderbara.length.toLocaleString('sv-SE')})
                 </button>
               ))}
               {konterbara.length > 0 && (
-                <span className="text-warm-600 text-xs">Tar runt en halv minut per rad, {SAMTIDIGA} åt gången.</span>
+                <span className="text-slate-400 text-xs">Tar runt en halv minut per rad, {SAMTIDIGA} åt gången.</span>
               )}
-              <button onClick={() => setValda([])} className="text-warm-500 hover:text-warm-300 text-xs transition ml-auto">
+              <button onClick={() => setValda([])} className="text-slate-500 hover:text-slate-700 text-xs transition ml-auto">
                 Avmarkera
               </button>
             </>
@@ -275,15 +275,15 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
       )}
 
       {filtered.length === 0 ? (
-        <div className="bg-navy-700/50 border border-navy-600 rounded-xl text-center py-12 text-warm-400 text-sm">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl text-center py-12 text-slate-600 text-sm">
           Ingen transaktion matchar filtret
         </div>
       ) : (
-        <div className="bg-navy-700/50 border border-navy-600 rounded-xl overflow-hidden">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-warm-500 text-[11px] uppercase tracking-widest border-b border-navy-600">
+                <tr className="text-slate-500 text-[11px] uppercase tracking-widest border-b border-slate-200">
                   <th className="px-4 py-2.5 w-8">
                     <input
                       type="checkbox"
@@ -291,7 +291,7 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
                       disabled={!!ko}
                       onChange={(e) => setValda(e.target.checked ? filtered.map((r) => r.id) : [])}
                       title={allaValda ? 'Avmarkera alla' : 'Markera alla i filtret'}
-                      className="accent-gold-500 align-middle"
+                      className="accent-blue-600 align-middle"
                     />
                   </th>
                   <th className="text-left font-semibold px-4 py-2.5">Datum</th>
@@ -300,7 +300,7 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
                   <th className="text-right font-semibold px-4 py-2.5">Belopp</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-navy-600/60">
+              <tbody className="divide-y divide-slate-200">
                 {filtered.slice(0, shown).map((r) => {
                   const s = status(r);
                   const kor = pagar.has(r.id);
@@ -329,7 +329,7 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
           {filtered.length > shown && (
             <button
               onClick={() => setShown((n) => n + PAGE)}
-              className="w-full px-4 py-3 text-sm text-warm-400 hover:text-white border-t border-navy-600 transition"
+              className="w-full px-4 py-3 text-sm text-slate-600 hover:text-slate-900 border-t border-slate-200 transition"
             >
               Visa fler ({(filtered.length - shown).toLocaleString('sv-SE')} kvar)
             </button>
@@ -360,7 +360,7 @@ function Rad({
     <>
       <tr
         onClick={onToggle}
-        className={`cursor-pointer transition ${open ? 'bg-navy-700/60' : vald ? 'bg-gold-500/5' : 'hover:bg-navy-700/40'}`}
+        className={`cursor-pointer transition ${open ? 'bg-slate-50' : vald ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
       >
         <td className="px-4 py-2.5 align-top" onClick={(e) => e.stopPropagation()}>
           <input
@@ -368,30 +368,30 @@ function Rad({
             checked={vald}
             disabled={lasta || kor}
             onChange={(e) => onValj(e.target.checked)}
-            className="accent-gold-500 align-middle"
+            className="accent-blue-600 align-middle"
           />
         </td>
-        <td className="px-4 py-2.5 text-warm-300 tabular-nums whitespace-nowrap align-top">
-          {r.datum || <span className="text-gold-400/80">utan datum</span>}
+        <td className="px-4 py-2.5 text-slate-700 tabular-nums whitespace-nowrap align-top">
+          {r.datum || <span className="text-blue-700">utan datum</span>}
         </td>
         <td className="px-4 py-2.5 align-top">
-          <span className="text-warm-100">{r.beskrivning || '—'}</span>
-          {r.motpart && r.motpart !== r.beskrivning && <span className="text-warm-500"> · {r.motpart}</span>}
-          {r.kalla === 'bank' && <span className="block text-warm-600 text-[11px] mt-0.5">Bankrad</span>}
+          <span className="text-slate-900">{r.beskrivning || '—'}</span>
+          {r.motpart && r.motpart !== r.beskrivning && <span className="text-slate-500"> · {r.motpart}</span>}
+          {r.kalla === 'bank' && <span className="block text-slate-400 text-[11px] mt-0.5">Bankrad</span>}
         </td>
         <td className="px-4 py-2.5 align-top whitespace-nowrap">
           <KonteringsStatus rad={r} status={s} kor={kor} fel={fel} />
         </td>
         <td className={`px-4 py-2.5 tabular-nums text-right whitespace-nowrap align-top font-medium ${
-          r.riktning === 'in' ? 'text-emerald-300' : 'text-warm-200'
+          r.riktning === 'in' ? 'text-emerald-700' : 'text-slate-800'
         }`}>
           {r.riktning === 'in' ? '+' : '−'}{kr.format(r.belopp)}
-          {r.valuta !== 'SEK' && <span className="text-warm-600 text-xs"> {r.valuta}</span>}
-          {r.moms ? <span className="block text-warm-600 text-[11px] font-normal">moms {kr.format(r.moms)}</span> : null}
+          {r.valuta !== 'SEK' && <span className="text-slate-400 text-xs"> {r.valuta}</span>}
+          {r.moms ? <span className="block text-slate-400 text-[11px] font-normal">moms {kr.format(r.moms)}</span> : null}
         </td>
       </tr>
       {open && (
-        <tr className="bg-navy-800/40">
+        <tr className="bg-white">
           <td colSpan={5} className="px-4 py-4">
             <Detalj rad={r} status={s} betalsatt={betalsatt} userId={userId} onRad={onRad} />
           </td>
@@ -402,15 +402,15 @@ function Rad({
 }
 
 function KonteringsStatus({ rad: r, status: s, kor, fel }: { rad: AdminKonteringRad; status: Status; kor: boolean; fel?: string }) {
-  if (kor) return <span className="text-gold-400 text-xs">Konterar…</span>;
-  if (fel) return <span className="text-red-400 text-xs whitespace-normal">{fel}</span>;
+  if (kor) return <span className="text-blue-700 text-xs">Konterar…</span>;
+  if (fel) return <span className="text-red-600 text-xs whitespace-normal">{fel}</span>;
   if (s === 'bokford') {
     const huvud = r.verifikation!.rader[0];
     return (
       <span className="text-xs">
-        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-semibold mr-2">Bokförd</span>
-        <span className="text-warm-300 tabular-nums">{huvud?.konto}</span>
-        <span className="text-warm-500"> {huvud?.kontonamn}</span>
+        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-semibold mr-2">Bokförd</span>
+        <span className="text-slate-700 tabular-nums">{huvud?.konto}</span>
+        <span className="text-slate-500"> {huvud?.kontonamn}</span>
       </span>
     );
   }
@@ -420,16 +420,16 @@ function KonteringsStatus({ rad: r, status: s, kor, fel }: { rad: AdminKontering
         {r.konteringar.map((k) => (
           <span key={k.modell} className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${OMDOME[k.omdome].prick}`} title={OMDOME[k.omdome].text} />
-            <span className="text-warm-600 w-12">{k.modell.startsWith('gpt') ? 'GPT' : 'Claude'}</span>
-            <span className="text-warm-200 tabular-nums">{k.konto ?? '—'}</span>
-            <span className="text-warm-500 truncate max-w-[14rem]">{k.kontonamn}</span>
-            {k.momssats ? <span className="text-warm-600">{k.momssats} %</span> : null}
+            <span className="text-slate-400 w-12">{k.modell.startsWith('gpt') ? 'GPT' : 'Claude'}</span>
+            <span className="text-slate-800 tabular-nums">{k.konto ?? '—'}</span>
+            <span className="text-slate-500 truncate max-w-[14rem]">{k.kontonamn}</span>
+            {k.momssats ? <span className="text-slate-400">{k.momssats} %</span> : null}
           </span>
         ))}
       </span>
     );
   }
-  return <span className="text-warm-600 text-xs">Okonterad</span>;
+  return <span className="text-slate-400 text-xs">Okonterad</span>;
 }
 
 function Detalj({
@@ -475,7 +475,7 @@ function Detalj({
       >
         {arbetar ? 'Raderar…' : 'Ja, radera'}
       </button>
-      <button onClick={() => setBekraftaRadera(false)} className="text-warm-500 hover:text-warm-300 text-xs transition">
+      <button onClick={() => setBekraftaRadera(false)} className="text-slate-500 hover:text-slate-700 text-xs transition">
         Avbryt
       </button>
     </>
@@ -484,7 +484,7 @@ function Detalj({
       onClick={() => setBekraftaRadera(true)}
       disabled={arbetar}
       title="Tar bort modellernas förslag och bokföringen — raden blir okonterad"
-      className="px-3 py-1.5 text-xs text-red-400/80 hover:text-red-400 border border-red-500/30 rounded-lg transition disabled:opacity-50"
+      className="px-3 py-1.5 text-xs text-red-600 hover:text-red-600 border border-red-500/30 rounded-lg transition disabled:opacity-50"
     >
       Radera konteringen
     </button>
@@ -501,8 +501,8 @@ function Detalj({
 
   const detaljer = r.detaljer ? (
     <details>
-      <summary className="text-warm-500 hover:text-warm-300 text-xs cursor-pointer">Detaljer från underlaget</summary>
-      <p className="text-warm-400 text-xs whitespace-pre-wrap mt-1 max-w-3xl">{r.detaljer}</p>
+      <summary className="text-slate-500 hover:text-slate-700 text-xs cursor-pointer">Detaljer från underlaget</summary>
+      <p className="text-slate-600 text-xs whitespace-pre-wrap mt-1 max-w-3xl">{r.detaljer}</p>
     </details>
   ) : null;
 
@@ -515,16 +515,16 @@ function Detalj({
           <tbody>
             {v.rader.map((x, i) => (
               <tr key={i}>
-                <td className="pr-3 text-warm-300 tabular-nums">{x.konto}</td>
-                <td className="pr-6 text-warm-500">{x.kontonamn}</td>
-                <td className="pr-3 text-right tabular-nums text-warm-200">{x.belopp > 0 ? kr.format(x.belopp) : ''}</td>
-                <td className="text-right tabular-nums text-warm-200">{x.belopp < 0 ? kr.format(-x.belopp) : ''}</td>
+                <td className="pr-3 text-slate-700 tabular-nums">{x.konto}</td>
+                <td className="pr-6 text-slate-500">{x.kontonamn}</td>
+                <td className="pr-3 text-right tabular-nums text-slate-800">{x.belopp > 0 ? kr.format(x.belopp) : ''}</td>
+                <td className="text-right tabular-nums text-slate-800">{x.belopp < 0 ? kr.format(-x.belopp) : ''}</td>
               </tr>
             ))}
           </tbody>
         </table>
         <div className="flex items-center gap-3">
-          <span className="text-warm-600 text-xs">
+          <span className="text-slate-400 text-xs">
             {v.signatur === 'AI' ? 'Bokförd direkt — båda modellerna var överens.' : `Bokförd av ${v.signatur ?? 'okänd'}.`}
           </span>
           {r.konteringar.length > 0 && (
@@ -532,13 +532,13 @@ function Detalj({
               onClick={angra}
               disabled={arbetar}
               title="Tar bort verifikationen men behåller modellernas förslag"
-              className="px-3 py-1.5 text-xs text-warm-300 hover:text-white border border-navy-500 rounded-lg transition disabled:opacity-50"
+              className="px-3 py-1.5 text-xs text-slate-700 hover:text-slate-900 border border-slate-300 rounded-lg transition disabled:opacity-50"
             >
               Ångra bokföringen
             </button>
           )}
           {raderaKnapp}
-          {fel && <span className="text-red-400 text-xs">{fel}</span>}
+          {fel && <span className="text-red-600 text-xs">{fel}</span>}
         </div>
         {r.konteringar.length > 0 && (
           <div className="grid md:grid-cols-2 gap-3 pt-2">
@@ -564,38 +564,38 @@ function Detalj({
           ))}
         </div>
       ) : (
-        <p className="text-warm-500 text-xs">Inte konterad än. Markera raden och tryck Kontera, eller välj konto själv nedan.</p>
+        <p className="text-slate-500 text-xs">Inte konterad än. Markera raden och tryck Kontera, eller välj konto själv nedan.</p>
       )}
       {r.konteringar.length > 0 && <div className="flex items-center gap-3">{raderaKnapp}</div>}
 
       {/* Eget konto: när ingen av modellerna har rätt. Kontot prövas mot K1 på servern. */}
-      <div className="flex items-end gap-2 flex-wrap pt-3 border-t border-navy-600/60">
-        <label className="text-xs text-warm-500">
+      <div className="flex items-end gap-2 flex-wrap pt-3 border-t border-slate-200">
+        <label className="text-xs text-slate-500">
           Eget konto
           <input
             value={konto}
             onChange={(e) => setKonto(e.target.value.replace(/\D/g, '').slice(0, 4))}
             placeholder="t.ex. 5400"
-            className="block mt-1 w-24 bg-navy-800 border border-navy-600 rounded-lg px-2 py-1.5 text-sm text-white tabular-nums focus:outline-none focus:border-gold-500"
+            className="block mt-1 w-24 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-900 tabular-nums focus:outline-none focus:border-blue-500"
           />
         </label>
-        <label className="text-xs text-warm-500">
+        <label className="text-xs text-slate-500">
           Moms
           <select
             value={sats}
             onChange={(e) => setSats(e.target.value)}
-            className="block mt-1 bg-navy-800 border border-navy-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-gold-500"
+            className="block mt-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
           >
             {['25', '12', '6', '0'].map((m) => <option key={m} value={m}>{m} %</option>)}
           </select>
         </label>
         {betalsatt === 'bada' && (
-          <label className="text-xs text-warm-500">
+          <label className="text-xs text-slate-500">
             Betalt via
             <select
               value={motkonto}
               onChange={(e) => setMotkonto(e.target.value)}
-              className="block mt-1 bg-navy-800 border border-navy-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-gold-500"
+              className="block mt-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
             >
               <option value="1930">1930 Företagskonto</option>
               <option value={r.riktning === 'ut' ? '2017' : '2013'}>
@@ -607,11 +607,11 @@ function Detalj({
         <button
           onClick={() => bokfor(konto, sats)}
           disabled={arbetar || konto.length !== 4}
-          className="px-3 py-1.5 bg-navy-600 hover:bg-navy-500 text-white font-semibold rounded-lg text-xs transition disabled:opacity-50"
+          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold rounded-lg text-xs transition disabled:opacity-50"
         >
           {arbetar ? 'Bokför…' : 'Bokför'}
         </button>
-        {fel && <span className="text-red-400 text-xs">{fel}</span>}
+        {fel && <span className="text-red-600 text-xs">{fel}</span>}
       </div>
     </div>
   );
@@ -621,29 +621,29 @@ function Forslag({ k, onBokfor, arbetar }: { k: AdminKontering; onBokfor?: () =>
   const g = k.granskning;
   const byttFran = g?.forstaKonto && g.forstaKonto !== k.konto ? g.forstaKonto : null;
   return (
-    <div className="rounded-xl border border-navy-600 bg-navy-800/40 p-4 space-y-2">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
       <div className="flex items-center gap-2">
         <span className={`w-2.5 h-2.5 rounded-full ${OMDOME[k.omdome].prick}`} />
-        <span className="text-warm-400 text-xs font-semibold">{MODELLNAMN[k.modell] ?? k.modell}</span>
+        <span className="text-slate-600 text-xs font-semibold">{MODELLNAMN[k.modell] ?? k.modell}</span>
         {g?.svarade && !g.svarade.includes(k.modell) && (
-          <span className="text-warm-600 text-[11px]">svarade: {g.svarade}</span>
+          <span className="text-slate-400 text-[11px]">svarade: {g.svarade}</span>
         )}
       </div>
-      <p className="text-warm-100 text-sm">
+      <p className="text-slate-900 text-sm">
         <span className="tabular-nums font-semibold">{k.konto ?? '—'}</span> {k.kontonamn}
-        <span className="text-warm-500"> · moms {k.momssats ?? 0} %</span>
-        {byttFran && <span className="text-warm-600 text-xs"> (bytt från {byttFran} i granskningen)</span>}
+        <span className="text-slate-500"> · moms {k.momssats ?? 0} %</span>
+        {byttFran && <span className="text-slate-400 text-xs"> (bytt från {byttFran} i granskningen)</span>}
       </p>
-      <p className="text-warm-400 text-xs leading-relaxed">{k.motivering}</p>
+      <p className="text-slate-600 text-xs leading-relaxed">{k.motivering}</p>
       {g?.motivering && (
-        <p className="text-warm-500 text-xs leading-relaxed">
-          <span className="text-warm-400">Granskning:</span> {g.motivering}
+        <p className="text-slate-500 text-xs leading-relaxed">
+          <span className="text-slate-600">Granskning:</span> {g.motivering}
         </p>
       )}
       {k.flaggor.some((f) => f.typ !== 'granskning') && (
         <ul className="space-y-0.5">
           {k.flaggor.filter((f) => f.typ !== 'granskning').map((f, i) => (
-            <li key={i} className={`text-xs ${f.allvar === 'stopp' ? 'text-red-400' : 'text-amber-300/90'}`}>• {f.text}</li>
+            <li key={i} className={`text-xs ${f.allvar === 'stopp' ? 'text-red-600' : 'text-amber-700'}`}>• {f.text}</li>
           ))}
         </ul>
       )}
@@ -651,7 +651,7 @@ function Forslag({ k, onBokfor, arbetar }: { k: AdminKontering; onBokfor?: () =>
         <button
           onClick={onBokfor}
           disabled={arbetar}
-          className="mt-1 px-3 py-1.5 bg-gold-500 hover:bg-gold-400 text-navy-900 font-bold rounded-lg text-xs transition disabled:opacity-50"
+          className="mt-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition disabled:opacity-50"
         >
           Bokför {k.konto}
         </button>

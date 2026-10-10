@@ -7,6 +7,7 @@ import {
   type Periodtyp, type Ruta,
 } from '@/lib/moms/eskd';
 import { Varningar } from './_varningar';
+import { DragFil } from './_dragfil';
 
 /**
  * Momsdeklarationen som fil för en period, räknad ur kundens verifikationer.
@@ -41,15 +42,21 @@ const kr2 = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFr
 const st = (n: number, en: string, flera: string) => `${n} ${n === 1 ? en : flera}`;
 const namn = (v: AdminVerifikation) => `${v.serie}${v.nummer}`.trim() || v.datum || v.text || '?';
 
-export function MomsFil({ verifikationer, orgNr, momsPeriod }: {
+export function MomsFil({ verifikationer, orgNr, momsPeriod, lastPeriod }: {
   verifikationer: AdminVerifikation[];
   orgNr: string | null;
   momsPeriod: MomsPeriod | null;
+  /** Låser panelen till en period och döljer periodvalet, som på inlämningssidan. */
+  lastPeriod?: { typ: Periodtyp; ar: number; nr: number };
 }) {
-  const [typ, setTyp] = useState<Periodtyp>(TYP_FOR_PERIOD[momsPeriod ?? 'månadsvis']);
-  const start = forraPerioden(typ);
-  const [ar, setAr] = useState(start.ar);
-  const [nr, setNr] = useState(start.nr);
+  const [valdTyp, setTyp] = useState<Periodtyp>(TYP_FOR_PERIOD[momsPeriod ?? 'månadsvis']);
+  const start = forraPerioden(valdTyp);
+  const [valtAr, setAr] = useState(start.ar);
+  const [valtNr, setNr] = useState(start.nr);
+  const [visaFil, setVisaFil] = useState(false);
+  const typ = lastPeriod?.typ ?? valdTyp;
+  const ar = lastPeriod?.ar ?? valtAr;
+  const nr = lastPeriod?.nr ?? valtNr;
 
   const byttTyp = (ny: Periodtyp) => {
     const p = forraPerioden(ny);
@@ -102,24 +109,28 @@ export function MomsFil({ verifikationer, orgNr, momsPeriod }: {
   const visade = (Object.keys(rutor) as Ruta[]).filter((r) => r !== '49').sort();
   const betala = rutor['49'] ?? 0;
 
+  const xml = formatOrgNr ? byggEskd({ orgNr: formatOrgNr, tom, rutor }) : null;
+  const filnamn = formatOrgNr ? `moms_${formatOrgNr.replace('-', '')}_${eskdPeriod(tom)}.xml` : '';
+  const bytes = useMemo(() => (xml ? latin1(xml) : null), [xml]);
+
   const laddaNer = () => {
-    if (!formatOrgNr) return;
-    const xml = byggEskd({ orgNr: formatOrgNr, tom, rutor });
+    if (!formatOrgNr || !xml) return;
     const blob = new Blob([latin1(xml)], { type: 'application/xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `moms_${formatOrgNr.replace('-', '')}_${eskdPeriod(tom)}.xml`;
+    a.download = filnamn;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const select = 'bg-navy-700 border border-navy-600 text-white text-xs rounded-lg px-2 py-1.5';
+  const select = 'bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-lg px-2 py-1.5';
 
   return (
-    <div className="bg-navy-800/60 border border-navy-700 rounded-xl p-4 mb-6">
+    <div className="bg-white border border-slate-200 rounded-xl p-4 mb-6">
       <div className="flex items-center gap-2 flex-wrap mb-3">
-        <h3 className="text-white text-sm font-semibold mr-auto">Momsdeklaration som fil</h3>
+        <h3 className="text-slate-900 text-sm font-semibold mr-auto">Momsdeklaration som fil</h3>
+        {!lastPeriod && <>
         <select value={typ} onChange={(e) => byttTyp(e.target.value as Periodtyp)} className={select}>
           <option value="månad">Månad</option>
           <option value="kvartal">Kvartal</option>
@@ -138,48 +149,69 @@ export function MomsFil({ verifikationer, orgNr, momsPeriod }: {
         <select value={ar} onChange={(e) => setAr(Number(e.target.value))} className={select}>
           {ars.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
+        </>}
+        <button
+          onClick={() => setVisaFil(!visaFil)}
+          disabled={!xml}
+          className="px-3 py-1.5 text-xs bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {visaFil ? 'Dölj filen' : 'Visa filen'}
+        </button>
         <button
           onClick={laddaNer}
           disabled={!formatOrgNr}
           title={formatOrgNr ? 'Ladda upp filen i Skatteverkets e-tjänst Lämna momsdeklaration' : 'Organisationsnummer saknas'}
-          className="px-3 py-1.5 text-xs bg-gold-500/15 hover:bg-gold-500/25 border border-gold-500/30 text-gold-400 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Ladda ner momsfil
         </button>
       </div>
 
       {!formatOrgNr && (
-        <p className="text-red-400 text-xs mb-3">
+        <p className="text-red-600 text-xs mb-3">
           Organisationsnummer saknas eller är fel — det behövs i filen. Det står på kundens profil (org_nr).
         </p>
       )}
 
       <Varningar varningar={varningar} className="mb-3" />
 
-      <p className="text-warm-500 text-xs mb-2">
+      {bytes && (
+        <div className="flex items-center gap-3 flex-wrap mb-3">
+          <DragFil namn={filnamn} mime="application/xml" bytes={bytes} />
+          <span className="text-[11px] text-slate-500">Dra filen till Skatteverkets fönster</span>
+        </div>
+      )}
+
+      <p className="text-slate-500 text-xs mb-2">
         {fran} – {tom} · {antal} {antal === 1 ? 'verifikation' : 'verifikationer'}
         {formatOrgNr && <> · {formatOrgNr}</>}
       </p>
 
       {visade.length === 0 ? (
-        <p className="text-warm-500 text-xs">Inget att redovisa i perioden — filen blir en nolldeklaration.</p>
+        <p className="text-slate-500 text-xs">Inget att redovisa i perioden — filen blir en nolldeklaration.</p>
       ) : (
         <table className="w-full text-xs">
           <tbody>
             {visade.map((r) => (
-              <tr key={r} className="border-t border-navy-700/60">
-                <td className="py-1 pr-3 text-warm-500 w-10">{r}</td>
-                <td className="py-1 pr-3 text-warm-300">{RUTNAMN[r]}</td>
-                <td className="py-1 text-right text-white tabular-nums">{kr.format(rutor[r] ?? 0)}</td>
+              <tr key={r} className="border-t border-slate-200">
+                <td className="py-1 pr-3 text-slate-500 w-10">{r}</td>
+                <td className="py-1 pr-3 text-slate-700">{RUTNAMN[r]}</td>
+                <td className="py-1 text-right text-slate-900 tabular-nums">{kr.format(rutor[r] ?? 0)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
-      <div className="flex justify-between border-t border-navy-600 mt-1 pt-2 text-xs">
-        <span className="text-warm-300"><span className="text-warm-500 mr-3">49</span>{betala < 0 ? 'Moms att få tillbaka' : 'Moms att betala'}</span>
-        <span className="text-white font-semibold tabular-nums">{kr.format(Math.abs(betala))} kr</span>
+      <div className="flex justify-between border-t border-slate-200 mt-1 pt-2 text-xs">
+        <span className="text-slate-700"><span className="text-slate-500 mr-3">49</span>{betala < 0 ? 'Moms att få tillbaka' : 'Moms att betala'}</span>
+        <span className="text-slate-900 font-semibold tabular-nums">{kr.format(Math.abs(betala))} kr</span>
       </div>
+
+      {visaFil && xml && (
+        <pre className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] text-slate-700 overflow-x-auto whitespace-pre">
+          {xml.replace(/></g, '>\n<')}
+        </pre>
+      )}
     </div>
   );
 }

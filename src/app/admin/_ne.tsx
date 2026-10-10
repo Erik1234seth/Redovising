@@ -8,6 +8,7 @@ import {
 } from '@/lib/ne/ne';
 import { exportArsbokslutPDF } from '@/lib/pdf';
 import { Varningar } from './_varningar';
+import { DragFil } from './_dragfil';
 
 /**
  * NE-bilagan och det förenklade årsbokslutet (K1) för ett inkomstår.
@@ -20,6 +21,8 @@ import { Varningar } from './_varningar';
  */
 
 const kr = new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 });
+/** SRU-filerna är ISO-8859-1 — avkodas för att kunna visas som text. */
+const latin1Text = (bytes: Uint8Array) => new TextDecoder('iso-8859-1').decode(bytes);
 const st = (n: number, en: string, flera: string) => `${n} ${n === 1 ? en : flera}`;
 const namn = (v: AdminVerifikation) => `${v.serie}${v.nummer}`.trim() || v.datum || v.text || '?';
 
@@ -46,12 +49,14 @@ const SKATTERADER: { falt: Skattefalt; rad: string; namn: string; tecken: '+' | 
   { falt: 'r43', rad: 'R43', namn: 'Årets avdrag för egenavgifter', tecken: '−' },
 ];
 
-export function NeBilaga({ verifikationer, person, data, onData, onError }: {
+export function NeBilaga({ verifikationer, person, data, onData, onError, fastAr }: {
   verifikationer: AdminVerifikation[] | null;
   person: Person;
   data: BokslutData | null;
   onData: (data: BokslutData) => void;
   onError: (message: string) => void;
+  /** Låser panelen till ett inkomstår och döljer årsvalet, som på inlämningssidan. */
+  fastAr?: number;
 }) {
   const iar = new Date().getFullYear();
   const ar0 = useMemo(() => {
@@ -60,8 +65,9 @@ export function NeBilaga({ verifikationer, person, data, onData, onError }: {
     return harFjol ? iar - 1 : iar;
   }, [verifikationer, iar]);
   const [valtAr, setValtAr] = useState<number | null>(null);
-  const ar = valtAr ?? ar0;
+  const ar = fastAr ?? valtAr ?? ar0;
   const [sparar, setSparar] = useState(false);
+  const [visaFil, setVisaFil] = useState(false);
 
   const manuellt: NeManuellt = data?.neUppgifter?.[String(ar)] ?? {};
   const pnr = personnummer12(data?.orgNr);
@@ -127,9 +133,11 @@ export function NeBilaga({ verifikationer, person, data, onData, onError }: {
     if (ib[kod] !== manuellt.ib?.[kod]) spara({ ...manuellt, ib });
   };
 
+  const sru = pnr ? byggSru({ ar, personnummer: pnr, namn: person.name ?? '', falt: neFalt(ne, ar, verksamhet) }) : null;
+
   const laddaNerSru = async () => {
-    if (!pnr) return;
-    const { info, blanketter } = byggSru({ ar, personnummer: pnr, namn: person.name ?? '', falt: neFalt(ne, ar, verksamhet) });
+    if (!sru) return;
+    const { info, blanketter } = sru;
     const JSZip = (await import('jszip')).default;
     const zip = new JSZip();
     // Filnamnen får inte ändras — Skatteverket läser dem som de är
@@ -161,39 +169,59 @@ export function NeBilaga({ verifikationer, person, data, onData, onError }: {
 
   const ars = [iar - 2, iar - 1, iar];
   const knapp = 'px-3 py-1.5 text-xs rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed';
-  const input = 'w-24 bg-navy-700 border border-navy-600 text-white text-xs rounded px-2 py-1 text-right tabular-nums placeholder:text-warm-600';
+  const input = 'w-24 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded px-2 py-1 text-right tabular-nums placeholder:text-slate-400';
   const s = ne.skatt;
 
   return (
-    <section className="mt-8 bg-navy-800/60 border border-navy-700 rounded-xl p-4">
+    <section className="mt-8 bg-white border border-slate-200 rounded-xl p-4">
       <div className="flex items-center gap-2 flex-wrap mb-3">
-        <h3 className="text-white text-sm font-semibold mr-auto">
+        <h3 className="text-slate-900 text-sm font-semibold mr-auto">
           NE-bilaga och förenklat årsbokslut (K1)
-          {sparar && <span className="text-warm-500 font-normal text-xs ml-2">Sparar…</span>}
+          {sparar && <span className="text-slate-500 font-normal text-xs ml-2">Sparar…</span>}
         </h3>
-        <select value={ar} onChange={(e) => setValtAr(Number(e.target.value))}
-          className="bg-navy-700 border border-navy-600 text-white text-xs rounded-lg px-2 py-1.5">
-          {ars.map((y) => <option key={y} value={y}>Inkomstår {y}</option>)}
-        </select>
+        {fastAr === undefined && (
+          <select value={ar} onChange={(e) => setValtAr(Number(e.target.value))}
+            className="bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-lg px-2 py-1.5">
+            {ars.map((y) => <option key={y} value={y}>Inkomstår {y}</option>)}
+          </select>
+        )}
+        <button onClick={() => setVisaFil(!visaFil)} disabled={!verifikationer || !sru}
+          className={`${knapp} bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900`}>
+          {visaFil ? 'Dölj filen' : 'Visa filen'}
+        </button>
         <button onClick={laddaNerPdf} disabled={!verifikationer}
-          className={`${knapp} bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white`}>
+          className={`${knapp} bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900`}>
           Årsbokslut (PDF)
         </button>
         <button onClick={laddaNerSru} disabled={!verifikationer || !pnr}
           title={pnr ? 'Zip med INFO.SRU och BLANKETTER.SRU — packa upp och ladda upp båda i Skatteverkets Filöverföring' : 'Giltigt personnummer saknas'}
-          className={`${knapp} bg-gold-500/15 hover:bg-gold-500/25 border border-gold-500/30 text-gold-400`}>
+          className={`${knapp} bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700`}>
           NE-fil (SRU)
         </button>
       </div>
 
+      {sru && verifikationer && (
+        <div className="flex items-center gap-3 flex-wrap mb-4">
+          <DragFil namn="INFO.SRU" mime="text/plain" bytes={sru.info} />
+          <DragFil namn="BLANKETTER.SRU" mime="text/plain" bytes={sru.blanketter} />
+          <span className="text-[11px] text-slate-500">Dra båda till Skatteverkets Filöverföring</span>
+        </div>
+      )}
+
+      {visaFil && sru && (
+        <pre className="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] text-slate-700 overflow-x-auto whitespace-pre">
+          {`INFO.SRU\n${latin1Text(sru.info)}\n\nBLANKETTER.SRU\n${latin1Text(sru.blanketter)}`}
+        </pre>
+      )}
+
       {!verifikationer ? (
-        <p className="text-warm-500 text-xs">Hämtar verifikationerna…</p>
+        <p className="text-slate-500 text-xs">Hämtar verifikationerna…</p>
       ) : (
         <>
           <Varningar varningar={allaVarningar} className="mb-4" />
 
           <label className="flex items-center gap-2 text-xs mb-4">
-            <span className="text-warm-400 shrink-0">Verksamhetens art</span>
+            <span className="text-slate-600 shrink-0">Verksamhetens art</span>
             <input
               defaultValue={verksamhet}
               key={`verksamhet-${ar}`}
@@ -202,36 +230,36 @@ export function NeBilaga({ verifikationer, person, data, onData, onError }: {
                 const v = e.target.value.trim();
                 if (v !== verksamhet) spara({ ...manuellt, verksamhet: v });
               }}
-              className="flex-1 bg-navy-700 border border-navy-600 text-white text-xs rounded px-2 py-1"
+              className="flex-1 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded px-2 py-1"
             />
           </label>
 
           <div className="grid lg:grid-cols-2 gap-6">
             <div>
-              <h4 className="text-[11px] font-semibold text-warm-400 uppercase tracking-widest mb-2">Resultaträkning</h4>
+              <h4 className="text-[11px] font-semibold text-slate-600 uppercase tracking-widest mb-2">Resultaträkning</h4>
               <table className="w-full text-xs">
                 <tbody>
                   {R_FALT.map((f) => (
-                    <tr key={f.kod} className="border-t border-navy-700/60">
-                      <td className="py-1 pr-2 text-warm-500 w-9">{f.rad}</td>
-                      <td className="py-1 pr-2 text-warm-300">{f.namn}</td>
-                      <td className="py-1 text-right text-white tabular-nums">{ne.r[f.kod] ? kr.format(ne.r[f.kod]) : '–'}</td>
+                    <tr key={f.kod} className="border-t border-slate-200">
+                      <td className="py-1 pr-2 text-slate-500 w-9">{f.rad}</td>
+                      <td className="py-1 pr-2 text-slate-700">{f.namn}</td>
+                      <td className="py-1 text-right text-slate-900 tabular-nums">{ne.r[f.kod] ? kr.format(ne.r[f.kod]) : '–'}</td>
                     </tr>
                   ))}
-                  <tr className="border-t border-navy-500">
-                    <td className="py-1.5 pr-2 text-warm-500">R11</td>
-                    <td className="py-1.5 pr-2 text-white font-semibold">Bokfört resultat</td>
-                    <td className="py-1.5 text-right text-white font-semibold tabular-nums">{kr.format(ne.r11)}</td>
+                  <tr className="border-t border-slate-300">
+                    <td className="py-1.5 pr-2 text-slate-500">R11</td>
+                    <td className="py-1.5 pr-2 text-slate-900 font-semibold">Bokfört resultat</td>
+                    <td className="py-1.5 text-right text-slate-900 font-semibold tabular-nums">{kr.format(ne.r11)}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
             <div>
-              <h4 className="text-[11px] font-semibold text-warm-400 uppercase tracking-widest mb-2">Balansräkning 31/12</h4>
+              <h4 className="text-[11px] font-semibold text-slate-600 uppercase tracking-widest mb-2">Balansräkning 31/12</h4>
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-warm-600 text-[10px]">
+                  <tr className="text-slate-400 text-[10px]">
                     <th className="text-left font-normal" colSpan={2} />
                     <th className="text-right font-normal pb-1" title="Förra årets NE, samma rad">Ingående</th>
                     <th className="text-right font-normal pb-1 pl-2">Årets</th>
@@ -242,15 +270,15 @@ export function NeBilaga({ verifikationer, person, data, onData, onError }: {
                   {B_FALT.map((f, i) => (
                     <Fragment key={f.kod}>
                       {i === 9 && (
-                        <tr key="b10" className="border-t border-navy-500">
-                          <td className="py-1 pr-2 text-warm-500 w-9">B10</td>
-                          <td className="py-1 pr-2 text-white font-semibold" colSpan={3}>Eget kapital (tillgångar − skulder)</td>
-                          <td className="py-1 text-right text-white font-semibold tabular-nums">{kr.format(ne.b10)}</td>
+                        <tr key="b10" className="border-t border-slate-300">
+                          <td className="py-1 pr-2 text-slate-500 w-9">B10</td>
+                          <td className="py-1 pr-2 text-slate-900 font-semibold" colSpan={3}>Eget kapital (tillgångar − skulder)</td>
+                          <td className="py-1 text-right text-slate-900 font-semibold tabular-nums">{kr.format(ne.b10)}</td>
                         </tr>
                       )}
-                      <tr className="border-t border-navy-700/60">
-                        <td className="py-1 pr-2 text-warm-500 w-9">{f.rad}</td>
-                        <td className="py-1 pr-2 text-warm-300">{f.namn}</td>
+                      <tr className="border-t border-slate-200">
+                        <td className="py-1 pr-2 text-slate-500 w-9">{f.rad}</td>
+                        <td className="py-1 pr-2 text-slate-700">{f.namn}</td>
                         <td className="py-0.5 text-right">
                           <input
                             key={`${ar}-${f.kod}`}
@@ -260,8 +288,8 @@ export function NeBilaga({ verifikationer, person, data, onData, onError }: {
                             className={input}
                           />
                         </td>
-                        <td className="py-1 pl-2 text-right text-warm-400 tabular-nums">{ne.rorelser[f.kod] ? kr.format(Math.round(ne.rorelser[f.kod])) : '–'}</td>
-                        <td className={`py-1 pl-2 text-right tabular-nums ${ne.b[f.kod] < 0 ? 'text-amber-300' : 'text-white'}`}>
+                        <td className="py-1 pl-2 text-right text-slate-600 tabular-nums">{ne.rorelser[f.kod] ? kr.format(Math.round(ne.rorelser[f.kod])) : '–'}</td>
+                        <td className={`py-1 pl-2 text-right tabular-nums ${ne.b[f.kod] < 0 ? 'text-amber-700' : 'text-slate-900'}`}>
                           {ne.b[f.kod] ? kr.format(ne.b[f.kod]) : '–'}
                         </td>
                       </tr>
@@ -272,23 +300,23 @@ export function NeBilaga({ verifikationer, person, data, onData, onError }: {
             </div>
           </div>
 
-          <h4 className="text-[11px] font-semibold text-warm-400 uppercase tracking-widest mt-6 mb-2">Skattemässiga justeringar</h4>
+          <h4 className="text-[11px] font-semibold text-slate-600 uppercase tracking-widest mt-6 mb-2">Skattemässiga justeringar</h4>
           <table className="w-full text-xs max-w-2xl">
             <tbody>
-              <tr className="border-t border-navy-700/60">
-                <td className="py-1 pr-2 text-warm-500 w-9">R12</td>
-                <td className="py-1 pr-2 text-warm-300">Bokfört resultat (R11)</td>
-                <td className="py-1 text-right text-white tabular-nums">{kr.format(s.r12)}</td>
+              <tr className="border-t border-slate-200">
+                <td className="py-1 pr-2 text-slate-500 w-9">R12</td>
+                <td className="py-1 pr-2 text-slate-700">Bokfört resultat (R11)</td>
+                <td className="py-1 text-right text-slate-900 tabular-nums">{kr.format(s.r12)}</td>
               </tr>
               {SKATTERADER.map((r) => {
                 const forslag = r.falt === 'r13' ? ne.forslag.r13 : r.falt === 'r14' ? ne.forslag.r14 : r.falt === 'r43' ? ne.forslag.r43 : null;
                 return (
-                  <tr key={r.falt} className="border-t border-navy-700/60">
-                    <td className="py-1 pr-2 text-warm-500">{r.rad}</td>
-                    <td className="py-1 pr-2 text-warm-300">
-                      <span className="text-warm-500 mr-1">{r.tecken}</span>{r.namn}
+                  <tr key={r.falt} className="border-t border-slate-200">
+                    <td className="py-1 pr-2 text-slate-500">{r.rad}</td>
+                    <td className="py-1 pr-2 text-slate-700">
+                      <span className="text-slate-500 mr-1">{r.tecken}</span>{r.namn}
                       {forslag !== null && manuellt[r.falt] === undefined && (
-                        <span className="text-warm-600 ml-1">(förslag{r.falt === 'r43' ? ', 25 % schablon' : ' ur kontona'})</span>
+                        <span className="text-slate-400 ml-1">(förslag{r.falt === 'r43' ? ', 25 % schablon' : ' ur kontona'})</span>
                       )}
                     </td>
                     <td className="py-0.5 text-right">
@@ -303,16 +331,16 @@ export function NeBilaga({ verifikationer, person, data, onData, onError }: {
                   </tr>
                 );
               })}
-              <tr className="border-t border-navy-500">
-                <td className="py-1.5 pr-2 text-warm-500">{s.resultat >= 0 ? 'R47' : 'R48'}</td>
-                <td className="py-1.5 pr-2 text-white font-semibold">
+              <tr className="border-t border-slate-300">
+                <td className="py-1.5 pr-2 text-slate-500">{s.resultat >= 0 ? 'R47' : 'R48'}</td>
+                <td className="py-1.5 pr-2 text-slate-900 font-semibold">
                   {s.resultat >= 0 ? 'Överskott (förs till INK1 p. 10.1)' : 'Underskott (förs till INK1 p. 10.2)'}
                 </td>
-                <td className="py-1.5 text-right text-white font-semibold tabular-nums">{kr.format(Math.abs(s.resultat))}</td>
+                <td className="py-1.5 text-right text-slate-900 font-semibold tabular-nums">{kr.format(Math.abs(s.resultat))}</td>
               </tr>
             </tbody>
           </table>
-          <p className="text-warm-600 text-[11px] mt-2">
+          <p className="text-slate-400 text-[11px] mt-2">
             Tomma fält räknas som 0, utom R13, R14 och R43 som tar förslaget. Räntefördelning och expansionsfond ingår inte.
           </p>
         </>

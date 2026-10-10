@@ -85,14 +85,14 @@ export default function NotificationBell() {
       <button
         onClick={toggle}
         aria-label={unseen.length ? `${unseen.length} nya notiser` : 'Notiser'}
-        className="relative p-2 text-warm-400 hover:text-white transition"
+        className="relative p-2 text-slate-600 hover:text-slate-900 transition"
       >
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9" />
         </svg>
         {unseen.length > 0 && (
           <span className={`absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold grid place-items-center ${
-            hasFailure ? 'bg-red-500 text-white' : 'bg-gold-500 text-navy-900'
+            hasFailure ? 'bg-red-500 text-white' : 'bg-blue-600 text-white'
           }`}>
             {unseen.length > 9 ? '9+' : unseen.length}
           </span>
@@ -100,13 +100,13 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-navy-900 border border-navy-600 rounded-xl shadow-2xl overflow-hidden z-50">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-navy-700">
-            <p className="text-xs font-semibold text-warm-400 uppercase tracking-widest">Senaste händelserna</p>
+        <div className="absolute right-0 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-slate-50 border border-slate-200 rounded-xl shadow-2xl overflow-hidden z-50">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-widest">Senaste händelserna</p>
             <Link
               href="/admin/status"
               onClick={() => setOpen(false)}
-              className="text-[11px] text-gold-500 hover:text-gold-400 transition"
+              className="text-[11px] text-blue-700 hover:text-blue-700 transition"
             >
               Systemstatus
             </Link>
@@ -114,25 +114,25 @@ export default function NotificationBell() {
 
           <div className="max-h-[26rem] overflow-y-auto">
             {notices.length === 0 && (
-              <p className="px-4 py-6 text-sm text-warm-500 text-center">Inget har hänt den senaste veckan.</p>
+              <p className="px-4 py-6 text-sm text-slate-500 text-center">Inget har hänt den senaste veckan.</p>
             )}
 
             {notices.map((n) => {
               const row = (
-                <div className="flex items-start gap-3 px-4 py-3 hover:bg-navy-800 transition">
+                <div className="flex items-start gap-3 px-4 py-3 hover:bg-white transition">
                   <span className={`shrink-0 w-2 h-2 rounded-full mt-1.5 ${DOT[n.level]}`} />
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm break-words ${n.level === 'fail' ? 'text-red-400' : 'text-white'}`}>
+                    <p className={`text-sm break-words ${n.level === 'fail' ? 'text-red-600' : 'text-slate-900'}`}>
                       {n.title}
                     </p>
-                    {n.detail && <p className="text-xs text-warm-500 mt-0.5 break-words">{n.detail}</p>}
-                    <p className="text-[11px] text-warm-600 mt-1">{relativeTime(n.at)}</p>
+                    {n.detail && <p className="text-xs text-slate-500 mt-0.5 break-words">{n.detail}</p>}
+                    <p className="text-[11px] text-slate-400 mt-1">{relativeTime(n.at)}</p>
                   </div>
                 </div>
               );
 
               return (
-                <div key={n.id} className="border-b border-navy-800 last:border-0">
+                <div key={n.id} className="border-b border-slate-100 last:border-0">
                   {n.personKey ? (
                     <Link href={`/admin/person/${encodeURIComponent(n.personKey)}`} onClick={() => setOpen(false)}>
                       {row}

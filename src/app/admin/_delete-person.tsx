@@ -102,11 +102,11 @@ export default function DeletePerson({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
-      <div className="bg-navy-800 border border-navy-600 rounded-2xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto">
-        <h2 className="text-lg font-bold text-white">
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto">
+        <h2 className="text-lg font-bold text-slate-900">
           {many ? `Radera ${people.length} personer` : `Radera ${nameOf(people[0])}`}
         </h2>
-        <p className="text-warm-400 text-sm mt-1.5">
+        <p className="text-slate-600 text-sm mt-1.5">
           Allt nedan försvinner ur databasen. Det går inte att ångra.
         </p>
 
@@ -115,7 +115,7 @@ export default function DeletePerson({
             {people.map((p) => (
               <span
                 key={p.key}
-                className="px-2 py-1 rounded-lg bg-navy-700 border border-navy-600 text-warm-300 text-xs"
+                className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-xs"
               >
                 {nameOf(p)}
               </span>
@@ -124,21 +124,21 @@ export default function DeletePerson({
         )}
 
         {preview === null && !error && (
-          <p className="text-warm-500 text-sm mt-5">Räknar ut vad som berörs...</p>
+          <p className="text-slate-500 text-sm mt-5">Räknar ut vad som berörs...</p>
         )}
 
         {preview && (
           <>
-            <div className="mt-5 bg-navy-700/50 border border-navy-600 rounded-xl divide-y divide-navy-600/60">
+            <div className="mt-5 bg-slate-50 border border-slate-200 rounded-xl divide-y divide-slate-200">
               {preview.tables.length === 0 ? (
-                <p className="px-3 py-3 text-warm-500 text-sm">
+                <p className="px-3 py-3 text-slate-500 text-sm">
                   Inget att radera — {many ? 'de finns' : 'personen finns'} inte kvar i någon tabell.
                 </p>
               ) : (
                 preview.tables.map(({ table, rows }) => (
                   <div key={table} className="flex items-baseline justify-between gap-3 px-3 py-2">
-                    <span className="text-warm-300 text-sm">{TABLE_LABEL[table] ?? table}</span>
-                    <span className="text-warm-500 text-xs shrink-0">
+                    <span className="text-slate-700 text-sm">{TABLE_LABEL[table] ?? table}</span>
+                    <span className="text-slate-500 text-xs shrink-0">
                       {rows} {rows === 1 ? 'rad' : 'rader'}
                     </span>
                   </div>
@@ -147,7 +147,7 @@ export default function DeletePerson({
             </div>
 
             {preview.authUsers > 0 && (
-              <p className="mt-3 text-sm text-red-400">
+              <p className="mt-3 text-sm text-red-600">
                 {preview.authUsers === 1
                   ? 'En inloggning tas bort. Personen kan inte längre logga in på sitt konto.'
                   : `${preview.authUsers} inloggningar tas bort. De kan inte längre logga in på sina konton.`}
@@ -155,21 +155,21 @@ export default function DeletePerson({
             )}
 
             {preview.activeSubscription && (
-              <p className="mt-3 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
+              <p className="mt-3 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-600 text-sm">
                 {many ? 'Någon av dem' : 'Personen'} har ett aktivt abonnemang i Stripe. Det sägs{' '}
                 <strong>inte</strong> upp av att du raderar här — avsluta det i Stripe först, annars
                 fortsätter faktureringen mot ett konto som inte finns.
               </p>
             )}
 
-            <p className="mt-4 text-warm-600 text-xs">
+            <p className="mt-4 text-slate-400 text-xs">
               Ett eventuellt STOPP på SMS ligger kvar, så vi inte börjar messa numret igen.
             </p>
           </>
         )}
 
         {error && (
-          <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
+          <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-600 text-sm">
             {error}
           </div>
         )}
@@ -178,7 +178,7 @@ export default function DeletePerson({
           <button
             onClick={onClose}
             disabled={busy}
-            className="flex-1 py-2.5 bg-navy-700 text-warm-300 hover:text-white rounded-xl transition text-sm font-medium disabled:opacity-50"
+            className="flex-1 py-2.5 bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl transition text-sm font-medium disabled:opacity-50"
           >
             Avbryt
           </button>

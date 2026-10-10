@@ -48,16 +48,16 @@ export const MOMSPERIODER: { value: MomsPeriod; label: string }[] = [
 
 /** Hur varje händelsetyp visas i tidslinjen. */
 export const EVENT_STYLE: Record<EventType, { label: string; dot: string }> = {
-  lead: { label: 'Lead', dot: 'bg-gold-500' },
+  lead: { label: 'Lead', dot: 'bg-blue-600' },
   mejl: { label: 'Mejl', dot: 'bg-blue-400' },
   sms_ut: { label: 'SMS ut', dot: 'bg-green-400' },
   sms_in: { label: 'SMS in', dot: 'bg-purple-400' },
-  mote: { label: 'Möte', dot: 'bg-gold-400' },
+  mote: { label: 'Möte', dot: 'bg-blue-500' },
   lank: { label: 'Länk', dot: 'bg-blue-300' },
   trad: { label: 'Mejltråd', dot: 'bg-blue-500' },
   konto: { label: 'Konto', dot: 'bg-green-500' },
-  order: { label: 'Order', dot: 'bg-gold-600' },
-  fil: { label: 'Fil', dot: 'bg-warm-400' },
+  order: { label: 'Order', dot: 'bg-blue-700' },
+  fil: { label: 'Fil', dot: 'bg-slate-100' },
   optout: { label: 'Avreg', dot: 'bg-red-400' },
 };
 

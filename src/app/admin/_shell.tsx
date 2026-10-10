@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import NotificationBell from './_bell';
 import NavMenu from './_nav-menu';
 
@@ -32,22 +33,22 @@ function CodeGate({ onUnlock }: { onUnlock: () => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-navy-800 flex items-center justify-center px-4">
-      <form onSubmit={handleSubmit} className="bg-navy-700/50 border border-navy-600 rounded-2xl p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-white mb-6 text-center">Admin</h1>
-        <label className="block text-sm font-medium text-warm-300 mb-2">Kod</label>
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
+      <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-2xl p-8 w-full max-w-sm shadow-sm">
+        <h1 className="text-2xl font-bold text-slate-900 mb-6 text-center">Admin</h1>
+        <label className="block text-sm font-medium text-slate-700 mb-2">Kod</label>
         <input
           type="password"
           value={code}
           onChange={(e) => { setCode(e.target.value); setError(''); }}
           autoFocus
-          className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-white rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition mb-4"
+          className="w-full px-4 py-3 bg-white border border-slate-200 text-slate-900 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition mb-4"
         />
-        {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
+        {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
         <button
           type="submit"
           disabled={busy || !code}
-          className="w-full py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all duration-200 disabled:opacity-50"
+          className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white font-bold rounded-xl transition-all duration-200 disabled:opacity-50"
         >
           {busy ? 'Loggar in...' : 'Logga in'}
         </button>
@@ -56,7 +57,12 @@ function CodeGate({ onUnlock }: { onUnlock: () => void }) {
   );
 }
 
+/** Sidor med lista till vänster och detaljer till höger behöver hela bredden. */
+const BREDA = ['/admin/inlamning'];
+
 export default function AdminShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const bredd = BREDA.some((b) => pathname?.startsWith(b)) ? 'max-w-[1400px]' : 'max-w-5xl';
   const [unlocked, setUnlocked] = useState(false);
   const [checked, setChecked] = useState(false);
 
@@ -73,11 +79,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   if (!unlocked) return <CodeGate onUnlock={() => setUnlocked(true)} />;
 
   return (
-    <div className="min-h-screen bg-navy-800">
-      <nav className="bg-navy-900/80 border-b border-navy-600 sticky top-0 z-40 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-14">
+    <div className="min-h-screen bg-slate-100">
+      <nav className="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div className={`${bredd} mx-auto px-4 flex items-center justify-between h-14`}>
           <div className="flex items-center gap-4">
-            <Link href="/admin" className="text-white font-bold text-sm hover:text-gold-500 transition">
+            <Link href="/admin" className="text-slate-900 font-bold text-sm hover:text-blue-700 transition">
               Admin
             </Link>
             <NavMenu />
@@ -89,14 +95,14 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 await fetch('/api/admin/login', { method: 'DELETE' }).catch(() => null);
                 setUnlocked(false);
               }}
-              className="px-3 py-1.5 text-xs text-warm-500 hover:text-warm-300 transition"
+              className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 transition"
             >
               Logga ut
             </button>
           </div>
         </div>
       </nav>
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">{children}</main>
+      <main className={`${bredd} mx-auto px-4 sm:px-6 py-8`}>{children}</main>
     </div>
   );
 }

@@ -130,26 +130,26 @@ export function TransaktionsLista({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <div className="rounded-xl border bg-navy-700/50 border-navy-600 p-4">
-          <p className="text-warm-500 text-[11px] uppercase tracking-widest">Transaktioner</p>
-          <p className="mt-1 text-lg font-bold tabular-nums text-white">{filtered.length.toLocaleString('sv-SE')}</p>
+        <div className="rounded-xl border bg-slate-50 border-slate-200 p-4">
+          <p className="text-slate-500 text-[11px] uppercase tracking-widest">Transaktioner</p>
+          <p className="mt-1 text-lg font-bold tabular-nums text-slate-900">{filtered.length.toLocaleString('sv-SE')}</p>
         </div>
         {summering.map((s) => (
-          <div key={s.valuta} className="rounded-xl border bg-navy-700/50 border-navy-600 p-4">
-            <p className="text-warm-500 text-[11px] uppercase tracking-widest">
+          <div key={s.valuta} className="rounded-xl border bg-slate-50 border-slate-200 p-4">
+            <p className="text-slate-500 text-[11px] uppercase tracking-widest">
               In / ut{summering.length > 1 || s.valuta !== 'SEK' ? ` · ${s.valuta}` : ''}
             </p>
             <p className="mt-1 text-lg font-bold tabular-nums">
-              <span className="text-emerald-300">{kr.format(s.in)}</span>
-              <span className="text-warm-600"> / </span>
-              <span className="text-warm-200">{kr.format(s.ut)}</span>
+              <span className="text-emerald-700">{kr.format(s.in)}</span>
+              <span className="text-slate-400"> / </span>
+              <span className="text-slate-800">{kr.format(s.ut)}</span>
             </p>
           </div>
         ))}
       </div>
 
       {antalDubbletter > 0 && (
-        <div className="bg-gold-500/10 border border-gold-500/30 rounded-xl p-4 text-sm text-gold-300 flex items-center gap-3 flex-wrap">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 flex items-center gap-3 flex-wrap">
           <span className="flex-1">
             {antalDubbletter === 1
               ? 'En banktransaktion är troligen en dubblett'
@@ -158,7 +158,7 @@ export function TransaktionsLista({
           </span>
           <button
             onClick={() => setBaraDubbletter((v) => !v)}
-            className="px-3 py-1.5 text-xs border border-gold-500/40 rounded-lg hover:bg-gold-500/10 transition"
+            className="px-3 py-1.5 text-xs border border-blue-400 rounded-lg hover:bg-blue-50 transition"
           >
             {baraDubbletter ? 'Visa alla' : 'Visa dubbletterna'}
           </button>
@@ -166,7 +166,7 @@ export function TransaktionsLista({
       )}
 
       {utanDatum > 0 && (
-        <div className="bg-gold-500/10 border border-gold-500/30 rounded-xl p-4 text-sm text-gold-300">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
           {utanDatum === 1
             ? 'En rad saknar datum — det framgick inte av underlaget.'
             : `${utanDatum} rader saknar datum — det framgick inte av underlagen.`}
@@ -178,12 +178,12 @@ export function TransaktionsLista({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Sök text, motpart, fil eller belopp"
-          className="flex-1 min-w-[12rem] bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-warm-600 focus:outline-none focus:border-gold-500 transition"
+          className="flex-1 min-w-[12rem] bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition"
         />
         <select
           value={riktning}
           onChange={(e) => setRiktning(e.target.value as Riktning)}
-          className="bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-500"
+          className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
         >
           <option value="alla">In och ut</option>
           <option value="in">Bara in</option>
@@ -193,7 +193,7 @@ export function TransaktionsLista({
           <select
             value={fil}
             onChange={(e) => setFil(e.target.value)}
-            className="bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-500 max-w-[16rem]"
+            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500 max-w-[16rem]"
           >
             <option value="">Alla filer ({filer.length})</option>
             {filer.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -202,8 +202,8 @@ export function TransaktionsLista({
       </div>
 
       {onDelete && valda.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap bg-navy-700/50 border border-navy-600 rounded-xl px-4 py-3">
-          <span className="text-warm-200 text-sm">
+        <div className="flex items-center gap-3 flex-wrap bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+          <span className="text-slate-800 text-sm">
             {valda.length.toLocaleString('sv-SE')} {valda.length === 1 ? 'markerad' : 'markerade'}
           </span>
           {bekrafta ? (
@@ -218,7 +218,7 @@ export function TransaktionsLista({
               <button
                 onClick={() => setBekrafta(false)}
                 disabled={raderar}
-                className="text-warm-500 hover:text-warm-300 text-xs transition disabled:opacity-50"
+                className="text-slate-500 hover:text-slate-700 text-xs transition disabled:opacity-50"
               >
                 Avbryt
               </button>
@@ -226,14 +226,14 @@ export function TransaktionsLista({
           ) : (
             <button
               onClick={() => setBekrafta(true)}
-              className="px-3 py-1.5 text-xs text-red-400/80 hover:text-red-400 border border-red-500/30 rounded-lg transition"
+              className="px-3 py-1.5 text-xs text-red-600 hover:text-red-600 border border-red-500/30 rounded-lg transition"
             >
               Radera
             </button>
           )}
           <button
             onClick={() => setValda([])}
-            className="text-warm-500 hover:text-warm-300 text-xs transition ml-auto"
+            className="text-slate-500 hover:text-slate-700 text-xs transition ml-auto"
           >
             Avmarkera
           </button>
@@ -241,15 +241,15 @@ export function TransaktionsLista({
       )}
 
       {filtered.length === 0 ? (
-        <div className="bg-navy-700/50 border border-navy-600 rounded-xl text-center py-12 text-warm-400 text-sm">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl text-center py-12 text-slate-600 text-sm">
           Ingen transaktion matchar filtret
         </div>
       ) : (
-        <div className="bg-navy-700/50 border border-navy-600 rounded-xl overflow-hidden">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-warm-500 text-[11px] uppercase tracking-widest border-b border-navy-600">
+                <tr className="text-slate-500 text-[11px] uppercase tracking-widest border-b border-slate-200">
                   {onDelete && (
                     <th className="px-4 py-2.5 w-8">
                       <input
@@ -257,7 +257,7 @@ export function TransaktionsLista({
                         checked={allaValda}
                         onChange={(e) => setValda(e.target.checked ? filtered.map((t) => t.id) : [])}
                         title={allaValda ? 'Avmarkera alla' : 'Markera alla i filtret'}
-                        className="accent-gold-500 align-middle"
+                        className="accent-blue-600 align-middle"
                       />
                     </th>
                   )}
@@ -268,9 +268,9 @@ export function TransaktionsLista({
                   <th className="text-right font-semibold px-4 py-2.5">Belopp</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-navy-600/60">
+              <tbody className="divide-y divide-slate-200">
                 {filtered.slice(0, shown).map((t) => (
-                  <tr key={t.id} className={`transition ${valda.includes(t.id) ? 'bg-gold-500/5' : 'hover:bg-navy-700/40'} ${arDublett(t) ? 'opacity-60' : ''}`}>
+                  <tr key={t.id} className={`transition ${valda.includes(t.id) ? 'bg-blue-50' : 'hover:bg-slate-50'} ${arDublett(t) ? 'opacity-60' : ''}`}>
                     {onDelete && (
                       <td className="px-4 py-2.5 align-top">
                         <input
@@ -278,62 +278,62 @@ export function TransaktionsLista({
                           checked={valda.includes(t.id)}
                           onChange={(e) => setValda((list) =>
                             e.target.checked ? [...list, t.id] : list.filter((id) => id !== t.id))}
-                          className="accent-gold-500 align-middle"
+                          className="accent-blue-600 align-middle"
                         />
                       </td>
                     )}
-                    <td className="px-4 py-2.5 text-warm-300 tabular-nums whitespace-nowrap align-top">
-                      {t.datum || <span className="text-gold-400/80">utan datum</span>}
+                    <td className="px-4 py-2.5 text-slate-700 tabular-nums whitespace-nowrap align-top">
+                      {t.datum || <span className="text-blue-700">utan datum</span>}
                     </td>
                     <td className="px-4 py-2.5 align-top">
-                      <span className="text-warm-100">{t.beskrivning || '—'}</span>
+                      <span className="text-slate-900">{t.beskrivning || '—'}</span>
                       {t.motpart && t.motpart !== t.beskrivning && (
-                        <span className="text-warm-500"> · {t.motpart}</span>
+                        <span className="text-slate-500"> · {t.motpart}</span>
                       )}
                       {t.dublettAv && (
-                        <span className="block text-gold-400 text-xs mt-0.5">
+                        <span className="block text-blue-700 text-xs mt-0.5">
                           Trolig dubblett av {perId.get(t.dublettAv)?.fileName ?? 'ett underlag'}
                           {perId.get(t.dublettAv)?.datum ? ` (${perId.get(t.dublettAv)!.datum})` : ''}
                         </span>
                       )}
                       {t.dublettOrsak && (
-                        <span className="block text-gold-400 text-xs mt-0.5">Trolig dubblett: {t.dublettOrsak}</span>
+                        <span className="block text-blue-700 text-xs mt-0.5">Trolig dubblett: {t.dublettOrsak}</span>
                       )}
                       {iBanken.has(t.id) && (
-                        <span className="block text-warm-500 text-xs mt-0.5">Finns också i banken</span>
+                        <span className="block text-slate-500 text-xs mt-0.5">Finns också i banken</span>
                       )}
                       {t.anteckning && (
-                        <span className="block text-gold-400/80 text-xs mt-0.5">{t.anteckning}</span>
+                        <span className="block text-blue-700 text-xs mt-0.5">{t.anteckning}</span>
                       )}
                       {t.detaljer && (
                         <details className="mt-0.5">
-                          <summary className="text-warm-500 hover:text-warm-300 text-xs cursor-pointer">Detaljer</summary>
-                          <p className="text-warm-400 text-xs whitespace-pre-wrap mt-1 max-w-2xl">{t.detaljer}</p>
+                          <summary className="text-slate-500 hover:text-slate-700 text-xs cursor-pointer">Detaljer</summary>
+                          <p className="text-slate-600 text-xs whitespace-pre-wrap mt-1 max-w-2xl">{t.detaljer}</p>
                         </details>
                       )}
-                      <span className="block md:hidden text-warm-600 text-[11px] mt-0.5">{t.fileName}</span>
+                      <span className="block md:hidden text-slate-400 text-[11px] mt-0.5">{t.fileName}</span>
                     </td>
                     <td className="px-4 py-2.5 align-top hidden md:table-cell">
                       {t.kalla === 'bank' ? (
-                        <span className="text-warm-500 text-xs break-all">{t.fileName ?? 'Bank'}</span>
+                        <span className="text-slate-500 text-xs break-all">{t.fileName ?? 'Bank'}</span>
                       ) : (
                         <Link
                           href={`/admin/underlag/${t.underlagId}`}
                           title={t.fileName ?? undefined}
-                          className="text-warm-500 hover:text-gold-400 text-xs transition break-all"
+                          className="text-slate-500 hover:text-blue-700 text-xs transition break-all"
                         >
                           {t.fileName ?? 'Okänd fil'}
                         </Link>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 text-warm-500 tabular-nums text-right whitespace-nowrap align-top hidden sm:table-cell">
+                    <td className="px-4 py-2.5 text-slate-500 tabular-nums text-right whitespace-nowrap align-top hidden sm:table-cell">
                       {t.moms ? kr.format(t.moms) : ''}
                     </td>
                     <td className={`px-4 py-2.5 tabular-nums text-right whitespace-nowrap align-top font-medium ${
-                      t.riktning === 'in' ? 'text-emerald-300' : 'text-warm-200'
+                      t.riktning === 'in' ? 'text-emerald-700' : 'text-slate-800'
                     }`}>
                       {t.riktning === 'in' ? '+' : '−'}{kr.format(t.belopp)}
-                      {t.valuta !== 'SEK' && <span className="text-warm-600 text-xs"> {t.valuta}</span>}
+                      {t.valuta !== 'SEK' && <span className="text-slate-400 text-xs"> {t.valuta}</span>}
                     </td>
                   </tr>
                 ))}
@@ -344,7 +344,7 @@ export function TransaktionsLista({
           {filtered.length > shown && (
             <button
               onClick={() => setShown((n) => n + PAGE)}
-              className="w-full px-4 py-3 text-sm text-warm-400 hover:text-white border-t border-navy-600 transition"
+              className="w-full px-4 py-3 text-sm text-slate-600 hover:text-slate-900 border-t border-slate-200 transition"
             >
               Visa fler ({(filtered.length - shown).toLocaleString('sv-SE')} kvar)
             </button>

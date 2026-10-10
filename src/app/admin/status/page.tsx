@@ -15,29 +15,29 @@ import { fullDate } from '../_pipeline';
  */
 
 const LEVEL_STYLE: Record<StatusLevel, { ring: string; text: string; mark: string }> = {
-  ok: { ring: 'bg-green-500/15 text-green-400', text: 'text-green-400', mark: '✓' },
-  fail: { ring: 'bg-red-500/15 text-red-400', text: 'text-red-400', mark: '✕' },
-  unknown: { ring: 'bg-navy-600 text-warm-500', text: 'text-warm-500', mark: '–' },
+  ok: { ring: 'bg-green-500/15 text-green-600', text: 'text-green-600', mark: '✓' },
+  fail: { ring: 'bg-red-500/15 text-red-600', text: 'text-red-600', mark: '✕' },
+  unknown: { ring: 'bg-slate-100 text-slate-500', text: 'text-slate-500', mark: '–' },
 };
 
 function CheckRow({ check }: { check: StatusCheck }) {
   const style = LEVEL_STYLE[check.level];
 
   return (
-    <div className="flex items-start gap-3 py-3 border-b border-navy-700 last:border-0">
+    <div className="flex items-start gap-3 py-3 border-b border-slate-200 last:border-0">
       <span className={`shrink-0 w-6 h-6 rounded-full grid place-items-center text-sm font-bold ${style.ring}`}>
         {style.mark}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="text-sm text-white font-medium">{check.label}</p>
+          <p className="text-sm text-slate-900 font-medium">{check.label}</p>
           {check.at && (
-            <span className="shrink-0 text-[11px] text-warm-600 tabular-nums">{fullDate(check.at)}</span>
+            <span className="shrink-0 text-[11px] text-slate-400 tabular-nums">{fullDate(check.at)}</span>
           )}
         </div>
-        <p className="text-xs text-warm-400 mt-0.5 break-words">{check.detail}</p>
+        <p className="text-xs text-slate-600 mt-0.5 break-words">{check.detail}</p>
         {check.level !== 'ok' && check.hint && (
-          <p className="text-xs text-warm-600 mt-1 break-words">{check.hint}</p>
+          <p className="text-xs text-slate-400 mt-1 break-words">{check.hint}</p>
         )}
       </div>
     </div>
@@ -70,26 +70,26 @@ export default function StatusPage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/admin" className="text-gold-500 hover:text-gold-400 text-sm transition">← Alla personer</Link>
+        <Link href="/admin" className="text-blue-700 hover:text-blue-700 text-sm transition">← Alla personer</Link>
 
         <div className="flex items-start justify-between gap-4 mt-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">Systemstatus</h1>
-            <p className="text-warm-400 text-sm mt-1.5">
+            <h1 className="text-2xl font-bold text-slate-900">Systemstatus</h1>
+            <p className="text-slate-600 text-sm mt-1.5">
               {loading && 'Kollar...'}
               {!loading && allGood && 'Alla flöden går fram.'}
               {!loading && !allGood && failing.length > 0 && `${failing.length} kontroller behöver ses över.`}
               {!loading && !allGood && failing.length === 0 && 'Ingen status att visa.'}
             </p>
             {report && (
-              <p className="text-warm-600 text-xs mt-1">Kollat {fullDate(report.checkedAt)}</p>
+              <p className="text-slate-400 text-xs mt-1">Kollat {fullDate(report.checkedAt)}</p>
             )}
           </div>
 
           <button
             onClick={load}
             disabled={loading}
-            className="px-3 py-1.5 text-xs bg-navy-700 hover:bg-navy-600 disabled:opacity-50 text-warm-300 rounded-lg transition shrink-0"
+            className="px-3 py-1.5 text-xs bg-slate-50 hover:bg-slate-100 disabled:opacity-50 text-slate-700 rounded-lg transition shrink-0"
           >
             {loading ? 'Kollar...' : 'Kolla igen'}
           </button>
@@ -97,22 +97,22 @@ export default function StatusPage() {
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">{error}</div>
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-600 text-sm">{error}</div>
       )}
 
       {allGood && (
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 flex items-center gap-3">
-          <span className="w-8 h-8 rounded-full bg-green-500/20 text-green-400 grid place-items-center text-lg font-bold">✓</span>
-          <p className="text-green-400 text-sm font-medium">
+          <span className="w-8 h-8 rounded-full bg-green-500/20 text-green-600 grid place-items-center text-lg font-bold">✓</span>
+          <p className="text-green-600 text-sm font-medium">
             Lead in, välkomstmejl, välkomst-SMS och AI-svaren fungerar.
           </p>
         </div>
       )}
 
       {report?.groups.map((group) => (
-        <div key={group.title} className="bg-navy-700/50 border border-navy-600 rounded-xl p-6">
-          <h2 className="text-xs font-semibold text-warm-400 uppercase tracking-widest">{group.title}</h2>
-          <p className="text-xs text-warm-600 mt-1.5 mb-3">{group.note}</p>
+        <div key={group.title} className="bg-slate-50 border border-slate-200 rounded-xl p-6">
+          <h2 className="text-xs font-semibold text-slate-600 uppercase tracking-widest">{group.title}</h2>
+          <p className="text-xs text-slate-400 mt-1.5 mb-3">{group.note}</p>
           <div>
             {group.checks.map((check) => <CheckRow key={check.id} check={check} />)}
           </div>
@@ -120,7 +120,7 @@ export default function StatusPage() {
       ))}
 
       {!loading && !report && !error && (
-        <p className="text-warm-500 text-sm">Ingen status att visa.</p>
+        <p className="text-slate-500 text-sm">Ingen status att visa.</p>
       )}
     </div>
   );

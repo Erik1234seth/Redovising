@@ -1,4 +1,5 @@
 import type { NeManuellt } from '@/lib/ne/ne';
+import type { Deadlineperiod } from '@/lib/deadlines';
 /**
  * Formen på det adminpanelen visar.
  *
@@ -375,4 +376,24 @@ export interface AdminKonteringRad {
     signatur: string | null;
     rader: { konto: string; kontonamn: string | null; belopp: number }[];
   } | null;
+}
+
+/** En period på inlämningssidan: deadline, om den är inlämnad och vad som ser fel ut. */
+export interface InlamningPeriod extends Deadlineperiod {
+  /** Deadline har passerat utan att perioden markerats som inlämnad. */
+  forsenad: boolean;
+  /** Raden i `inlamningar`, när perioden markerats som inlämnad. */
+  inlamning: { id: string; at: string; kvittensNamn: string | null } | null;
+  /** Det som ser fel ut i bokföringen eller uppgifterna, i klartext. Visas rött. */
+  flaggor: string[];
+  antalVerifikationer?: number;
+}
+
+export interface InlamningKund {
+  profileId: string;
+  email: string | null;
+  namn: string;
+  foretag: string | null;
+  momsPeriod: MomsPeriod | null;
+  perioder: InlamningPeriod[];
 }

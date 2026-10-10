@@ -132,19 +132,19 @@ export function VerifikationLista({ verifikationer, showSource = false }: { veri
           { label: 'Differens', value: kr.format(totals.differens), bad: Math.abs(totals.differens) >= 0.005 },
         ].map((tile) => (
           <div key={tile.label} className={`rounded-xl border p-4 ${
-            tile.bad ? 'bg-red-500/10 border-red-500/40' : 'bg-navy-700/50 border-navy-600'
+            tile.bad ? 'bg-red-500/10 border-red-500/40' : 'bg-slate-50 border-slate-200'
           }`}>
-            <p className="text-warm-500 text-[11px] uppercase tracking-widest">{tile.label}</p>
-            <p className={`mt-1 text-lg font-bold tabular-nums ${tile.bad ? 'text-red-400' : 'text-white'}`}>{tile.value}</p>
+            <p className="text-slate-500 text-[11px] uppercase tracking-widest">{tile.label}</p>
+            <p className={`mt-1 text-lg font-bold tabular-nums ${tile.bad ? 'text-red-600' : 'text-slate-900'}`}>{tile.value}</p>
           </div>
         ))}
       </div>
 
       {unbalanced.length > 0 && (
         <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 text-sm">
-          <p className="text-red-400 font-semibold">
+          <p className="text-red-600 font-semibold">
             ⚠ {unbalanced.length === 1 ? 'En verifikation balanserar inte' : `${unbalanced.length} verifikationer balanserar inte`}:{' '}
-            <span className="font-normal text-red-300">
+            <span className="font-normal text-red-700">
               {unbalanced.slice(0, 10).map((v) => `${v.serie}${v.nummer} (${kr.format(v.summa)})`).join(', ')}
               {unbalanced.length > 10 && ' …'}
             </span>
@@ -157,13 +157,13 @@ export function VerifikationLista({ verifikationer, showSource = false }: { veri
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Sök verifikation, text, konto eller belopp"
-          className="flex-1 min-w-[12rem] bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-warm-600 focus:outline-none focus:border-gold-500 transition"
+          className="flex-1 min-w-[12rem] bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition"
         />
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as Sort)}
           title="Sortering"
-          className="bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-500"
+          className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
         >
           <option value="datum">Sortera på datum</option>
           <option value="nummer">Sortera på verifikationsnummer</option>
@@ -172,7 +172,7 @@ export function VerifikationLista({ verifikationer, showSource = false }: { veri
           <select
             value={year}
             onChange={(e) => setYear(e.target.value)}
-            className="bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-500"
+            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
           >
             <option value="">Alla år</option>
             {years.map((y) => <option key={y} value={y}>{y}</option>)}
@@ -182,14 +182,14 @@ export function VerifikationLista({ verifikationer, showSource = false }: { veri
           <select
             value={serie}
             onChange={(e) => setSerie(e.target.value)}
-            className="bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-500"
+            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
           >
             <option value="">Alla serier</option>
             {series.map((s) => <option key={s} value={s}>Serie {s}</option>)}
           </select>
         )}
         {verifikationer.some((v) => !v.balanserad) && (
-          <label className="flex items-center gap-2 text-sm text-warm-300 cursor-pointer">
+          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
             <input type="checkbox" checked={onlyUnbalanced} onChange={(e) => setOnlyUnbalanced(e.target.checked)} />
             Bara obalanserade
           </label>
@@ -197,7 +197,7 @@ export function VerifikationLista({ verifikationer, showSource = false }: { veri
       </div>
 
       {filtered.length === 0 ? (
-        <div className="bg-navy-700/50 border border-navy-600 rounded-xl text-center py-12 text-warm-400 text-sm">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl text-center py-12 text-slate-600 text-sm">
           {verifikationer.length === 0 ? 'Inga verifikationer.' : 'Inga verifikationer matchar.'}
         </div>
       ) : (
@@ -208,7 +208,7 @@ export function VerifikationLista({ verifikationer, showSource = false }: { veri
           {filtered.length > shown && (
             <button
               onClick={() => setShown((n) => n + PAGE)}
-              className="w-full py-3 bg-navy-700/50 hover:bg-navy-700 border border-navy-600 rounded-xl text-sm text-warm-300 transition"
+              className="w-full py-3 bg-slate-50 hover:bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 transition"
             >
               Visa {Math.min(PAGE, filtered.length - shown)} till ({(filtered.length - shown).toLocaleString('sv-SE')} kvar)
             </button>
@@ -225,26 +225,26 @@ function Verifikation({ v, showSource }: { v: Ver; showSource: boolean }) {
   const kredit = rows.filter((t) => t.belopp < 0).reduce((s, t) => s - t.belopp, 0);
 
   return (
-    <div className={`bg-navy-700/50 border rounded-xl p-4 ${v.balanserad ? 'border-navy-600' : 'border-red-500/60'}`}>
+    <div className={`bg-slate-50 border rounded-xl p-4 ${v.balanserad ? 'border-slate-200' : 'border-red-500/60'}`}>
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <p className="text-white text-sm font-semibold min-w-0 break-words">
-          <span className="text-gold-400 tabular-nums mr-2">{v.serie}{v.nummer}</span>
-          {v.text || <span className="text-warm-500 font-normal italic">(ingen text)</span>}
+        <p className="text-slate-900 text-sm font-semibold min-w-0 break-words">
+          <span className="text-blue-700 tabular-nums mr-2">{v.serie}{v.nummer}</span>
+          {v.text || <span className="text-slate-500 font-normal italic">(ingen text)</span>}
         </p>
-        <span className="text-warm-500 text-xs tabular-nums shrink-0">
+        <span className="text-slate-500 text-xs tabular-nums shrink-0">
           {v.datum}
-          {v.registrerad && v.registrerad !== v.datum && <span className="text-warm-600"> · reg. {v.registrerad}</span>}
-          {v.signatur && <span className="text-warm-600"> · {v.signatur}</span>}
+          {v.registrerad && v.registrerad !== v.datum && <span className="text-slate-400"> · reg. {v.registrerad}</span>}
+          {v.signatur && <span className="text-slate-400"> · {v.signatur}</span>}
         </span>
       </div>
 
       {showSource && (v.kalla || v.fileName) && (
-        <p className="text-warm-600 text-[11px] mt-1">
+        <p className="text-slate-400 text-[11px] mt-1">
           {v.kalla && (
-            <span className="px-1.5 py-0.5 rounded bg-navy-600 text-warm-300 font-semibold mr-1.5">{KALLA[v.kalla] ?? v.kalla}</span>
+            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold mr-1.5">{KALLA[v.kalla] ?? v.kalla}</span>
           )}
           {v.fileName && v.underlagId ? (
-            <Link href={`/admin/underlag/${v.underlagId}`} className="hover:text-gold-400 transition">från {v.fileName}</Link>
+            <Link href={`/admin/underlag/${v.underlagId}`} className="hover:text-blue-700 transition">från {v.fileName}</Link>
           ) : v.fileName && <>från {v.fileName}</>}
         </p>
       )}
@@ -252,7 +252,7 @@ function Verifikation({ v, showSource }: { v: Ver; showSource: boolean }) {
       <div className="overflow-x-auto mt-3">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-warm-500 text-[11px] uppercase tracking-widest">
+            <tr className="text-slate-500 text-[11px] uppercase tracking-widest">
               <th className="text-left font-medium pb-1.5 pr-3 w-16">Konto</th>
               <th className="text-left font-medium pb-1.5 pr-3">Benämning</th>
               <th className="text-right font-medium pb-1.5 pl-3 w-28">Debet</th>
@@ -264,13 +264,13 @@ function Verifikation({ v, showSource }: { v: Ver; showSource: boolean }) {
               const history = t.borttagen || t.tillagd;
               const strike = t.borttagen ? 'line-through' : '';
               return (
-                <tr key={i} className={`border-t border-navy-600/60 ${history ? 'text-warm-600' : 'text-warm-100'}`}>
+                <tr key={i} className={`border-t border-slate-200 ${history ? 'text-slate-400' : 'text-slate-900'}`}>
                   <td className={`py-1.5 pr-3 tabular-nums ${strike}`}>{t.konto}</td>
                   <td className="py-1.5 pr-3">
                     <span className={strike}>{t.kontonamn || '—'}</span>
-                    {t.text && t.text !== v.text && <span className="text-warm-500"> · {t.text}</span>}
+                    {t.text && t.text !== v.text && <span className="text-slate-500"> · {t.text}</span>}
                     {t.objekt.length > 0 && (
-                      <span className="text-warm-600 text-xs"> · {t.objekt.map((o) => `${o.dimension}:${o.objekt}`).join(', ')}</span>
+                      <span className="text-slate-400 text-xs"> · {t.objekt.map((o) => `${o.dimension}:${o.objekt}`).join(', ')}</span>
                     )}
                     {t.borttagen && <span className="ml-2 text-[10px] uppercase tracking-wide">borttagen</span>}
                     {t.tillagd && <span className="ml-2 text-[10px] uppercase tracking-wide">tillagd i efterhand</span>}
@@ -280,9 +280,9 @@ function Verifikation({ v, showSource }: { v: Ver; showSource: boolean }) {
                 </tr>
               );
             })}
-            <tr className="border-t border-navy-500 text-warm-300 font-semibold">
+            <tr className="border-t border-slate-300 text-slate-700 font-semibold">
               <td colSpan={2} className="pt-1.5 pr-3 text-xs">
-                {v.balanserad ? 'Summa' : <span className="text-red-400">Balanserar inte — differens {kr.format(v.summa)}</span>}
+                {v.balanserad ? 'Summa' : <span className="text-red-600">Balanserar inte — differens {kr.format(v.summa)}</span>}
               </td>
               <td className="pt-1.5 pl-3 text-right tabular-nums">{kr.format(debet)}</td>
               <td className="pt-1.5 pl-3 text-right tabular-nums">{kr.format(kredit)}</td>

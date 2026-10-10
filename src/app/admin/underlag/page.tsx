@@ -27,9 +27,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  inkommet: 'bg-gold-500/15 text-gold-400 border-gold-500/30',
-  granskas: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  bokfort: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  inkommet: 'bg-blue-50 text-blue-700 border-blue-200',
+  granskas: 'bg-blue-500/15 text-blue-700 border-blue-500/30',
+  bokfort: 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30',
 };
 
 const NEXT_STATUS: Record<string, { to: string; label: string; primary?: boolean }[]> = {
@@ -110,7 +110,7 @@ export default function UnderlagPage() {
     setBusy(null);
   };
 
-  if (loading) return <div className="text-center py-20 text-warm-400">Laddar...</div>;
+  if (loading) return <div className="text-center py-20 text-slate-600">Laddar...</div>;
 
   const waiting = underlag.filter((u) => u.status !== 'bokfort');
   const done = underlag.filter((u) => u.status === 'bokfort');
@@ -119,15 +119,15 @@ export default function UnderlagPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Inkomna underlag</h1>
-        <p className="text-warm-400 text-sm mt-1.5">
+        <h1 className="text-2xl font-bold text-slate-900">Inkomna underlag</h1>
+        <p className="text-slate-600 text-sm mt-1.5">
           Filerna kunderna laddat upp i bokföringsfliken eller mejlat in som bilagor. Bokföringen
           behöver läggas in innan de ser något.
         </p>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-600 text-sm">
           {error}
         </div>
       )}
@@ -136,7 +136,7 @@ export default function UnderlagPage() {
         <button
           onClick={() => setShowDone(false)}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-            showDone ? 'text-warm-500 hover:text-warm-300' : 'bg-navy-700 text-white border border-navy-600'
+            showDone ? 'text-slate-500 hover:text-slate-700' : 'bg-slate-50 text-slate-900 border border-slate-200'
           }`}
         >
           Att göra ({waiting.length})
@@ -144,7 +144,7 @@ export default function UnderlagPage() {
         <button
           onClick={() => setShowDone(true)}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-            showDone ? 'bg-navy-700 text-white border border-navy-600' : 'text-warm-500 hover:text-warm-300'
+            showDone ? 'bg-slate-50 text-slate-900 border border-slate-200' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
           Bokförda ({done.length})
@@ -152,9 +152,9 @@ export default function UnderlagPage() {
       </div>
 
       {visible.length === 0 ? (
-        <div className="bg-navy-700/50 border border-navy-600 rounded-xl text-center py-16">
-          <p className="text-warm-300">{showDone ? 'Inget är bokfört än' : 'Inga underlag väntar'}</p>
-          <p className="text-warm-600 text-xs mt-1.5">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl text-center py-16">
+          <p className="text-slate-700">{showDone ? 'Inget är bokfört än' : 'Inga underlag väntar'}</p>
+          <p className="text-slate-400 text-xs mt-1.5">
             {showDone
               ? 'Underlag du klarmarkerar hamnar här.'
               : 'Nästa gång någon laddar upp ett underlag dyker det upp här.'}
@@ -163,24 +163,24 @@ export default function UnderlagPage() {
       ) : (
         <div className="space-y-3">
           {visible.map((u) => (
-            <div key={u.id} className="bg-navy-700/50 border border-navy-600 rounded-xl p-5">
+            <div key={u.id} className="bg-slate-50 border border-slate-200 rounded-xl p-5">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${STATUS_STYLES[u.status] ?? STATUS_STYLES.inkommet}`}>
                       {STATUS_LABELS[u.status] ?? u.status}
                     </span>
-                    <p className="text-white font-semibold truncate">{u.fileName}</p>
+                    <p className="text-slate-900 font-semibold truncate">{u.fileName}</p>
                     {u.fileSize !== null && (
-                      <span className="text-warm-600 text-xs">{fileSize(u.fileSize)}</span>
+                      <span className="text-slate-400 text-xs">{fileSize(u.fileSize)}</span>
                     )}
                     {u.source === 'mejl' && (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border bg-blue-500/10 text-blue-300 border-blue-500/30">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border bg-blue-500/10 text-blue-700 border-blue-500/30">
                         ✉ via mejl
                       </span>
                     )}
                     {u.source === 'admin' && (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border bg-gold-500/10 text-gold-400 border-gold-500/30">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border bg-blue-50 text-blue-700 border-blue-200">
                         👤 uppladdat av oss
                       </span>
                     )}
@@ -189,10 +189,10 @@ export default function UnderlagPage() {
                         title={u.verifikationer.fel ?? undefined}
                         className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
                           u.verifikationer.fel && !u.verifikationer.inlagda
-                            ? 'bg-red-500/10 text-red-400 border-red-500/30'
+                            ? 'bg-red-500/10 text-red-600 border-red-500/30'
                             : u.verifikationer.fel
-                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                            : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                            ? 'bg-amber-500/10 text-amber-700 border-amber-500/30'
+                            : 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30'
                         }`}
                       >
                         {u.verifikationer.fel && !u.verifikationer.inlagda
@@ -202,21 +202,21 @@ export default function UnderlagPage() {
                     )}
                   </div>
 
-                  <p className="text-warm-400 text-sm mt-1.5">
+                  <p className="text-slate-600 text-sm mt-1.5">
                     {u.personKey ? (
                       <Link
                         href={`/admin/person/${encodeURIComponent(u.personKey)}`}
-                        className="hover:text-gold-500 transition"
+                        className="hover:text-blue-700 transition"
                       >
                         {u.personName || u.personEmail}
                       </Link>
                     ) : (
-                      <span className="text-warm-600">Okänd avsändare</span>
+                      <span className="text-slate-400">Okänd avsändare</span>
                     )}
-                    {u.company && <span className="text-warm-600"> · {u.company}</span>}
+                    {u.company && <span className="text-slate-400"> · {u.company}</span>}
                   </p>
 
-                  <p className="text-warm-600 text-xs mt-1" title={fullDate(u.at)}>
+                  <p className="text-slate-400 text-xs mt-1" title={fullDate(u.at)}>
                     {relativeTime(u.at)}
                   </p>
                   <Varningar
@@ -233,7 +233,7 @@ export default function UnderlagPage() {
                   {isSieFile(u.fileName) && (
                     <Link
                       href={`/admin/underlag/${u.id}`}
-                      className="px-4 py-2 bg-gold-500/15 hover:bg-gold-500/25 border border-gold-500/30 text-gold-400 rounded-xl text-sm font-medium transition"
+                      className="px-4 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-xl text-sm font-medium transition"
                     >
                       Verifikationer
                     </Link>
@@ -243,7 +243,7 @@ export default function UnderlagPage() {
                       href={u.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-xl text-sm font-medium transition"
+                      className="px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-xl text-sm font-medium transition"
                     >
                       Öppna filen
                     </a>
@@ -251,12 +251,12 @@ export default function UnderlagPage() {
                   {u.url ? (
                     <a
                       href={`/api/admin/underlag/${u.id}/ladda-ner`}
-                      className="px-4 py-2 bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-xl text-sm font-medium transition"
+                      className="px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-xl text-sm font-medium transition"
                     >
                       Ladda ner
                     </a>
                   ) : (
-                    <span className="text-red-400 text-xs">Filen saknas i lagringen</span>
+                    <span className="text-red-600 text-xs">Filen saknas i lagringen</span>
                   )}
 
                   {(NEXT_STATUS[u.status] ?? []).map((step) => (
@@ -266,8 +266,8 @@ export default function UnderlagPage() {
                       disabled={busy === u.id}
                       className={`px-4 py-2 rounded-xl text-sm transition disabled:opacity-50 ${
                         step.primary
-                          ? 'bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold'
-                          : 'text-warm-500 hover:text-warm-300 font-medium'
+                          ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white font-bold'
+                          : 'text-slate-500 hover:text-slate-700 font-medium'
                       }`}
                     >
                       {step.label}
@@ -286,7 +286,7 @@ export default function UnderlagPage() {
                       <button
                         onClick={() => setConfirmDelete(null)}
                         disabled={busy === u.id}
-                        className="px-3 py-2 text-warm-500 hover:text-warm-300 rounded-xl text-sm font-medium transition disabled:opacity-50"
+                        className="px-3 py-2 text-slate-500 hover:text-slate-700 rounded-xl text-sm font-medium transition disabled:opacity-50"
                       >
                         Avbryt
                       </button>
@@ -295,7 +295,7 @@ export default function UnderlagPage() {
                     <button
                       onClick={() => setConfirmDelete(u.id)}
                       disabled={busy === u.id}
-                      className="px-3 py-2 text-red-400/70 hover:text-red-400 rounded-xl text-sm font-medium transition disabled:opacity-50"
+                      className="px-3 py-2 text-red-600 hover:text-red-600 rounded-xl text-sm font-medium transition disabled:opacity-50"
                     >
                       Radera
                     </button>

@@ -110,11 +110,11 @@ export default function SmsComposer({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
-      <div className="bg-navy-800 border border-navy-600 rounded-2xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
         {sentTo ? (
           <>
-            <h2 className="text-lg font-bold text-white">SMS skickat</h2>
-            <p className="text-warm-400 text-sm mt-1.5">
+            <h2 className="text-lg font-bold text-slate-900">SMS skickat</h2>
+            <p className="text-slate-600 text-sm mt-1.5">
               Gick i väg till {formatPhone(sentTo)}
               {targetName ? ` (${targetName})` : ''}. Det ligger nu i personens historik, och
               kommer det ett svar dyker AI:ns förslag upp bland utkasten.
@@ -126,13 +126,13 @@ export default function SmsComposer({
                   setText('');
                   if (!fixed) { setPicked(null); setQuery(''); }
                 }}
-                className="flex-1 py-2.5 bg-navy-700 text-warm-300 hover:text-white rounded-xl transition text-sm font-medium"
+                className="flex-1 py-2.5 bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl transition text-sm font-medium"
               >
                 Skriv ett till
               </button>
               <button
                 onClick={onClose}
-                className="flex-1 py-2.5 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all text-sm"
+                className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white font-bold rounded-xl transition-all text-sm"
               >
                 Klart
               </button>
@@ -140,19 +140,19 @@ export default function SmsComposer({
           </>
         ) : (
           <>
-            <h2 className="text-lg font-bold text-white">Nytt SMS</h2>
-            <p className="text-warm-400 text-sm mt-1.5">
+            <h2 className="text-lg font-bold text-slate-900">Nytt SMS</h2>
+            <p className="text-slate-600 text-sm mt-1.5">
               Texten går ut direkt när du trycker Skicka — det här är inget utkast.
             </p>
 
-            <label className="block text-xs font-semibold text-warm-400 uppercase tracking-widest mt-5 mb-2">
+            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-widest mt-5 mb-2">
               Till
             </label>
 
             {fixed ? (
-              <div className="bg-navy-700/50 border border-navy-600 rounded-xl px-4 py-3 text-sm text-white">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900">
                 {to?.name ? <span>{to.name} · </span> : null}
-                <span className="text-warm-300">{formatPhone(fixed)}</span>
+                <span className="text-slate-700">{formatPhone(fixed)}</span>
               </div>
             ) : (
               <>
@@ -161,20 +161,20 @@ export default function SmsComposer({
                   onChange={(e) => { setQuery(e.target.value); setPicked(null); setError(''); }}
                   placeholder="Sök namn eller skriv ett nummer"
                   autoFocus
-                  className="w-full px-4 py-2.5 bg-navy-700/50 border border-navy-600 text-white placeholder-warm-600 rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition text-sm"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm"
                 />
 
                 {matches.length > 0 && (
-                  <div className="mt-2 bg-navy-700/50 border border-navy-600 rounded-xl divide-y divide-navy-600/60 overflow-hidden">
+                  <div className="mt-2 bg-slate-50 border border-slate-200 rounded-xl divide-y divide-slate-200 overflow-hidden">
                     {matches.map((p) => (
                       <button
                         key={p.key}
                         onClick={() => { setPicked(p); setQuery(nameOf(p)); }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-navy-600/60 transition"
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-100 transition"
                       >
-                        <span className="text-white text-sm">{nameOf(p)}</span>
-                        <span className="text-warm-500 text-xs ml-2">{formatPhone(p.phone ?? '')}</span>
-                        {p.optedOut && <span className="text-red-400 text-[11px] ml-2">avregistrerad</span>}
+                        <span className="text-slate-900 text-sm">{nameOf(p)}</span>
+                        <span className="text-slate-500 text-xs ml-2">{formatPhone(p.phone ?? '')}</span>
+                        {p.optedOut && <span className="text-red-600 text-[11px] ml-2">avregistrerad</span>}
                       </button>
                     ))}
                   </div>
@@ -182,25 +182,25 @@ export default function SmsComposer({
 
                 {/* Numret som faktiskt skickas till, så en feltolkad inknappning
                     syns innan SMS:et går i väg. */}
-                <p className="text-warm-600 text-[11px] mt-1.5">
+                <p className="text-slate-400 text-[11px] mt-1.5">
                   {!query.trim() ? (
                     'Går även bra att skriva in ett nummer som inte finns i listan.'
                   ) : target ? (
                     <>Skickas till {formatPhone(target)}{targetName ? ` · ${targetName}` : ''}</>
                   ) : (
-                    <span className="text-red-400">Inget giltigt telefonnummer ännu</span>
+                    <span className="text-red-600">Inget giltigt telefonnummer ännu</span>
                   )}
                 </p>
               </>
             )}
 
             {optedOut && (
-              <p className="mt-3 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 text-red-400 text-xs">
+              <p className="mt-3 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 text-red-600 text-xs">
                 Numret har avregistrerat sig från SMS. Utskicket går inte igenom.
               </p>
             )}
 
-            <label className="block text-xs font-semibold text-warm-400 uppercase tracking-widest mt-5 mb-2">
+            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-widest mt-5 mb-2">
               Meddelande
             </label>
             <textarea
@@ -209,14 +209,14 @@ export default function SmsComposer({
               rows={6}
               autoFocus={!!fixed}
               placeholder="Skriv meddelandet här"
-              className="w-full bg-navy-700/50 border border-navy-600 text-warm-100 placeholder-warm-600 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition resize-y"
+              className="w-full bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition resize-y"
             />
-            <p className="text-warm-600 text-[11px] mt-1.5">
+            <p className="text-slate-400 text-[11px] mt-1.5">
               {text.length} tecken · {count} SMS{count > 1 ? ' (delas upp och debiteras styckvis)' : ''}
             </p>
 
             {error && (
-              <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
+              <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-600 text-sm">
                 {error}
               </div>
             )}
@@ -225,14 +225,14 @@ export default function SmsComposer({
               <button
                 onClick={onClose}
                 disabled={busy}
-                className="flex-1 py-2.5 bg-navy-700 text-warm-300 hover:text-white rounded-xl transition text-sm font-medium disabled:opacity-50"
+                className="flex-1 py-2.5 bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl transition text-sm font-medium disabled:opacity-50"
               >
                 Avbryt
               </button>
               <button
                 onClick={send}
                 disabled={busy || empty || !target || optedOut}
-                className="flex-1 py-2.5 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 font-bold rounded-xl transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white font-bold rounded-xl transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {busy ? 'Skickar...' : 'Skicka'}
               </button>

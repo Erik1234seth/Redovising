@@ -83,36 +83,36 @@ export default function SmsDraftsPage() {
     setBusy(null);
   };
 
-  if (loading) return <div className="text-center py-20 text-warm-400">Laddar...</div>;
+  if (loading) return <div className="text-center py-20 text-slate-600">Laddar...</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">SMS-utkast</h1>
-          <p className="text-warm-400 text-sm mt-1.5">
+          <h1 className="text-2xl font-bold text-slate-900">SMS-utkast</h1>
+          <p className="text-slate-600 text-sm mt-1.5">
             AI:n har skrivit svaren nedan men inget går ut förrän du trycker Skicka. Ändra
             texten om du vill. Personen väntar under tiden.
           </p>
         </div>
         <button
           onClick={() => setComposing(true)}
-          className="px-4 py-2 bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-xl text-sm font-medium transition shrink-0"
+          className="px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-xl text-sm font-medium transition shrink-0"
         >
           + Nytt SMS
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-600 text-sm">
           {error}
         </div>
       )}
 
       {drafts.length === 0 ? (
-        <div className="bg-navy-700/50 border border-navy-600 rounded-xl text-center py-16">
-          <p className="text-warm-300">Inga utkast väntar</p>
-          <p className="text-warm-600 text-xs mt-1.5">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl text-center py-16">
+          <p className="text-slate-700">Inga utkast väntar</p>
+          <p className="text-slate-400 text-xs mt-1.5">
             Nästa gång någon messar oss dyker AI:ns svar upp här.
           </p>
         </div>
@@ -126,47 +126,47 @@ export default function SmsDraftsPage() {
             const count = segments(text);
 
             return (
-              <div key={d.id} className="bg-navy-700/50 border border-navy-600 rounded-xl overflow-hidden">
+              <div key={d.id} className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
                 <div className="flex items-baseline justify-between gap-3 flex-wrap px-5 pt-4">
                   <Link
                     href={`/admin/person/${encodeURIComponent(`p:${d.phone}`)}`}
-                    className="text-white text-sm font-medium hover:text-gold-500 transition"
+                    className="text-slate-900 text-sm font-medium hover:text-blue-700 transition"
                   >
                     {formatPhone(d.phone)}
                   </Link>
-                  <span className="text-warm-600 text-[11px]" title={fullDate(d.at)}>
+                  <span className="text-slate-400 text-[11px]" title={fullDate(d.at)}>
                     utkast skrivet {relativeTime(d.at)}
                   </span>
                 </div>
 
                 {d.optedOut && (
-                  <p className="mx-5 mt-3 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-red-400 text-xs">
+                  <p className="mx-5 mt-3 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-red-600 text-xs">
                     Numret har avregistrerat sig från SMS. Utkastet går inte att skicka — släng det.
                   </p>
                 )}
 
                 {d.question && (
                   <div className="px-5 pt-3">
-                    <p className="text-warm-500 text-[11px] mb-1">
+                    <p className="text-slate-500 text-[11px] mb-1">
                       Personen skrev {d.questionAt ? relativeTime(d.questionAt) : ''}
                     </p>
-                    <p className="bg-navy-600/60 text-warm-100 text-sm rounded-lg px-3 py-2 whitespace-pre-wrap break-words">
+                    <p className="bg-slate-100 text-slate-900 text-sm rounded-lg px-3 py-2 whitespace-pre-wrap break-words">
                       {d.question}
                     </p>
                   </div>
                 )}
 
                 <div className="px-5 pt-3">
-                  <p className="text-warm-500 text-[11px] mb-1">AI:ns förslag</p>
+                  <p className="text-slate-500 text-[11px] mb-1">AI:ns förslag</p>
                   <textarea
                     value={text}
                     onChange={(e) => setBodies((b) => ({ ...b, [d.id]: e.target.value }))}
                     rows={Math.min(10, Math.max(3, text.split('\n').length + 1))}
-                    className="w-full bg-navy-800 border border-navy-600 text-warm-100 text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-gold-500 focus:border-gold-500 outline-none transition resize-y"
+                    className="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition resize-y"
                   />
-                  <p className="text-warm-600 text-[11px] mt-1.5">
+                  <p className="text-slate-400 text-[11px] mt-1.5">
                     {text.length} tecken · {count} SMS{count > 1 ? ' (delas upp och debiteras styckvis)' : ''}
-                    {edited && <span className="text-gold-500"> · ändrad</span>}
+                    {edited && <span className="text-blue-700"> · ändrad</span>}
                   </p>
                 </div>
 
@@ -174,21 +174,21 @@ export default function SmsDraftsPage() {
                   <button
                     onClick={() => act(d.id, 'POST')}
                     disabled={working || empty || d.optedOut}
-                    className="px-4 py-2 text-sm font-semibold bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-900 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-4 py-2 text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {working ? 'Skickar...' : 'Skicka'}
                   </button>
                   <button
                     onClick={() => act(d.id, 'PATCH')}
                     disabled={working || empty || !edited}
-                    className="px-3 py-2 text-sm text-warm-300 hover:text-white bg-navy-600/60 hover:bg-navy-600 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-3 py-2 text-sm text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-100 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Spara utan att skicka
                   </button>
                   <button
                     onClick={() => act(d.id, 'DELETE')}
                     disabled={working}
-                    className="px-3 py-2 text-sm bg-red-500/15 hover:bg-red-500/30 text-red-400 rounded-lg transition disabled:opacity-40 ml-auto"
+                    className="px-3 py-2 text-sm bg-red-500/15 hover:bg-red-500/30 text-red-600 rounded-lg transition disabled:opacity-40 ml-auto"
                   >
                     Släng
                   </button>
@@ -199,7 +199,7 @@ export default function SmsDraftsPage() {
         </div>
       )}
 
-      <p className="text-warm-600 text-xs">
+      <p className="text-slate-400 text-xs">
         Välkomst-SMS till nya leads går fortfarande ut direkt — de är en fast mall och
         hamnar aldrig här. Detsamma gäller det du själv skriver under + Nytt SMS.
       </p>

@@ -20,10 +20,10 @@ import { momsnrFranOrgnr } from '@/lib/momsnr';
 export const STATUS_STYLE: Record<BokslutStatus, {
   label: string; pill: string; bar: string; border: string; dot: string;
 }> = {
-  saknas: { label: 'Saknas', pill: 'bg-red-500/20 text-red-300', bar: 'bg-red-500', border: 'border-l-red-500', dot: 'bg-red-500' },
-  kolla: { label: 'Kolla', pill: 'bg-amber-500/20 text-amber-300', bar: 'bg-amber-400', border: 'border-l-amber-400', dot: 'bg-amber-400' },
-  klart: { label: 'Finns', pill: 'bg-emerald-500/20 text-emerald-300', bar: 'bg-emerald-500', border: 'border-l-emerald-500', dot: 'bg-emerald-500' },
-  ej: { label: 'Behövs inte', pill: 'bg-navy-600 text-warm-400', bar: 'bg-navy-500', border: 'border-l-navy-500', dot: 'bg-warm-600' },
+  saknas: { label: 'Saknas', pill: 'bg-red-500/20 text-red-700', bar: 'bg-red-500', border: 'border-l-red-500', dot: 'bg-red-500' },
+  kolla: { label: 'Kolla', pill: 'bg-amber-500/20 text-amber-700', bar: 'bg-amber-400', border: 'border-l-amber-400', dot: 'bg-amber-400' },
+  klart: { label: 'Finns', pill: 'bg-emerald-500/20 text-emerald-700', bar: 'bg-emerald-500', border: 'border-l-emerald-500', dot: 'bg-emerald-500' },
+  ej: { label: 'Behövs inte', pill: 'bg-slate-100 text-slate-600', bar: 'bg-slate-200', border: 'border-l-navy-500', dot: 'bg-slate-300' },
 };
 
 const ORDNING: BokslutStatus[] = ['saknas', 'kolla', 'klart', 'ej'];
@@ -215,12 +215,12 @@ export function BokslutChecklista(props: Props) {
       <section>
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <p className={`text-2xl font-bold ${per('saknas') ? 'text-white' : 'text-emerald-300'}`}>
+            <p className={`text-2xl font-bold ${per('saknas') ? 'text-slate-900' : 'text-emerald-700'}`}>
               {per('saknas') === 0 && per('kolla') === 0
                 ? '✓ Allt finns för bokslutet'
                 : `${per('klart')} av ${aktuella} klara`}
             </p>
-            <p className="text-warm-500 text-xs mt-1">
+            <p className="text-slate-500 text-xs mt-1">
               {[
                 per('saknas') && `${per('saknas')} saknas`,
                 per('kolla') && `${per('kolla')} att kolla`,
@@ -230,21 +230,21 @@ export function BokslutChecklista(props: Props) {
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             {ORDNING.map((s) => (
-              <span key={s} className="flex items-center gap-1.5 text-[11px] text-warm-400">
+              <span key={s} className="flex items-center gap-1.5 text-[11px] text-slate-600">
                 <span className={`w-2 h-2 rounded-full ${STATUS_STYLE[s].dot}`} />
                 {STATUS_STYLE[s].label}
               </span>
             ))}
           </div>
         </div>
-        <div className="flex h-2 rounded-full overflow-hidden mt-4 gap-0.5 bg-navy-800">
+        <div className="flex h-2 rounded-full overflow-hidden mt-4 gap-0.5 bg-white">
           {ORDNING.flatMap((s) => punkter.filter((p) => p.status === s)).map((p) => (
             <span key={p.id} title={p.label} className={`flex-1 ${STATUS_STYLE[p.status].bar}`} />
           ))}
         </div>
 
         {!kanSpara && (
-          <p className="mt-4 text-amber-300/90 text-xs bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+          <p className="mt-4 text-amber-700 text-xs bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
             Personen har inget konto än, så det mesta går inte att fylla i förrän kontot finns.
           </p>
         )}
@@ -264,23 +264,23 @@ export function BokslutChecklista(props: Props) {
           const ikon = saknas
             ? { tecken: '!', klass: 'bg-red-500 text-white', text: `${saknas} saknas` }
             : kolla
-            ? { tecken: '?', klass: 'bg-amber-400 text-navy-900', text: `${kolla} att kolla` }
+            ? { tecken: '?', klass: 'bg-amber-400 text-white', text: `${kolla} att kolla` }
             : { tecken: '✓', klass: 'bg-emerald-500 text-white', text: 'Allt klart' };
           return (
-            <section key={grupp} className="bg-navy-800/30 border border-navy-600 rounded-xl">
+            <section key={grupp} className="bg-white border border-slate-200 rounded-xl">
               <button
                 onClick={() => setOppna((l) => (oppen ? l.filter((g) => g !== grupp) : [...l, grupp]))}
                 aria-expanded={oppen}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-navy-700/40 rounded-xl transition"
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 rounded-xl transition"
               >
                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${ikon.klass}`}>
                   {ikon.tecken}
                 </span>
-                <span className="text-xs font-semibold text-warm-200 uppercase tracking-widest">{rubrik}</span>
-                <span className={`text-[11px] ${saknas ? 'text-red-300' : kolla ? 'text-amber-300' : 'text-emerald-300'}`}>
+                <span className="text-xs font-semibold text-slate-800 uppercase tracking-widest">{rubrik}</span>
+                <span className={`text-[11px] ${saknas ? 'text-red-700' : kolla ? 'text-amber-700' : 'text-emerald-700'}`}>
                   {ikon.text}
                 </span>
-                <span className={`ml-auto text-warm-500 transition-transform ${oppen ? 'rotate-90' : ''}`}>›</span>
+                <span className={`ml-auto text-slate-500 transition-transform ${oppen ? 'rotate-90' : ''}`}>›</span>
               </button>
               {oppen && (
                 <ul className="space-y-2 px-4 pb-4">
@@ -310,12 +310,12 @@ export function BokslutChecklista(props: Props) {
 function Rad({ punkt: p, children }: { punkt: BokslutPunkt; children: React.ReactNode }) {
   const stil = STATUS_STYLE[p.status];
   return (
-    <li className={`bg-navy-800/40 border border-navy-600 border-l-4 ${stil.border} rounded-lg px-4 py-3`}>
+    <li className={`bg-white border border-slate-200 border-l-4 ${stil.border} rounded-lg px-4 py-3`}>
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${stil.pill}`}>
           {stil.label}
         </span>
-        <span className="text-white text-sm font-semibold">{p.label}</span>
+        <span className="text-slate-900 text-sm font-semibold">{p.label}</span>
       </div>
       <div className="mt-2">{children}</div>
     </li>
@@ -335,7 +335,7 @@ function Atgard(props: Props & {
   const [utkast, setUtkast] = useState(p.id === 'orgnr' ? data?.orgNr ?? '' : person.verksamhet ?? '');
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const input = 'bg-navy-800 border border-navy-600 rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-warm-600 focus:outline-none focus:border-gold-500 transition disabled:opacity-50';
+  const input = 'bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition disabled:opacity-50';
 
   if (p.id === 'orgnr') {
     return (
@@ -353,9 +353,9 @@ function Atgard(props: Props & {
 
   if (p.id === 'momsnr') {
     return (
-      <p className={`text-sm ${p.status === 'saknas' ? 'text-red-300/90' : 'text-warm-200'}`}>
+      <p className={`text-sm ${p.status === 'saknas' ? 'text-red-700' : 'text-slate-800'}`}>
         <span className="font-mono">{p.vardet}</span>
-        {p.status === 'klart' && <span className="text-warm-600 text-[11px] ml-2">skrivs automatiskt ur organisationsnumret</span>}
+        {p.status === 'klart' && <span className="text-slate-400 text-[11px] ml-2">skrivs automatiskt ur organisationsnumret</span>}
       </p>
     );
   }
@@ -392,11 +392,11 @@ function Atgard(props: Props & {
             aria-pressed={v.vald}
             className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition disabled:opacity-50 ${
               v.vald
-                ? 'bg-gold-500/15 border-gold-500 text-gold-400 font-semibold'
-                : 'bg-navy-800/40 border-navy-600 text-warm-300 hover:border-warm-500'
+                ? 'bg-blue-50 border-blue-500 text-blue-700 font-semibold'
+                : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
             }`}
           >
-            <span className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 ${v.vald ? 'bg-gold-500 border-gold-500' : 'border-navy-500'}`} />
+            <span className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 ${v.vald ? 'bg-blue-600 border-blue-500' : 'border-slate-300'}`} />
             {v.label}
           </button>
         ))}
@@ -415,7 +415,7 @@ function Atgard(props: Props & {
 
   return (
     <>
-      <p className={`text-sm break-words ${p.status === 'saknas' ? 'text-red-300/90' : 'text-warm-300'}`}>
+      <p className={`text-sm break-words ${p.status === 'saknas' ? 'text-red-700' : 'text-slate-700'}`}>
         {behovsInte ? 'Markerad som att den inte behövs.' : p.vardet}
       </p>
 
@@ -426,7 +426,7 @@ function Atgard(props: Props & {
               key={f.id}
               href={`/api/admin/underlag/${f.id}/ladda-ner`}
               title={`Ladda ner · inkom ${fullDate(f.at)}`}
-              className="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 hover:bg-blue-500/25 text-[10px] font-semibold break-all transition"
+              className="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 hover:bg-blue-500/25 text-[10px] font-semibold break-all transition"
             >
               📎 {f.fileName}
             </a>
@@ -449,7 +449,7 @@ function Atgard(props: Props & {
           <button
             onClick={() => fileInput.current?.click()}
             disabled={!props.canUpload || !!props.uploading}
-            className="px-3 py-1.5 text-xs bg-gold-500/15 hover:bg-gold-500/25 border border-gold-500/30 text-gold-400 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {knapp}
           </button>
@@ -459,12 +459,12 @@ function Atgard(props: Props & {
           <button
             onClick={() => props.onStatus(behovsInte ? null : 'ej')}
             disabled={sparar}
-            className="px-3 py-1.5 text-xs bg-navy-700 hover:bg-navy-600 border border-navy-600 text-warm-300 rounded-lg transition disabled:opacity-50"
+            className="px-3 py-1.5 text-xs bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg transition disabled:opacity-50"
           >
             {behovsInte ? '↺ Behövs ändå' : uppladdning === 'ne' ? 'Behövs inte' : 'Har inget lager eller inventarier'}
           </button>
         )}
-        {props.uploading && <span className="text-gold-400 text-xs">Laddar upp {props.uploading}…</span>}
+        {props.uploading && <span className="text-blue-700 text-xs">Laddar upp {props.uploading}…</span>}
       </div>
     </>
   );

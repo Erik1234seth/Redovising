@@ -49,13 +49,13 @@ export default function SieFilPage() {
       .catch(() => { setError('Kunde inte hämta filen'); setLoading(false); });
   }, [id]);
 
-  if (loading) return <div className="text-center py-20 text-warm-400">Tolkar SIE-filen...</div>;
+  if (loading) return <div className="text-center py-20 text-slate-600">Tolkar SIE-filen...</div>;
 
   if (error || !sie || !underlag) {
     return (
       <div className="space-y-4">
-        <Link href="/admin/underlag" className="text-gold-500 hover:text-gold-400 text-sm transition">← Underlag</Link>
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+        <Link href="/admin/underlag" className="text-blue-700 hover:text-blue-700 text-sm transition">← Underlag</Link>
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-600 text-sm">
           {error || 'Hittade inget sådant underlag'}
         </div>
       </div>
@@ -70,25 +70,25 @@ export default function SieFilPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/underlag" className="text-gold-500 hover:text-gold-400 text-sm transition">← Underlag</Link>
-        <h1 className="text-2xl font-bold text-white mt-4 break-words">
+        <Link href="/admin/underlag" className="text-blue-700 hover:text-blue-700 text-sm transition">← Underlag</Link>
+        <h1 className="text-2xl font-bold text-slate-900 mt-4 break-words">
           {header.foretag || underlag.fileName}
         </h1>
-        <p className="text-warm-400 text-sm mt-1.5">
+        <p className="text-slate-600 text-sm mt-1.5">
           {[
             header.orgnr && `Org.nr ${header.orgnr}`,
             current && `Räkenskapsår ${current.start} – ${current.slut}`,
             header.program && `Exporterad från ${header.program}`,
           ].filter(Boolean).join(' · ') || 'Inga företagsuppgifter i filen'}
         </p>
-        <p className="text-warm-600 text-xs mt-1">
+        <p className="text-slate-400 text-xs mt-1">
           {underlag.fileName} · inkom {fullDate(underlag.at)}
           {header.genererad && ` · filen skapad ${header.genererad}`}
           {` · ${sie.teckenkodning}`}
           {personHref && (
             <>
               {' · '}
-              <Link href={personHref} className="text-gold-500 hover:text-gold-400 transition">{underlag.personEmail}</Link>
+              <Link href={personHref} className="text-blue-700 hover:text-blue-700 transition">{underlag.personEmail}</Link>
             </>
           )}
         </p>
@@ -99,16 +99,16 @@ export default function SieFilPage() {
         <div className={`rounded-xl border p-4 text-sm flex items-center justify-between gap-3 flex-wrap ${
           imp.fel ? 'bg-red-500/10 border-red-500/40' : 'bg-emerald-500/10 border-emerald-500/30'
         }`}>
-          <p className={imp.fel ? 'text-red-300' : 'text-emerald-300'}>
+          <p className={imp.fel ? 'text-red-700' : 'text-emerald-700'}>
             {imp.fel
               ? `Verifikationerna kunde inte läggas in: ${imp.fel}`
               : `✓ ${imp.inlagda} ${imp.inlagda === 1 ? 'verifikation inlagd' : 'verifikationer inlagda'} hos kunden`}
             {imp.dubbletter > 0 && (
-              <span className="text-warm-400"> · {imp.dubbletter} fanns redan från en tidigare fil</span>
+              <span className="text-slate-600"> · {imp.dubbletter} fanns redan från en tidigare fil</span>
             )}
           </p>
           {personHref && !imp.fel && (
-            <Link href={`${personHref}#verifikationer`} className="text-gold-500 hover:text-gold-400 text-xs transition">
+            <Link href={`${personHref}#verifikationer`} className="text-blue-700 hover:text-blue-700 text-xs transition">
               Kundens verifikationer →
             </Link>
           )}
@@ -117,7 +117,7 @@ export default function SieFilPage() {
 
       {sie.varningar.length > 0 && (
         <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 text-sm space-y-1">
-          {sie.varningar.map((w, i) => <p key={i} className="text-red-300">{w}</p>)}
+          {sie.varningar.map((w, i) => <p key={i} className="text-red-700">{w}</p>)}
         </div>
       )}
 

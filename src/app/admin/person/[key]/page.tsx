@@ -427,13 +427,13 @@ export default function PersonPage() {
     load();
   };
 
-  if (loading) return <div className="text-center py-20 text-warm-400">Laddar...</div>;
+  if (loading) return <div className="text-center py-20 text-slate-600">Laddar...</div>;
 
   if (error || !person) {
     return (
       <div className="space-y-4">
-        <Link href="/admin" className="text-gold-500 hover:text-gold-400 text-sm transition">← Alla personer</Link>
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+        <Link href="/admin" className="text-blue-700 hover:text-blue-700 text-sm transition">← Alla personer</Link>
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-600 text-sm">
           {error || 'Hittade ingen sådan person'}
         </div>
       </div>
@@ -460,11 +460,11 @@ export default function PersonPage() {
     return (
       <>
         {id === 'kontext' && !person.redovisningsmetod && (
-          <span title="Bokföringsmetoden är inte ifylld än" className="w-1.5 h-1.5 rounded-full bg-warm-600 shrink-0" />
+          <span title="Bokföringsmetoden är inte ifylld än" className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />
         )}
         {id === 'kontext' && (
           <span className={`px-1.5 rounded text-[10px] font-bold shrink-0 normal-case tracking-normal ${
-            person.issues.length > 0 ? 'bg-red-500 text-white' : 'bg-navy-600 text-warm-300'
+            person.issues.length > 0 ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-700'
           }`}>
             {events.length}
           </span>
@@ -475,29 +475,29 @@ export default function PersonPage() {
           <span
             title={saknas ? `${saknas} saknas inför bokslutet` : kolla ? `${kolla} att kolla` : 'Allt finns'}
             className={`px-1.5 rounded text-[10px] font-bold shrink-0 normal-case tracking-normal ${
-              saknas ? 'bg-red-500 text-white' : kolla ? 'bg-amber-400 text-navy-900' : 'bg-emerald-500 text-white'
+              saknas ? 'bg-red-500 text-white' : kolla ? 'bg-amber-400 text-white' : 'bg-emerald-500 text-white'
             }`}
           >
             {saknas || kolla || '✓'}
           </span>
         )}
         {id === 'konversationer' && mail.length > 0 && (
-          <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
+          <span className="px-1.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 shrink-0 normal-case tracking-normal">
             {mail.length}
           </span>
         )}
         {id === 'underlag' && underlag.length > 0 && (
-          <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
+          <span className="px-1.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 shrink-0 normal-case tracking-normal">
             {underlag.length}
           </span>
         )}
         {id === 'transaktioner' && transaktionerCount > 0 && (
-          <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
+          <span className="px-1.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 shrink-0 normal-case tracking-normal">
             {transaktionerCount.toLocaleString('sv-SE')}
           </span>
         )}
         {id === 'verifikationer' && verifikationerCount > 0 && (
-          <span className="px-1.5 rounded text-[10px] font-bold bg-navy-600 text-warm-300 shrink-0 normal-case tracking-normal">
+          <span className="px-1.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 shrink-0 normal-case tracking-normal">
             {verifikationerCount.toLocaleString('sv-SE')}
           </span>
         )}
@@ -508,26 +508,26 @@ export default function PersonPage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/admin" className="text-gold-500 hover:text-gold-400 text-sm transition">← Alla personer</Link>
+        <Link href="/admin" className="text-blue-700 hover:text-blue-700 text-sm transition">← Alla personer</Link>
 
         <div className="flex items-start justify-between gap-4 mt-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold text-white truncate">
+              <h1 className="text-2xl font-bold text-slate-900 truncate">
                 {person.name || person.email || (person.phone ? formatPhone(person.phone) : '—')}
               </h1>
               <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${
-                person.isCustomer ? 'bg-green-500/20 text-green-400' : 'bg-purple-500/20 text-purple-400'
+                person.isCustomer ? 'bg-green-500/20 text-green-600' : 'bg-purple-500/20 text-purple-400'
               }`}>
                 {person.isCustomer ? 'Kund' : 'Prospekt'}
               </span>
               {person.optedOut && (
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-red-500/20 text-red-400">
+                <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-red-500/20 text-red-600">
                   Avregistrerad från SMS
                 </span>
               )}
             </div>
-            <p className="text-warm-400 text-sm mt-1.5">
+            <p className="text-slate-600 text-sm mt-1.5">
               {[
                 person.email,
                 person.phone && formatPhone(person.phone),
@@ -535,15 +535,15 @@ export default function PersonPage() {
                 person.source && `via ${person.source}`,
               ].filter(Boolean).join(' · ') || '—'}
             </p>
-            <p className="text-warm-600 text-xs mt-1">
+            <p className="text-slate-400 text-xs mt-1">
               {person.emailCount} mejl · {person.smsCount} SMS · först sedd {fullDate(person.firstSeen)}
             </p>
 
             {(other.emails.length > 0 || other.phones.length > 0) && (
-              <p className="text-warm-600 text-xs mt-2">
+              <p className="text-slate-400 text-xs mt-2">
                 Även:{' '}
                 {[...other.emails, ...other.phones.map(formatPhone)].join(' · ')}
-                <span className="block mt-0.5 text-warm-700">
+                <span className="block mt-0.5 text-slate-400">
                   Raderna slogs ihop för att de delar mejl eller telefonnummer.
                 </span>
               </p>
@@ -556,14 +556,14 @@ export default function PersonPage() {
                 onClick={() => setMessaging(true)}
                 disabled={person.optedOut}
                 title={person.optedOut ? 'Numret har avregistrerat sig från SMS' : undefined}
-                className="px-3 py-1.5 text-xs bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-xs bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 + SMS
               </button>
             )}
             <button
               onClick={() => setDeleting(true)}
-              className="px-3 py-1.5 text-xs bg-red-500/15 hover:bg-red-500/30 text-red-400 rounded-lg transition"
+              className="px-3 py-1.5 text-xs bg-red-500/15 hover:bg-red-500/30 text-red-600 rounded-lg transition"
             >
               Ta bort
             </button>
@@ -576,7 +576,7 @@ export default function PersonPage() {
       {person.issues.length > 0 && (
         <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-5">
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h2 className="text-red-400 font-bold text-sm flex items-center gap-2">
+            <h2 className="text-red-600 font-bold text-sm flex items-center gap-2">
               ⚠ {person.issues.length === 1
                 ? 'Ett utskick gick inte som det skulle'
                 : `${person.issues.length} utskick gick inte som de skulle`}
@@ -585,7 +585,7 @@ export default function PersonPage() {
               <button
                 onClick={() => setDismissed(person.issues.map((x) => ({ channel: x.channel, id: x.id })), true)}
                 disabled={savingIssue}
-                className="px-3 py-1 text-xs font-medium bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-lg transition disabled:opacity-50"
+                className="px-3 py-1 text-xs font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-lg transition disabled:opacity-50"
               >
                 ✓ Markera alla som hanterade
               </button>
@@ -595,31 +595,31 @@ export default function PersonPage() {
             {person.issues.map((x) => (
               <li key={x.id} className="text-sm">
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                  <span className="text-white font-medium">
+                  <span className="text-slate-900 font-medium">
                     {x.channel === 'mejl' ? '✉' : '💬'} {x.what}
                   </span>
                   <span className="flex items-center gap-3 shrink-0">
-                    <span className="text-warm-500 text-[11px]">{fullDate(x.at)}</span>
+                    <span className="text-slate-500 text-[11px]">{fullDate(x.at)}</span>
                     <button
                       onClick={() => setDismissed([{ channel: x.channel, id: x.id }], true)}
                       disabled={savingIssue}
-                      className="px-2 py-0.5 text-[11px] font-medium text-warm-300 hover:text-white bg-navy-700/80 hover:bg-navy-600 rounded-md transition disabled:opacity-50"
+                      className="px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-md transition disabled:opacity-50"
                     >
                       ✓ Hanterat
                     </button>
                   </span>
                 </div>
-                <p className="text-red-300/90 mt-0.5">{x.reason}</p>
+                <p className="text-red-700 mt-0.5">{x.reason}</p>
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      <div className="bg-navy-700/50 border border-navy-600 rounded-xl">
+      <div className="bg-slate-50 border border-slate-200 rounded-xl">
         {/* Fliknamnen bär små märken så att en tom bokföringsmetod eller en
             handpåkopplad adress syns utan att man öppnar fliken först. */}
-        <div className="flex flex-wrap border-b border-navy-600">
+        <div className="flex flex-wrap border-b border-slate-200">
           {TABS.filter((t) => !BOKFORING.includes(t.id)).map((t) => {
             const active = tab === t.id;
             return (
@@ -629,8 +629,8 @@ export default function PersonPage() {
                 aria-current={active ? 'true' : undefined}
                 className={`flex items-center gap-1.5 px-4 sm:px-5 py-3 text-xs font-semibold uppercase tracking-widest whitespace-nowrap border-b-2 -mb-px transition ${
                   active
-                    ? 'border-gold-500 text-gold-400'
-                    : 'border-transparent text-warm-500 hover:text-warm-300'
+                    ? 'border-blue-500 text-blue-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
                 }`}
               >
                 {t.label}
@@ -647,8 +647,8 @@ export default function PersonPage() {
               aria-current={BOKFORING.includes(tab) ? 'true' : undefined}
               className={`flex items-center gap-1.5 px-4 sm:px-5 py-3 text-xs font-semibold uppercase tracking-widest whitespace-nowrap border-b-2 -mb-px transition ${
                 BOKFORING.includes(tab)
-                  ? 'border-gold-500 text-gold-400'
-                  : 'border-transparent text-warm-500 hover:text-warm-300'
+                  ? 'border-blue-500 text-blue-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
               {BOKFORING.includes(tab) ? TABS.find((t) => t.id === tab)?.label : 'Bokföring'}
@@ -656,13 +656,13 @@ export default function PersonPage() {
               <span className={`text-[9px] transition ${menyOppen ? 'rotate-180' : ''}`}>▼</span>
             </button>
             {menyOppen && (
-              <div className="absolute left-0 top-full mt-1 z-20 min-w-[200px] bg-navy-800 border border-navy-600 rounded-lg shadow-xl py-1">
+              <div className="absolute left-0 top-full mt-1 z-20 min-w-[200px] bg-white border border-slate-200 rounded-lg shadow-xl py-1">
                 {TABS.filter((t) => BOKFORING.includes(t.id)).map((t) => (
                   <button
                     key={t.id}
                     onClick={() => { selectTab(t.id); setMenyOppen(false); }}
                     className={`w-full flex items-center justify-between gap-3 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-left transition ${
-                      tab === t.id ? 'text-gold-400 bg-navy-700/60' : 'text-warm-400 hover:text-warm-200 hover:bg-navy-700/40'
+                      tab === t.id ? 'text-blue-700 bg-slate-50' : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
                     }`}
                   >
                     {t.label}
@@ -681,11 +681,11 @@ export default function PersonPage() {
           {tab === 'kontext' && (
             <div className="space-y-8">
               <section>
-                <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">Verksamhet</h3>
+                <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-4">Verksamhet</h3>
                 {person.verksamhet ? (
-                  <p className="text-warm-100 text-sm whitespace-pre-wrap break-words">{person.verksamhet}</p>
+                  <p className="text-slate-900 text-sm whitespace-pre-wrap break-words">{person.verksamhet}</p>
                 ) : (
-                  <p className="text-warm-500 text-sm">
+                  <p className="text-slate-500 text-sm">
                     Ingen verksamhetsbeskrivning ifylld{person.isCustomer ? '' : ' — personen har inget konto än'}.
                   </p>
                 )}
@@ -693,8 +693,8 @@ export default function PersonPage() {
 
               {/* Kontantmetoden eller faktureringsmetoden. Är inget valt står
                   korten tomma tills någon klickar i ett — vi gissar inte åt kunden. */}
-              <section className="pt-6 border-t border-navy-600">
-                <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">Bokföringsmetod</h3>
+              <section className="pt-6 border-t border-slate-200">
+                <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-4">Bokföringsmetod</h3>
                 {person.profileId || person.contactId ? (
                   <>
                     <div className="grid sm:grid-cols-2 gap-3">
@@ -709,41 +709,41 @@ export default function PersonPage() {
                             title={chosen ? 'Klicka igen för att ta bort valet' : undefined}
                             className={`text-left rounded-xl border p-4 transition disabled:opacity-60 ${
                               chosen
-                                ? 'bg-gold-500/15 border-gold-500 ring-1 ring-gold-500/30'
-                                : 'bg-navy-800/40 border-navy-600 hover:border-warm-500'
+                                ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500/30'
+                                : 'bg-white border-slate-200 hover:border-slate-300'
                             }`}
                           >
                             <div className="flex items-center gap-2">
                               <span className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
-                                chosen ? 'bg-gold-500 border-gold-500' : 'border-navy-500'
+                                chosen ? 'bg-blue-600 border-blue-500' : 'border-slate-300'
                               }`}>
-                                {chosen && <span className="text-navy-900 text-[9px] font-bold leading-none">✓</span>}
+                                {chosen && <span className="text-slate-900 text-[9px] font-bold leading-none">✓</span>}
                               </span>
-                              <span className={`text-sm font-semibold ${chosen ? 'text-gold-400' : 'text-warm-200'}`}>
+                              <span className={`text-sm font-semibold ${chosen ? 'text-blue-700' : 'text-slate-800'}`}>
                                 {m.label}
                               </span>
                             </div>
-                            <p className="text-warm-500 text-xs mt-2 leading-relaxed">{m.hint}</p>
+                            <p className="text-slate-500 text-xs mt-2 leading-relaxed">{m.hint}</p>
                           </button>
                         );
                       })}
                     </div>
-                    <p className="text-warm-600 text-xs mt-3">
+                    <p className="text-slate-400 text-xs mt-3">
                       {person.profileId
                         ? 'Sparas på kundens konto.'
                         : 'Personen har inget konto än — valet sparas på kontaktförfrågan och följer med när kontot skapas.'}
                     </p>
                   </>
                 ) : (
-                  <p className="text-warm-500 text-sm">
+                  <p className="text-slate-500 text-sm">
                     Varken konto eller kontaktförfrågan är kopplad, så det finns ingen rad att spara metoden
                     på. Personen syns här för att vi har mejlat eller messat numret.
                   </p>
                 )}
               </section>
 
-              <section className="pt-6 border-t border-navy-600">
-                <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">Momsperiod</h3>
+              <section className="pt-6 border-t border-slate-200">
+                <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-4">Momsperiod</h3>
                 {person.profileId ? (
                   <>
                     <div className="grid grid-cols-3 gap-3">
@@ -757,23 +757,23 @@ export default function PersonPage() {
                             aria-pressed={chosen}
                             className={`flex items-center gap-2 rounded-xl border px-4 py-3 transition disabled:opacity-60 ${
                               chosen
-                                ? 'bg-gold-500/15 border-gold-500 ring-1 ring-gold-500/30'
-                                : 'bg-navy-800/40 border-navy-600 hover:border-warm-500'
+                                ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500/30'
+                                : 'bg-white border-slate-200 hover:border-slate-300'
                             }`}
                           >
                             <span className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
-                              chosen ? 'bg-gold-500 border-gold-500' : 'border-navy-500'
+                              chosen ? 'bg-blue-600 border-blue-500' : 'border-slate-300'
                             }`}>
-                              {chosen && <span className="text-navy-900 text-[9px] font-bold leading-none">✓</span>}
+                              {chosen && <span className="text-slate-900 text-[9px] font-bold leading-none">✓</span>}
                             </span>
-                            <span className={`text-sm font-semibold ${chosen ? 'text-gold-400' : 'text-warm-200'}`}>
+                            <span className={`text-sm font-semibold ${chosen ? 'text-blue-700' : 'text-slate-800'}`}>
                               {m.label}
                             </span>
                           </button>
                         );
                       })}
                     </div>
-                    <p className="text-warm-600 text-xs mt-3">
+                    <p className="text-slate-400 text-xs mt-3">
                       {person.momsPeriod === 'ingen-moms'
                         ? 'Kunden angav att de inte redovisar moms. Välj en period ovan om det var fel.'
                         : person.momsPeriod
@@ -782,7 +782,7 @@ export default function PersonPage() {
                     </p>
                   </>
                 ) : (
-                  <p className="text-warm-500 text-sm">
+                  <p className="text-slate-500 text-sm">
                     Personen har inget konto än — momsperioden väljs i onboardingen.
                   </p>
                 )}
@@ -790,8 +790,8 @@ export default function PersonPage() {
 
               {/* Vilket konto kunden betalar från. Konteringen bokför mot 1930
                   vid företagskonto, och mot 2017/2013 vid privatkonto. */}
-              <section className="pt-6 border-t border-navy-600">
-                <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">Betalar via</h3>
+              <section className="pt-6 border-t border-slate-200">
+                <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-4">Betalar via</h3>
                 {person.profileId ? (
                   <>
                     <div className="grid grid-cols-2 gap-3 max-w-md">
@@ -808,23 +808,23 @@ export default function PersonPage() {
                             aria-pressed={chosen}
                             className={`flex items-center gap-2 rounded-xl border px-4 py-3 transition disabled:opacity-60 ${
                               chosen
-                                ? 'bg-gold-500/15 border-gold-500 ring-1 ring-gold-500/30'
-                                : 'bg-navy-800/40 border-navy-600 hover:border-warm-500'
+                                ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500/30'
+                                : 'bg-white border-slate-200 hover:border-slate-300'
                             }`}
                           >
                             <span className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
-                              chosen ? 'bg-gold-500 border-gold-500' : 'border-navy-500'
+                              chosen ? 'bg-blue-600 border-blue-500' : 'border-slate-300'
                             }`}>
-                              {chosen && <span className="text-navy-900 text-[9px] font-bold leading-none">✓</span>}
+                              {chosen && <span className="text-slate-900 text-[9px] font-bold leading-none">✓</span>}
                             </span>
-                            <span className={`text-sm font-semibold ${chosen ? 'text-gold-400' : 'text-warm-200'}`}>
+                            <span className={`text-sm font-semibold ${chosen ? 'text-blue-700' : 'text-slate-800'}`}>
                               {m.label}
                             </span>
                           </button>
                         );
                       })}
                     </div>
-                    <p className="text-warm-600 text-xs mt-3">
+                    <p className="text-slate-400 text-xs mt-3">
                       {person.betalsatt === 'bada'
                         ? 'Kunden angav att de betalar från både företags- och privatkonto — betalkontot väljs per rad i konteringen. Välj ett ovan om det ska gälla alla.'
                         : person.betalsatt
@@ -833,14 +833,14 @@ export default function PersonPage() {
                     </p>
                   </>
                 ) : (
-                  <p className="text-warm-500 text-sm">Personen har inget konto än — det väljs i onboardingen.</p>
+                  <p className="text-slate-500 text-sm">Personen har inget konto än — det väljs i onboardingen.</p>
                 )}
               </section>
 
-              <section className="pt-6 border-t border-navy-600">
-                <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">Historik</h3>
+              <section className="pt-6 border-t border-slate-200">
+                <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-4">Historik</h3>
                 {events.length === 0 ? (
-                  <p className="text-warm-500 text-sm">Inget registrerat ännu.</p>
+                  <p className="text-slate-500 text-sm">Inget registrerat ännu.</p>
                 ) : (
                   <>
                     <div className="space-y-0">
@@ -852,31 +852,31 @@ export default function PersonPage() {
                             {/* Tidslinjens streck */}
                             <div className="flex flex-col items-center shrink-0 pt-1.5">
                               <span className={`w-2.5 h-2.5 rounded-full ${style.dot} shrink-0`} />
-                              {!last && <span className="w-px flex-1 bg-navy-600 my-1" />}
+                              {!last && <span className="w-px flex-1 bg-slate-100 my-1" />}
                             </div>
 
                             <div className={`min-w-0 flex-1 ${last ? '' : 'pb-5'} ${
                               e.bad ? 'border-l-2 border-red-500 -ml-2 pl-2' : ''
                             }`}>
                               <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                                <span className={`text-sm font-medium ${e.bad ? 'text-red-400' : 'text-white'}`}>
+                                <span className={`text-sm font-medium ${e.bad ? 'text-red-600' : 'text-slate-900'}`}>
                                   {e.bad && '⚠ '}{e.title}
                                 </span>
-                                <span className="text-warm-600 text-[11px] shrink-0">{fullDate(e.at)}</span>
+                                <span className="text-slate-400 text-[11px] shrink-0">{fullDate(e.at)}</span>
                               </div>
                               <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-warm-500 text-[11px]">{style.label}</span>
+                                <span className="text-slate-500 text-[11px]">{style.label}</span>
                                 {e.meta && (
-                                  <span className={`text-[11px] ${e.bad ? 'text-red-400' : 'text-warm-600'}`}>· {e.meta}</span>
+                                  <span className={`text-[11px] ${e.bad ? 'text-red-600' : 'text-slate-400'}`}>· {e.meta}</span>
                                 )}
                               </div>
                               {e.detail && (
                                 <p className={`mt-2 text-sm whitespace-pre-wrap break-words rounded-lg px-3 py-2 ${
                                   e.bad
-                                    ? 'bg-red-500/10 text-red-200'
+                                    ? 'bg-red-500/10 text-red-800'
                                     : e.type === 'sms_in'
-                                    ? 'bg-navy-600/60 text-warm-100'
-                                    : 'bg-navy-800/60 text-warm-300'
+                                    ? 'bg-slate-100 text-slate-900'
+                                    : 'bg-white text-slate-700'
                                 }`}>
                                   {e.detail}
                                 </p>
@@ -885,17 +885,17 @@ export default function PersonPage() {
                                 <button
                                   onClick={() => setDismissed([{ channel: e.issue!.channel, id: e.issue!.id }], !e.issue!.dismissed)}
                                   disabled={savingIssue}
-                                  className="mt-1.5 mr-3 text-[11px] text-warm-500 hover:text-white transition disabled:opacity-50"
+                                  className="mt-1.5 mr-3 text-[11px] text-slate-500 hover:text-slate-900 transition disabled:opacity-50"
                                 >
                                   {e.issue.dismissed ? '↺ Markera som fel igen' : '✓ Markera som hanterat'}
                                 </button>
                               )}
                               {e.technical && (
                                 <details className="mt-1.5">
-                                  <summary className="text-warm-600 text-[11px] cursor-pointer hover:text-warm-400">
+                                  <summary className="text-slate-400 text-[11px] cursor-pointer hover:text-slate-600">
                                     Visa tekniskt fel
                                   </summary>
-                                  <pre className="mt-1 text-[11px] text-warm-500 bg-navy-800/60 rounded-lg px-3 py-2 whitespace-pre-wrap break-all">
+                                  <pre className="mt-1 text-[11px] text-slate-500 bg-white rounded-lg px-3 py-2 whitespace-pre-wrap break-all">
                                     {e.technical}
                                   </pre>
                                 </details>
@@ -906,7 +906,7 @@ export default function PersonPage() {
                       })}
                     </div>
 
-                    <p className="text-warm-600 text-xs mt-5">
+                    <p className="text-slate-400 text-xs mt-5">
                       Mejl loggas sedan 20 aug 2026. Äldre utskick finns inte registrerade.
                     </p>
                   </>
@@ -932,7 +932,7 @@ export default function PersonPage() {
           )}
           {tab === 'bokslut' && (
             verifikationerError
-              ? <p className="text-red-400 text-sm mt-8">{verifikationerError}</p>
+              ? <p className="text-red-600 text-sm mt-8">{verifikationerError}</p>
               : <NeBilaga verifikationer={verifikationer} person={person} data={bokslut} onData={setBokslut} onError={setError} />
           )}
 
@@ -946,8 +946,8 @@ export default function PersonPage() {
                   delar mejl eller telefon av sig själv — det här är för kunden som
                   svarat från en adress vi aldrig sett, där det inte finns något
                   att haka i. */}
-              <div className="mt-8 pt-6 border-t border-navy-600">
-                <h3 className="text-xs font-semibold text-warm-400 uppercase tracking-widest mb-4">
+              <div className="mt-8 pt-6 border-t border-slate-200">
+                <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-4">
                   Mejladresser
                 </h3>
 
@@ -957,22 +957,22 @@ export default function PersonPage() {
                       och ska inte stå två gånger. */}
                   {!person.manualEmails.some((m) => m.email === person.email) && (
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-warm-100 break-all">{person.email || '—'}</span>
-                      <span className="text-warm-600 text-[11px] shrink-0">huvudadress</span>
+                      <span className="text-slate-900 break-all">{person.email || '—'}</span>
+                      <span className="text-slate-400 text-[11px] shrink-0">huvudadress</span>
                     </div>
                   )}
 
                   {person.manualEmails.map((m) => (
                     <div key={m.id} className="flex items-center gap-2 text-sm">
-                      <span className="text-warm-100 break-all">{m.email}</span>
-                      <span className="text-warm-600 text-[11px] shrink-0">
+                      <span className="text-slate-900 break-all">{m.email}</span>
+                      <span className="text-slate-400 text-[11px] shrink-0">
                         {m.email === person.email ? 'huvudadress · tillagd för hand' : 'tillagd för hand'}
                       </span>
                       <button
                         onClick={() => removeEmail(m.id)}
                         disabled={savingEmail}
                         title="Ta bort kopplingen"
-                        className="ml-auto shrink-0 px-2 py-0.5 text-[11px] text-warm-600 hover:text-red-400 rounded transition disabled:opacity-40"
+                        className="ml-auto shrink-0 px-2 py-0.5 text-[11px] text-slate-400 hover:text-red-600 rounded transition disabled:opacity-40"
                       >
                         Ta bort
                       </button>
@@ -987,18 +987,18 @@ export default function PersonPage() {
                     onChange={(e) => setNewEmail(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') addEmail(); }}
                     placeholder="annan.adress@exempel.se"
-                    className="flex-1 min-w-0 bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-warm-600 focus:outline-none focus:border-gold-500 transition"
+                    className="flex-1 min-w-0 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition"
                   />
                   <button
                     onClick={addEmail}
                     disabled={savingEmail || !newEmail.trim()}
-                    className="shrink-0 px-4 py-2 text-sm bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="shrink-0 px-4 py-2 text-sm bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Koppla
                   </button>
                 </div>
 
-                <p className="text-warm-600 text-xs mt-3 leading-relaxed">
+                <p className="text-slate-400 text-xs mt-3 leading-relaxed">
                   Allt som redan kommit in på adressen flyttas hit när du kopplar den, och personen
                   försvinner ur listan som en egen rad.{' '}
                   {person.profileId
@@ -1021,12 +1021,12 @@ export default function PersonPage() {
                 if (canUpload) uploadFiles([...e.dataTransfer.files]);
               }}
               className={`-m-2 p-2 rounded-xl border border-dashed transition ${
-                dragging ? 'border-gold-500 bg-gold-500/5' : 'border-transparent'
+                dragging ? 'border-blue-500 bg-blue-50' : 'border-transparent'
               }`}
             >
               <div className="flex items-center justify-end gap-3 mb-4 flex-wrap">
                 {underlag.length > 0 && (
-                  <Link href="/admin/underlag" className="text-gold-500 hover:text-gold-400 text-xs transition mr-auto">
+                  <Link href="/admin/underlag" className="text-blue-700 hover:text-blue-700 text-xs transition mr-auto">
                     Öppna underlagen →
                   </Link>
                 )}
@@ -1035,7 +1035,7 @@ export default function PersonPage() {
                     <button
                       onClick={() => setValda(valda.length === lasbara.length ? [] : lasbara.map((f) => f.id))}
                       disabled={!!laser}
-                      className="text-warm-500 hover:text-warm-300 text-xs transition disabled:opacity-40"
+                      className="text-slate-500 hover:text-slate-700 text-xs transition disabled:opacity-40"
                     >
                       {valda.length === lasbara.length ? 'Avmarkera alla' : 'Markera alla'}
                     </button>
@@ -1043,7 +1043,7 @@ export default function PersonPage() {
                       onClick={lasUtTransaktioner}
                       disabled={valda.length === 0 || !!laser}
                       title="Låter en AI läsa filerna. Kvitton och kontoutdrag blir transaktioner. Redan bokförda underlag med konton blir verifikationer."
-                      className="px-3 py-1.5 text-xs bg-gold-500/15 hover:bg-gold-500/25 border border-gold-500/30 text-gold-400 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="px-3 py-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {laser ? 'Läser…' : `Läs av med AI${valda.length ? ` (${valda.length})` : ''}`}
                     </button>
@@ -1060,28 +1060,28 @@ export default function PersonPage() {
                   onClick={() => fileInput.current?.click()}
                   disabled={!canUpload || !!uploading}
                   title={canUpload ? 'Eller dra och släpp filer i fliken' : 'Personen har varken konto eller mejladress'}
-                  className="px-3 py-1.5 text-xs bg-navy-700 hover:bg-navy-600 border border-navy-600 text-white rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 text-xs bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   + Ladda upp
                 </button>
               </div>
 
               {uploading && (
-                <p className="text-gold-400 text-xs mb-3">Laddar upp {uploading}…</p>
+                <p className="text-blue-700 text-xs mb-3">Laddar upp {uploading}…</p>
               )}
 
               {laser && (
-                <p className="text-gold-400 text-xs mb-3">
+                <p className="text-blue-700 text-xs mb-3">
                   AI:n läser {laser}… Ett stort kontoutdrag kan ta ett par minuter.
                 </p>
               )}
 
               {underlag.length === 0 ? (
-                <p className="text-warm-500 text-sm">
+                <p className="text-slate-500 text-sm">
                   Inga filer mejlade eller uppladdade än.{canUpload && ' Dra hit filer eller klicka på Ladda upp.'}
                 </p>
               ) : (
-                <ul className="divide-y divide-navy-600/60">
+                <ul className="divide-y divide-slate-200">
                   {underlag.map((f) => (
                     <li key={f.id} className="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
                       <input
@@ -1093,16 +1093,16 @@ export default function PersonPage() {
                         title={kanLasasAvAi(f.fileName, f.mimeType)
                           ? 'Markera för att läsa av filen med AI'
                           : 'Den här filtypen läser vi inte av med AI'}
-                        className="shrink-0 mt-1 accent-gold-500 disabled:opacity-30"
+                        className="shrink-0 mt-1 accent-blue-600 disabled:opacity-30"
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="text-warm-100 text-sm block truncate" title={f.fileName}>
+                        <span className="text-slate-900 text-sm block truncate" title={f.fileName}>
                           {f.fileName}
                         </span>
                         {/* Koden i sandlådan skrivs om varje körning — noteringen
                             visar att den läste rätt ställe */}
                         {(f.transaktioner?.notering || f.verifikationer?.notering) && (
-                          <span className="text-warm-600 text-[11px] block">
+                          <span className="text-slate-400 text-[11px] block">
                             {f.transaktioner?.notering || f.verifikationer?.notering}
                           </span>
                         )}
@@ -1113,10 +1113,10 @@ export default function PersonPage() {
                           ...f.varningar,
                         ]} />
                         {f.verifikationer?.fel && !f.verifikationer.inlagda && (
-                          <span className="block text-red-400 text-[11px]">{f.verifikationer.fel}</span>
+                          <span className="block text-red-600 text-[11px]">{f.verifikationer.fel}</span>
                         )}
                         {f.transaktioner?.fel && (
-                          <span className="block text-red-400 text-[11px]">{f.transaktioner.fel}</span>
+                          <span className="block text-red-600 text-[11px]">{f.transaktioner.fel}</span>
                         )}
                       </span>
                       {f.transaktioner && (
@@ -1124,8 +1124,8 @@ export default function PersonPage() {
                           title={f.transaktioner.fel ?? `Utläst ${fullDate(f.transaktioner.at)}`}
                           className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
                             f.transaktioner.fel
-                              ? 'bg-red-500/15 text-red-400'
-                              : 'bg-blue-500/15 text-blue-300'
+                              ? 'bg-red-500/15 text-red-600'
+                              : 'bg-blue-500/15 text-blue-700'
                           }`}
                         >
                           {f.transaktioner.fel
@@ -1139,10 +1139,10 @@ export default function PersonPage() {
                           title={f.verifikationer.fel ?? 'Bokfört underlag — AI:n läste ut verifikationerna med kontona i filen'}
                           className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 transition ${
                             f.verifikationer.fel && !f.verifikationer.inlagda
-                              ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+                              ? 'bg-red-500/15 text-red-600 hover:bg-red-500/25'
                               : f.verifikationer.fel
-                              ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
-                              : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
+                              ? 'bg-amber-500/15 text-amber-700 hover:bg-amber-500/25'
+                              : 'bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25'
                           }`}
                         >
                           {f.verifikationer.fel && !f.verifikationer.inlagda
@@ -1156,10 +1156,10 @@ export default function PersonPage() {
                           title={f.verifikationer?.fel ?? 'Visa verifikationerna i filen'}
                           className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 transition ${
                             f.verifikationer?.fel
-                              ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+                              ? 'bg-red-500/15 text-red-600 hover:bg-red-500/25'
                               : f.verifikationer
-                              ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
-                              : 'bg-gold-500/15 text-gold-400 hover:bg-gold-500/25'
+                              ? 'bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25'
+                              : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
                           }`}
                         >
                           {f.verifikationer?.fel
@@ -1169,11 +1169,11 @@ export default function PersonPage() {
                             : 'SIE · verifikationer →'}
                         </Link>
                       )}
-                      <span className="text-warm-600 text-[11px] shrink-0 hidden sm:inline">{fullDate(f.at)}</span>
+                      <span className="text-slate-400 text-[11px] shrink-0 hidden sm:inline">{fullDate(f.at)}</span>
                       <a
                         href={`/api/admin/underlag/${f.id}/ladda-ner`}
                         title={`Ladda ner ${f.fileName}`}
-                        className="text-gold-500 hover:text-gold-400 text-[11px] shrink-0 transition"
+                        className="text-blue-700 hover:text-blue-700 text-[11px] shrink-0 transition"
                       >
                         Ladda ner
                       </a>
@@ -1189,7 +1189,7 @@ export default function PersonPage() {
                           <button
                             onClick={() => setConfirmDelete(null)}
                             disabled={!!raderar}
-                            className="text-warm-500 hover:text-warm-300 text-[11px] transition disabled:opacity-50"
+                            className="text-slate-500 hover:text-slate-700 text-[11px] transition disabled:opacity-50"
                           >
                             Avbryt
                           </button>
@@ -1199,7 +1199,7 @@ export default function PersonPage() {
                           onClick={() => setConfirmDelete(f.id)}
                           disabled={!!raderar || !!laser}
                           title="Radera filen och allt som lästs ur den"
-                          className="text-red-400/70 hover:text-red-400 text-[11px] shrink-0 transition disabled:opacity-40"
+                          className="text-red-600 hover:text-red-600 text-[11px] shrink-0 transition disabled:opacity-40"
                         >
                           Radera
                         </button>
@@ -1215,18 +1215,18 @@ export default function PersonPage() {
               avskriften: datum, text och belopp som de stod på kvittot. */}
           {tab === 'transaktioner' && (
             transaktionerError ? (
-              <p className="text-red-400 text-sm">{transaktionerError}</p>
+              <p className="text-red-600 text-sm">{transaktionerError}</p>
             ) : !transaktioner ? (
-              <p className="text-warm-500 text-sm">Hämtar transaktionerna…</p>
+              <p className="text-slate-500 text-sm">Hämtar transaktionerna…</p>
             ) : transaktioner.length === 0 ? (
-              <p className="text-warm-500 text-sm leading-relaxed">
+              <p className="text-slate-500 text-sm leading-relaxed">
                 Inga transaktioner utlästa än. Kryssa i filerna under Underlag och klicka på
                 &quot;Läs av med AI&quot; — AI:n läser av kvitton, fakturor, kontoutdrag
                 och Excel-listor.
               </p>
             ) : (
               <>
-                <p className="text-warm-600 text-xs mb-4">
+                <p className="text-slate-400 text-xs mb-4">
                   Utläst ur underlagen med AI och inte konterat än — konteringen blir en
                   verifikation i nästa steg.
                 </p>
@@ -1242,7 +1242,7 @@ export default function PersonPage() {
             person.profileId ? (
               <KonteringsVy userId={person.profileId} betalsatt={person.betalsatt} />
             ) : (
-              <p className="text-warm-500 text-sm">Personen har inget konto än, så det finns inget att kontera.</p>
+              <p className="text-slate-500 text-sm">Personen har inget konto än, så det finns inget att kontera.</p>
             )
           )}
 
@@ -1251,18 +1251,18 @@ export default function PersonPage() {
               — det syns på varje verifikation var den kom ifrån. */}
           {tab === 'verifikationer' && (
             verifikationerError ? (
-              <p className="text-red-400 text-sm">{verifikationerError}</p>
+              <p className="text-red-600 text-sm">{verifikationerError}</p>
             ) : !verifikationer ? (
-              <p className="text-warm-500 text-sm">Hämtar verifikationerna…</p>
+              <p className="text-slate-500 text-sm">Hämtar verifikationerna…</p>
             ) : verifikationer.length === 0 ? (
-              <p className="text-warm-500 text-sm leading-relaxed">
+              <p className="text-slate-500 text-sm leading-relaxed">
                 Inga verifikationer än. När kunden mejlar in eller du laddar upp en SIE-fil läggs
                 verifikationerna in här automatiskt. En bokförd PDF eller Excel-export — verifikationslista,
                 grundbok, huvudbok — läses in med &quot;Läs av med AI&quot; under Underlag.
               </p>
             ) : (
               <>
-                <p className="text-warm-600 text-xs mb-4">
+                <p className="text-slate-400 text-xs mb-4">
                   {verifikationer.length.toLocaleString('sv-SE')} verifikationer från {verFiler}{' '}
                   {verFiler === 1 ? 'fil' : 'filer'}.
                 </p>
@@ -1308,7 +1308,7 @@ function MailThreads({ mail }: { mail: AdminMailMessage[] }) {
 
   if (threads.length === 0) {
     return (
-      <p className="text-warm-500 text-sm">
+      <p className="text-slate-500 text-sm">
         Inga mejl sparade än. Mejlen synkas från Gmail en gång i timmen.
       </p>
     );
@@ -1320,13 +1320,13 @@ function MailThreads({ mail }: { mail: AdminMailMessage[] }) {
         const last = messages[messages.length - 1];
         const subject = messages.find((m) => m.subject)?.subject || '(inget ämne)';
         return (
-          <details key={last.threadId} open={i === 0} className="group bg-navy-800/40 border border-navy-600 rounded-lg">
+          <details key={last.threadId} open={i === 0} className="group bg-white border border-slate-200 rounded-lg">
             <summary className="flex items-baseline justify-between gap-3 px-4 py-3 cursor-pointer list-none">
-              <span className="text-white text-sm font-medium truncate min-w-0">
-                <span className="text-warm-500 mr-1.5 inline-block transition group-open:rotate-90">›</span>
+              <span className="text-slate-900 text-sm font-medium truncate min-w-0">
+                <span className="text-slate-500 mr-1.5 inline-block transition group-open:rotate-90">›</span>
                 {subject}
               </span>
-              <span className="text-warm-600 text-[11px] shrink-0">
+              <span className="text-slate-400 text-[11px] shrink-0">
                 {messages.length} mejl · {fullDate(last.at)}
               </span>
             </summary>
@@ -1338,21 +1338,21 @@ function MailThreads({ mail }: { mail: AdminMailMessage[] }) {
                 return (
                   <div key={m.id} className={`flex ${fromUs ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[85%] min-w-0 rounded-lg px-3 py-2 ${
-                      fromUs ? 'bg-gold-500/10 border border-gold-500/20' : 'bg-navy-600/60'
+                      fromUs ? 'bg-blue-50 border border-blue-200' : 'bg-slate-100'
                     }`}>
                       <div className="flex items-baseline justify-between gap-3">
-                        <span className={`text-[11px] font-semibold ${fromUs ? 'text-gold-400' : 'text-warm-300'}`}>
+                        <span className={`text-[11px] font-semibold ${fromUs ? 'text-blue-700' : 'text-slate-700'}`}>
                           {fromUs ? 'Vi' : m.from || 'Kunden'}
                         </span>
-                        <span className="text-warm-600 text-[11px] shrink-0">{fullDate(m.at)}</span>
+                        <span className="text-slate-400 text-[11px] shrink-0">{fullDate(m.at)}</span>
                       </div>
-                      <p className="mt-1 text-sm text-warm-100 whitespace-pre-wrap break-words">
-                        {text || <span className="text-warm-500 italic">(ingen text)</span>}
+                      <p className="mt-1 text-sm text-slate-900 whitespace-pre-wrap break-words">
+                        {text || <span className="text-slate-500 italic">(ingen text)</span>}
                       </p>
                       {m.attachments.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {m.attachments.map((name, j) => (
-                            <span key={j} className="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 text-[10px] font-semibold break-all">
+                            <span key={j} className="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 text-[10px] font-semibold break-all">
                               📎 {name}
                             </span>
                           ))}
@@ -1360,10 +1360,10 @@ function MailThreads({ mail }: { mail: AdminMailMessage[] }) {
                       )}
                       {m.body.trim() && m.raw.trim() !== m.body.trim() && (
                         <details className="mt-1.5">
-                          <summary className="text-warm-600 text-[11px] cursor-pointer hover:text-warm-400">
+                          <summary className="text-slate-400 text-[11px] cursor-pointer hover:text-slate-600">
                             Visa hela mejlet
                           </summary>
-                          <p className="mt-1 text-xs text-warm-400 whitespace-pre-wrap break-words">{m.raw}</p>
+                          <p className="mt-1 text-xs text-slate-600 whitespace-pre-wrap break-words">{m.raw}</p>
                         </details>
                       )}
                     </div>
