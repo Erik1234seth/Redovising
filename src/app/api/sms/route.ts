@@ -5,6 +5,7 @@ import { normalizePhone } from '@/lib/sms/phone';
 import { identifySender } from '@/lib/sms/identify';
 import { generateSmsReply } from '@/lib/sms/answer';
 import { notifyIncomingSms } from '@/lib/sms/notify';
+import { skapaArendenFranMeddelande } from '@/lib/arenden/fran-meddelande';
 
 // o3 plus två vektorsökningar tar längre tid än Twilios webhook-timeout på 15 s.
 // Därför kvitteras webhooken direkt och svaret genereras efteråt, via Twilios
@@ -191,6 +192,26 @@ export async function POST(request: Request) {
         phone: from, direction: 'out', body: reply,
         user_id: sender.userId, status: 'draft',
       });
+
+      // Ger SMS:et något vi ska göra senare blir det ett ärende
+      const { data: tidigare } = await sb.from('sms_messages')
+        .select('direction, body, status').eq('phone', from)
+        .order('created_at', { ascending: false }).limit(12);
+      await skapaArendenFranMeddelande({
+        supabase: sb,
+        kanal: 'sms',
+        ref: messageSid ?? `${from}-${Date.now()}`,
+        personKey: sender.email ?? from,
+        personNamn: sender.name,
+        meddelande: body,
+        historik: (tidigare ?? [])
+          .filter((m) => m.direction === 'in' || ['sent', 'delivered', 'draft'].includes(m.status ?? ''))
+          .reverse()
+          .map((m) => `${m.direction === 'in' ? 'Kund' : 'Vi'}: ${m.body}`)
+          .join('\n'),
+        vartSvar: reply,
+      });
+
       console.log(
         `[sms] utkast till ${from} väntar på godkännande ` +
           `(${sender.kind}, konto: ${sender.hasAccount ? sender.account?.matchedBy ?? 'ja' : 'nej'}, ${reply.length} tecken)`,

@@ -9,6 +9,7 @@ import { handleGeneralQuestion } from '@/lib/inmail/handlers/general-question';
 import { handleUnknownUser } from '@/lib/inmail/handlers/unknown-user';
 import { saveMailAttachments } from '@/lib/inmail/save-attachments';
 import { withUnderlagAck } from '@/lib/inmail/underlag-ack';
+import { arendenEfterMejl } from '@/lib/arenden/efter-mejl';
 
 function getSupabase() {
   return createClient(
@@ -20,7 +21,11 @@ function getSupabase() {
 
 /** Svaret på mejlet, plus en bekräftelse när det kom underlag med det. */
 export async function POST(request: Request) {
-  return withUnderlagAck(request, await handlePost(request.clone()));
+  const kopia = request.clone();
+  const svar = await withUnderlagAck(request, await handlePost(request.clone()));
+  // Ger mejlet något vi ska göra senare blir det ett ärende, efter svaret
+  arendenEfterMejl(kopia, svar);
+  return svar;
 }
 
 async function handlePost(request: Request) {

@@ -397,3 +397,31 @@ export interface InlamningKund {
   momsPeriod: MomsPeriod | null;
   perioder: InlamningPeriod[];
 }
+
+/** En att göra-punkt på Ärenden-sidan (`arenden`). */
+export interface Arende {
+  id: string;
+  titel: string;
+  beskrivning: string | null;
+  /** När det ska göras, YYYY-MM-DD. */
+  datum: string | null;
+  status: 'oppen' | 'klar';
+  /** Mejl eller telefon — samma nyckel som `/admin/person/[key]`. */
+  personKey: string | null;
+  personNamn: string | null;
+  /** Vem som skapade det: vi själva, mail-AI:n eller SMS-AI:n. */
+  kalla: 'manuell' | 'mejl' | 'sms';
+  skapad: string;
+  klar: string | null;
+}
+
+/** Ett bokat möte (`meetings`), som det visas bland ärendena. */
+export interface AdminMote {
+  id: string;
+  namn: string | null;
+  email: string | null;
+  telefon: string | null;
+  datum: string;
+  tid: string | null;
+  meddelande: string | null;
+}
