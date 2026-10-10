@@ -277,6 +277,8 @@ export interface PersonUnderlag {
   verifikationer: UnderlagImport | null;
   /** Satt när någon kört AI-avläsningen på filen. */
   transaktioner: UnderlagTransaktioner | null;
+  /** Underlagskontrollen efter mejl: har underlaget allt vi behöver? Null = inte kontrollerad. */
+  kontroll: { status: 'komplett' | 'saknar' | 'fel'; saknas: { rad: string; vad: string }[]; at: string } | null;
 }
 
 /**

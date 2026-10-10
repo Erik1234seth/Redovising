@@ -1113,7 +1113,21 @@ export default function PersonPage() {
                         {f.transaktioner?.fel && (
                           <span className="block text-red-600 text-[11px]">{f.transaktioner.fel}</span>
                         )}
+                        {/* Underlagskontrollen: det vi väntar på svar från kunden om */}
+                        {f.kontroll?.status === 'saknar' && f.kontroll.saknas.length > 0 && (
+                          <span className="block text-amber-700 text-[11px]">
+                            Väntar på kunden: {f.kontroll.saknas.map((s) => `${s.rad} (${s.vad})`).join(' · ')}
+                          </span>
+                        )}
                       </span>
+                      {f.kontroll && (
+                        <span title={`Kontrollerad ${fullDate(f.kontroll.at)}`}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                            f.kontroll.status === 'komplett' ? 'bg-emerald-50 text-emerald-700'
+                              : f.kontroll.status === 'fel' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-800'}`}>
+                          {f.kontroll.status === 'komplett' ? 'Komplett' : f.kontroll.status === 'fel' ? 'Oläslig' : 'Saknar info'}
+                        </span>
+                      )}
                       {f.transaktioner && (
                         <span
                           title={f.transaktioner.fel ?? `Utläst ${fullDate(f.transaktioner.at)}`}

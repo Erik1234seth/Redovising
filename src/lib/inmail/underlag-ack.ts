@@ -61,6 +61,8 @@ export async function withUnderlagAck(request: Request, response: Response): Pro
     const data = await response.clone().json();
     // No-reply-avsändare ska aldrig få något utkast
     if (data?.action === 'skipped') return response;
+    // Underlagsflödet skriver ett eget svar om filerna, med det som saknas
+    if (data?.action === 'underlag_kontroll') return response;
 
     const { senderEmail, messageId } = await request.json() as { senderEmail?: string; messageId?: string };
     if (!senderEmail || !messageId) return response;

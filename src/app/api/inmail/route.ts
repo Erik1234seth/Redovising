@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
+import { arUnderlagsmejl, korUnderlagsflode } from '@/lib/underlag-kontroll';
 import { createClient } from '@supabase/supabase-js';
 import { classifyIntent } from '@/lib/inmail/classify';
 import { isNoReplyAddress } from '@/lib/inmail/no-reply';
@@ -20,6 +21,9 @@ function getSupabase() {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }
+
+/** Avläsning och kontroll av underlag körs efter svaret, men inom samma anrop. */
+export const maxDuration = 300;
 
 /** Svaret på mejlet, plus en bekräftelse när det kom underlag med det. */
 export async function POST(request: Request) {
@@ -149,6 +153,20 @@ async function handlePost(request: Request) {
         return NextResponse.json(result);
       }
       // If neither confirm nor cancel, fall through to normal classification
+    }
+
+    // Underlag först: bilagor, eller ett svar på det vi frågat om underlaget.
+    // Avläsning och kontroll tar minuter och görs efter svaret till Apps
+    // Script. Utkastet hamnar i inkorgen när det är klart.
+    if (await arUnderlagsmejl({
+      supabase, profil: profile, amne: subject, text: emailBody, historik: undefined,
+      harBilagor: savedUnderlag > 0 || attachments.length > 0,
+    })) {
+      after(() => korUnderlagsflode({
+        supabase: getSupabase(), profil: profile, avsandare: senderEmail, messageId,
+        threadId: gmailThreadId, amne: subject, text: emailBody, historik: undefined,
+      }));
+      return NextResponse.json({ action: 'underlag_kontroll' });
     }
 
     // Classify intent
