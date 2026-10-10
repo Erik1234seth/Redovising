@@ -10,6 +10,8 @@ import { handleUnknownUser } from '@/lib/inmail/handlers/unknown-user';
 import { saveMailAttachments } from '@/lib/inmail/save-attachments';
 import { withUnderlagAck } from '@/lib/inmail/underlag-ack';
 import { arendenEfterMejl } from '@/lib/arenden/efter-mejl';
+import { sparaMejlutkast } from '@/lib/inkorg/mejlutkast';
+import { smsKontextForMejl } from '@/lib/inkorg/kontext';
 
 function getSupabase() {
   return createClient(
@@ -22,10 +24,12 @@ function getSupabase() {
 /** Svaret på mejlet, plus en bekräftelse när det kom underlag med det. */
 export async function POST(request: Request) {
   const kopia = request.clone();
+  const utkastKopia = request.clone();
   const svar = await withUnderlagAck(request, await handlePost(request.clone()));
   // Ger mejlet något vi ska göra senare blir det ett ärende, efter svaret
   arendenEfterMejl(kopia, svar);
-  return svar;
+  // Svaret blir ett utkast i adminpanelens inkorg, inte i Gmail
+  return sparaMejlutkast(utkastKopia, svar);
 }
 
 async function handlePost(request: Request) {
@@ -92,6 +96,7 @@ async function handlePost(request: Request) {
         messageId,
         emailHistory,
         attachmentNames: attachments.map((a, i) => a.name || `bilaga-${i + 1}`),
+        smsKontext: await smsKontextForMejl(supabase, senderEmail),
       }));
     }
 
@@ -164,6 +169,7 @@ async function handlePost(request: Request) {
         return NextResponse.json(await handleGeneralQuestion({
           supabase, profile, subject, body: emailBody, emailHistory,
           attachmentNames: attachments.map((a, i) => a.name || `bilaga-${i + 1}`),
+          smsKontext: await smsKontextForMejl(supabase, senderEmail),
         }));
 
       default:

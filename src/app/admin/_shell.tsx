@@ -58,7 +58,7 @@ function CodeGate({ onUnlock }: { onUnlock: () => void }) {
 }
 
 /** Sidor med lista till vänster och detaljer till höger behöver hela bredden. */
-const BREDA = ['/admin/inlamning', '/admin/kalender'];
+const BREDA = ['/admin/inlamning', '/admin/kalender', '/admin/inkorg'];
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

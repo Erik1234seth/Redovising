@@ -70,8 +70,11 @@ export async function handleUnknownUser(params: {
   emailHistory?: string;
   /** Namnen på bifogade filer. De är redan sparade som underlag. */
   attachmentNames?: string[];
+  /** SMS-konversationen med samma person, så att svaret kan bygga på den. */
+  smsKontext?: string;
 }): Promise<{ action: string; replyBody: string }> {
-  const { supabase, senderEmail, subject, body, gmailThreadId, messageId, emailHistory } = params;
+  const { supabase, senderEmail, subject, body, gmailThreadId, messageId, smsKontext } = params;
+  const emailHistory = [params.emailHistory, smsKontext].filter(Boolean).join('\n\n') || undefined;
   const attachmentNames = params.attachmentNames ?? [];
 
   // Skapa konto-länken ur länkregistret (knowledge/lankregister.md). Förut gick

@@ -56,6 +56,14 @@ function doPost(e) {
       return json(lookupSendResult(payload.ref));
     }
 
+    // Svar och nya mejl från inkorgen i adminpanelen. Signaturen läggs på här,
+    // med samma funktioner som mail-AI:ns utkast använde (check-inbox.gs).
+    if (payload.action === 'reply' || payload.action === 'compose') {
+      const result = payload.action === 'reply' ? replyFromInboxRequest(payload) : composeFromInboxRequest(payload);
+      rememberSendResult(payload.ref, result);
+      return json(result);
+    }
+
     // Systemstatus postar med bara hemligheten och förväntar sig exakt det här
     // felet som bevis på att webbappen svarar. Ändra inte texten.
     if (!payload.to || !payload.subject || !payload.html) {
@@ -94,6 +102,48 @@ function sendMailForRequest(payload) {
   }
 
   return { ok: true, threadId: threadId };
+}
+
+/** Text- och HTML-versionen med signatur. Faller tillbaka på ren text om check-inbox.gs saknar funktionerna. */
+function inboxBodies(text) {
+  const plain = typeof withSignature === 'function' ? withSignature(text) : String(text);
+  const html = typeof withSignatureHtml === 'function'
+    ? withSignatureHtml(text)
+    : String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  return { plain: plain, html: html };
+}
+
+/**
+ * Svarar på kundens mejl i samma tråd. `messageId` är mejlet som besvaras —
+ * inte trådens sista meddelande, som kan vara vårt eget, och då hade svaret
+ * gått till oss själva.
+ */
+function replyFromInboxRequest(payload) {
+  if (!payload.messageId || !payload.text) return { ok: false, error: 'messageId och text krävs' };
+  try {
+    const message = GmailApp.getMessageById(payload.messageId);
+    if (!message) return { ok: false, error: 'Mejlet som skulle besvaras finns inte i Gmail' };
+    const bodies = inboxBodies(payload.text);
+    message.reply(bodies.plain, { htmlBody: bodies.html, name: SENDER_NAME });
+    return { ok: true, threadId: message.getThread().getId() };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+/** Ett nytt mejl, när det inte finns någon tråd att svara i. */
+function composeFromInboxRequest(payload) {
+  if (!payload.to || !payload.subject || !payload.text) return { ok: false, error: 'to, subject och text krävs' };
+  try {
+    const bodies = inboxBodies(payload.text);
+    GmailApp.sendEmail(payload.to, payload.subject, bodies.plain, { htmlBody: bodies.html, name: SENDER_NAME, replyTo: REPLY_TO });
+    var threadId = '';
+    const sent = GmailApp.search('to:' + payload.to + ' in:sent', 0, 1);
+    if (sent.length > 0) threadId = sent[0].getId();
+    return { ok: true, threadId: threadId };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
 }
 
 function rememberSendResult(ref, result) {

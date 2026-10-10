@@ -426,3 +426,60 @@ export interface AdminMote {
   tid: string | null;
   meddelande: string | null;
 }
+
+/** Inkorgens tre flikar: leads, uppsignade som saknar ombudsuppgifterna, och klara kunder. */
+export type InkorgKategori = 'lead' | 'saknar' | 'kund';
+
+/** En rad i inkorgen — en person, med det senaste som hänt i mejl eller SMS. */
+export interface InkorgKonversation {
+  key: string;
+  namn: string;
+  email: string | null;
+  phone: string | null;
+  kategori: InkorgKategori;
+  senaste: { kanal: 'mejl' | 'sms'; riktning: 'in' | 'out'; text: string; amne: string | null; at: string };
+  /** Något har kommit in sedan konversationen senast öppnades. */
+  olast: boolean;
+  /** Utkast som väntar på att skickas, mejl och SMS. */
+  utkast: number;
+}
+
+export interface InkorgMeddelande {
+  id: string;
+  kanal: 'mejl' | 'sms';
+  riktning: 'in' | 'out';
+  at: string;
+  text: string;
+  amne?: string | null;
+  /** Gmail-id, för att kunna svara i rätt tråd. */
+  gmailMessageId?: string;
+  gmailThreadId?: string;
+  bilagor?: string[];
+  /** SMS-status för utgående: sent, failed … */
+  status?: string | null;
+  /** Ett fast utskick (välkomst-SMS, påminnelse, mejlnotis) — inget någon skrivit. */
+  automatisk?: boolean;
+}
+
+export interface InkorgUtkast {
+  id: string;
+  kanal: 'mejl' | 'sms';
+  text: string;
+  /** Mejladress eller telefonnummer. */
+  till: string;
+  amne?: string | null;
+  /** Mejlet utkastet svarar på. Saknas det blir det ett nytt mejl. */
+  svarPa?: string | null;
+  fel?: string | null;
+  at: string;
+}
+
+export interface InkorgTrad {
+  person: Person;
+  kategori: InkorgKategori;
+  /** Det som behövs i mellanfliken: uppgifterna vi hämtar när vi blivit ombud. */
+  uppgifter: { momsPeriod: MomsPeriod | null; startAr: number | null; redovisningsmetod: Redovisningsmetod | null; ombudKlart: string | null } | null;
+  meddelanden: InkorgMeddelande[];
+  utkast: InkorgUtkast[];
+  arenden: Arende[];
+}

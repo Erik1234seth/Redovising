@@ -88,8 +88,10 @@ export async function handleGeneralQuestion(params: {
   emailHistory?: string;
   /** Namnen på bifogade filer. De är redan sparade som underlag. */
   attachmentNames?: string[];
+  /** SMS-konversationen med samma person, så att svaret kan bygga på den. */
+  smsKontext?: string;
 }): Promise<{ action: string; replyBody: string }> {
-  const { supabase, profile, subject, body, emailHistory } = params;
+  const { supabase, profile, subject, body, emailHistory, smsKontext } = params;
   const attachmentNames = params.attachmentNames ?? [];
 
   // Hämta relevanta utdrag ur indexerade dokument (t.ex. K1-vägledningen),
@@ -111,9 +113,10 @@ export async function handleGeneralQuestion(params: {
     attachmentNames,
   });
 
-  const userContent = emailHistory
+  const mejl = emailHistory
     ? `Mailkonversation:\n\n${emailHistory}`
     : `Ämne: ${subject || '(inget ämne)'}\n\nFråga:\n${body.slice(0, 1500)}`;
+  const userContent = smsKontext ? `${smsKontext}\n\n${mejl}` : mejl;
 
   const answer = await callOpenAI({
     model: 'o3',

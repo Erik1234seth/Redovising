@@ -6,7 +6,7 @@ erik@enklabokslut.se. Projektet äger både Gmail-inkorgen och utskicken.
 | Fil | Riktning | Vad den gör |
 | --- | --- | --- |
 | `check-inbox.gs` | Gmail → oss | Tidsstyrd trigger läser olästa mejl och postar till `/api/inmail` respektive `/api/inmail/reply`. AI-svaret sparas som utkast i tråden. Äger `doGet`. |
-| `send-mail.gs` | oss → Gmail | Webbapp som tar emot `doPost` från `handleNewLead` och skickar välkomstmejlet till nya leads. Äger `doPost`. |
+| `send-mail.gs` | oss → Gmail | Webbapp som tar emot `doPost`: välkomstmejlet till nya leads, och svar (`action: reply`) och nya mejl (`action: compose`) från inkorgen i adminpanelen. Äger `doPost`. |
 | `save-attachments.gs` | Gmail → oss | Anropas från `checkInbox` innan mail-AI:n. Laddar upp varje bilaga direkt till lagringen (via `/api/inmail/underlag`) och sparar den som underlag på avsändarens adress. Alla filtyper, ingen tolkning. Varken `doGet` eller `doPost`. |
 | `sync-mail.gs` | Gmail → oss | Tidsstyrd trigger varje timme speglar alla konversationer, åt båda hållen, till `/api/inmail/messages/import` (tabellen `mail_messages`). Syns under fliken Mejl på personsidan. Varken `doGet` eller `doPost`. |
 | `export-sent.gs` | Gmail → oss | Tidsstyrd trigger skickar nattligen upp dina skickade svar till `/api/inmail/examples/import`, så AI:n kan härma din ton. Varken `doGet` eller `doPost`. |
@@ -51,6 +51,10 @@ no-reply-adresser tas inte med.
 
 **Sätt igång:** kör `setUpMailSync()` en gång, sedan `syncMailBackfill()` tills
 den säger KLART. `removeMailSync()` stänger av.
+
+## Inkorgen (från 2026-10-10)
+
+Mail-AI:ns svar blir inte längre Gmail-utkast. `/api/inmail` och `/api/inmail/reply` svarar utan `replyBody`, så `check-inbox.gs` skapar inget utkast, och texten sparas i `mejl_utkast`. När någon trycker Skicka i `/admin/inkorg` postar servern `action: reply` med Gmail-id:t för kundens mejl, och `send-mail.gs` svarar i samma tråd med signaturen från `check-inbox.gs`. Ingen ändring behövs i `check-inbox.gs`.
 
 ## Script Properties
 

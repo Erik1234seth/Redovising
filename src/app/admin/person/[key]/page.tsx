@@ -1025,11 +1025,6 @@ export default function PersonPage() {
               }`}
             >
               <div className="flex items-center justify-end gap-3 mb-4 flex-wrap">
-                {underlag.length > 0 && (
-                  <Link href="/admin/underlag" className="text-blue-700 hover:text-blue-700 text-xs transition mr-auto">
-                    Öppna underlagen →
-                  </Link>
-                )}
                 {lasbara.length > 0 && (
                   <>
                     <button

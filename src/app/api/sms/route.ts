@@ -12,7 +12,7 @@ import { skapaArendenFranMeddelande } from '@/lib/arenden/fran-meddelande';
 // REST-API istället för TwiML.
 //
 // AI-svaret skickas INTE härifrån. Det sparas som ett utkast (status 'draft')
-// och går ut först när någon tryckt Skicka i adminpanelen, på /admin/sms.
+// och går ut först när någon tryckt Skicka i adminpanelen, i inkorgen, /admin/inkorg.
 // Fram till dess får personen som messat inget svar alls — förr kom det inom
 // någon halvminut. Det är priset för att ingenting går ut ogranskat, och det
 // är därför utkasten har en egen sida med räknare i navigeringen istället för
@@ -187,7 +187,7 @@ export async function POST(request: Request) {
         return;
       }
 
-      // Utkast, inte utskick. Raden plockas upp av /admin/sms.
+      // Utkast, inte utskick. Raden plockas upp av inkorgen, /admin/inkorg.
       await log(sb, {
         phone: from, direction: 'out', body: reply,
         user_id: sender.userId, status: 'draft',

@@ -54,7 +54,7 @@ export default function SieFilPage() {
   if (error || !sie || !underlag) {
     return (
       <div className="space-y-4">
-        <Link href="/admin/underlag" className="text-blue-700 hover:text-blue-700 text-sm transition">← Underlag</Link>
+        <button onClick={() => history.back()} className="text-blue-700 hover:text-blue-700 text-sm transition">← Tillbaka</button>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-600 text-sm">
           {error || 'Hittade inget sådant underlag'}
         </div>
@@ -70,7 +70,7 @@ export default function SieFilPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/underlag" className="text-blue-700 hover:text-blue-700 text-sm transition">← Underlag</Link>
+        <button onClick={() => history.back()} className="text-blue-700 hover:text-blue-700 text-sm transition">← Tillbaka</button>
         <h1 className="text-2xl font-bold text-slate-900 mt-4 break-words">
           {header.foretag || underlag.fileName}
         </h1>

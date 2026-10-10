@@ -28,7 +28,7 @@ import { logEmail, type EmailKind } from '../email-log';
  * skickar aldrig om, så ett tappat svar kan inte bli ett dubbelt mejl.
  */
 
-interface GmailResult {
+export interface GmailResult {
   ok: boolean;
   /** Gmail-trådens id, så att svaret går att koppla ihop med utskicket. */
   threadId?: string;
@@ -97,7 +97,8 @@ async function post(url: string, body: Record<string, unknown>, timeoutMs: numbe
   }
 }
 
-async function callScript(payload: Record<string, unknown>): Promise<GmailResult> {
+/** Anropar Apps Script-webbappen med valfri åtgärd, med samma skydd mot tappade svar. */
+export async function callScript(payload: Record<string, unknown>): Promise<GmailResult> {
   const url = process.env.GMAIL_SCRIPT_URL;
   const secret = process.env.GMAIL_SCRIPT_SECRET;
 
