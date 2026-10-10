@@ -948,66 +948,6 @@ export default function Home() {
       </section>
 
       {/* ══════════════════════════════════════════
-          TESTIMONIALS
-      ══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-24" style={{ backgroundColor: NAV_BG }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-14">
-            <p className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: CORAL }}>Kundrecensioner</p>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">
-              Vad våra kunder säger
-            </h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                name: 'Anna Lindgren',
-                role: 'Frilansfotograf',
-                avatar: '/annalindgren.png',
-                quote: 'Äntligen ett ställe som verkligen förstår hur det fungerar att driva enskild firma. Snabbt, tydligt och till ett pris jag faktiskt har råd med.',
-              },
-              {
-                name: 'Marcus Eriksson',
-                role: 'Webbutvecklare',
-                avatar: '/markus.png',
-                quote: 'Jag hade aldrig gjort bokslut själv och var lite nervös. Men det var superenkelt — de skötte allt och jag visste exakt vad det kostade från start.',
-              },
-              {
-                name: 'Sara Berg',
-                role: 'Kostrådgivare',
-                avatar: '/sofia.png',
-                quote: 'Rekommenderar varmt! Tok bara några dagar och NE-bilagan var klar. Slipper oroa mig inför deklarationen nu.',
-              },
-            ].map(({ name, role, avatar, quote }) => (
-              <div
-                key={name}
-                className="rounded-2xl p-7 flex flex-col"
-                style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
-              >
-                <div className="flex gap-0.5 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <svg key={i} className="w-4 h-4 text-amber-400 fill-amber-400" viewBox="0 0 24 24">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                    </svg>
-                  ))}
-                </div>
-                <p className="text-sm leading-relaxed flex-1 mb-6" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                  &ldquo;{quote}&rdquo;
-                </p>
-                <div className="flex items-center gap-3">
-                  <Image src={avatar} alt={name} width={56} height={56} className="rounded-full object-cover ring-2 ring-white/20" />
-                  <div>
-                    <p className="text-sm font-bold text-white">{name}</p>
-                    <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
           BREV-, FACEBOOK- & ORGANISK POPUP — samma flöde (AdFunnel) för besökare
           från utskicksbrevets QR-kod (?ref=brev-*), Facebook-annonsen (?ref=fb-*)
           och de som bara skriver in enklabokslut.se utan någon ref alls.
