@@ -247,7 +247,7 @@ function Bubbla({ m }: { m: InkorgMeddelande }) {
   if (m.automatisk) {
     return (
       <p className="text-center text-[11px] text-slate-400" title={m.text}>
-        Automatiskt SMS · {tidLang(m.at)} · {m.text.replace(/s+/g, ' ').slice(0, 70)}…
+        Automatiskt SMS · {tidLang(m.at)} · {m.text.replace(/\s+/g, ' ').slice(0, 70)}…
       </p>
     );
   }
