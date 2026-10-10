@@ -27,8 +27,6 @@ export const maxDuration = 120;
 
 type Supabase = ReturnType<typeof createServerClient>;
 
-/** Allt före det här räknas som läst — annars hade hela historiken lyst som ny när inkorgen öppnades första gången. */
-const INKORG_START = '2026-10-10T00:00:00Z';
 
 /** Utgående SMS som kunden faktiskt fått eller som misslyckats. Utkast och slängda visas inte i tråden. */
 const SYNLIGA_SMS = ['sent', 'delivered', 'queued', 'sending', 'failed'];
@@ -112,11 +110,12 @@ function grupperaPerPerson(people: Map<string, Built>, data: Awaited<ReturnType<
   return per;
 }
 
+/** När konversationen senast öppnades, över alla personens adresser. Tom sträng = aldrig öppnad. */
 function senastLast(p: Built, last: Map<string, string>): string {
   return p.aliases.reduce((max, a) => {
     const t = last.get(a);
     return t && t > max ? t : max;
-  }, INKORG_START);
+  }, '');
 }
 
 export async function GET(request: NextRequest) {

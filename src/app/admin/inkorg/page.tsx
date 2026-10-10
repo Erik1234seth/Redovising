@@ -14,8 +14,7 @@ import type {
  * förrän någon trycker Skicka.
  */
 
-const FLIKAR: { id: InkorgKategori | 'alla'; namn: string }[] = [
-  { id: 'alla', namn: 'Alla' },
+const FLIKAR: { id: InkorgKategori; namn: string }[] = [
   { id: 'lead', namn: 'Leads' },
   { id: 'saknar', namn: 'Saknar uppgifter' },
   { id: 'kund', namn: 'Kunder' },
@@ -46,7 +45,7 @@ function KanalMarke({ kanal }: { kanal: 'mejl' | 'sms' }) {
 export default function InkorgPage() {
   const [lista, setLista] = useState<InkorgKonversation[] | null>(null);
   const [fel, setFel] = useState('');
-  const [flik, setFlik] = useState<InkorgKategori | 'alla'>('alla');
+  const [flik, setFlik] = useState<InkorgKategori>('lead');
   const [bara, setBara] = useState<'alla' | 'olasta' | 'utkast'>('alla');
   const [sok, setSok] = useState('');
   const [vald, setVald] = useState<string | null>(null);
@@ -66,12 +65,13 @@ export default function InkorgPage() {
   const synliga = useMemo(() => {
     const q = sok.trim().toLowerCase();
     return (lista ?? []).filter((k) =>
-      (flik === 'alla' || k.kategori === flik)
+      k.kategori === flik
       && (bara === 'alla' || (bara === 'olasta' ? k.olast : k.utkast > 0))
       && (!q || [k.namn, k.email, k.phone, k.senaste.text].some((f) => f?.toLowerCase().includes(q))));
   }, [lista, flik, bara, sok]);
 
-  const antal = (id: InkorgKategori | 'alla') => (lista ?? []).filter((k) => (id === 'alla' || k.kategori === id) && (k.olast || k.utkast > 0)).length;
+  /** Olästa per flik — det som syns som siffra bredvid fliknamnet. */
+  const antal = (id: InkorgKategori) => (lista ?? []).filter((k) => k.kategori === id && k.olast).length;
 
   const oppna = (key: string) => {
     setVald(key);
@@ -113,16 +113,20 @@ export default function InkorgPage() {
           {synliga.map((k) => (
             <li key={k.key}>
               <button onClick={() => oppna(k.key)}
-                className={`w-full text-left px-3 py-2.5 transition ${vald === k.key ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                className={`w-full text-left px-3 py-2.5 border-l-4 transition ${
+                  vald === k.key ? 'bg-blue-50 border-l-blue-600'
+                    : k.olast ? 'bg-white border-l-blue-600 hover:bg-blue-50/50'
+                      : 'bg-slate-50 border-l-transparent hover:bg-slate-100'}`}>
                 <span className="flex items-center gap-2">
                   {k.olast && <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />}
-                  <span className={`text-sm truncate mr-auto ${k.olast ? 'font-bold text-slate-900' : 'text-slate-800'}`}>{k.namn}</span>
+                  <span className={`text-sm truncate mr-auto ${k.olast ? 'font-bold text-slate-900' : 'text-slate-500'}`}>{k.namn}</span>
+                  {!k.olast && vald !== k.key && <span className="text-[10px] text-slate-400 shrink-0">Läst</span>}
                   {k.utkast > 0 && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">Utkast</span>}
                   <span className="text-[11px] text-slate-400 shrink-0">{tidKort(k.senaste.at)}</span>
                 </span>
                 <span className="flex items-center gap-1.5 mt-0.5">
                   <KanalMarke kanal={k.senaste.kanal} />
-                  <span className={`text-xs truncate ${k.olast ? 'text-slate-700' : 'text-slate-500'}`}>
+                  <span className={`text-xs truncate ${k.olast ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>
                     {k.senaste.riktning === 'out' && 'Du: '}
                     {k.senaste.kanal === 'mejl' && k.senaste.amne ? <span className="font-medium">{k.senaste.amne} — </span> : null}
                     {k.senaste.text}
