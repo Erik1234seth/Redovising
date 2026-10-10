@@ -432,7 +432,7 @@ export default function PersonPage() {
   if (error || !person) {
     return (
       <div className="space-y-4">
-        <Link href="/admin" className="text-blue-700 hover:text-blue-700 text-sm transition">← Alla personer</Link>
+        <Link href="/admin/personer" className="text-blue-700 hover:text-blue-700 text-sm transition">← Alla personer</Link>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-600 text-sm">
           {error || 'Hittade ingen sådan person'}
         </div>
@@ -508,7 +508,7 @@ export default function PersonPage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/admin" className="text-blue-700 hover:text-blue-700 text-sm transition">← Alla personer</Link>
+        <Link href="/admin/personer" className="text-blue-700 hover:text-blue-700 text-sm transition">← Alla personer</Link>
 
         <div className="flex items-start justify-between gap-4 mt-4">
           <div className="min-w-0">
@@ -1282,7 +1282,7 @@ export default function PersonPage() {
         <DeletePerson
           people={[person]}
           onClose={() => setDeleting(false)}
-          onDeleted={() => router.push('/admin')}
+          onDeleted={() => router.push('/admin/personer')}
         />
       )}
     </div>

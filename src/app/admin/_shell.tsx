@@ -60,9 +60,12 @@ function CodeGate({ onUnlock }: { onUnlock: () => void }) {
 /** Sidor med lista till vänster och detaljer till höger behöver hela bredden. */
 const BREDA = ['/admin/inlamning', '/admin/kalender', '/admin/inkorg'];
 
+/** Översikten är startsidan och får också hela bredden — men bara på exakt /admin. */
+const BRED_EXAKT = ['/admin'];
+
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const bredd = BREDA.some((b) => pathname?.startsWith(b)) ? 'max-w-[1400px]' : 'max-w-5xl';
+  const bredd = BREDA.some((b) => pathname?.startsWith(b)) || BRED_EXAKT.includes(pathname ?? '') ? 'max-w-[1400px]' : 'max-w-5xl';
   const [unlocked, setUnlocked] = useState(false);
   const [checked, setChecked] = useState(false);
 

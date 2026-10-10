@@ -70,7 +70,7 @@ export default function StatusPage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/admin" className="text-blue-700 hover:text-blue-700 text-sm transition">← Alla personer</Link>
+        <Link href="/admin" className="text-blue-700 hover:text-blue-700 text-sm transition">← Översikt</Link>
 
         <div className="flex items-start justify-between gap-4 mt-4">
           <div>

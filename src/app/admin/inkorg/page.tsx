@@ -62,6 +62,17 @@ export default function InkorgPage() {
     return () => clearInterval(t);
   }, [ladda]);
 
+  // ?key=… öppnar en konversation direkt, t.ex. från översikten
+  const franLank = useRef(false);
+  useEffect(() => {
+    if (!lista || franLank.current) return;
+    franLank.current = true;
+    const k = new URLSearchParams(window.location.search).get('key');
+    const traff = k && lista.find((x) => x.key === k || x.email === k || x.phone === k);
+    if (traff) { setFlik(traff.kategori); oppna(traff.key); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lista]);
+
   const synliga = useMemo(() => {
     const q = sok.trim().toLowerCase();
     return (lista ?? []).filter((k) =>
