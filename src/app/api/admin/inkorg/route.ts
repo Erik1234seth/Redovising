@@ -158,9 +158,11 @@ export async function GET(request: NextRequest) {
 
     const konversationer: InkorgKonversation[] = [];
     for (const { person: p, meddelanden, utkast } of per.values()) {
-      // Bara riktiga konversationer: någon har skrivit till oss, vi har skrivit själva, eller ett utkast väntar
+      // Först när personen själv skrivit till oss blir det en konversation. Det
+      // vi skickat ut (välkomstmejlet till leads, utskick) syns inte förrän de
+      // svarar — då finns det med i tråden som sammanhang.
       const riktiga = meddelanden.filter((m) => !m.automatisk);
-      if (!riktiga.length && !utkast.length) continue;
+      if (!riktiga.some((m) => m.riktning === 'in') && !utkast.length) continue;
       const sista = riktiga[riktiga.length - 1];
       const sistaIn = [...meddelanden].reverse().find((m) => m.riktning === 'in');
       const visa = sista ?? { kanal: utkast[0].kanal, riktning: 'out' as const, text: utkast[0].text, amne: utkast[0].amne ?? null, at: utkast[0].at };
