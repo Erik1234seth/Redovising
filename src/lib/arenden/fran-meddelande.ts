@@ -18,8 +18,11 @@ interface Forslag { titel: string; beskrivning?: string; datum?: string | null }
 const PROMPT = (idag: string) => `Du hjälper en redovisningsbyrå (Enkla Bokslut, bokföring och bokslut åt enskilda firmor) att hålla koll på saker de behöver göra SENARE.
 
 Du får ett inkommande meddelande från en kund eller ett lead, tidigare konversation och ibland det svar vi tänker skicka.
-Avgör om meddelandet kräver att byrån gör något vid en senare tidpunkt. Exempel:
-- Kunden säger att underlaget kommer nästa vecka → "Påminn om underlaget" med datum när det borde ha kommit.
+Avgör om meddelandet kräver att byrån gör något vid en senare tidpunkt. Påminnelser till kunden är det vanligaste. Exempel:
+- Kunden säger att underlaget kommer nästa vecka → "Påminn kunden om underlaget" med datum när det borde ha kommit.
+- Kunden lovar att göra något (skicka kvitton, kontoutdrag, uppgifter, lägga in oss som deklarationsombud hos Skatteverket, betala) → "Påminn kunden om …" några dagar efter att det borde vara gjort.
+- Vi ber kunden om något i vårt svar (underlag, en uppgift, ett svar på en fråga, att lägga in oss som ombud) → "Påminn kunden om …" om 3–5 dagar, ifall de inte hör av sig.
+- Kunden nämner en deadline eller ett datum som rör deras bokföring eller deklaration → påminn i god tid före.
 - Kunden ber oss höra av oss efter semestern / i januari / om en månad.
 - Leadet vill tänka på saken → "Följ upp" om ungefär en vecka.
 - Vi lovar i svaret att återkomma, kontrollera något eller skicka något.
@@ -30,7 +33,7 @@ De flesta meddelanden ger inga ärenden alls. Hellre ett för lite än ett onöd
 
 Dagens datum: ${idag}. Räkna ut datum som YYYY-MM-DD. Saknas en tidpunkt, välj en rimlig (oftast 3–7 dagar fram).
 
-Svara med JSON: {"arenden": [{"titel": "kort, börjar med ett verb", "beskrivning": "en eller två meningar med det man behöver veta", "datum": "YYYY-MM-DD"}]}
+Svara med JSON: {"arenden": [{"titel": "kort, börjar med ett verb — t.ex. 'Påminn kunden om kontoutdragen'", "beskrivning": "en eller två meningar: vad vi väntar på eller ska göra, och varför", "datum": "YYYY-MM-DD"}]}
 Tom lista om inget behöver göras.`;
 
 export async function skapaArendenFranMeddelande(opts: {
