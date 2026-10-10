@@ -5,7 +5,7 @@ erik@enklabokslut.se. Projektet äger både Gmail-inkorgen och utskicken.
 
 | Fil | Riktning | Vad den gör |
 | --- | --- | --- |
-| `check-inbox.gs` | Gmail → oss | Tidsstyrd trigger läser olästa mejl och postar till `/api/inmail` respektive `/api/inmail/reply`. AI-svaret sparas som utkast i tråden. Äger `doGet`. |
+| `check-inbox.gs` | Gmail → oss | Tidsstyrd trigger läser olästa mejl och postar till `/api/inmail` respektive `/api/inmail/reply`. Sedan 2026-10-10 blir AI-svaret ett utkast i adminpanelens inkorg, inte i Gmail. Utlösaren ställs in för hand under Utlösare (rekommenderat: var 5:e minut). Äger `doGet`. |
 | `send-mail.gs` | oss → Gmail | Webbapp som tar emot `doPost`: välkomstmejlet till nya leads, och svar (`action: reply`) och nya mejl (`action: compose`) från inkorgen i adminpanelen. Äger `doPost`. |
 | `save-attachments.gs` | Gmail → oss | Anropas från `checkInbox` innan mail-AI:n. Laddar upp varje bilaga direkt till lagringen (via `/api/inmail/underlag`) och sparar den som underlag på avsändarens adress. Alla filtyper, ingen tolkning. Varken `doGet` eller `doPost`. |
 | `sync-mail.gs` | Gmail → oss | Tidsstyrd trigger varje timme speglar alla konversationer, åt båda hållen, till `/api/inmail/messages/import` (tabellen `mail_messages`). Syns under fliken Mejl på personsidan. Varken `doGet` eller `doPost`. |
