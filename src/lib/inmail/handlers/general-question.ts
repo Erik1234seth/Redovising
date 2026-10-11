@@ -3,6 +3,7 @@ import { callOpenAI, formatAmount } from '../openai-client';
 import { retrieveKnowledge, retrieveExamples, embedQuery } from '../retrieve';
 import { buildGeneralQuestionPrompt } from '../general-question-prompt';
 import { anteckningarForPrompt } from '../../inkorg/anteckningar';
+import { byggMejlkontext } from '../../mejlkontext';
 
 const MOMS_PERIOD_TEXT: Record<string, string> = {
   monthly: 'månadsvis',
@@ -93,8 +94,18 @@ export async function handleGeneralQuestion(params: {
   smsKontext?: string;
   /** Resultatet av underlagskontrollen och hur svaret ska använda det (underlagsflödet). */
   underlagKontext?: string;
+  /** Gmail-id för mejlet som besvaras, så att det inte står två gånger i historiken. */
+  messageId?: string;
 }): Promise<{ action: string; replyBody: string }> {
-  const { supabase, profile, subject, body, emailHistory, smsKontext, underlagKontext } = params;
+  const { supabase, profile, subject, body, smsKontext, underlagKontext, messageId } = params;
+
+  // Hela mejlhistoriken med kunden, från alla trådar och adresser. Tråden som
+  // Apps Script skickar räcker inte: ett svar i "redovisning" handlar ofta om
+  // en fil som kom i en annan tråd veckor tidigare. Tråden används bara om
+  // arkivet inte gick att läsa.
+  const historik = await byggMejlkontext(supabase, { userId: profile.id, emails: [profile.email], utanMessageId: messageId })
+    .catch(() => '');
+  const emailHistory = historik || params.emailHistory;
   const attachmentNames = params.attachmentNames ?? [];
 
   // Hämta relevanta utdrag ur indexerade dokument (t.ex. K1-vägledningen),
@@ -117,9 +128,12 @@ export async function handleGeneralQuestion(params: {
     attachmentNames,
   }) + anteckningar;
 
-  const mejl = emailHistory
-    ? `Mailkonversation:\n\n${emailHistory}`
-    : `Ämne: ${subject || '(inget ämne)'}\n\nFråga:\n${body.slice(0, 1500)}`;
+  const aktuellt = `Ämne: ${subject || '(inget ämne)'}\n\n${body.slice(0, 3000)}`;
+  const mejl = historik
+    ? `${historik}\n\nMEJLET DU SVARAR PÅ:\n${aktuellt}`
+    : emailHistory
+      ? `Mailkonversation:\n\n${emailHistory}`
+      : `Ämne: ${subject || '(inget ämne)'}\n\nFråga:\n${body.slice(0, 1500)}`;
   const userContent = [smsKontext, mejl, underlagKontext].filter(Boolean).join('\n\n');
 
   const answer = await callOpenAI({

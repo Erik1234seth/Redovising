@@ -34,7 +34,10 @@ function fel(err: unknown, status = 500) {
 
 const CHUNK = 200;
 
-/** Raderna för fliken. Dubbletter och rader på 0 kr tas inte med — de konteras inte. */
+/**
+ * Raderna för fliken. Dubbletter, rader som redan är bokförda via en
+ * kassarapport eller dagskassa, och rader på 0 kr tas inte med — de konteras inte.
+ */
 async function rader(supabase: SupabaseClient, userId: string, bara?: string[]): Promise<AdminKonteringRad[]> {
   const transaktioner: Record<string, unknown>[] = [];
   for (let from = 0; ; from += 1000) {
@@ -43,6 +46,7 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string[]):
       .select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, kalla, detaljer, bokforing_underlag(file_name)')
       .eq('user_id', userId)
       .is('dublett_av', null)
+      .is('dublett_orsak', null)
       .gt('belopp', 0)
       .order('datum', { ascending: true, nullsFirst: false })
       .order('underlag_id')

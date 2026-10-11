@@ -323,6 +323,9 @@ export async function konteraTransaktioner(
     .select(TRANSAKTION_KOLUMNER)
     .eq('user_id', userId)
     .is('dublett_av', null)
+    // Redan bokförda via en kassarapport eller dagskassa: pengarna ligger
+    // redan på 1930, och en kontering till skulle lägga dem där två gånger
+    .is('dublett_orsak', null)
     .in('id', transaktionIds);
   if (error) throw new Error(`Kunde inte läsa transaktionerna: ${error.message}`);
 

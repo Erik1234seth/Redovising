@@ -11,6 +11,7 @@ import { handleGeneralQuestion } from '@/lib/inmail/handlers/general-question';
 import { handleUnknownUser } from '@/lib/inmail/handlers/unknown-user';
 import { smsKontextForMejl } from '@/lib/inkorg/kontext';
 import { normalizePhone } from '@/lib/sms/phone';
+import { arUnderlagsmejl, korUnderlagsflode } from '@/lib/underlag-kontroll';
 
 /**
  * Inkorgen: mejl och SMS per person, med utkasten som väntar.
@@ -24,7 +25,8 @@ import { normalizePhone } from '@/lib/sms/phone';
  * /api/admin/sms-drafts som förut.
  */
 
-export const maxDuration = 120;
+/** "Skriv om" på ett underlagsmejl läser och kontrollerar filerna, och det tar minuter. */
+export const maxDuration = 300;
 
 type Supabase = ReturnType<typeof createServerClient>;
 
@@ -359,8 +361,26 @@ async function aiUtkast(supabase: Supabase, key: string, kanal: 'mejl' | 'sms') 
   let svar: { replyBody: string };
   if (p.profileId) {
     const { data: profil } = await supabase.from('profiles').select('id, full_name, email').eq('id', p.profileId).single();
+
+    // Samma väg som när mejlet kom in: handlar det om underlag läses filerna
+    // och kontrolleras först, och flödet skriver utkastet självt
+    if (senaste?.gmailMessageId && senaste.gmailThreadId) {
+      const sortering = await arUnderlagsmejl({
+        supabase, profil: profil!, amne, text: senaste.text, messageId: senaste.gmailMessageId,
+        harBilagor: !!senaste.bilagor?.length,
+      });
+      if (sortering.underlag) {
+        await korUnderlagsflode({
+          supabase, profil: profil!, avsandare: email, messageId: senaste.gmailMessageId, threadId: senaste.gmailThreadId,
+          amne, text: senaste.text, filer: sortering.filer, kalla: 'manuell',
+        });
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     svar = await handleGeneralQuestion({
       supabase, profile: profil!, subject: amne, body: senaste?.text ?? '', emailHistory: historik || undefined, smsKontext,
+      messageId: senaste?.gmailMessageId,
     });
   } else if (senaste?.gmailThreadId && senaste.gmailMessageId) {
     svar = await handleUnknownUser({

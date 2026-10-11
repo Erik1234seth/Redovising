@@ -314,7 +314,7 @@ function Utkast({ u, personKey, onKlar }: { u: InkorgUtkast; personKey: string; 
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">UTKAST</span>
         <KanalMarke kanal={u.kanal} />
         <span className="text-xs text-slate-500 truncate">till {u.till}{u.kanal === 'mejl' && !u.svarPa ? ' · nytt mejl' : ''}</span>
-        {skriverOm && <span className="text-xs text-slate-500">AI:n skriver om… (kan ta en halvminut)</span>}
+        {skriverOm && <span className="text-xs text-slate-500">AI:n skriver om… (med underlag kan det ta några minuter)</span>}
         <button onClick={skrivOm} disabled={upptagen} title="Skriv om utkastet"
           className="ml-auto w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-40">
           <svg className={`w-4 h-4 ${skriverOm ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { befintligaVerifikationsnycklar, verifikationsnyckel } from '@/lib/sie/import';
 import { byggMejlkontext } from '@/lib/mejlkontext';
 import { markeraDubbletter } from './dubbletter';
+import { arVarAdress } from '@/lib/underlag/var-fil';
 import { extraheraTransaktioner, kanLasasAvAi, type ExtraheradTransaktion, type ExtraheradVerifikation } from './extract';
 import type { Underlagstyp } from './normalisera';
 
@@ -56,6 +57,11 @@ export async function lasUtTransaktioner(
     .maybeSingle<UnderlagRad>();
   if (error) throw new Error(`Kunde inte läsa underlaget: ${error.message}`);
   if (!row) throw new Error('Underlaget finns inte');
+
+  // Våra egna filer är kopior av kundens underlag — utlästa skulle de bokföras två gånger
+  if (arVarAdress(row.sender_email)) {
+    throw new Error(`${row.file_name} är skickad av oss och används bara som kontext, inte som underlag`);
+  }
 
   if (!kanLasasAvAi(row.file_name, row.mime_type)) {
     throw new Error(`${row.file_name} är inte en filtyp vi kan läsa av (bild, PDF, Excel eller CSV)`);

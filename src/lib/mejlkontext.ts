@@ -18,7 +18,12 @@ const MEJLKONTEXT_MAX_TECKEN = 40000;
 
 export async function byggMejlkontext(
   supabase: SupabaseClient,
-  { userId, emails }: { userId: string | null; emails: (string | null | undefined)[] },
+  { userId, emails, utanMessageId }: {
+    userId: string | null;
+    emails: (string | null | undefined)[];
+    /** Mejlet som besvaras just nu. Det visas för sig, så det ska inte stå här också. */
+    utanMessageId?: string;
+  },
 ): Promise<string> {
   const alias = userId
     ? (await supabase.from('person_aliases').select('alias_email').eq('user_id', userId)).data ?? []
@@ -29,7 +34,7 @@ export async function byggMejlkontext(
 
   const { data, error } = await supabase
     .from('mail_messages')
-    .select('direction, subject, body, attachment_names, sent_at')
+    .select('gmail_message_id, direction, subject, body, attachment_names, sent_at')
     .in('customer_email', adresser)
     .order('sent_at', { ascending: false })
     .limit(200);
@@ -38,6 +43,7 @@ export async function byggMejlkontext(
   const block: string[] = [];
   let tecken = 0;
   for (const m of data ?? []) {
+    if (utanMessageId && m.gmail_message_id === utanMessageId) continue;
     const text = String(m.body ?? '').trim();
     const bilagor = (m.attachment_names ?? []) as string[];
     if (!text && !bilagor.length) continue;

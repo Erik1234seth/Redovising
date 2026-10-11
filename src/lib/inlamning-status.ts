@@ -21,7 +21,7 @@ export async function flaggaBokforing(supabase: SupabaseClient, kunder: Inlamnin
   ].join(',');
 
   const ver: { user_id: string | null; customer_email: string | null; datum: string | null; balanserad: boolean; transaktion_id: string | null }[] = [];
-  const tr: { id: string; user_id: string | null; customer_email: string | null; datum: string | null; dublett_av: string | null }[] = [];
+  const tr: { id: string; user_id: string | null; customer_email: string | null; datum: string | null; dublett_av: string | null; dublett_orsak: string | null }[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase.from('verifikationer')
       .select('user_id, customer_email, datum, balanserad, transaktion_id')
@@ -32,7 +32,7 @@ export async function flaggaBokforing(supabase: SupabaseClient, kunder: Inlamnin
   }
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase.from('transaktioner')
-      .select('id, user_id, customer_email, datum, dublett_av')
+      .select('id, user_id, customer_email, datum, dublett_av, dublett_orsak')
       .or(filter).gte('datum', fran).lte('datum', tom).range(from, from + 999);
     if (error) throw new Error(`Kunde inte läsa transaktioner: ${error.message}`);
     tr.push(...(data ?? []));
@@ -42,7 +42,7 @@ export async function flaggaBokforing(supabase: SupabaseClient, kunder: Inlamnin
 
   for (const k of kunder) {
     const minaV = ver.filter((v) => agare(v) === k);
-    const minaT = tr.filter((t) => agare(t) === k && !t.dublett_av);
+    const minaT = tr.filter((t) => agare(t) === k && !t.dublett_av && !t.dublett_orsak);
     for (const p of k.perioder) {
       const iP = <T extends { datum: string | null }>(r: T) => !!r.datum && r.datum >= p.fran && r.datum <= p.tom;
       const v = minaV.filter(iP);

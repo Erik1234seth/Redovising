@@ -133,13 +133,14 @@ async function handlePost(request: Request) {
     // Underlag först: bilagor, eller ett svar på det vi frågat om underlaget.
     // Avläsning och kontroll tar minuter och görs efter svaret till Apps
     // Script. Utkastet hamnar i inkorgen när det är klart.
-    if (await arUnderlagsmejl({
-      supabase, profil: profile, amne: subject, text: emailBody, historik: undefined,
+    const sortering = await arUnderlagsmejl({
+      supabase, profil: profile, amne: subject, text: emailBody, messageId,
       harBilagor: savedUnderlag > 0 || attachments.length > 0,
-    })) {
+    });
+    if (sortering.underlag) {
       after(() => korUnderlagsflode({
         supabase: getSupabase(), profil: profile, avsandare: senderEmail, messageId,
-        threadId: gmailThreadId, amne: subject, text: emailBody, historik: undefined,
+        threadId: gmailThreadId, amne: subject, text: emailBody, historik: undefined, filer: sortering.filer,
       }));
       return NextResponse.json({ action: 'underlag_kontroll' });
     }
@@ -183,7 +184,7 @@ async function handlePost(request: Request) {
 
       case 'GENERAL_QUESTION':
         return NextResponse.json(await handleGeneralQuestion({
-          supabase, profile, subject, body: emailBody,
+          supabase, profile, subject, body: emailBody, messageId,
           attachmentNames: attachments.map((a, i) => a.name || `bilaga-${i + 1}`),
           smsKontext: await smsKontextForMejl(supabase, senderEmail),
         }));
