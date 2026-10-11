@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { profilForAdress } from './profil';
 
 /**
  * Bekräftar att mejlade underlag kommit fram.
@@ -25,8 +26,7 @@ function getSupabase() {
 }
 
 async function firstNameFor(supabase: ReturnType<typeof getSupabase>, email: string): Promise<string | null> {
-  const { data: profile } = await supabase
-    .from('profiles').select('full_name').ilike('email', email).limit(1).maybeSingle();
+  const profile = await profilForAdress(supabase, email);
   const { data: lead } = profile?.full_name
     ? { data: null }
     : await supabase.from('contact_requests').select('name').ilike('email', email)

@@ -83,7 +83,8 @@ function grupperaPerPerson(people: Map<string, Built>, data: Awaited<ReturnType<
     if (!p) continue;
     fa(p).meddelanden.push({
       id: m.gmail_message_id, kanal: 'mejl', riktning: m.direction, at: m.sent_at, text: m.body ?? '',
-      amne: m.subject, gmailMessageId: m.gmail_message_id, gmailThreadId: m.gmail_thread_id, bilagor: m.attachment_names ?? [],
+      amne: m.subject, gmailMessageId: m.gmail_message_id, gmailThreadId: m.gmail_thread_id, adress: m.customer_email ?? undefined,
+      bilagor: m.attachment_names ?? [],
     });
   }
   for (const s of data.sms) {
@@ -346,7 +347,9 @@ async function aiUtkast(supabase: Supabase, key: string, kanal: 'mejl' | 'sms') 
 
   const mejl = meddelanden.filter((m) => m.kanal === 'mejl');
   const senaste = [...mejl].reverse().find((m) => m.riktning === 'in');
-  const email = p.email;
+  // Svaret går till adressen kunden senast skrev från, även om den är en
+  // kopplad adress och inte den som står på kontot
+  const email = senaste?.adress || p.email;
   if (!email) return fel('Personen har ingen mejladress');
 
   const historik = mejl.slice(-15).map((m) => `From: ${m.riktning === 'in' ? email : 'erik@enklabokslut.se'}\nDate: ${m.at}\n\n${m.text}`).join('\n\n---\n\n');

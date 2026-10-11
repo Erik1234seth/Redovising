@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { normalizePhone } from '@/lib/sms/phone';
+import { profilForAdress } from '@/lib/inmail/profil';
 
 /**
  * Den andra kanalen som kontext till AI:n: mail-AI:n får SMS-konversationen
@@ -9,15 +10,19 @@ import { normalizePhone } from '@/lib/sms/phone';
 
 const SMS_MAX = 20;
 
-/** Telefonnumren vi känner till för en mejladress: profilen, formulären och mötena. */
+/**
+ * Telefonnumren vi känner till för en mejladress: profilen, formulären och mötena.
+ * Är adressen kopplad till ett konto räknas kontots egen adress också.
+ */
 export async function nummerFor(supabase: SupabaseClient, email: string): Promise<string[]> {
   const e = email.trim().toLowerCase();
-  const [p, c, m] = await Promise.all([
-    supabase.from('profiles').select('phone').ilike('email', e),
-    supabase.from('contact_requests').select('phone').ilike('email', e),
-    supabase.from('meetings').select('phone').ilike('email', e),
-  ]);
-  return [...new Set([...(p.data ?? []), ...(c.data ?? []), ...(m.data ?? [])]
+  const profil = await profilForAdress(supabase, e);
+  const adresser = [...new Set([e, profil?.email?.trim().toLowerCase()].filter((a): a is string => !!a))];
+  const rader = await Promise.all(adresser.flatMap((a) => [
+    supabase.from('contact_requests').select('phone').ilike('email', a),
+    supabase.from('meetings').select('phone').ilike('email', a),
+  ]));
+  return [...new Set([{ phone: profil?.phone ?? null }, ...rader.flatMap((r) => r.data ?? [])]
     .map((r) => normalizePhone(r.phone))
     .filter((n): n is string => !!n))];
 }

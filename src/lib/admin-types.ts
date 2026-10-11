@@ -456,6 +456,8 @@ export interface InkorgMeddelande {
   /** Gmail-id, för att kunna svara i rätt tråd. */
   gmailMessageId?: string;
   gmailThreadId?: string;
+  /** Kundens adress i mejlet. Kan vara en kopplad adress, inte den på kontot. */
+  adress?: string;
   bilagor?: string[];
   /** SMS-status för utgående: sent, failed … */
   status?: string | null;

@@ -1,6 +1,7 @@
 import { after } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { isNoReplyAddress } from '@/lib/inmail/no-reply';
+import { profilForAdress } from '@/lib/inmail/profil';
 import { skapaArendenFranMeddelande } from './fran-meddelande';
 
 /**
@@ -25,7 +26,7 @@ export function arendenEfterMejl(request: Request, response: Response): void {
 
       const { replyBody } = await svar.json().catch(() => ({})) as { replyBody?: string };
       const supabase = createServerClient();
-      const { data: profil } = await supabase.from('profiles').select('full_name').ilike('email', email).limit(1).maybeSingle();
+      const profil = await profilForAdress(supabase, email);
 
       await skapaArendenFranMeddelande({
         supabase,

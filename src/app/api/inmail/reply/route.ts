@@ -13,6 +13,7 @@ import { withUnderlagAck } from '@/lib/inmail/underlag-ack';
 import { arendenEfterMejl } from '@/lib/arenden/efter-mejl';
 import { sparaMejlutkast } from '@/lib/inkorg/mejlutkast';
 import { smsKontextForMejl } from '@/lib/inkorg/kontext';
+import { profilForAdress } from '@/lib/inmail/profil';
 
 function getSupabase() {
   return createClient(
@@ -76,12 +77,8 @@ async function handlePost(request: Request) {
     const savedUnderlag = await saveMailAttachments({ supabase, senderEmail, messageId, attachments });
     if (savedUnderlag) console.log(`[inmail/reply] ${savedUnderlag} bilagor från ${senderEmail} sparade som underlag`);
 
-    // Require known user for replies
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, full_name, email')
-      .eq('email', senderEmail)
-      .single();
+    // Kontot bakom avsändaren, även när kunden svarar från en kopplad adress
+    const profile = await profilForAdress(supabase, senderEmail);
 
     // Okänd avsändare i en tråd är inte samma sak som ingen avsändare. Sedan
     // välkomstmejlet till nya leads går från vår Gmail börjar varje sådan

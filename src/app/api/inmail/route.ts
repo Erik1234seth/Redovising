@@ -13,6 +13,7 @@ import { withUnderlagAck } from '@/lib/inmail/underlag-ack';
 import { arendenEfterMejl } from '@/lib/arenden/efter-mejl';
 import { sparaMejlutkast } from '@/lib/inkorg/mejlutkast';
 import { smsKontextForMejl } from '@/lib/inkorg/kontext';
+import { profilForAdress } from '@/lib/inmail/profil';
 
 function getSupabase() {
   return createClient(
@@ -76,37 +77,11 @@ async function handlePost(request: Request) {
     const savedUnderlag = await saveMailAttachments({ supabase, senderEmail, messageId, attachments });
     if (savedUnderlag) console.log(`[inmail] ${savedUnderlag} bilagor från ${senderEmail} sparade som underlag`);
 
-    // Look up user
-    let { data: profile } = await supabase
-      .from('profiles')
-      .select('id, full_name, email')
-      .eq('email', senderEmail)
-      .single();
-
-    // Kunden kan svara från en annan adress än den kontot står på. Har någon
+    // Kunden kan mejla från en annan adress än den kontot står på. Har någon
     // kopplat adressen för hand i adminpanelen hör den till samma person, och
     // svaret ska då byggas på kundens uppgifter och inte behandlas som ett
     // mejl från en främling.
-    if (!profile) {
-      const { data: alias } = await supabase
-        .from('person_aliases')
-        .select('user_id')
-        .eq('alias_email', senderEmail.trim().toLowerCase())
-        .not('user_id', 'is', null)
-        .maybeSingle();
-
-      if (alias?.user_id) {
-        const { data: linked } = await supabase
-          .from('profiles')
-          .select('id, full_name, email')
-          .eq('id', alias.user_id)
-          .single();
-        if (linked) {
-          console.log(`[inmail] ${senderEmail} är en kopplad adress till ${linked.email}`);
-          profile = linked;
-        }
-      }
-    }
+    const profile = await profilForAdress(supabase, senderEmail);
 
     // Unknown user — handle separately
     if (!profile) {

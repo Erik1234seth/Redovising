@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isSieFile } from '@/lib/sie/parse';
 import { importSieUnderlag } from '@/lib/sie/import';
+import { profilForAdress } from './profil';
 
 /**
  * Sparar bilagorna i inkommande mejl som underlag — alla, oavsett filtyp.
@@ -44,22 +45,7 @@ function normalize(info: MailFileInfo) {
 }
 
 export async function resolveUserId(supabase: SupabaseClient, email: string): Promise<string | null> {
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .ilike('email', email)
-    .limit(1)
-    .maybeSingle();
-  if (profile?.id) return profile.id;
-
-  const { data: alias } = await supabase
-    .from('person_aliases')
-    .select('user_id')
-    .eq('alias_email', email)
-    .not('user_id', 'is', null)
-    .limit(1)
-    .maybeSingle();
-  return alias?.user_id ?? null;
+  return (await profilForAdress(supabase, email))?.id ?? null;
 }
 
 /** Mappen följer kontot när det finns, annars adressen. */
