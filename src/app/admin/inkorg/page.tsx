@@ -234,9 +234,12 @@ function Trad({ personKey, onAndrat }: { personKey: string; onAndrat: () => void
       </div>
 
       <div className="p-4 border-t border-slate-200 space-y-3 bg-slate-50/60 rounded-b-xl">
-        {trad.utkast.map((u) => <Utkast key={`${u.kanal}-${u.id}`} u={u} personKey={personKey} onKlar={uppdatera} />)}
-        <Skriv email={senasteMejlIn?.adress || p.email} phone={p.phone} svarPa={senasteMejlIn?.gmailMessageId ?? null}
-          amne={senasteAmne} onKlar={uppdatera} />
+        {/* En ruta: AI-utkastet när det finns, annars en tom att skriva i. Vill vi
+            skriva något eget slänger vi utkastet. */}
+        {trad.utkast.length
+          ? trad.utkast.map((u) => <Utkast key={`${u.kanal}-${u.id}`} u={u} personKey={personKey} onKlar={uppdatera} />)
+          : <Skriv email={senasteMejlIn?.adress || p.email} phone={p.phone} svarPa={senasteMejlIn?.gmailMessageId ?? null}
+              amne={senasteAmne} onKlar={uppdatera} />}
       </div>
     </div>
   );
