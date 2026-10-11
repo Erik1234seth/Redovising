@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { isSieFile } from '@/lib/sie/parse';
 import { importSieUnderlag } from '@/lib/sie/import';
 import { profilForAdress } from './profil';
+import { arVarAdress } from '@/lib/underlag/var-fil';
 
 /**
  * Sparar bilagorna i inkommande mejl som underlag — alla, oavsett filtyp.
@@ -32,6 +33,11 @@ export interface MailFileInfo {
   fileName: string;
   size: number;
   mimeType?: string;
+  /**
+   * Kunden, när det är vi som skickat filen (sync-mail.gs). Filen hamnar då
+   * hos kunden som vår fil: kontext till AI:n, aldrig underlag att bokföra.
+   */
+  customerEmail?: string;
 }
 
 function normalize(info: MailFileInfo) {
@@ -41,7 +47,19 @@ function normalize(info: MailFileInfo) {
     fileName: info.fileName?.trim() || 'bilaga',
     size: info.size,
     mimeType: info.mimeType?.trim() || 'application/octet-stream',
+    customerEmail: info.customerEmail?.trim().toLowerCase() || null,
   };
+}
+
+/**
+ * Kontot filen hör till. Kundens filer kopplas via avsändaren. Våra egna
+ * kopplas via kunden, och bara när kunden har ett konto — en bilaga till ett
+ * lead eller en leverantör är inget vi behöver spara.
+ */
+async function agareFor(supabase: SupabaseClient, info: ReturnType<typeof normalize>): Promise<{ userId: string | null; spara: boolean }> {
+  if (!arVarAdress(info.email)) return { userId: await resolveUserId(supabase, info.email), spara: true };
+  const userId = info.customerEmail ? await resolveUserId(supabase, info.customerEmail) : null;
+  return { userId, spara: !!userId };
 }
 
 export async function resolveUserId(supabase: SupabaseClient, email: string): Promise<string | null> {
@@ -75,13 +93,14 @@ function validate(info: MailFileInfo) {
 export async function prepareMailUpload(
   supabase: SupabaseClient,
   raw: MailFileInfo,
-): Promise<{ status: 'exists' } | { status: 'upload'; path: string; signedUrl: string }> {
+): Promise<{ status: 'exists' | 'skipped' } | { status: 'upload'; path: string; signedUrl: string }> {
   validate(raw);
   const info = normalize(raw);
 
   if (await alreadySaved(supabase, info.messageId, info.fileName, info.size)) return { status: 'exists' };
 
-  const userId = await resolveUserId(supabase, info.email);
+  const { userId, spara } = await agareFor(supabase, info);
+  if (!spara) return { status: 'skipped' };
   const safeName = info.fileName.replace(/[^a-zA-Z0-9.-]/g, '_').slice(0, 60) || 'bilaga';
   const path = `${folderFor(userId, info.email)}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
 
@@ -95,10 +114,11 @@ export async function prepareMailUpload(
 export async function confirmMailUpload(
   supabase: SupabaseClient,
   raw: MailFileInfo & { path: string },
-): Promise<{ status: 'saved' | 'exists' }> {
+): Promise<{ status: 'saved' | 'exists' | 'skipped' }> {
   validate(raw);
   const info = normalize(raw);
-  const userId = await resolveUserId(supabase, info.email);
+  const { userId, spara } = await agareFor(supabase, info);
+  if (!spara) return { status: 'skipped' };
 
   // Sökvägen kommer från scriptet — den måste ligga i den mapp vi själva delade ut
   const folder = folderFor(userId, info.email);
@@ -173,7 +193,7 @@ export async function saveMailAttachments(params: {
 
     try {
       const prepared = await prepareMailUpload(supabase, info);
-      if (prepared.status === 'exists') continue;
+      if (prepared.status !== 'upload') continue;
 
       const { error } = await supabase.storage
         .from(UNDERLAG_BUCKET)

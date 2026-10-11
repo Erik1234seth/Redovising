@@ -20,6 +20,13 @@
 //                       MAIL_SYNC_OFFSET.
 //
 // Att köra om är ofarligt: importen gör upsert på meddelandets id.
+//
+// Bilagor i mejl VI skickat (till exempel en Excel-fil där kunden ska markera
+// privata rader) laddas också upp, av syncMailRecent och syncSentRecent. De
+// hamnar hos kunden som våra filer: kontext till AI:n när kunden svarar, men
+// aldrig underlag som bokförs. Servern sparar bara när mottagaren har ett
+// konto, och stoppar dubbletter, så samma bilaga laddas aldrig upp två gånger.
+// Kundens egna bilagor sparas av save-attachments.gs som förut.
 
 // Inte -in:drafts: den kan utesluta hela trådar där AI:n lagt ett svarsutkast.
 // Utkasten sorteras bort per meddelande i collectMailMessages i stället.
@@ -67,7 +74,9 @@ function syncMailRecent() {
     var threads = GmailApp.search(MAIL_SYNC_RECENT_QUERY, offset, MAIL_SYNC_THREADS_PER_RUN);
     if (threads.length === 0) break;
 
-    addMailSyncTotals(totals, flushMailMessages(config, collectMailMessages(threads, owners)));
+    var uploads = [];
+    addMailSyncTotals(totals, flushMailMessages(config, collectMailMessages(threads, owners, uploads)));
+    saveOutgoingAttachments(config, uploads);
     offset += threads.length;
 
     if (threads.length < MAIL_SYNC_THREADS_PER_RUN) break;
@@ -83,7 +92,10 @@ function syncMailRecent() {
 function syncSentRecent() {
   var threads = GmailApp.search(MAIL_SYNC_SENT_QUERY, 0, MAIL_SYNC_THREADS_PER_RUN);
   if (threads.length === 0) return;
-  var res = flushMailMessages(getConfig(), collectMailMessages(threads, getMailSyncOwners()));
+  var config = getConfig();
+  var uploads = [];
+  var res = flushMailMessages(config, collectMailMessages(threads, getMailSyncOwners(), uploads));
+  saveOutgoingAttachments(config, uploads);
   console.log('syncSentRecent: ' + threads.length + ' trådar. Sparade ' + res.imported + ', misslyckades ' + res.failed + '.');
 }
 
@@ -156,7 +168,10 @@ function removeMailSyncTriggers() {
 // Gör om trådarnas mejl till rader. Kunden är avsändaren på inkommande mejl
 // och första mottagaren som inte är vi på utgående. Mejl mellan våra egna
 // adresser och från no-reply-avsändare tas inte med.
-function collectMailMessages(threads, owners) {
+//
+// Skickas en lista som uploads läggs våra utgående mejl med bilagor till i
+// den, så att bilagorna kan laddas upp efteråt (saveOutgoingAttachments).
+function collectMailMessages(threads, owners, uploads) {
   var out = [];
 
   for (var t = 0; t < threads.length; t++) {
@@ -179,6 +194,7 @@ function collectMailMessages(threads, owners) {
       try {
         var atts = m.getAttachments({ includeInlineImages: false });
         for (var a = 0; a < atts.length; a++) names.push(atts[a].getName());
+        if (uploads && outgoing && atts.length) uploads.push({ message: m, from: from, customer: customer, files: atts });
       } catch (err) {
         console.warn('Kunde inte läsa bilagorna i ' + m.getId() + ': ' + err.message);
       }
@@ -229,4 +245,57 @@ function addMailSyncTotals(totals, res) {
   totals.imported += res.imported;
   totals.skipped += res.skipped;
   totals.failed += res.failed;
+}
+
+
+// ─── Bilagor i mejl vi skickat ────────────────────────────────────────────────
+// Samma tre steg som save-attachments.gs, men filen kopplas till kunden
+// (customerEmail) och inte till avsändaren, som ju är vi:
+//   1. POST /api/inmail/underlag  { action: 'prepare', ... }  → signedUrl,
+//      'exists' (redan sparad) eller 'skipped' (mottagaren har inget konto)
+//   2. PUT  signedUrl  (filens bytes)
+//   3. POST /api/inmail/underlag  { action: 'confirm', ... }
+// Misslyckas en fil görs ett nytt försök vid nästa körning — servern vet vad
+// som redan finns.
+
+function saveOutgoingAttachments(config, uploads) {
+  var saved = 0;
+  var failed = 0;
+
+  for (var u = 0; u < uploads.length; u++) {
+    var item = uploads[u];
+    for (var i = 0; i < item.files.length; i++) {
+      var att = item.files[i];
+      var info = {
+        senderEmail: item.from,
+        customerEmail: item.customer,
+        messageId: item.message.getId(),
+        fileName: att.getName() || ('bilaga-' + (i + 1)),
+        mimeType: att.getContentType() || 'application/octet-stream',
+        size: att.getSize(),
+      };
+
+      var prepared = callApi(config, '/api/inmail/underlag', Object.assign({ action: 'prepare' }, info));
+      if (!prepared) { failed++; continue; }
+      if (prepared.status !== 'upload') continue;
+
+      var put = UrlFetchApp.fetch(prepared.signedUrl, {
+        method: 'put',
+        contentType: info.mimeType,
+        payload: att.getBytes(),
+        muteHttpExceptions: true,
+      });
+      if (put.getResponseCode() >= 300) {
+        console.error('Uppladdning av ' + info.fileName + ' till ' + info.customerEmail + ' misslyckades: ' + put.getResponseCode());
+        failed++;
+        continue;
+      }
+
+      var confirmed = callApi(config, '/api/inmail/underlag', Object.assign({ action: 'confirm', path: prepared.path }, info));
+      if (!confirmed) { failed++; continue; }
+      if (confirmed.status === 'saved') saved++;
+    }
+  }
+
+  if (saved || failed) console.log('Bilagor i skickade mejl: sparade ' + saved + ', misslyckades ' + failed + '.');
 }
