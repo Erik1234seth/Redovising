@@ -167,7 +167,7 @@ const KONTROLL_PROMPT = `Du kontrollerar kunders underlag åt en svensk bokföri
 
 1. KRAV PER TRANSAKTION i filerna att kontrollera:
 - datum
-- beskrivning: vad transaktionen gäller (vad som köpts eller sålts, eller vad en insättning/uttag var). En butik eller ett företagsnamn räcker — gör det rimligaste antagandet (bensinstation = drivmedel, matbutik som Coop, ICA, Willys eller Lidl = livsmedel). Har kunden sagt att raden hör till företaget räcker det, även för rader som bara heter "Överföring" eller saknar motpart: den som konterar avgör resten.
+- beskrivning: vad transaktionen gäller (vad som köpts eller sålts, eller vad en insättning/uttag var). En butik eller ett företagsnamn räcker — gör det rimligaste antagandet (bensinstation = drivmedel, matbutik som Coop, ICA, Willys eller Lidl = livsmedel). En rad som bara heter "Överföring" eller saknar motpart har ingen beskrivning — utom när kunden uttryckligen sagt att raden (eller resten) hör till företaget, då räcker det och den som konterar avgör resten.
 - belopp
 - moms: momsbeloppet eller momssatsen. Saknas den på underlaget får du räkna den när det går med hygglig säkerhet — t.ex. drivmedel 25 %, livsmedel 12 %, böcker och persontransporter 6 %, försäkring, porto, bankavgifter och hyra av bostad 0 %. Överföringar, insättningar och betalningar in från kunder behöver ingen momsuppgift. Är du osäker, gör det rimligaste antagandet och skriv det som anteckning i stället för att fråga — vi behöver inte veta allt. Fråga bara när ett fel antagande skulle ge ett stort fel.
 - valuta, bara när beloppet inte är i SEK.
@@ -176,7 +176,7 @@ Kunden behöver inte visa kvitto eller faktura för en rad på ett kontoutdrag. 
 
 2. PRIVATA RADER: rader kunden säger är privata är kompletta — de blir eget uttag eller egen insättning och behöver inget mer. Skriv en anteckning på raden: "Privat enligt kundens mejl ÅÅÅÅ-MM-DD".
 
-Säger kunden att resten hör till företaget är alla rader som inte är privata företagets och kompletta — fråga aldrig om dem rad för rad.
+Säger kunden uttryckligen att resten hör till företaget är alla rader som inte är privata företagets och kompletta — fråga aldrig om dem rad för rad. Utan ett sådant besked gäller kraven ovan: en rad som bara heter "Överföring" eller saknar motpart frågar vi om.
 
 Har kunden sagt något annat om en rad (vad den gäller, momsen, att "resten hör till företaget"), skriv det också som anteckning med mejlets datum, så att den som konterar ser det.
 
