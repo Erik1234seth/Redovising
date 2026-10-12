@@ -36,6 +36,14 @@ const SYNLIGA_SMS = ['sent', 'delivered', 'queued', 'sending', 'failed'];
 
 const MAX_RADER = 3000;
 
+/**
+ * Mejl vi skickat från inkorgen syns direkt, utan att vänta på att synk-scriptet
+ * (var 5:e minut) hämtat in dem från Gmail. När Gmails kopia finns — ett utgående
+ * mejl till personen skickat runt samma tid eller senare — visas den i stället.
+ */
+const SKICKADE_DAGAR = 2;
+const SKICKAD_MARGINAL_MS = 5 * 60_000;
+
 /** SMS-mallarna som går ut av sig själva. De visas nedtonade och räknas inte som en konversation. */
 const AUTOMATISKA = ['lead_welcome', 'lead_paminnelse', 'lead_booking', 'mejl_notis', 'meeting_reminder'];
 
@@ -47,7 +55,7 @@ function kategori(p: Built, ombud: Map<string, string | null>): InkorgKategori {
 const visningsnamn = (p: Built) => p.name || p.company || p.email || p.phone || p.key;
 
 async function lasData(supabase: Supabase) {
-  const [mejl, sms, mejlUtkast, last, profiler] = await Promise.all([
+  const [mejl, sms, mejlUtkast, skickade, last, profiler] = await Promise.all([
     supabase.from('mail_messages')
       .select('gmail_message_id, gmail_thread_id, direction, customer_email, subject, body, attachment_names, sent_at')
       .order('sent_at', { ascending: false }).limit(MAX_RADER),
@@ -55,15 +63,18 @@ async function lasData(supabase: Supabase) {
       .select('id, phone, direction, body, status, error, kind, created_at')
       .order('created_at', { ascending: false }).limit(MAX_RADER),
     supabase.from('mejl_utkast').select('id, till_email, amne, text, svar_pa_message_id, fel, created_at').eq('status', 'draft'),
+    supabase.from('mejl_utkast').select('id, till_email, amne, text, sent_at').eq('status', 'sent')
+      .gte('sent_at', new Date(Date.now() - SKICKADE_DAGAR * 86_400_000).toISOString()),
     supabase.from('inkorg_last').select('alias, last_read_at'),
     supabase.from('profiles').select('id, ombud_klart_at, moms_period, start_ar, redovisningsmetod'),
   ]);
-  const fel = mejl.error ?? sms.error ?? mejlUtkast.error ?? last.error ?? profiler.error;
+  const fel = mejl.error ?? sms.error ?? mejlUtkast.error ?? skickade.error ?? last.error ?? profiler.error;
   if (fel) throw new Error(fel.message);
   return {
     mejl: mejl.data ?? [],
     sms: sms.data ?? [],
     mejlUtkast: mejlUtkast.data ?? [],
+    skickade: skickade.data ?? [],
     last: new Map((last.data ?? []).map((r) => [r.alias as string, r.last_read_at as string])),
     profiler: profiler.data ?? [],
   };
@@ -87,6 +98,15 @@ function grupperaPerPerson(people: Map<string, Built>, data: Awaited<ReturnType<
       id: m.gmail_message_id, kanal: 'mejl', riktning: m.direction, at: m.sent_at, text: m.body ?? '',
       amne: m.subject, gmailMessageId: m.gmail_message_id, gmailThreadId: m.gmail_thread_id, adress: m.customer_email ?? undefined,
       bilagor: m.attachment_names ?? [],
+    });
+  }
+  for (const u of data.skickade) {
+    const p = perAlias.get(emailKey(u.till_email) ?? '');
+    if (!p || !u.sent_at) continue;
+    const fran = new Date(new Date(u.sent_at).getTime() - SKICKAD_MARGINAL_MS).toISOString();
+    if (fa(p).meddelanden.some((m) => m.kanal === 'mejl' && m.riktning === 'out' && !!m.gmailMessageId && m.at >= fran)) continue;
+    fa(p).meddelanden.push({
+      id: `skickat-${u.id}`, kanal: 'mejl', riktning: 'out', at: u.sent_at, text: u.text ?? '', amne: u.amne, adress: u.till_email,
     });
   }
   for (const s of data.sms) {
