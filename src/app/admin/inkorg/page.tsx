@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { RAKNA_OM } from '../_nav-menu';
 import type {
   AiAnteckning, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast,
 } from '@/lib/admin-types';
@@ -107,13 +108,14 @@ export default function InkorgPage() {
     fetch('/api/admin/inkorg', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, keys }) })
       .then((r) => r.json()).then((d) => { if (d.error) setFel(d.error); })
       .catch(() => setFel('Kunde inte spara ändringen'))
-      .finally(ladda);
+      .finally(() => { ladda(); window.dispatchEvent(new Event(RAKNA_OM)); });
   };
 
   const oppna = (key: string) => {
     setVald(key);
     setLista((l) => l?.map((k) => (k.key === key ? { ...k, olast: false } : k)) ?? null);
-    fetch('/api/admin/inkorg', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'last', key }) }).catch(() => {});
+    fetch('/api/admin/inkorg', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'last', key }) })
+      .then(() => window.dispatchEvent(new Event(RAKNA_OM))).catch(() => {});
   };
 
   return (
