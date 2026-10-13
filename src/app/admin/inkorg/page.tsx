@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type {
-  AiAnteckning, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast, MomsPeriod, Redovisningsmetod,
+  AiAnteckning, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast,
 } from '@/lib/admin-types';
 
 /**
@@ -49,6 +49,7 @@ export default function InkorgPage() {
   const [bara, setBara] = useState<'alla' | 'olasta' | 'utkast'>('alla');
   const [sok, setSok] = useState('');
   const [vald, setVald] = useState<string | null>(null);
+  const [markerade, setMarkerade] = useState<Set<string>>(new Set());
 
   const ladda = useCallback(() => {
     fetch('/api/admin/inkorg').then((r) => r.json()).then((d) => {
@@ -84,6 +85,31 @@ export default function InkorgPage() {
   /** Olästa per flik — det som syns som siffra bredvid fliknamnet. */
   const antal = (id: InkorgKategori) => (lista ?? []).filter((k) => k.kategori === id && k.olast).length;
 
+  // Markeringen gäller det man ser — byts flik, filter eller sökning börjar den om
+  useEffect(() => { setMarkerade(new Set()); }, [flik, bara, sok]);
+
+  const markera = (key: string) => setMarkerade((m) => {
+    const n = new Set(m);
+    if (n.has(key)) n.delete(key); else n.add(key);
+    return n;
+  });
+  const allaMarkerade = synliga.length > 0 && synliga.every((k) => markerade.has(k.key));
+
+  /** Oläst igen eller bort ur inkorgen. Historiken rörs inte — en borttagen kommer tillbaka när något nytt händer. */
+  const forMarkerade = (action: 'olast' | 'dolj') => {
+    const keys = [...markerade];
+    if (!keys.length) return;
+    setLista((l) => (action === 'olast'
+      ? l?.map((k) => (markerade.has(k.key) ? { ...k, olast: true } : k))
+      : l?.filter((k) => !markerade.has(k.key))) ?? null);
+    if (action === 'dolj' && vald && markerade.has(vald)) setVald(null);
+    setMarkerade(new Set());
+    fetch('/api/admin/inkorg', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, keys }) })
+      .then((r) => r.json()).then((d) => { if (d.error) setFel(d.error); })
+      .catch(() => setFel('Kunde inte spara ändringen'))
+      .finally(ladda);
+  };
+
   const oppna = (key: string) => {
     setVald(key);
     setLista((l) => l?.map((k) => (k.key === key ? { ...k, olast: false } : k)) ?? null);
@@ -116,15 +142,35 @@ export default function InkorgPage() {
           </div>
         </div>
 
+        {synliga.length > 0 && (
+          <div className="px-3 py-1.5 border-b border-slate-200 flex items-center gap-3 text-xs bg-slate-50">
+            <input type="checkbox" checked={allaMarkerade} aria-label="Markera alla"
+              onChange={() => setMarkerade(allaMarkerade ? new Set() : new Set(synliga.map((k) => k.key)))}
+              className="accent-blue-600" />
+            {markerade.size === 0 ? <span className="text-slate-400">Markera för att ändra flera</span> : (
+              <>
+                <span className="text-slate-600">{markerade.size} markerade</span>
+                <button onClick={() => forMarkerade('olast')} className="text-blue-700 hover:underline">Markera som oläst</button>
+                <button onClick={() => forMarkerade('dolj')} title="Tas bort ur listan. Mejlen och historiken ligger kvar, och konversationen kommer tillbaka när något nytt händer."
+                  className="text-red-600 hover:underline">Ta bort ur inkorgen</button>
+              </>
+            )}
+          </div>
+        )}
+
         {fel && <p className="text-red-600 text-sm p-3">{fel}</p>}
         {!lista && !fel && <p className="text-slate-500 text-sm p-3">Hämtar…</p>}
         {lista && synliga.length === 0 && <p className="text-slate-500 text-sm p-3">Inget här.</p>}
 
         <ul className="divide-y divide-slate-100 lg:max-h-[calc(100vh-14rem)] overflow-y-auto">
           {synliga.map((k) => (
-            <li key={k.key}>
+            <li key={k.key} className="flex items-stretch">
+              <label className={`flex items-start pl-3 pt-3 cursor-pointer ${vald === k.key ? 'bg-blue-50' : k.olast ? 'bg-white' : 'bg-slate-50'}`}>
+                <input type="checkbox" checked={markerade.has(k.key)} onChange={() => markera(k.key)}
+                  aria-label={`Markera ${k.namn}`} className="accent-blue-600" />
+              </label>
               <button onClick={() => oppna(k.key)}
-                className={`w-full text-left px-3 py-2.5 border-l-4 transition ${
+                className={`flex-1 min-w-0 text-left px-3 py-2.5 border-l-4 transition ${
                   vald === k.key ? 'bg-blue-50 border-l-blue-600'
                     : k.olast ? 'bg-white border-l-blue-600 hover:bg-blue-50/50'
                       : 'bg-slate-50 border-l-transparent hover:bg-slate-100'}`}>
@@ -210,9 +256,6 @@ function Trad({ personKey, onAndrat }: { personKey: string; onAndrat: () => void
 
       {visaAnteckning && <Anteckningar personKey={personKey} anteckningar={trad.anteckningar} onAndrat={ladda} />}
 
-      {trad.uppgifter && p.profileId && (
-        <Ombudsuppgifter profileId={p.profileId} uppgifter={trad.uppgifter} onSparat={uppdatera} />
-      )}
 
       {trad.arenden.length > 0 && (
         <div className="px-4 py-3 border-b border-slate-200 bg-amber-50/40">
@@ -451,66 +494,3 @@ function Anteckningar({ personKey, anteckningar, onAndrat }: {
   );
 }
 
-const MOMS: { v: MomsPeriod; t: string }[] = [
-  { v: 'månadsvis', t: 'Månadsvis' }, { v: 'kvartalsvis', t: 'Kvartalsvis' }, { v: 'helår', t: 'Årsvis' }, { v: 'ingen-moms', t: 'Ingen moms' },
-];
-
-function Ombudsuppgifter({ profileId, uppgifter, onSparat }: {
-  profileId: string;
-  uppgifter: NonNullable<InkorgTrad['uppgifter']>;
-  onSparat: () => void;
-}) {
-  const [moms, setMoms] = useState<MomsPeriod | ''>(uppgifter.momsPeriod ?? '');
-  const [startAr, setStartAr] = useState(uppgifter.startAr ? String(uppgifter.startAr) : '');
-  const [metod, setMetod] = useState<Redovisningsmetod | ''>(uppgifter.redovisningsmetod ?? '');
-  const [upptagen, setUpptagen] = useState(false);
-  const [fel, setFel] = useState('');
-
-  const spara = async (klart?: boolean) => {
-    setUpptagen(true); setFel('');
-    try {
-      await post('/api/admin/inkorg', {
-        action: 'ombud', profileId, momsPeriod: moms, startAr, redovisningsmetod: metod,
-        ...(klart !== undefined ? { klart } : {}),
-      });
-      onSparat();
-    } catch (e) { setFel(e instanceof Error ? e.message : 'Kunde inte spara'); } finally { setUpptagen(false); }
-  };
-
-  if (uppgifter.ombudKlart) {
-    return (
-      <div className="px-4 py-2 border-b border-slate-200 text-xs text-slate-500 flex items-center gap-2">
-        <span className="text-emerald-700">✓ Ombud klart {new Date(uppgifter.ombudKlart).toLocaleDateString('sv-SE')}</span>
-        <span>· {MOMS.find((m) => m.v === uppgifter.momsPeriod)?.t ?? 'momsperiod saknas'} · startår {uppgifter.startAr ?? '–'} · {uppgifter.redovisningsmetod ?? 'metod saknas'}</span>
-        <button onClick={() => spara(false)} disabled={upptagen} className="ml-auto text-slate-400 hover:text-red-600">Ångra</button>
-      </div>
-    );
-  }
-
-  const falt = 'bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-slate-900';
-  return (
-    <div className="px-4 py-3 border-b border-slate-200 bg-amber-50/50">
-      <p className="text-sm font-semibold text-amber-900 mb-1">Uppgifter från Skatteverket</p>
-      <p className="text-xs text-amber-800/80 mb-2">När kunden lagt in oss som deklarationsombud: fyll i det vi hämtat och tryck Ombud klart. Då flyttas kunden till Kunder.</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <select value={moms} onChange={(e) => setMoms(e.target.value as MomsPeriod)} className={falt}>
-          <option value="">Momsperiod…</option>
-          {MOMS.map((m) => <option key={m.v} value={m.v}>{m.t}</option>)}
-        </select>
-        <input value={startAr} onChange={(e) => setStartAr(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="Startår" className={`${falt} w-24`} />
-        <select value={metod} onChange={(e) => setMetod(e.target.value as Redovisningsmetod)} className={falt}>
-          <option value="">Bokföringsmetod…</option>
-          <option value="faktureringsmetoden">Faktureringsmetoden</option>
-          <option value="kontantmetoden">Kontantmetoden</option>
-        </select>
-        <button onClick={() => spara()} disabled={upptagen} className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Spara</button>
-        <button onClick={() => spara(true)} disabled={upptagen || !moms || !startAr || !metod}
-          title={!moms || !startAr || !metod ? 'Fyll i alla tre först' : ''}
-          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50">
-          Ombud klart ✓
-        </button>
-      </div>
-      {fel && <p className="text-xs text-red-600 mt-1">{fel}</p>}
-    </div>
-  );
-}

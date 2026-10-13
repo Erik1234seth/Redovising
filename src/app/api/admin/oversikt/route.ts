@@ -3,14 +3,14 @@ import { createServerClient } from '@/lib/supabase-server';
 
 /**
  * Det översikten behöver som inte redan finns i andra routes: kunderna som
- * väntar på att vi lägger in ombudsuppgifterna. Resten (inkorg, ärenden,
+ * saknar startår eller bokföringsmetod — samma regel som inkorgens flik. Resten (inkorg, ärenden,
  * inlämning, leads) hämtar sidan från sina egna routes.
  */
 export async function GET() {
   const { data, error } = await createServerClient()
     .from('profiles')
     .select('id, full_name, company_name, email, created_at')
-    .is('ombud_klart_at', null)
+    .or('start_ar.is.null,redovisningsmetod.is.null')
     .order('created_at', { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

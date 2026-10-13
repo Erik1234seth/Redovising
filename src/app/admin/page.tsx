@@ -202,12 +202,12 @@ export default function OversiktPage() {
               </section>
 
               <section className={panel}>
-                <h2 className={rubrik}>Väntar på ombudsuppgifter {data?.saknarOmbud ? `(${data.saknarOmbud.length})` : ''}</h2>
+                <h2 className={rubrik}>Saknar uppgifter {data?.saknarOmbud ? `(${data.saknarOmbud.length})` : ''}</h2>
                 {!data?.saknarOmbud?.length ? tom('Alla kunder har sina uppgifter inlagda.') : (
                   <ul className="flex flex-wrap gap-1.5">
                     {data.saknarOmbud.map((k) => (
                       <li key={k.profileId}>
-                        <Link href={`/admin/inkorg?key=${encodeURIComponent(k.email ?? k.profileId)}`}
+                        <Link href={`/admin/person/${encodeURIComponent(k.email ?? k.profileId)}`}
                           className="inline-block text-xs px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 hover:bg-amber-100">
                           {k.namn}
                         </Link>

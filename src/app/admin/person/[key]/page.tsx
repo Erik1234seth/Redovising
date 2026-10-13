@@ -227,6 +227,43 @@ export default function PersonPage() {
     }
   };
 
+  /** Startåret sparas när fältet lämnas, och bara om det ändrats. */
+  const [startArText, setStartArText] = useState<string | null>(null);
+  const sparaStartAr = async () => {
+    if (!person?.profileId || startArText === null) return;
+    const ar = startArText.trim() ? Number(startArText) : null;
+    setStartArText(null);
+    if (ar === person.startAr) return;
+    const previous = person.startAr;
+    setPerson({ ...person, startAr: ar });
+    const res = await fetch('/api/admin/people', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: person.profileId, startAr: ar }),
+    });
+    if (!res.ok) {
+      setPerson((p) => (p ? { ...p, startAr: previous } : p));
+      setError((await res.json().catch(() => null))?.error ?? 'Startåret kunde inte sparas');
+    }
+  };
+
+  const [savingPeriodisk, setSavingPeriodisk] = useState(false);
+  const setPeriodisk = async (value: boolean) => {
+    if (!person?.profileId || savingPeriodisk) return;
+    setPerson({ ...person, periodiskSammanfattning: value });
+    setSavingPeriodisk(true);
+    const res = await fetch('/api/admin/people', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: person.profileId, periodiskSammanfattning: value }),
+    });
+    setSavingPeriodisk(false);
+    if (!res.ok) {
+      setPerson((p) => (p ? { ...p, periodiskSammanfattning: !value } : p));
+      setError('Periodisk sammanfattning kunde inte sparas');
+    }
+  };
+
   /**
    * Kopplar en till adress till personen. Laddar om efteråt i stället för att
    * skriva i state: kopplingen slår ihop personen med allt som redan kommit in
@@ -743,6 +780,30 @@ export default function PersonPage() {
               </section>
 
               <section className="pt-6 border-t border-slate-200">
+                <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-4">Startår</h3>
+                {person.profileId ? (
+                  <>
+                    <input
+                      value={startArText ?? (person.startAr ? String(person.startAr) : '')}
+                      onChange={(e) => setStartArText(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      onBlur={sparaStartAr}
+                      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                      placeholder="ÅÅÅÅ"
+                      inputMode="numeric"
+                      className="w-28 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
+                    />
+                    <p className="text-slate-400 text-xs mt-3">
+                      {person.startAr && person.redovisningsmetod
+                        ? 'Startår och bokföringsmetod finns — kunden ligger under Kunder i inkorgen.'
+                        : 'Med startår och bokföringsmetod flyttas kunden från Saknar uppgifter till Kunder i inkorgen.'}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-slate-500 text-sm">Personen har inget konto än.</p>
+                )}
+              </section>
+
+              <section className="pt-6 border-t border-slate-200">
                 <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-4">Momsperiod</h3>
                 {person.profileId ? (
                   <>
@@ -834,6 +895,20 @@ export default function PersonPage() {
                   </>
                 ) : (
                   <p className="text-slate-500 text-sm">Personen har inget konto än — det väljs i onboardingen.</p>
+                )}
+              </section>
+
+              {/* Försäljning till företag i andra EU-länder ska redovisas i en periodisk sammanfattning */}
+              <section className="pt-6 border-t border-slate-200">
+                <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-4">Periodisk sammanfattning</h3>
+                {person.profileId ? (
+                  <label className="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
+                    <input type="checkbox" checked={person.periodiskSammanfattning} disabled={savingPeriodisk}
+                      onChange={(e) => setPeriodisk(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                    Ska ha periodisk sammanfattning
+                  </label>
+                ) : (
+                  <p className="text-slate-500 text-sm">Personen har inget konto än.</p>
                 )}
               </section>
 

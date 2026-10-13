@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { build, emailKey, locate, phoneKey, summary, type Built } from '@/lib/personer';
 import type {
-  AiAnteckning, Arende, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast, MomsPeriod, Redovisningsmetod,
+  AiAnteckning, Arende, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast,
 } from '@/lib/admin-types';
 import { callScript } from '@/lib/emails/send-via-gmail';
 import { identifySender } from '@/lib/sms/identify';
@@ -18,8 +18,8 @@ import { arUnderlagsmejl, korUnderlagsflode } from '@/lib/underlag-kontroll';
  *
  * GET              → konversationerna, nyast först
  * GET ?key=        → hela tråden för en person: mejl och SMS i tidsordning
- * POST { action }  → läst, skicka/spara/släng mejlutkast, nytt mejl,
- *                    AI-utkast på begäran, ombudsuppgifterna
+ * POST { action }  → läst, oläst, ta bort ur inkorgen, skicka/spara/släng
+ *                    mejlutkast, nytt mejl, AI-utkast på begäran
  *
  * SMS-utkasten ligger kvar i sms_messages (status 'draft') och skickas med
  * /api/admin/sms-drafts som förut.
@@ -47,15 +47,16 @@ const SKICKAD_MARGINAL_MS = 5 * 60_000;
 /** SMS-mallarna som går ut av sig själva. De visas nedtonade och räknas inte som en konversation. */
 const AUTOMATISKA = ['lead_welcome', 'lead_paminnelse', 'lead_booking', 'mejl_notis', 'meeting_reminder'];
 
-function kategori(p: Built, ombud: Map<string, string | null>): InkorgKategori {
+/** Ett konto blir kund när startåret och bokföringsmetoden finns, oavsett om de fylls i här eller i personvyn. */
+function kategori(p: Built, klara: Set<string>): InkorgKategori {
   if (!p.profileId) return 'lead';
-  return ombud.get(p.profileId) ? 'kund' : 'saknar';
+  return klara.has(p.profileId) ? 'kund' : 'saknar';
 }
 
 const visningsnamn = (p: Built) => p.name || p.company || p.email || p.phone || p.key;
 
 async function lasData(supabase: Supabase) {
-  const [mejl, sms, mejlUtkast, skickade, last, profiler] = await Promise.all([
+  const [mejl, sms, mejlUtkast, skickade, last, dolda, profiler] = await Promise.all([
     supabase.from('mail_messages')
       .select('gmail_message_id, gmail_thread_id, direction, customer_email, subject, body, attachment_names, sent_at')
       .order('sent_at', { ascending: false }).limit(MAX_RADER),
@@ -66,9 +67,10 @@ async function lasData(supabase: Supabase) {
     supabase.from('mejl_utkast').select('id, till_email, amne, text, sent_at').eq('status', 'sent')
       .gte('sent_at', new Date(Date.now() - SKICKADE_DAGAR * 86_400_000).toISOString()),
     supabase.from('inkorg_last').select('alias, last_read_at'),
-    supabase.from('profiles').select('id, ombud_klart_at, moms_period, start_ar, redovisningsmetod'),
+    supabase.from('inkorg_dold').select('alias, dold_at'),
+    supabase.from('profiles').select('id, start_ar, redovisningsmetod'),
   ]);
-  const fel = mejl.error ?? sms.error ?? mejlUtkast.error ?? skickade.error ?? last.error ?? profiler.error;
+  const fel = mejl.error ?? sms.error ?? mejlUtkast.error ?? skickade.error ?? last.error ?? dolda.error ?? profiler.error;
   if (fel) throw new Error(fel.message);
   return {
     mejl: mejl.data ?? [],
@@ -76,6 +78,7 @@ async function lasData(supabase: Supabase) {
     mejlUtkast: mejlUtkast.data ?? [],
     skickade: skickade.data ?? [],
     last: new Map((last.data ?? []).map((r) => [r.alias as string, r.last_read_at as string])),
+    dolda: new Map((dolda.data ?? []).map((r) => [r.alias as string, r.dold_at as string])),
     profiler: profiler.data ?? [],
   };
 }
@@ -134,7 +137,7 @@ function grupperaPerPerson(people: Map<string, Built>, data: Awaited<ReturnType<
   return per;
 }
 
-/** När konversationen senast öppnades, över alla personens adresser. Tom sträng = aldrig öppnad. */
+/** Senaste tidpunkten över alla personens adresser, t.ex. när konversationen öppnades. Tom sträng = aldrig. */
 function senastLast(p: Built, last: Map<string, string>): string {
   return p.aliases.reduce((max, a) => {
     const t = last.get(a);
@@ -146,7 +149,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createServerClient();
     const [people, data] = await Promise.all([build(), lasData(supabase)]);
-    const ombud = new Map(data.profiler.map((p) => [p.id as string, p.ombud_klart_at as string | null]));
+    const klara = new Set(data.profiler.filter((p) => p.start_ar && p.redovisningsmetod).map((p) => p.id as string));
     const per = grupperaPerPerson(people, data);
 
     const key = request.nextUrl.searchParams.get('key');
@@ -154,7 +157,6 @@ export async function GET(request: NextRequest) {
       const p = locate(people, key);
       if (!p) return NextResponse.json({ error: 'Hittade ingen sådan person' }, { status: 404 });
       const v = per.get(p.key);
-      const profil = p.profileId ? data.profiler.find((x) => x.id === p.profileId) : null;
       const nycklar = [...new Set([...p.aliases.map((a) => a.slice(2)), p.email, p.phone].filter((x): x is string => !!x))];
       const mejladresser = p.aliases.filter((a) => a.startsWith('e:')).map((a) => a.slice(2));
       const telefoner = p.aliases.filter((a) => a.startsWith('p:')).map((a) => a.slice(2));
@@ -171,13 +173,7 @@ export async function GET(request: NextRequest) {
 
       const trad: InkorgTrad = {
         person: summary(p),
-        kategori: kategori(p, ombud),
-        uppgifter: profil ? {
-          momsPeriod: profil.moms_period as MomsPeriod | null,
-          startAr: profil.start_ar as number | null,
-          redovisningsmetod: profil.redovisningsmetod as Redovisningsmetod | null,
-          ombudKlart: profil.ombud_klart_at as string | null,
-        } : null,
+        kategori: kategori(p, klara),
         meddelanden: v?.meddelanden ?? [],
         utkast: v?.utkast ?? [],
         arenden: (arenden ?? []).map((r): Arende => ({
@@ -197,6 +193,10 @@ export async function GET(request: NextRequest) {
       const riktiga = meddelanden.filter((m) => !m.automatisk);
       if (!riktiga.some((m) => m.riktning === 'in') && !utkast.length) continue;
       const sista = riktiga[riktiga.length - 1];
+      // Borttagen ur inkorgen: syns igen först när något nytt kommer in eller ett nytt utkast skrivs
+      const dold = senastLast(p, data.dolda);
+      const nyast = [sista?.at ?? '', ...utkast.map((u) => u.at)].reduce((a, b) => (b > a ? b : a), '');
+      if (dold && nyast <= dold) continue;
       const sistaIn = [...meddelanden].reverse().find((m) => m.riktning === 'in');
       const visa = sista ?? { kanal: utkast[0].kanal, riktning: 'out' as const, text: utkast[0].text, amne: utkast[0].amne ?? null, at: utkast[0].at };
       konversationer.push({
@@ -204,7 +204,7 @@ export async function GET(request: NextRequest) {
         namn: visningsnamn(p),
         email: p.email,
         phone: p.phone,
-        kategori: kategori(p, ombud),
+        kategori: kategori(p, klara),
         senaste: { kanal: visa.kanal, riktning: visa.riktning, text: visa.text.replace(/\s+/g, ' ').slice(0, 160), amne: visa.amne ?? null, at: visa.at },
         olast: !!sistaIn && sistaIn.at > senastLast(p, data.last),
         utkast: utkast.length,
@@ -257,6 +257,20 @@ export async function POST(request: NextRequest) {
         const { error } = await supabase.from('inkorg_last').upsert(p.aliases.map((alias) => ({ alias, last_read_at: nu })));
         if (error) return fel(error.message, 500);
         return NextResponse.json({ ok: true });
+      }
+
+      case 'olast':
+      case 'dolj': {
+        // Flera på en gång: de markerade i listan
+        const keys: string[] = Array.isArray(body.keys) ? body.keys.map(String) : [];
+        if (!keys.length) return fel('keys krävs');
+        const people = await build();
+        const aliases = [...new Set(keys.flatMap((k) => locate(people, k)?.aliases ?? []))];
+        if (!aliases.length) return fel('Hittade ingen sådan person', 404);
+        const { error } = body.action === 'olast'
+          ? await supabase.from('inkorg_last').delete().in('alias', aliases)
+          : await supabase.from('inkorg_dold').upsert(aliases.map((alias) => ({ alias, dold_at: new Date().toISOString() })));
+        return error ? fel(error.message, 500) : NextResponse.json({ ok: true });
       }
 
       case 'skicka-mejl':
@@ -319,17 +333,6 @@ export async function POST(request: NextRequest) {
         if (!body.id) return fel('id krävs');
         const { error } = await supabase.from('ai_anteckningar').delete().eq('id', body.id);
         return error ? fel(error.message, 500) : NextResponse.json({ ok: true });
-      }
-
-      case 'ombud': {
-        if (!body.profileId) return fel('profileId krävs');
-        const andring: Record<string, unknown> = {};
-        if ('klart' in body) andring.ombud_klart_at = body.klart ? new Date().toISOString() : null;
-        if ('momsPeriod' in body) andring.moms_period = body.momsPeriod || null;
-        if ('startAr' in body) andring.start_ar = body.startAr ? Number(body.startAr) : null;
-        if ('redovisningsmetod' in body) andring.redovisningsmetod = body.redovisningsmetod || null;
-        const { error } = await supabase.from('profiles').update(andring).eq('id', body.profileId);
-        return error ? fel(error.message, 500) : NextResponse.json({ ok: true, ombudKlart: andring.ombud_klart_at ?? null });
       }
 
       default:

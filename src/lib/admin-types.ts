@@ -69,8 +69,12 @@ export interface Person {
   redovisningsmetod: Redovisningsmetod | null;
   /** Momsperioden kunden valde i onboardingen. Finns bara när personen har konto. */
   momsPeriod: MomsPeriod | null;
+  /** Året firman startade (`profiles.start_ar`). Med bokföringsmetoden flyttar det kunden till Kunder i inkorgen. */
+  startAr: number | null;
   /** Företagskonto eller privatkonto. Null tills kunden eller vi valt. */
   betalsatt: Betalsatt | null;
+  /** Säljer till företag i andra EU-länder och ska lämna periodisk sammanfattning. Sätts för hand. */
+  periodiskSammanfattning: boolean;
   /**
    * Adresser som kopplats hit för hand, för att personen svarat från en annan
    * mejl än den vi kände till. Skiljda från de sammanslagna adresserna i
@@ -429,7 +433,7 @@ export interface AdminMote {
   meddelande: string | null;
 }
 
-/** Inkorgens tre flikar: leads, uppsignade som saknar ombudsuppgifterna, och klara kunder. */
+/** Inkorgens tre flikar: leads, uppsignade som saknar startår eller bokföringsmetod, och klara kunder. */
 export type InkorgKategori = 'lead' | 'saknar' | 'kund';
 
 /** En rad i inkorgen — en person, med det senaste som hänt i mejl eller SMS. */
@@ -481,8 +485,6 @@ export interface InkorgUtkast {
 export interface InkorgTrad {
   person: Person;
   kategori: InkorgKategori;
-  /** Det som behövs i mellanfliken: uppgifterna vi hämtar när vi blivit ombud. */
-  uppgifter: { momsPeriod: MomsPeriod | null; startAr: number | null; redovisningsmetod: Redovisningsmetod | null; ombudKlart: string | null } | null;
   meddelanden: InkorgMeddelande[];
   utkast: InkorgUtkast[];
   arenden: Arende[];

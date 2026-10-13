@@ -296,7 +296,7 @@ const MOMSPERIODER: MomsPeriod[] = ['månadsvis', 'kvartalsvis', 'helår', 'inge
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const { contactId, profileId, stage, redovisningsmetod, momsPeriod, betalsatt, neUppgifter } = await request.json();
+    const { contactId, profileId, stage, redovisningsmetod, momsPeriod, betalsatt, periodiskSammanfattning, startAr, neUppgifter } = await request.json();
     const supabase = getSupabase();
 
     // NE-uppgifterna för ett inkomstår ersätter det som fanns för just det året
@@ -325,6 +325,32 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Personen har inget konto att spara betalsättet på' }, { status: 400 });
       }
       const { error } = await supabase.from('profiles').update({ har_foretagskonto: betalsatt }).eq('id', profileId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
+
+    // null tar bort startåret
+    if (startAr !== undefined) {
+      const ar = startAr === null || startAr === '' ? null : Number(startAr);
+      if (ar !== null && (!Number.isInteger(ar) || ar < 1900 || ar > new Date().getFullYear() + 1)) {
+        return NextResponse.json({ error: 'startAr måste vara ett år (ÅÅÅÅ)' }, { status: 400 });
+      }
+      if (!profileId) {
+        return NextResponse.json({ error: 'Personen har inget konto att spara startåret på' }, { status: 400 });
+      }
+      const { error } = await supabase.from('profiles').update({ start_ar: ar }).eq('id', profileId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (periodiskSammanfattning !== undefined) {
+      if (typeof periodiskSammanfattning !== 'boolean') {
+        return NextResponse.json({ error: 'periodiskSammanfattning måste vara true eller false' }, { status: 400 });
+      }
+      if (!profileId) {
+        return NextResponse.json({ error: 'Personen har inget konto att spara det på' }, { status: 400 });
+      }
+      const { error } = await supabase.from('profiles').update({ periodisk_sammanfattning: periodiskSammanfattning }).eq('id', profileId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true });
     }
