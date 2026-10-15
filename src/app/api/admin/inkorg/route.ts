@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { build, emailKey, locate, phoneKey, summary, type Built } from '@/lib/personer';
 import type {
-  AiAnteckning, Arende, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast,
+  AiAnteckning, Arende, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast, MejlBilaga,
 } from '@/lib/admin-types';
 import { callScript } from '@/lib/emails/send-via-gmail';
+import { UNDERLAG_BUCKET } from '@/lib/inmail/save-attachments';
 import { identifySender } from '@/lib/sms/identify';
 import { generateSmsReply } from '@/lib/sms/answer';
 import { handleGeneralQuestion } from '@/lib/inmail/handlers/general-question';
@@ -64,7 +65,7 @@ async function lasData(supabase: Supabase) {
       .select('id, phone, direction, body, status, error, kind, created_at')
       .order('created_at', { ascending: false }).limit(MAX_RADER),
     supabase.from('mejl_utkast').select('id, till_email, amne, text, svar_pa_message_id, fel, created_at').eq('status', 'draft'),
-    supabase.from('mejl_utkast').select('id, till_email, amne, text, sent_at').eq('status', 'sent')
+    supabase.from('mejl_utkast').select('id, till_email, amne, text, bilagor, sent_at').eq('status', 'sent')
       .gte('sent_at', new Date(Date.now() - SKICKADE_DAGAR * 86_400_000).toISOString()),
     supabase.from('inkorg_last').select('alias, last_read_at'),
     supabase.from('inkorg_dold').select('alias, dold_at'),
@@ -110,6 +111,7 @@ function grupperaPerPerson(people: Map<string, Built>, data: Awaited<ReturnType<
     if (fa(p).meddelanden.some((m) => m.kanal === 'mejl' && m.riktning === 'out' && !!m.gmailMessageId && m.at >= fran)) continue;
     fa(p).meddelanden.push({
       id: `skickat-${u.id}`, kanal: 'mejl', riktning: 'out', at: u.sent_at, text: u.text ?? '', amne: u.amne, adress: u.till_email,
+      bilagor: lasBilagor(u.bilagor).map((b) => b.namn),
     });
   }
   for (const s of data.sms) {
@@ -221,18 +223,48 @@ export async function GET(request: NextRequest) {
 
 const fel = (error: string, status = 400) => NextResponse.json({ error }, { status });
 
+/**
+ * Bilagor laddas upp av webbläsaren direkt till lagringen (Vercel tar inte emot
+ * mer än 4,5 MB i en förfrågan), och scriptet hämtar dem själv via länkar som
+ * gäller en kort stund. Gmail tar max 25 MB per mejl.
+ */
+const BILAGA_MAPP = 'mejlbilagor/';
+const BILAGA_LANK_SEKUNDER = 15 * 60;
+
+/** Bilagorna i en förfrågan, bara sådana som ligger i bilagemappen. */
+function lasBilagor(v: unknown): MejlBilaga[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((b): b is MejlBilaga => !!b && typeof b.path === 'string' && b.path.startsWith(BILAGA_MAPP) && !b.path.includes('..'))
+    .map((b) => ({ path: b.path, namn: String(b.namn || b.path.split('/').pop()).slice(0, 200) }));
+}
+
 /** Skickar ett mejlutkast: svar i tråden om det finns ett mejl att svara på, annars ett nytt mejl. */
-async function skickaMejl(supabase: Supabase, id: string, text: string, amne?: string) {
+async function skickaMejl(supabase: Supabase, id: string, text: string, amne?: string, bilagor?: MejlBilaga[]) {
   const { data: claimed, error } = await supabase.from('mejl_utkast')
-    .update({ status: 'sending', text, ...(amne !== undefined ? { amne } : {}), updated_at: new Date().toISOString() })
+    .update({
+      status: 'sending', text, ...(amne !== undefined ? { amne } : {}), ...(bilagor ? { bilagor } : {}),
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', id).eq('status', 'draft')
-    .select('id, till_email, amne, svar_pa_message_id').maybeSingle();
+    .select('id, till_email, amne, svar_pa_message_id, bilagor').maybeSingle();
   if (error) return fel(error.message, 500);
   if (!claimed) return fel('Utkastet är redan skickat eller hanteras av någon annan', 409);
 
+  const filer = lasBilagor(claimed.bilagor);
+  const attachments: { url: string; name: string }[] = [];
+  for (const b of filer) {
+    const { data, error: lankFel } = await supabase.storage.from(UNDERLAG_BUCKET).createSignedUrl(b.path, BILAGA_LANK_SEKUNDER);
+    if (lankFel || !data) {
+      await supabase.from('mejl_utkast').update({ status: 'draft', fel: `Bilagan ${b.namn} gick inte att hämta` }).eq('id', id);
+      return fel(`Bilagan ${b.namn} gick inte att hämta: ${lankFel?.message ?? 'okänt fel'}`, 500);
+    }
+    attachments.push({ url: data.signedUrl, name: b.namn });
+  }
+
   const res = await callScript(claimed.svar_pa_message_id
-    ? { action: 'reply', messageId: claimed.svar_pa_message_id, text }
-    : { action: 'compose', to: claimed.till_email, subject: claimed.amne || 'Enkla Bokslut', text });
+    ? { action: 'reply', messageId: claimed.svar_pa_message_id, text, attachments }
+    : { action: 'compose', to: claimed.till_email, subject: claimed.amne || 'Enkla Bokslut', text, attachments });
 
   if (!res.ok) {
     // Tillbaka som utkast, så att det går att försöka igen
@@ -240,6 +272,10 @@ async function skickaMejl(supabase: Supabase, id: string, text: string, amne?: s
     return fel(res.error ?? 'Mejlet kunde inte skickas', 502);
   }
   await supabase.from('mejl_utkast').update({ status: 'sent', sent_at: new Date().toISOString(), fel: null }).eq('id', id);
+  // En äldre version av send-mail.gs bortser från bilagorna men skickar ändå
+  if (attachments.length && res.bilagor === undefined) {
+    return fel('Mejlet skickades, men UTAN bilagor: send-mail.gs i Apps Script behöver publiceras om med den nya versionen.', 502);
+  }
   return NextResponse.json({ ok: true });
 }
 
@@ -275,7 +311,17 @@ export async function POST(request: NextRequest) {
 
       case 'skicka-mejl':
         if (!body.id || !text) return fel('id och text krävs');
-        return skickaMejl(supabase, body.id, text, typeof body.amne === 'string' ? body.amne : undefined);
+        return skickaMejl(supabase, body.id, text, typeof body.amne === 'string' ? body.amne : undefined,
+          'bilagor' in body ? lasBilagor(body.bilagor) : undefined);
+
+      case 'bilaga-forbered': {
+        // Uppladdningslänk för en fil som ska bifogas. Webbläsaren laddar upp själv.
+        const safe = String(body.namn || 'fil').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+        const path = `${BILAGA_MAPP}${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}_${safe}`;
+        const { data, error } = await supabase.storage.from(UNDERLAG_BUCKET).createSignedUploadUrl(path);
+        if (error || !data) return fel(`Kunde inte skapa uppladdningslänk: ${error?.message}`, 500);
+        return NextResponse.json({ path: data.path, signedUrl: data.signedUrl });
+      }
 
       case 'spara-mejl': {
         if (!body.id || !text) return fel('id och text krävs');
@@ -295,7 +341,7 @@ export async function POST(request: NextRequest) {
         if (!till.includes('@') || !text) return fel('Mottagare och text krävs');
         const { data, error } = await supabase.from('mejl_utkast').insert({
           till_email: till, amne: String(body.amne ?? '').trim() || null, text,
-          svar_pa_message_id: body.svarPa || null, kalla: 'manuell',
+          svar_pa_message_id: body.svarPa || null, kalla: 'manuell', bilagor: lasBilagor(body.bilagor),
         }).select('id').single();
         if (error) return fel(error.message, 500);
         return skickaMejl(supabase, data.id, text);

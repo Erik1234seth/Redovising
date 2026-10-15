@@ -475,6 +475,12 @@ export interface InkorgMeddelande {
   automatisk?: boolean;
 }
 
+/** En fil som bifogas ett mejl från inkorgen. Ligger i lagringen under mejlbilagor/. */
+export interface MejlBilaga {
+  path: string;
+  namn: string;
+}
+
 export interface InkorgUtkast {
   id: string;
   kanal: 'mejl' | 'sms';

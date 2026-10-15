@@ -114,6 +114,22 @@ function inboxBodies(text) {
 }
 
 /**
+ * Bilagorna från inkorgen. Servern skickar korta nedladdningslänkar till
+ * lagringen i stället för själva filerna, och scriptet hämtar dem här.
+ * Går en fil inte att hämta kastas ett fel, så att mejlet inte går iväg utan den.
+ */
+function inboxAttachments(payload) {
+  const list = Array.isArray(payload.attachments) ? payload.attachments : [];
+  return list.map(function (a) {
+    const response = UrlFetchApp.fetch(a.url, { muteHttpExceptions: true });
+    if (response.getResponseCode() !== 200) {
+      throw new Error('Bilagan ' + a.name + ' gick inte att hämta (HTTP ' + response.getResponseCode() + ')');
+    }
+    return response.getBlob().setName(a.name);
+  });
+}
+
+/**
  * Svarar på kundens mejl i samma tråd. `messageId` är mejlet som besvaras —
  * inte trådens sista meddelande, som kan vara vårt eget, och då hade svaret
  * gått till oss själva.
@@ -124,8 +140,10 @@ function replyFromInboxRequest(payload) {
     const message = GmailApp.getMessageById(payload.messageId);
     if (!message) return { ok: false, error: 'Mejlet som skulle besvaras finns inte i Gmail' };
     const bodies = inboxBodies(payload.text);
-    message.reply(bodies.plain, { htmlBody: bodies.html, name: SENDER_NAME });
-    return { ok: true, threadId: message.getThread().getId() };
+    const attachments = inboxAttachments(payload);
+    message.reply(bodies.plain, { htmlBody: bodies.html, name: SENDER_NAME, attachments: attachments });
+    // `bilagor` talar om för servern att den här versionen kan bifoga filer
+    return { ok: true, threadId: message.getThread().getId(), bilagor: attachments.length };
   } catch (error) {
     return { ok: false, error: String(error) };
   }
@@ -136,11 +154,14 @@ function composeFromInboxRequest(payload) {
   if (!payload.to || !payload.subject || !payload.text) return { ok: false, error: 'to, subject och text krävs' };
   try {
     const bodies = inboxBodies(payload.text);
-    GmailApp.sendEmail(payload.to, payload.subject, bodies.plain, { htmlBody: bodies.html, name: SENDER_NAME, replyTo: REPLY_TO });
+    const attachments = inboxAttachments(payload);
+    GmailApp.sendEmail(payload.to, payload.subject, bodies.plain, {
+      htmlBody: bodies.html, name: SENDER_NAME, replyTo: REPLY_TO, attachments: attachments,
+    });
     var threadId = '';
     const sent = GmailApp.search('to:' + payload.to + ' in:sent', 0, 1);
     if (sent.length > 0) threadId = sent[0].getId();
-    return { ok: true, threadId: threadId };
+    return { ok: true, threadId: threadId, bilagor: attachments.length };
   } catch (error) {
     return { ok: false, error: String(error) };
   }

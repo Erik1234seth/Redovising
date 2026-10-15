@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { RAKNA_OM } from '../_nav-menu';
 import type {
-  AiAnteckning, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast,
+  AiAnteckning, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast, MejlBilaga,
 } from '@/lib/admin-types';
 
 /**
@@ -325,11 +325,82 @@ const post = async (url: string, body: object, method = 'POST') => {
   return d;
 };
 
+/** Gmail tar max 25 MB per mejl, och bilagorna växer när de kodas. */
+const MAX_BILAGOR_MB = 20;
+
+/** Filer att bifoga ett mejl. De laddas upp direkt när de väljs, så Skicka skickar bara sökvägarna. */
+function useBilagor() {
+  const [bilagor, setBilagor] = useState<(MejlBilaga & { storlek: number })[]>([]);
+  const [laddar, setLaddar] = useState(0);
+  const [fel, setFel] = useState('');
+
+  const lagg = async (filer: FileList | null) => {
+    if (!filer?.length) return;
+    const lista = [...filer];
+    const total = [...bilagor.map((b) => b.storlek), ...lista.map((f) => f.size)].reduce((a, b) => a + b, 0);
+    if (total > MAX_BILAGOR_MB * 1024 * 1024) { setFel(`Bilagorna får vara högst ${MAX_BILAGOR_MB} MB tillsammans`); return; }
+    setFel(''); setLaddar((n) => n + lista.length);
+    await Promise.all(lista.map(async (fil) => {
+      try {
+        const { path, signedUrl } = await post('/api/admin/inkorg', { action: 'bilaga-forbered', namn: fil.name });
+        const put = await fetch(signedUrl, { method: 'PUT', headers: { 'Content-Type': fil.type || 'application/octet-stream' }, body: fil });
+        if (!put.ok) throw new Error(`${fil.name} kunde inte laddas upp`);
+        setBilagor((b) => [...b, { path, namn: fil.name, storlek: fil.size }]);
+      } catch (e) {
+        setFel(e instanceof Error ? e.message : `${fil.name} kunde inte laddas upp`);
+      } finally {
+        setLaddar((n) => n - 1);
+      }
+    }));
+  };
+
+  return {
+    bilagor, laddar, fel, lagg,
+    ta: (path: string) => setBilagor((b) => b.filter((x) => x.path !== path)),
+    tom: () => setBilagor([]),
+    /** Det som skickas till servern. */
+    data: () => bilagor.map(({ path, namn }) => ({ path, namn })),
+  };
+}
+
+function BilageKnapp({ b, disabled }: { b: ReturnType<typeof useBilagor>; disabled?: boolean }) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input ref={input} type="file" multiple className="hidden"
+        onChange={(e) => { b.lagg(e.target.files); e.target.value = ''; }} />
+      <button type="button" onClick={() => input.current?.click()} disabled={disabled} title="Bifoga filer"
+        className="w-7 h-7 flex items-center justify-center rounded-md text-slate-500 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-40">
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+        </svg>
+      </button>
+    </>
+  );
+}
+
+function BilageLista({ b }: { b: ReturnType<typeof useBilagor> }) {
+  if (!b.bilagor.length && !b.laddar && !b.fel) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 px-1 py-1">
+      {b.bilagor.map((x) => (
+        <span key={x.path} className="inline-flex items-center gap-1 text-xs bg-slate-100 border border-slate-200 rounded-md pl-2 pr-1 py-0.5 text-slate-700">
+          📎 <span className="max-w-[200px] truncate">{x.namn}</span>
+          <button type="button" onClick={() => b.ta(x.path)} title="Ta bort" className="px-1 text-slate-400 hover:text-red-600">×</button>
+        </span>
+      ))}
+      {b.laddar > 0 && <span className="text-xs text-slate-500">Laddar upp {b.laddar} fil{b.laddar > 1 ? 'er' : ''}…</span>}
+      {b.fel && <span className="text-xs text-red-600">{b.fel}</span>}
+    </div>
+  );
+}
+
 function Utkast({ u, personKey, onKlar }: { u: InkorgUtkast; personKey: string; onKlar: () => void }) {
   const [text, setText] = useState(u.text);
   const [upptagen, setUpptagen] = useState(false);
   const [skriverOm, setSkriverOm] = useState(false);
   const [fel, setFel] = useState(u.fel ?? '');
+  const bilagor = useBilagor();
 
   const kor = async (fn: () => Promise<unknown>) => {
     setUpptagen(true); setFel('');
@@ -337,7 +408,7 @@ function Utkast({ u, personKey, onKlar }: { u: InkorgUtkast; personKey: string; 
   };
 
   const skicka = () => kor(() => u.kanal === 'mejl'
-    ? post('/api/admin/inkorg', { action: 'skicka-mejl', id: u.id, text })
+    ? post('/api/admin/inkorg', { action: 'skicka-mejl', id: u.id, text, bilagor: bilagor.data() })
     : post('/api/admin/sms-drafts', { id: u.id, body: text }));
   const spara = () => kor(() => u.kanal === 'mejl'
     ? post('/api/admin/inkorg', { action: 'spara-mejl', id: u.id, text })
@@ -370,13 +441,15 @@ function Utkast({ u, personKey, onKlar }: { u: InkorgUtkast; personKey: string; 
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={Math.min(14, Math.max(4, text.split('\n').length + 1))}
         className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
       {u.kanal === 'sms' && <p className="text-[11px] text-slate-400 mt-0.5">{text.length} tecken</p>}
+      {u.kanal === 'mejl' && <BilageLista b={bilagor} />}
       {u.kanal === 'mejl' && <p className="text-[11px] text-slate-400 mt-0.5">Signaturen läggs på när mejlet skickas.</p>}
       {fel && <p className="text-xs text-red-600 mt-1">{fel}</p>}
       <div className="flex items-center gap-2 mt-2">
-        <button onClick={skicka} disabled={upptagen || !text.trim()}
+        <button onClick={skicka} disabled={upptagen || !text.trim() || bilagor.laddar > 0}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50">
           {upptagen && !skriverOm ? 'Skickar…' : 'Skicka'}
         </button>
+        {u.kanal === 'mejl' && <BilageKnapp b={bilagor} disabled={upptagen} />}
         {text !== u.text && <button onClick={spara} disabled={upptagen} className="px-3 py-2 text-sm text-slate-700 hover:text-slate-900">Spara ändring</button>}
         <button onClick={slang} disabled={upptagen} className="ml-auto px-3 py-2 text-sm text-slate-500 hover:text-red-600">Släng</button>
       </div>
@@ -391,6 +464,7 @@ function Skriv({ email, phone, svarPa, amne, onKlar }: {
   const [text, setText] = useState('');
   const [rubrik, setRubrik] = useState('');
   const [skickar, setSkickar] = useState(false);
+  const bilagor = useBilagor();
   const [fel, setFel] = useState('');
 
   if (!email && !phone) return null;
@@ -399,9 +473,9 @@ function Skriv({ email, phone, svarPa, amne, onKlar }: {
   const skicka = async () => {
     setSkickar(true); setFel('');
     try {
-      if (kanal === 'mejl') await post('/api/admin/inkorg', { action: 'nytt-mejl', till: email, amne: nyttMejl ? rubrik : amne, svarPa, text });
+      if (kanal === 'mejl') await post('/api/admin/inkorg', { action: 'nytt-mejl', till: email, amne: nyttMejl ? rubrik : amne, svarPa, text, bilagor: bilagor.data() });
       else await post('/api/admin/sms-send', { phone, body: text });
-      setText(''); setRubrik(''); onKlar();
+      setText(''); setRubrik(''); bilagor.tom(); onKlar();
     } catch (e) { setFel(e instanceof Error ? e.message : 'Kunde inte skicka'); }
     finally { setSkickar(false); }
   };
@@ -422,18 +496,20 @@ function Skriv({ email, phone, svarPa, amne, onKlar }: {
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && text.trim()) skicka(); }}
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && text.trim() && !bilagor.laddar) skicka(); }}
         placeholder={kanal === 'mejl' ? `Skriv ett mejl till ${email}…` : `Skriv ett SMS till ${phone}…`}
         rows={Math.min(12, Math.max(3, text.split('\n').length + 1))}
         className="w-full px-3 py-2.5 text-sm text-slate-900 bg-transparent resize-none focus:outline-none"
       />
+      {kanal === 'mejl' && <div className="px-2"><BilageLista b={bilagor} /></div>}
       <div className="flex items-center gap-1 px-2 pb-2">
         {email && flik('mejl', 'Mejl')}
         {phone && flik('sms', 'SMS')}
+        {kanal === 'mejl' && <BilageKnapp b={bilagor} disabled={skickar} />}
         {kanal === 'mejl' && svarPa && <span className="text-[11px] text-slate-400 ml-1">svar i tråden · signaturen läggs på</span>}
         {kanal === 'sms' && text && <span className="text-[11px] text-slate-400 ml-1">{text.length} tecken</span>}
         {fel && <span className="text-xs text-red-600 ml-2">{fel}</span>}
-        <button onClick={skicka} disabled={skickar || !text.trim() || (nyttMejl && !rubrik.trim())}
+        <button onClick={skicka} disabled={skickar || !text.trim() || (nyttMejl && !rubrik.trim()) || (kanal === 'mejl' && bilagor.laddar > 0)}
           className="ml-auto px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg disabled:opacity-40">
           {skickar ? 'Skickar…' : 'Skicka'}
         </button>

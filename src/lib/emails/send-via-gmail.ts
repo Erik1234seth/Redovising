@@ -32,6 +32,8 @@ export interface GmailResult {
   ok: boolean;
   /** Gmail-trådens id, så att svaret går att koppla ihop med utskicket. */
   threadId?: string;
+  /** Antal bifogade filer. Saknas när scriptet är en äldre version utan stöd för bilagor. */
+  bilagor?: number;
   error?: string;
 }
 
@@ -111,7 +113,7 @@ export async function callScript(payload: Record<string, unknown>): Promise<Gmai
   try {
     const parsed = await post(url, { secret, ref, ...payload }, SEND_TIMEOUT_MS);
     if (!parsed.ok) return { ok: false, error: parsed.error || 'Apps Script nekade utskicket' };
-    return { ok: true, threadId: parsed.threadId };
+    return { ok: true, threadId: parsed.threadId, bilagor: parsed.bilagor as number | undefined };
   } catch (err) {
     if (!(err instanceof LostResponse)) throw err;
     return recover(url, secret, ref, err.message);
@@ -139,7 +141,7 @@ async function recover(url: string, secret: string, ref: string, lost: string): 
     const result = answer.result as GmailResult;
     if (result.ok) console.log(`[gmail] ${ref} hade gått iväg trots tappat svar`);
     return result.ok
-      ? { ok: true, threadId: result.threadId }
+      ? { ok: true, threadId: result.threadId, bilagor: result.bilagor }
       : { ok: false, error: result.error || 'Apps Script nekade utskicket' };
   }
 
