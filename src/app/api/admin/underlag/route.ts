@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import type { AdminUnderlag } from '@/lib/admin-types';
 import { importPendingSie, reimportAfterDelete } from '@/lib/sie/import';
+import { FLYTTAD_FOR_HAND } from '@/lib/underlag/sortering';
 
 /**
  * Underlagen kunderna laddat upp i bokföringsfliken, och knapparna som för dem
@@ -101,12 +102,16 @@ export async function GET() {
   }
 }
 
-/** Flyttar ett underlag mellan inkommet, granskas och bokfört. */
+/**
+ * Flyttar ett underlag mellan inkommet, granskas och bokfört — eller, med
+ * `sortering`, mellan underlagen och övriga filer.
+ */
 export async function PATCH(request: NextRequest) {
   try {
-    const { id, status } = await request.json();
+    const { id, status, sortering } = await request.json();
 
     if (!id) return NextResponse.json({ error: 'id krävs' }, { status: 400 });
+    if (sortering !== undefined) return flytta(getSupabase(), id, sortering);
     if (!STATUSES.includes(status as Status)) {
       return NextResponse.json({ error: `status måste vara ${STATUSES.join(', ')}` }, { status: 400 });
     }
@@ -119,6 +124,39 @@ export async function PATCH(request: NextRequest) {
     const message = error instanceof Error ? error.message : 'Internt fel';
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+/**
+ * Erik flyttar en fil själv. Det gäller sedan före AI-avläsningens bedömning.
+ *
+ * Blir filen en övrig fil tas det som lästs ut ur den bort — transaktionerna
+ * med sina konteringar och verifikationerna AI:n skrev av — så att inget ur
+ * den bokförs. Tillbaka bland underlagen läses den av på nytt med AI.
+ */
+async function flytta(supabase: ReturnType<typeof getSupabase>, id: string, sortering: unknown) {
+  if (sortering !== 'underlag' && sortering !== 'ovrigt') {
+    return NextResponse.json({ error: 'sortering måste vara underlag eller ovrigt' }, { status: 400 });
+  }
+
+  if (sortering === 'ovrigt') {
+    const { error: tFel } = await supabase.from('transaktioner').delete().eq('underlag_id', id);
+    if (tFel) return NextResponse.json({ error: `Kunde inte ta bort transaktionerna: ${tFel.message}` }, { status: 500 });
+    const { error: vFel } = await supabase.from('verifikationer').delete().eq('underlag_id', id).eq('kalla', 'ai');
+    if (vFel) return NextResponse.json({ error: `Kunde inte ta bort verifikationerna: ${vFel.message}` }, { status: 500 });
+  }
+
+  const { error } = await supabase.from('bokforing_underlag').update({
+    sortering,
+    sortering_orsak: FLYTTAD_FOR_HAND,
+    sortering_at: new Date().toISOString(),
+    ...(sortering === 'ovrigt' ? {
+      transaktioner_utlasta_at: null, transaktioner_antal: null, transaktioner_notering: null, transaktioner_fel: null,
+      verifikationer_inlagda_at: null, verifikationer_antal: null, verifikationer_dubbletter: null, verifikationer_fel: null,
+      varningar: null, kontroll_status: null, kontroll_saknas: null, kontroll_at: null,
+    } : {}),
+  }).eq('id', id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }
 
 /**

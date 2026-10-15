@@ -1,7 +1,7 @@
 import { buildImageParts } from '@/lib/underlag/fil-delar';
 import { arBildEllerPdf, arTabellfil, kanLasasAvAi } from '@/lib/underlag/filtyp';
 import {
-  DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, tolkaSvar,
+  DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, OVRIGTREGEL, tolkaSvar,
   type ExtraheradTransaktion, type ExtraheradVerifikation, type TolkatSvar,
 } from './normalisera';
 import { lasMedSandlada } from './sandlada';
@@ -48,15 +48,18 @@ Börja med att avgöra vilken sorts underlag det är:
 - "transaktioner": ett kvitto, en faktura eller ett kontoutdrag. Det är det vanliga. Underlaget säger vad som köpts, sålts eller betalats, men inte hur det bokförts.
 - "verifikationer": ett underlag som REDAN är bokfört — en verifikationslista, grundbok, dagbok eller huvudbok ur ett bokföringsprogram. Kännetecknet är att raderna har kontonummer (t.ex. 1930, 2641, 3001) med belopp i debet eller kredit.
 
+${OVRIGTREGEL}
+
 Välj "verifikationer" bara när kontonumren faktiskt står i underlaget. Hitta aldrig på konton själv.
 
 Returnera ett JSON-objekt:
 {
-  "typ": "transaktioner" eller "verifikationer",
+  "typ": "transaktioner", "verifikationer" eller "ovrigt",
+  "vad": "vid ovrigt: kort vad filen är, t.ex. \"NE-bilaga 2025\" eller \"hyresavtal\" — annars tom sträng",
   "transaktioner": [...],
   "verifikationer": [...]
 }
-Fyll bara listan som hör till typen. Den andra är tom.
+Fyll bara listan som hör till typen. Den andra är tom. Vid "ovrigt" är båda tomma.
 
 Varje transaktion har exakt dessa fält:
 {

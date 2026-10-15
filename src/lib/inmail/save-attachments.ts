@@ -3,6 +3,7 @@ import { isSieFile } from '@/lib/sie/parse';
 import { importSieUnderlag } from '@/lib/sie/import';
 import { profilForAdress } from './profil';
 import { arVarAdress } from '@/lib/underlag/var-fil';
+import { sorteringVidUppladdning } from '@/lib/underlag/sortering';
 
 /**
  * Sparar bilagorna i inkommande mejl som underlag — alla, oavsett filtyp.
@@ -146,6 +147,7 @@ async function insertRow(
     file_path: path,
     file_size: info.size,
     mime_type: info.mimeType,
+    ...sorteringVidUppladdning(info.fileName, info.mimeType, info.email),
   }).select('id').single();
 
   if (error) {

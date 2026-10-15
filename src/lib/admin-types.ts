@@ -283,6 +283,10 @@ export interface PersonUnderlag {
   transaktioner: UnderlagTransaktioner | null;
   /** Underlagskontrollen efter mejl: har underlaget allt vi behöver? Null = inte kontrollerad. */
   kontroll: { status: 'komplett' | 'saknar' | 'fel'; saknas: { rad: string; vad: string }[]; at: string } | null;
+  /** underlag = ska bokföras, ovrigt = bra att ha men konteras inte, null = inte sorterad än. */
+  sortering: 'underlag' | 'ovrigt' | null;
+  /** Varför: "Skickad av oss", vad AI:n tyckte filen var, eller "Flyttad för hand". */
+  sorteringOrsak: string | null;
 }
 
 /**
@@ -376,6 +380,8 @@ export interface AdminKonteringRad {
   fileName: string | null;
   /** Allt annat som stod om transaktionen på underlaget. */
   detaljer: string;
+  /** Osäkerheter från avläsningen, svar från kunden och byråns ändringar och instruktioner. */
+  anteckning: string;
   konteringar: AdminKontering[];
   verifikation: {
     id: string;

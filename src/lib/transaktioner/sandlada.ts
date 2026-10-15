@@ -1,4 +1,4 @@
-import { DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, tolkaSvar, type TolkatSvar } from './normalisera';
+import { DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, OVRIGTREGEL, tolkaSvar, type TolkatSvar } from './normalisera';
 
 /**
  * Läser ett kalkylblad eller en textlista genom att låta modellen köra Python
@@ -25,11 +25,12 @@ Läs filen med pandas (openpyxl för xlsx, pdfplumber för PDF — texten sida f
 Avgör först vad filen är:
 - "transaktioner": ett kontoutdrag eller en transaktionslista. Det är det vanliga. Raderna säger vad som betalats, men inte hur det bokförts.
 - "verifikationer": en export som REDAN är bokförd — verifikationslista, grundbok, dagbok eller huvudbok ur ett bokföringsprogram. Kännetecknet är en kolumn med kontonummer (t.ex. 1930, 2641, 3001) och belopp i debet och kredit.
+${OVRIGTREGEL}
 Välj "verifikationer" bara när kontonumren faktiskt står i filen. Hitta aldrig på konton själv.
 
 Skriv resultatet till /mnt/data/${UTFIL} som ett JSON-objekt:
-{ "typ": "transaktioner" eller "verifikationer", "transaktioner": [...], "verifikationer": [...] }
-Fyll bara listan som hör till typen. Den andra är tom.
+{ "typ": "transaktioner", "verifikationer" eller "ovrigt", "vad": "vid ovrigt: kort vad filen är, annars tom sträng", "transaktioner": [...], "verifikationer": [...] }
+Fyll bara listan som hör till typen. Den andra är tom. Vid "ovrigt" är båda tomma.
 
 Varje transaktion:
 {

@@ -6,6 +6,7 @@ import { markeraDubbletter } from './dubbletter';
 import { arVarAdress } from '@/lib/underlag/var-fil';
 import { extraheraTransaktioner, kanLasasAvAi, type ExtraheradTransaktion, type ExtraheradVerifikation } from './extract';
 import type { Underlagstyp } from './normalisera';
+import { FLYTTAD_FOR_HAND } from '@/lib/underlag/sortering';
 
 /**
  * Kör AI-avläsningen på ett underlag och sparar resultatet hos kunden.
@@ -16,6 +17,8 @@ import type { Underlagstyp } from './normalisera';
  *
  * AI:n avgör vad filen är. Ett kvitto eller kontoutdrag blir transaktioner,
  * ett redan bokfört underlag blir verifikationer med kontona som står i det.
+ * En fil som inte är ett underlag alls — en NE-bilaga, ett avtal — sorteras
+ * till övriga filer, och ingenting läses ut ur den.
  *
  * Körs en fil om igen ersätts det som lästes ut förra gången, oavsett vilken
  * sort det blev då. Utfallet skrivs på underlagsraden — transaktioner_* eller
@@ -32,6 +35,8 @@ export interface TransaktionResultat {
   dubbletter?: number;
   /** Sandlådans rad om vad den läste — tom för bilder och PDF. */
   notering?: string;
+  /** Vad filen är, när den sorterats som övrigt. */
+  vad?: string;
   /** Det som sorterades bort eller inte gick att tolka — sparas på underlaget. */
   varningar?: string[];
   fel?: string;
@@ -44,6 +49,8 @@ interface UnderlagRad {
   file_name: string;
   file_path: string;
   mime_type: string | null;
+  sortering: string | null;
+  sortering_orsak: string | null;
 }
 
 export async function lasUtTransaktioner(
@@ -52,7 +59,7 @@ export async function lasUtTransaktioner(
 ): Promise<TransaktionResultat> {
   const { data: row, error } = await supabase
     .from('bokforing_underlag')
-    .select('id, user_id, sender_email, file_name, file_path, mime_type')
+    .select('id, user_id, sender_email, file_name, file_path, mime_type, sortering, sortering_orsak')
     .eq('id', underlagId)
     .maybeSingle<UnderlagRad>();
   if (error) throw new Error(`Kunde inte läsa underlaget: ${error.message}`);
@@ -68,7 +75,7 @@ export async function lasUtTransaktioner(
   }
 
   let kraschade = false;
-  const result = await lasRad(supabase, row).catch((err): TransaktionResultat => {
+  let result = await lasRad(supabase, row).catch((err): TransaktionResultat => {
     kraschade = true;
     return { typ: 'transaktioner', antal: 0, fel: err instanceof Error ? err.message : 'Okänt fel' };
   });
@@ -85,9 +92,40 @@ export async function lasUtTransaktioner(
     return result;
   }
 
+  // Har Erik lagt filen bland underlagen själv gäller det, även om AI:n
+  // tycker att den är något annat
+  const handsorterad = row.sortering_orsak === FLYTTAD_FOR_HAND;
+  if (result.typ === 'ovrigt' && handsorterad && row.sortering === 'underlag') {
+    result = { typ: 'transaktioner', antal: 0, fel: `AI:n hittade inga transaktioner — den tror att filen är ${result.vad || 'något annat än ett underlag'}` };
+  }
+
+  if (result.typ === 'ovrigt') {
+    await supabase.from('bokforing_underlag').update({
+      sortering: 'ovrigt',
+      sortering_orsak: result.vad || 'Inget underlag för bokföringen',
+      sortering_at: nu,
+      transaktioner_utlasta_at: nu,
+      transaktioner_antal: 0,
+      transaktioner_notering: result.notering || null,
+      transaktioner_fel: null,
+      varningar: null,
+      verifikationer_inlagda_at: null,
+      verifikationer_antal: null,
+      verifikationer_dubbletter: null,
+      verifikationer_fel: null,
+      kontroll_status: null,
+      kontroll_saknas: null,
+      kontroll_at: null,
+    }).eq('id', row.id);
+    return result;
+  }
+
+  const sortering = handsorterad ? {} : { sortering: 'underlag', sortering_orsak: 'Avläst med AI', sortering_at: nu };
+
   // Bara en av sorterna gäller för filen. Den andra nollställs, annars visar
   // panelen kvar vad en tidigare körning gav.
   await supabase.from('bokforing_underlag').update(result.typ === 'verifikationer' ? {
+    ...sortering,
     verifikationer_inlagda_at: nu,
     verifikationer_antal: result.antal,
     verifikationer_dubbletter: result.dubbletter ?? 0,
@@ -98,6 +136,7 @@ export async function lasUtTransaktioner(
     transaktioner_notering: result.notering || null,
     transaktioner_fel: null,
   } : {
+    ...sortering,
     transaktioner_utlasta_at: nu,
     transaktioner_antal: result.antal,
     transaktioner_notering: result.notering || null,
@@ -147,6 +186,8 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
   if (deleteError) throw new Error(`Kunde inte rensa tidigare transaktioner: ${deleteError.message}`);
   const { error: deleteVerError } = await supabase.from('verifikationer').delete().eq('underlag_id', row.id).eq('kalla', 'ai');
   if (deleteVerError) throw new Error(`Kunde inte rensa tidigare verifikationer: ${deleteVerError.message}`);
+
+  if (svar.typ === 'ovrigt') return { typ: 'ovrigt', antal: 0, vad: svar.vad, notering: svar.notering };
 
   if (svar.typ === 'verifikationer') {
     const res = await sparaVerifikationer(supabase, row, email, svar.verifikationer);

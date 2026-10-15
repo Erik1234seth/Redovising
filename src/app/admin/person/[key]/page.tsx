@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, BokslutData, MomsPeriod, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
 import { EVENT_STYLE, REDOVISNINGSMETODER, MOMSPERIODER, fullDate } from '../../_pipeline';
-import DeletePerson from '../../_delete-person';
 import SmsComposer from '../../_sms-composer';
 import { formatPhone } from '@/lib/sms/phone';
 import { isSieFile } from '@/lib/sie/parse';
@@ -25,7 +24,8 @@ import { NeBilaga } from '../../_ne';
  * tidslinjen. Metoden och verksamheten läses sällan och tog var sitt kort i
  * höjd innan tidslinjen ens började; som rubriker i samma flik kostar de
  * ingenting. Adresserna bor under Mejl, där mejlen de hör till finns, och
- * filerna under Underlag — dit går det också att dra och släppa nya.
+ * filerna under Underlag — dit går det också att dra och släppa nya. Filer
+ * som inte ska bokföras (NE-bilagor, avtal, våra egna) ligger under Övriga filer.
  * Bokslut är checklistan över vad som finns och vad som saknas inför bokslutet.
  *
  * Vald flik läggs i adressen som #flik, så att en länk hit kan peka på en
@@ -35,6 +35,7 @@ const TABS = [
   { id: 'kontext', label: 'Kundkontext' },
   { id: 'bokslut', label: 'Bokslut' },
   { id: 'konversationer', label: 'Mejl' },
+  { id: 'filer', label: 'Övriga filer' },
   { id: 'underlag', label: 'Underlag' },
   { id: 'transaktioner', label: 'Transaktioner' },
   { id: 'kontering', label: 'Kontering' },
@@ -48,7 +49,6 @@ const BOKFORING: Tab[] = ['underlag', 'transaktioner', 'kontering', 'verifikatio
 
 export default function PersonPage() {
   const params = useParams<{ key: string }>();
-  const router = useRouter();
   const rawKey = Array.isArray(params.key) ? params.key[0] : params.key;
 
   const [person, setPerson] = useState<Person | null>(null);
@@ -72,7 +72,6 @@ export default function PersonPage() {
   const [savingMoms, setSavingMoms] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [savingEmail, setSavingEmail] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [messaging, setMessaging] = useState(false);
   const [tab, setTab] = useState<Tab>('kontext');
   const [menyOppen, setMenyOppen] = useState(false);
@@ -82,6 +81,9 @@ export default function PersonPage() {
   // Radera kräver två klick: första visar "Ja, radera", andra raderar på riktigt
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [raderar, setRaderar] = useState<string | null>(null);
+  // Att flytta en utläst fil till övrigt tar bort transaktionerna — då krävs två klick
+  const [flyttar, setFlyttar] = useState<string | null>(null);
+  const [bekraftaFlytt, setBekraftaFlytt] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   // Ligger i en useCallback för att kunna köras om efter ett manuellt SMS —
@@ -464,6 +466,31 @@ export default function PersonPage() {
     load();
   };
 
+  /**
+   * Flyttar en fil mellan underlagen och övriga filer. Till övrigt tas det som
+   * lästs ut ur den bort, så transaktionerna och verifikationerna hämtas om.
+   */
+  const flyttaFil = async (id: string, sortering: 'underlag' | 'ovrigt') => {
+    if (flyttar) return;
+    setFlyttar(id);
+    setError('');
+    const res = await fetch('/api/admin/underlag', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, sortering }),
+    }).catch(() => null);
+    const data = await res?.json().catch(() => ({}));
+    setFlyttar(null);
+    setBekraftaFlytt(null);
+    if (!res?.ok) { setError(data?.error || 'Filen kunde inte flyttas'); return; }
+    setValda((list) => list.filter((v) => v !== id));
+    setVerifikationer(null);
+    setVerifikationerError('');
+    setTransaktioner(null);
+    setTransaktionerError('');
+    load();
+  };
+
   if (loading) return <div className="text-center py-20 text-slate-600">Laddar...</div>;
 
   if (error || !person) {
@@ -484,9 +511,44 @@ export default function PersonPage() {
     ? new Set(verifikationer.map((v) => v.underlagId).filter(Boolean)).size
     : 0;
 
+  // Underlagsfliken visar bara det som ska bokföras. Det som sorterats som
+  // övrigt — NE-bilagor, avtal, filer vi själva skickat — har en egen flik.
+  // Osorterade filer står bland underlagen tills avläsningen sorterat dem.
+  const bokforingsfiler = underlag.filter((f) => f.sortering !== 'ovrigt');
+  const ovrigaFiler = underlag.filter((f) => f.sortering === 'ovrigt');
+
   // SIE-filer läses med kod och hör hemma bland verifikationerna, så de går
   // inte att kryssa i här
-  const lasbara = underlag.filter((f) => kanLasasAvAi(f.fileName, f.mimeType));
+  const lasbara = bokforingsfiler.filter((f) => kanLasasAvAi(f.fileName, f.mimeType));
+
+  /** Radera med två klick — samma i underlagen och bland övriga filer. */
+  const raderaKnapp = (id: string, disabled: boolean) => (confirmDelete === id ? (
+    <span className="flex items-center gap-2 shrink-0">
+      <button
+        onClick={() => raderaUnderlag(id)}
+        disabled={!!raderar}
+        className="px-2 py-0.5 bg-red-600 hover:bg-red-500 text-white font-semibold rounded text-[11px] transition disabled:opacity-50"
+      >
+        {raderar === id ? 'Raderar…' : 'Ja, radera'}
+      </button>
+      <button
+        onClick={() => setConfirmDelete(null)}
+        disabled={!!raderar}
+        className="text-slate-500 hover:text-slate-700 text-[11px] transition disabled:opacity-50"
+      >
+        Avbryt
+      </button>
+    </span>
+  ) : (
+    <button
+      onClick={() => setConfirmDelete(id)}
+      disabled={!!raderar || disabled}
+      title="Radera filen och allt som lästs ur den"
+      className="text-red-600 hover:text-red-600 text-[11px] shrink-0 transition disabled:opacity-40"
+    >
+      Radera
+    </button>
+  ));
 
   const punkter = bokslutPunkter(person, bokslut, underlag, verifikationerCount, transaktionerCount);
   const saknas = punkter.filter((p) => p.status === 'saknas').length;
@@ -523,9 +585,14 @@ export default function PersonPage() {
             {mail.length}
           </span>
         )}
-        {id === 'underlag' && underlag.length > 0 && (
+        {id === 'underlag' && bokforingsfiler.length > 0 && (
           <span className="px-1.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 shrink-0 normal-case tracking-normal">
-            {underlag.length}
+            {bokforingsfiler.length}
+          </span>
+        )}
+        {id === 'filer' && ovrigaFiler.length > 0 && (
+          <span className="px-1.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 shrink-0 normal-case tracking-normal">
+            {ovrigaFiler.length}
           </span>
         )}
         {id === 'transaktioner' && transaktionerCount > 0 && (
@@ -598,12 +665,6 @@ export default function PersonPage() {
                 + SMS
               </button>
             )}
-            <button
-              onClick={() => setDeleting(true)}
-              className="px-3 py-1.5 text-xs bg-red-500/15 hover:bg-red-500/30 text-red-600 rounded-lg transition"
-            >
-              Ta bort
-            </button>
           </div>
         </div>
       </div>
@@ -1084,6 +1145,55 @@ export default function PersonPage() {
             </>
           )}
 
+          {/* Filer som är bra att ha men inte ska bokföras: NE-bilagor, avtal,
+              brev, filer vi själva skickat. Sorteras bort innan något läses ut
+              ur dem, så att de aldrig hamnar i konteringen. */}
+          {tab === 'filer' && (
+            ovrigaFiler.length === 0 ? (
+              <p className="text-slate-500 text-sm leading-relaxed">
+                Inga övriga filer. Hit sorteras filer som inte är underlag för bokföringen — till exempel en
+                NE-bilaga, ett avtal eller ett brev från Skatteverket — när de läses av, eller när du flyttar dem
+                från Underlag.
+              </p>
+            ) : (
+              <>
+                <p className="text-slate-400 text-xs mb-4">
+                  Bra att ha, men konteras inte. Ligger en fil fel, flytta den till Underlag — där läses den av med AI.
+                </p>
+                <ul className="divide-y divide-slate-200">
+                  {ovrigaFiler.map((f) => (
+                    <li key={f.id} className="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
+                      <span className="min-w-0 flex-1">
+                        <span className="text-slate-900 text-sm block truncate" title={f.fileName}>{f.fileName}</span>
+                        {f.sorteringOrsak && <span className="text-slate-400 text-[11px] block">{f.sorteringOrsak}</span>}
+                      </span>
+                      <span className="text-slate-400 text-[11px] shrink-0 hidden sm:inline">{fullDate(f.at)}</span>
+                      <a
+                        href={`/api/admin/underlag/${f.id}/ladda-ner`}
+                        title={`Ladda ner ${f.fileName}`}
+                        className="text-blue-700 hover:text-blue-700 text-[11px] shrink-0 transition"
+                      >
+                        Ladda ner
+                      </a>
+                      {/* Våra egna filer är kopior av kundens underlag och läses aldrig ut */}
+                      {f.sorteringOrsak !== 'Skickad av oss' && kanLasasAvAi(f.fileName, f.mimeType) && (
+                        <button
+                          onClick={() => flyttaFil(f.id, 'underlag')}
+                          disabled={!!flyttar}
+                          title="Är ett underlag för bokföringen — flytta till Underlag och läs av den där"
+                          className="text-slate-500 hover:text-slate-800 text-[11px] shrink-0 transition disabled:opacity-40"
+                        >
+                          {flyttar === f.id ? 'Flyttar…' : 'Till underlag'}
+                        </button>
+                      )}
+                      {raderaKnapp(f.id, false)}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )
+          )}
+
           {/* Filerna personen skickat, så det syns att de hamnat på rätt person.
               Går också att släppa filer i fliken för att ladda upp dem åt personen. */}
           {tab === 'underlag' && (
@@ -1146,13 +1256,13 @@ export default function PersonPage() {
                 </p>
               )}
 
-              {underlag.length === 0 ? (
+              {bokforingsfiler.length === 0 ? (
                 <p className="text-slate-500 text-sm">
-                  Inga filer mejlade eller uppladdade än.{canUpload && ' Dra hit filer eller klicka på Ladda upp.'}
+                  Inga underlag mejlade eller uppladdade än.{canUpload && ' Dra hit filer eller klicka på Ladda upp.'}
                 </p>
               ) : (
                 <ul className="divide-y divide-slate-200">
-                  {underlag.map((f) => (
+                  {bokforingsfiler.map((f) => (
                     <li key={f.id} className="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
                       <input
                         type="checkbox"
@@ -1261,18 +1371,19 @@ export default function PersonPage() {
                       >
                         Ladda ner
                       </a>
-                      {confirmDelete === f.id ? (
+                      {/* SIE-filer är alltid bokföring och flyttas inte */}
+                      {!isSieFile(f.fileName) && (bekraftaFlytt === f.id ? (
                         <span className="flex items-center gap-2 shrink-0">
                           <button
-                            onClick={() => raderaUnderlag(f.id)}
-                            disabled={!!raderar}
-                            className="px-2 py-0.5 bg-red-600 hover:bg-red-500 text-white font-semibold rounded text-[11px] transition disabled:opacity-50"
+                            onClick={() => flyttaFil(f.id, 'ovrigt')}
+                            disabled={!!flyttar}
+                            className="px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded text-[11px] transition disabled:opacity-50"
                           >
-                            {raderar === f.id ? 'Raderar…' : 'Ja, radera'}
+                            {flyttar === f.id ? 'Flyttar…' : 'Ja, flytta'}
                           </button>
                           <button
-                            onClick={() => setConfirmDelete(null)}
-                            disabled={!!raderar}
+                            onClick={() => setBekraftaFlytt(null)}
+                            disabled={!!flyttar}
                             className="text-slate-500 hover:text-slate-700 text-[11px] transition disabled:opacity-50"
                           >
                             Avbryt
@@ -1280,14 +1391,17 @@ export default function PersonPage() {
                         </span>
                       ) : (
                         <button
-                          onClick={() => setConfirmDelete(f.id)}
-                          disabled={!!raderar || !!laser}
-                          title="Radera filen och allt som lästs ur den"
-                          className="text-red-600 hover:text-red-600 text-[11px] shrink-0 transition disabled:opacity-40"
+                          onClick={() => (f.transaktioner?.antal || f.verifikationer?.inlagda
+                            ? setBekraftaFlytt(f.id)
+                            : flyttaFil(f.id, 'ovrigt'))}
+                          disabled={!!flyttar || !!laser}
+                          title="Inget underlag för bokföringen — flytta till Övriga filer. Det som lästs ut ur filen, och konteringen av det, tas bort."
+                          className="text-slate-500 hover:text-slate-800 text-[11px] shrink-0 transition disabled:opacity-40"
                         >
-                          Radera
+                          Till övriga
                         </button>
-                      )}
+                      ))}
+                      {raderaKnapp(f.id, !!laser)}
                     </li>
                   ))}
                 </ul>
@@ -1364,14 +1478,6 @@ export default function PersonPage() {
           to={{ phone: person.phone, name: person.name, optedOut: person.optedOut }}
           onClose={() => setMessaging(false)}
           onSent={load}
-        />
-      )}
-
-      {deleting && (
-        <DeletePerson
-          people={[person]}
-          onClose={() => setDeleting(false)}
-          onDeleted={() => router.push('/admin/personer')}
         />
       )}
     </div>

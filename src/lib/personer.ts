@@ -159,7 +159,7 @@ export async function build(): Promise<Map<string, Built>> {
     supabase.from('orders').select('id, user_id, guest_email, guest_name, guest_phone, guest_company, package_type, bank, status, created_at'),
     supabase.from('email_log').select('id, to_email, subject, kind, status, error, created_at, issue_dismissed_at'),
     supabase.from('contact_files').select('id, contact_id, stage, file_name, created_at'),
-    supabase.from('bokforing_underlag').select('id, user_id, sender_email, source, file_name, mime_type, status, created_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel, transaktioner_utlasta_at, transaktioner_antal, transaktioner_notering, transaktioner_fel, varningar, kontroll_status, kontroll_saknas, kontroll_at'),
+    supabase.from('bokforing_underlag').select('id, user_id, sender_email, source, file_name, mime_type, status, created_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel, transaktioner_utlasta_at, transaktioner_antal, transaktioner_notering, transaktioner_fel, varningar, kontroll_status, kontroll_saknas, kontroll_at, sortering, sortering_orsak'),
     supabase.from('person_aliases').select('id, alias_email, person_key, created_at'),
   ]);
 
@@ -496,6 +496,8 @@ export async function build(): Promise<Map<string, Built>> {
         verifikationer: imported,
         transaktioner: utlasta,
         kontroll: r.kontroll_status ? { status: r.kontroll_status, saknas: r.kontroll_saknas ?? [], at: r.kontroll_at } : null,
+        sortering: r.sortering ?? null,
+        sorteringOrsak: r.sortering_orsak ?? null,
       });
     }
 

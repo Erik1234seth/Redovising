@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { UNDERLAG_BUCKET, folderFor, resolveUserId } from '@/lib/inmail/save-attachments';
 import { isSieFile } from '@/lib/sie/parse';
 import { importSieUnderlag } from '@/lib/sie/import';
+import { sorteringVidUppladdning } from '@/lib/underlag/sortering';
 
 /**
  * Laddar upp underlag åt en kund från personsidan i adminpanelen.
@@ -98,6 +99,7 @@ export async function POST(request: NextRequest) {
         file_path: body.path,
         file_size: size,
         mime_type: body.mimeType?.trim() || 'application/octet-stream',
+        ...sorteringVidUppladdning(fileName, body.mimeType?.trim() || null, email),
       }).select('id').single();
 
       if (error) {

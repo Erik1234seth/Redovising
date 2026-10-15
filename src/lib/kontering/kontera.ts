@@ -125,6 +125,7 @@ Regler:
 - sakerhet: "hog" bara när underlaget tydligt visar vad det är. "lag" när du gissar.
 - motivering: en eller två meningar om varför, på svenska.
 - Använd kundens verksamhet för att avgöra vad ett köp är till för. Har kunden i ett mejl förklarat vad ett köp eller en inbetalning avser, väger det tyngre än en gissning — säg det i motiveringen.
+- Står det en instruktion från byrån i anteckningen följer du den. Den väger tyngst av allt.
 
 K1-KONTOPLAN (konto namn — beskrivning [sökord]):
 ${kontolista()}`;
@@ -141,7 +142,31 @@ Du får en transaktion, kontot som valts och kontots regler ur K1-kontobeskrivni
 
 Gränsprövningarna är uträknade i kod. Godta siffrorna.
 
-Transaktionen konteras direkt från underlaget, inte från en tidigare bokföring. Punkter som handlar om vilket BAS-konto en post tidigare bokförts på stämmer därför aldrig — bortse från dem.`;
+Transaktionen konteras direkt från underlaget, inte från en tidigare bokföring. Punkter som handlar om vilket BAS-konto en post tidigare bokförts på stämmer därför aldrig — bortse från dem.
+
+Står det en instruktion från byrån i anteckningen och kontot följer den, är kontot rätt om inte reglerna uttryckligen förbjuder det.`;
+
+const RATTELSE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['datum', 'belopp', 'moms', 'valuta', 'riktning', 'kommentar'],
+  properties: {
+    datum: { type: ['string', 'null'], description: 'YYYY-MM-DD, eller null om det inte ändras' },
+    belopp: { type: ['number', 'null'], description: 'Nytt totalbelopp inklusive moms, positivt, eller null' },
+    moms: { type: ['number', 'null'], description: 'Nytt momsbelopp, eller null' },
+    valuta: { type: ['string', 'null'], description: 'Ny valutakod, eller null' },
+    riktning: { type: ['string', 'null'], enum: ['in', 'ut', null] },
+    kommentar: { type: 'string' },
+  },
+};
+
+const RATTELSE_FAST = `Du rättar en transaktion åt en svensk bokföringsbyrå innan den konteras. Byrån har skrivit en instruktion om transaktionen.
+
+Avgör om instruktionen ändrar transaktionens uppgifter: datum, belopp, moms, valuta eller riktning. Ändra bara det instruktionen säger eller som direkt följer av den, och sätt null på resten. Handlar instruktionen bara om vilket konto eller vilken moms som ska väljas, är alla fält null — den följer med till konteringen ändå.
+
+Bokföringen sker i svenska kronor. Är beloppet i en annan valuta och instruktionen ger kursen eller beloppet i kronor, räkna om belopp och moms till kronor och sätt valuta till "SEK". Ger instruktionen ingen kurs, ändra bara valutan och skriv i kommentaren att beloppet i kronor saknas. Hitta aldrig på en växelkurs.
+
+kommentar: en mening på svenska om vad du ändrade, eller att inget ändrades.`;
 
 function transaktionText(t: Transaktion, betalsatt: Betalsatt): string {
   return [
@@ -416,6 +441,113 @@ export async function bokforManuellt(
   if (count) throw new Error('Transaktionen är redan bokförd — ångra först');
   if (![0, 6, 12, 25].includes(momssats)) throw new Error('Momssatsen måste vara 0, 6, 12 eller 25');
   await bokfor(supabase, t as Transaktion, konto, momssats, betalsatt, 'Erik', motkonto);
+}
+
+// ---------- rätta transaktionen ----------
+
+export interface Andringar {
+  datum?: string;
+  belopp?: number;
+  moms?: number;
+  valuta?: string;
+  riktning?: 'in' | 'ut';
+}
+
+const FALTNAMN: Record<keyof Andringar, string> = {
+  datum: 'datum', belopp: 'belopp', moms: 'moms', valuta: 'valuta', riktning: 'riktning',
+};
+
+/** Transaktionen, så länge den inte är bokförd. En bokförd rad ändras inte under verifikationen. */
+async function obokford(supabase: SupabaseClient, userId: string, transaktionId: string): Promise<Transaktion> {
+  const { data: t, error } = await supabase
+    .from('transaktioner').select(TRANSAKTION_KOLUMNER).eq('id', transaktionId).eq('user_id', userId).maybeSingle();
+  if (error) throw new Error(`Kunde inte läsa transaktionen: ${error.message}`);
+  if (!t) throw new Error('Transaktionen finns inte');
+  const { count } = await supabase
+    .from('verifikationer').select('id', { count: 'exact', head: true }).eq('transaktion_id', transaktionId);
+  if (count) throw new Error('Transaktionen är redan bokförd — ångra bokföringen först');
+  return t as Transaktion;
+}
+
+/**
+ * Skriver ändringarna på transaktionen. Det gamla värdet sparas i anteckningen,
+ * så att det syns vad underlaget sa och vad som ändrats — och konteringen läser
+ * anteckningen.
+ */
+async function sparaAndringar(supabase: SupabaseClient, t: Transaktion, andringar: Andringar, notering?: string) {
+  const ny = { ...andringar };
+  if (ny.datum !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(ny.datum)) throw new Error('Datumet ska skrivas ÅÅÅÅ-MM-DD');
+  if (ny.belopp !== undefined && !(ny.belopp > 0)) throw new Error('Beloppet måste vara större än noll');
+  if (ny.valuta !== undefined) {
+    ny.valuta = ny.valuta.trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(ny.valuta)) throw new Error('Valutan ska vara en kod på tre bokstäver, t.ex. SEK eller DKK');
+  }
+  if (ny.riktning !== undefined && ny.riktning !== 'in' && ny.riktning !== 'ut') throw new Error('Riktningen är in eller ut');
+  const belopp = ny.belopp ?? Number(t.belopp);
+  if (ny.moms !== undefined && (ny.moms < 0 || ny.moms >= belopp)) throw new Error('Momsen måste vara mindre än beloppet');
+
+  const fore: Record<string, unknown> = { ...t, valuta: t.valuta || 'SEK' };
+  const byten = (Object.keys(ny) as (keyof Andringar)[])
+    .filter((k) => ny[k] !== undefined && String(ny[k]) !== String(fore[k] ?? ''))
+    .map((k) => `${FALTNAMN[k]} ${fore[k] ?? '—'} → ${ny[k]}`);
+  if (!byten.length && !notering) return;
+
+  const rad = [`${svenskDag(new Date())}: ${notering ?? 'Ändrat av byrån'}`, byten.length ? `(${byten.join(', ')})` : '']
+    .filter(Boolean).join(' ');
+  const { error } = await supabase.from('transaktioner').update({
+    ...Object.fromEntries(Object.entries(ny).filter(([, v]) => v !== undefined)),
+    anteckning: [t.anteckning, rad].filter(Boolean).join('\n'),
+  }).eq('id', t.id);
+  if (error) throw new Error(`Kunde inte spara ändringen: ${error.message}`);
+}
+
+/** Erik rättar datum, belopp, moms, valuta eller riktning för hand. Förslagen ligger kvar. */
+export async function andraTransaktion(supabase: SupabaseClient, userId: string, transaktionId: string, andringar: Andringar) {
+  await sparaAndringar(supabase, await obokford(supabase, userId, transaktionId), andringar);
+}
+
+/**
+ * Erik skriver vad som är fel, och AI:n gör om konteringen utifrån det.
+ *
+ * Först rättar en modell transaktionens uppgifter om instruktionen kräver det
+ * — ett belopp i fel valuta, fel datum. Instruktionen sparas i anteckningen
+ * och följer därmed med när båda modellerna sedan konterar om från början.
+ */
+export async function konteraMedInstruktion(
+  supabase: SupabaseClient,
+  userId: string,
+  transaktionId: string,
+  instruktion: string,
+): Promise<{ kommentar: string; utfall: Utfall | undefined }> {
+  const t = await obokford(supabase, userId, transaktionId);
+  const { data: profil } = await supabase.from('profiles').select('har_foretagskonto').eq('id', userId).maybeSingle();
+  const betalsatt = tolkaBetalsatt(profil?.har_foretagskonto ?? null);
+  if (!betalsatt) throw new Error('Välj först om kunden betalar via företagskonto eller privatkonto (Kundkontext).');
+
+  const { data: r } = await fraga<{
+    datum: string | null; belopp: number | null; moms: number | null;
+    valuta: string | null; riktning: 'in' | 'ut' | null; kommentar: string;
+  }>('gpt-5.5', {
+    system: { fast: RATTELSE_FAST, kund: '' },
+    user: `TRANSAKTIONEN:\n${transaktionText(t, betalsatt)}\n\nBYRÅNS INSTRUKTION:\n${instruktion}`,
+    namn: 'rattelse',
+    schema: RATTELSE_SCHEMA,
+  });
+
+  const andringar: Andringar = {
+    datum: r.datum ?? undefined,
+    belopp: r.belopp ?? undefined,
+    moms: r.moms ?? undefined,
+    valuta: r.valuta ?? undefined,
+    riktning: r.riktning ?? undefined,
+  };
+  await sparaAndringar(supabase, t, andringar, `Instruktion från byrån: ${instruktion}`);
+
+  // Förslagen gällde de gamla uppgifterna — konteringen görs om från början
+  const { error } = await supabase.from('konteringar').delete().eq('transaktion_id', transaktionId).eq('user_id', userId);
+  if (error) throw new Error(`Kunde inte ta bort de gamla förslagen: ${error.message}`);
+  const [utfall] = await konteraTransaktioner(supabase, userId, [transaktionId]);
+  return { kommentar: r.kommentar, utfall };
 }
 
 /**

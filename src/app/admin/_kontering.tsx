@@ -499,11 +499,20 @@ function Detalj({
       motkonto: betalsatt === 'bada' ? motkonto : undefined,
     });
 
-  const detaljer = r.detaljer ? (
-    <details>
-      <summary className="text-slate-500 hover:text-slate-700 text-xs cursor-pointer">Detaljer från underlaget</summary>
-      <p className="text-slate-600 text-xs whitespace-pre-wrap mt-1 max-w-3xl">{r.detaljer}</p>
-    </details>
+  const detaljer = (r.detaljer || r.anteckning) ? (
+    <div className="space-y-1">
+      {r.anteckning && (
+        <p className="text-slate-600 text-xs whitespace-pre-wrap max-w-3xl">
+          <span className="text-slate-500">Anteckning:</span> {r.anteckning}
+        </p>
+      )}
+      {r.detaljer && (
+        <details>
+          <summary className="text-slate-500 hover:text-slate-700 text-xs cursor-pointer">Detaljer från underlaget</summary>
+          <p className="text-slate-600 text-xs whitespace-pre-wrap mt-1 max-w-3xl">{r.detaljer}</p>
+        </details>
+      )}
+    </div>
   ) : null;
 
   if (s === 'bokford') {
@@ -540,6 +549,9 @@ function Detalj({
           {raderaKnapp}
           {fel && <span className="text-red-600 text-xs">{fel}</span>}
         </div>
+        <p className="text-slate-400 text-xs">
+          Ska belopp, valuta eller datum rättas, eller AI:n kontera om med en instruktion? Ångra bokföringen först.
+        </p>
         {r.konteringar.length > 0 && (
           <div className="grid md:grid-cols-2 gap-3 pt-2">
             {r.konteringar.map((k) => <Forslag key={k.modell} k={k} />)}
@@ -613,6 +625,147 @@ function Detalj({
         </button>
         {fel && <span className="text-red-600 text-xs">{fel}</span>}
       </div>
+
+      <Ratta rad={r} userId={userId} onRad={onRad} />
+    </div>
+  );
+}
+
+/**
+ * När avläsningen blev fel — ett belopp i danska kronor som lästes som
+ * svenska, fel datum. Antingen skriver Erik vad som är fel och AI:n rättar
+ * och konterar om, eller så ändras uppgifterna för hand.
+ */
+function Ratta({ rad: r, userId, onRad }: {
+  rad: AdminKonteringRad;
+  userId: string;
+  onRad: (rad: AdminKonteringRad | null) => void;
+}) {
+  const [instruktion, setInstruktion] = useState('');
+  const [arbetar, setArbetar] = useState<'ai' | 'spara' | null>(null);
+  const [fel, setFel] = useState('');
+  const [kommentar, setKommentar] = useState('');
+  const [andra, setAndra] = useState(false);
+  const [falt, setFalt] = useState({
+    datum: r.datum,
+    belopp: String(r.belopp),
+    moms: r.moms === null ? '' : String(r.moms),
+    valuta: r.valuta,
+    riktning: r.riktning,
+  });
+  const satt = (k: keyof typeof falt) => (e: { target: { value: string } }) => setFalt((f) => ({ ...f, [k]: e.target.value }));
+  const tal = (s: string) => Number(s.replace(/\s/g, '').replace(',', '.'));
+
+  const skicka = async (method: 'POST' | 'PATCH', body: object) => {
+    setFel('');
+    setKommentar('');
+    const res = await fetch('/api/admin/kontering', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, transaktionId: r.id, ...body }),
+    }).catch(() => null);
+    const data = await res?.json().catch(() => ({}));
+    setArbetar(null);
+    if (!res?.ok) { setFel(data?.error || 'Det gick inte'); return false; }
+    if (data.kommentar) setKommentar(data.kommentar);
+    if (data.rad) onRad(data.rad);
+    return true;
+  };
+
+  const konteraOm = async () => {
+    setArbetar('ai');
+    if (await skicka('POST', { instruktion })) setInstruktion('');
+  };
+
+  const spara = async () => {
+    setArbetar('spara');
+    const andringar = {
+      datum: falt.datum || undefined,
+      belopp: tal(falt.belopp),
+      moms: falt.moms.trim() ? tal(falt.moms) : undefined,
+      valuta: falt.valuta,
+      riktning: falt.riktning,
+    };
+    if (await skicka('PATCH', { andringar })) setAndra(false);
+  };
+
+  const input = 'block mt-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500';
+
+  return (
+    <div className="pt-3 border-t border-slate-200 space-y-3">
+      <label className="block text-xs text-slate-500">
+        Instruktion till AI:n
+        <textarea
+          value={instruktion}
+          onChange={(e) => setInstruktion(e.target.value)}
+          disabled={!!arbetar}
+          rows={2}
+          placeholder="t.ex. Beloppet är i DKK, 1 DKK = 1,52 kr. Eller: Det här är representation, inte material."
+          className={`${input} w-full max-w-3xl resize-y disabled:opacity-50`}
+        />
+      </label>
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          onClick={konteraOm}
+          disabled={!!arbetar || !instruktion.trim()}
+          title="AI:n rättar beloppet, valutan eller datumet om instruktionen säger det, och båda modellerna konterar om"
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition disabled:opacity-50"
+        >
+          {arbetar === 'ai' ? 'Konterar om…' : 'Kontera om med instruktionen'}
+        </button>
+        <button
+          onClick={() => setAndra((v) => !v)}
+          disabled={!!arbetar}
+          className="text-slate-600 hover:text-slate-900 text-xs transition disabled:opacity-50"
+        >
+          {andra ? 'Stäng' : 'Ändra belopp, valuta eller datum själv'}
+        </button>
+        {arbetar === 'ai' && <span className="text-slate-400 text-xs">Tar upp till ett par minuter.</span>}
+        {kommentar && <span className="text-slate-600 text-xs">{kommentar}</span>}
+        {fel && <span className="text-red-600 text-xs">{fel}</span>}
+      </div>
+
+      {andra && (
+        <div className="flex items-end gap-2 flex-wrap">
+          <label className="text-xs text-slate-500">
+            Datum
+            <input type="date" value={falt.datum} onChange={satt('datum')} className={input} />
+          </label>
+          <label className="text-xs text-slate-500">
+            Belopp inkl. moms
+            <input value={falt.belopp} onChange={satt('belopp')} inputMode="decimal" className={`${input} w-28 tabular-nums`} />
+          </label>
+          <label className="text-xs text-slate-500">
+            Moms
+            <input value={falt.moms} onChange={satt('moms')} inputMode="decimal" placeholder="okänd" className={`${input} w-24 tabular-nums`} />
+          </label>
+          <label className="text-xs text-slate-500">
+            Valuta
+            <input
+              value={falt.valuta}
+              onChange={(e) => setFalt((f) => ({ ...f, valuta: e.target.value.toUpperCase().slice(0, 3) }))}
+              className={`${input} w-16 uppercase`}
+            />
+          </label>
+          <label className="text-xs text-slate-500">
+            Riktning
+            <select value={falt.riktning} onChange={satt('riktning')} className={input}>
+              <option value="ut">Ut (köp)</option>
+              <option value="in">In (försäljning)</option>
+            </select>
+          </label>
+          <button
+            onClick={spara}
+            disabled={!!arbetar || !(tal(falt.belopp) > 0)}
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold rounded-lg text-xs transition disabled:opacity-50"
+          >
+            {arbetar === 'spara' ? 'Sparar…' : 'Spara'}
+          </button>
+          <span className="text-slate-400 text-xs basis-full">
+            Bokföringen sker i kronor — skriv beloppet i SEK och sätt valutan till SEK. Det gamla värdet sparas i anteckningen.
+          </span>
+        </div>
+      )}
     </div>
   );
 }

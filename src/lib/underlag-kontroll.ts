@@ -50,19 +50,23 @@ interface FilRad {
   verifikationer_antal: number | null;
   verifikationer_fel: string | null;
   transaktioner_fel: string | null;
+  sortering: string | null;
 }
 
-const FIL_KOLUMNER = 'id, file_name, mime_type, sender_email, gmail_message_id, created_at, kontroll_status, kontroll_saknas, verifikationer_inlagda_at, verifikationer_antal, verifikationer_fel, transaktioner_fel';
+const FIL_KOLUMNER = 'id, file_name, mime_type, sender_email, gmail_message_id, created_at, kontroll_status, kontroll_saknas, verifikationer_inlagda_at, verifikationer_antal, verifikationer_fel, transaktioner_fel, sortering';
 
 /** Ett redan bokfört underlag (kassarapport, SIE) har allt — det finns inget att fråga om. */
 const arBokford = (f: FilRad) => !!f.verifikationer_inlagda_at && !f.verifikationer_fel && (f.verifikationer_antal ?? 0) > 0;
 
-/** Kundens egna filer, alltså inte de vi skickat. */
+/**
+ * Kundens egna underlag: inte de vi skickat, och inte övriga filer som en
+ * NE-bilaga eller ett avtal — dem finns det inget att kontrollera i.
+ */
 async function kundensFiler(supabase: SupabaseClient, userId: string): Promise<FilRad[]> {
   const { data, error } = await supabase.from('bokforing_underlag')
     .select(FIL_KOLUMNER).eq('user_id', userId).order('created_at');
   if (error) throw new Error(`Kunde inte läsa underlagen: ${error.message}`);
-  return ((data ?? []) as FilRad[]).filter((f) => !arVarAdress(f.sender_email));
+  return ((data ?? []) as FilRad[]).filter((f) => !arVarAdress(f.sender_email) && f.sortering !== 'ovrigt');
 }
 
 /** Filer som inte är klara: aldrig kontrollerade, eller kontrollerade med något som saknas. */
@@ -435,7 +439,7 @@ export async function korUnderlagsflode(opts: {
     const filer = await kundensFiler(supabase, profil.id);
     const valda = new Set(opts.filer ?? []);
     const nya = filer.filter((f) => f.gmail_message_id === opts.messageId);
-    const alla = filer.filter((f) => f.gmail_message_id === opts.messageId || valda.has(f.id));
+    let alla = filer.filter((f) => f.gmail_message_id === opts.messageId || valda.has(f.id));
 
     // Läs ut (eller läs om, med kundens nya svar) — SIE läggs in av sig själv
     // och behöver det inte, och ett bokfört underlag läses inte om
@@ -444,6 +448,9 @@ export async function korUnderlagsflode(opts: {
     await iOmgangar(attLasa, SAMTIDIGA, (f) => lasUtTransaktioner(supabase, f.id).catch((err) => {
       console.error(`[underlag-kontroll] kunde inte läsa ${f.file_name}:`, err instanceof Error ? err.message : err);
     }));
+    // Avläsningen sorterar: det som visade sig vara övriga filer kontrolleras inte
+    const kvar = new Set((await kundensFiler(supabase, profil.id)).map((f) => f.id));
+    alla = alla.filter((f) => kvar.has(f.id));
 
     const [mejlkontext, varaFiler] = await Promise.all([
       byggMejlkontext(supabase, { userId: profil.id, emails: [email, profil.email] }),
@@ -473,10 +480,15 @@ export async function korUnderlagsflode(opts: {
         return perRad.size ? `${rubrik}\n${[...perRad].map(([rad, vad]) => `    • ${rad}: ${vad.join(', ')}`).join('\n')}` : rubrik;
       }).join('\n')}\n\nSvara kunden. Saknas något: förklara konkret, transaktion för transaktion, vilka uppgifter vi behöver och be kunden svara på mejlet. Fråga bara om det som står ovan, och aldrig om sådant kunden redan har svarat på. Gick en fil inte att läsa: be om en tydligare bild eller en annan fil. Är allt komplett: tacka kort och bekräfta att vi har det vi behöver. Ställer kunden också en annan fråga i mejlet: svara på den i samma mejl.`
       : 'UNDERLAGSKONTROLL: mejlet handlar om underlag, men vi hittade inga filer att kontrollera — varken bifogade nu eller tidigare inskickade som mejlet gäller. Svara på det kunden skriver, och be om underlaget om det behövs.';
+    // Bilagor som sorterades bort är inte borttappade — kunden ska inte bli ombedd att skicka dem igen
+    const ovriga = nya.filter((f) => !alla.some((x) => x.id === f.id)).map((f) => f.file_name);
+    const ovrigtKontext = ovriga.length
+      ? `\n\nÖVRIGA FILER: ${ovriga.join(', ')} är inga underlag för bokföringen (till exempel en NE-bilaga, ett avtal eller ett brev). De är sparade hos oss som övriga filer och behöver inte kontrolleras. Bekräfta kort att vi fått dem.`
+      : '';
 
     const svar = await handleGeneralQuestion({
       supabase, profile: profil, subject: opts.amne, body: opts.text, messageId: opts.messageId,
-      emailHistory: opts.historik, smsKontext: await smsKontextForMejl(supabase, email), underlagKontext,
+      emailHistory: opts.historik, smsKontext: await smsKontextForMejl(supabase, email), underlagKontext: underlagKontext + ovrigtKontext,
       attachmentNames: nya.map((f) => f.file_name),
     });
 

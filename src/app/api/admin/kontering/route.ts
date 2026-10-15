@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { AdminKontering, AdminKonteringRad } from '@/lib/admin-types';
-import { bokforManuellt, konteraTransaktioner } from '@/lib/kontering/kontera';
+import { andraTransaktion, bokforManuellt, konteraMedInstruktion, konteraTransaktioner, type Andringar } from '@/lib/kontering/kontera';
 import { slaUppKonto } from '@/lib/kontering/regelverk';
 
 /**
@@ -10,8 +10,10 @@ import { slaUppKonto } from '@/lib/kontering/regelverk';
  *
  *   GET     transaktionerna med modellernas förslag och eventuell verifikation
  *   POST    kontera EN transaktion med båda modellerna (en per anrop, så att
- *           anropet hinner klart inom fem minuter — fliken kör flera parallellt)
+ *           anropet hinner klart inom fem minuter — fliken kör flera parallellt).
+ *           Med en instruktion rättas transaktionen först och konteras om.
  *   PUT     bokför ett förslag eller ett eget konto för hand
+ *   PATCH   rätta transaktionens datum, belopp, moms, valuta eller riktning
  *   DELETE  radera bokföringen, eller hela konteringen (förslag och bokföring),
  *           för en eller flera transaktioner — de kan då konteras om
  */
@@ -43,7 +45,7 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string[]):
   for (let from = 0; ; from += 1000) {
     let q = supabase
       .from('transaktioner')
-      .select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, kalla, detaljer, bokforing_underlag(file_name)')
+      .select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, kalla, detaljer, anteckning, bokforing_underlag(file_name)')
       .eq('user_id', userId)
       .is('dublett_av', null)
       .is('dublett_orsak', null)
@@ -114,6 +116,7 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string[]):
       kalla: t.kalla as string,
       fileName: underlag?.file_name ?? null,
       detaljer: (t.detaljer as string) ?? '',
+      anteckning: (t.anteckning as string) ?? '',
       konteringar: konteringar.get(t.id as string) ?? [],
       verifikation: verifikationer.get(t.id as string) ?? null,
     };
@@ -131,14 +134,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { userId, transaktionId } = await request.json().catch(() => ({}));
+  const { userId, transaktionId, instruktion } = await request.json().catch(() => ({}));
   if (!userId || !transaktionId) return NextResponse.json({ error: 'userId och transaktionId behövs' }, { status: 400 });
   try {
     const supabase = getSupabase();
-    const [utfall] = await konteraTransaktioner(supabase, userId, [transaktionId]);
+    const text = typeof instruktion === 'string' ? instruktion.trim() : '';
+    let kommentar: string | undefined;
+    let utfall;
+    if (text) ({ kommentar, utfall } = await konteraMedInstruktion(supabase, userId, transaktionId, text));
+    else [utfall] = await konteraTransaktioner(supabase, userId, [transaktionId]);
     if (utfall?.fel) return fel(utfall.fel, 502);
     const [rad] = await rader(supabase, userId, [transaktionId]);
-    return NextResponse.json({ rad: rad ?? null });
+    return NextResponse.json({ rad: rad ?? null, kommentar });
   } catch (err) {
     return fel(err);
   }
@@ -152,6 +159,23 @@ export async function PUT(request: NextRequest) {
   try {
     const supabase = getSupabase();
     await bokforManuellt(supabase, userId, transaktionId, String(konto).trim(), Number(momssats) || 0, motkonto || undefined);
+    const [rad] = await rader(supabase, userId, [transaktionId]);
+    return NextResponse.json({ rad: rad ?? null });
+  } catch (err) {
+    return fel(err, 400);
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const { userId, transaktionId, andringar } = await request.json().catch(() => ({})) as {
+    userId?: string; transaktionId?: string; andringar?: Andringar;
+  };
+  if (!userId || !transaktionId || !andringar) {
+    return NextResponse.json({ error: 'userId, transaktionId och andringar behövs' }, { status: 400 });
+  }
+  try {
+    const supabase = getSupabase();
+    await andraTransaktion(supabase, userId, transaktionId, andringar);
     const [rad] = await rader(supabase, userId, [transaktionId]);
     return NextResponse.json({ rad: rad ?? null });
   } catch (err) {
