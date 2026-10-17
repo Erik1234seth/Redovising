@@ -115,8 +115,8 @@ async function transaktionerFor(owner: Owner): Promise<AdminTransaktion[]> {
       if (t.bank_konto_hash) bankNamn.set(t.bank_konto_hash, 'Bank');
       out.push({
         id: t.id,
-        underlagId: t.underlag_id ?? `bank:${t.bank_konto_hash}`,
-        fileName: t.bank_konto_hash ? null : file?.file_name ?? null,
+        underlagId: t.underlag_id ?? (t.kalla === 'woocommerce' ? 'woocommerce' : `bank:${t.bank_konto_hash}`),
+        fileName: t.kalla === 'woocommerce' ? 'WooCommerce' : t.bank_konto_hash ? null : file?.file_name ?? null,
         radnr: t.radnr ?? 0,
         datum: t.datum ?? '',
         beskrivning: t.beskrivning ?? '',

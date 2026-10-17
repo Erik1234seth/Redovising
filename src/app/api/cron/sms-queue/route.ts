@@ -5,6 +5,7 @@ import { runLeadReminders, type ReminderRun } from '@/lib/leads/reminders';
 import { synkaAllaZettle } from '@/lib/zettle/sync';
 import { synkaAllaShopify } from '@/lib/shopify/sync';
 import { synkaAllaBanker } from '@/lib/bank/sync';
+import { synkaAllaWoo } from '@/lib/woocommerce/sync';
 
 /**
  * Morgonens utskick: tömmer SMS-kön och skickar dagens lead-påminnelser.
@@ -16,8 +17,9 @@ import { synkaAllaBanker } from '@/lib/bank/sync';
  * `src/lib/leads/reminders.ts` och går även att trigga för hand via
  * /api/cron/lead-reminders. Zettle-synken åker med av samma skäl (logiken i
  * `src/lib/zettle/sync.ts`, för hand via /api/cron/zettle), liksom Shopify-synken
- * (`src/lib/shopify/sync.ts`, /api/cron/shopify) och banksynken
- * (`src/lib/bank/sync.ts`, /api/cron/bank).
+ * (`src/lib/shopify/sync.ts`, /api/cron/shopify), banksynken
+ * (`src/lib/bank/sync.ts`, /api/cron/bank) och WooCommerce-synken
+ * (`src/lib/woocommerce/sync.ts`, /api/cron/woocommerce).
  *
  * Kön i sig är ett skyddsnät: sedan nattspärren togs bort går lead-SMS ut
  * direkt och inget nytt hamnar här, så den delen har normalt ingenting att
@@ -127,6 +129,16 @@ export async function GET(request: Request) {
     bank = { error: message };
   }
 
+  // Också före Shopify. Efter banken, så att dubblettflaggningen ser dagens bankrader
+  let woocommerce: Awaited<ReturnType<typeof synkaAllaWoo>> | { error: string };
+  try {
+    woocommerce = await synkaAllaWoo(supabase);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[sms-queue] WooCommerce-synken avbröts:', message);
+    woocommerce = { error: message };
+  }
+
   let shopify: Awaited<ReturnType<typeof synkaAllaShopify>> | { error: string };
   try {
     shopify = await synkaAllaShopify(supabase);
@@ -136,5 +148,5 @@ export async function GET(request: Request) {
     shopify = { error: message };
   }
 
-  return NextResponse.json({ sent, failed, skipped, reminders, zettle, bank, shopify });
+  return NextResponse.json({ sent, failed, skipped, reminders, zettle, bank, woocommerce, shopify });
 }

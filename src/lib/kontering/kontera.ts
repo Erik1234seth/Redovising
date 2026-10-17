@@ -178,7 +178,9 @@ function transaktionText(t: Transaktion, betalsatt: Betalsatt): string {
     `Beskrivning: ${t.beskrivning || '—'}`,
     t.anteckning ? `Anteckning: ${t.anteckning}` : '',
     t.detaljer ? `Allt som står om transaktionen på underlaget:\n${t.detaljer}` : '',
-    `Källa: ${t.kalla === 'bank' ? 'rad på kontoutdrag (inget kvitto)' : 'utläst ur kundens underlag'}`,
+    `Källa: ${t.kalla === 'bank' ? 'rad på kontoutdrag (inget kvitto)'
+      : t.kalla === 'woocommerce' ? 'order eller återbetalning i kundens webbutik (WooCommerce), hämtad direkt från butiken'
+      : 'utläst ur kundens underlag'}`,
     `Betalas via: ${betalsatt === 'privatkonto' ? 'privatkonto' : betalsatt === 'foretagskonto' ? 'företagskonto' : 'okänt'}`,
   ].filter(Boolean).join('\n');
 }

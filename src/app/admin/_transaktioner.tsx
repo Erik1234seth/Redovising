@@ -314,7 +314,7 @@ export function TransaktionsLista({
                       <span className="block md:hidden text-slate-400 text-[11px] mt-0.5">{t.fileName}</span>
                     </td>
                     <td className="px-4 py-2.5 align-top hidden md:table-cell">
-                      {t.kalla === 'bank' ? (
+                      {t.kalla === 'bank' || t.kalla === 'woocommerce' ? (
                         <span className="text-slate-500 text-xs break-all">{t.fileName ?? 'Bank'}</span>
                       ) : (
                         <Link

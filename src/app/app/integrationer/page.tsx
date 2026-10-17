@@ -226,6 +226,184 @@ function ShopifyKort({ meddela }: { meddela: Meddela }) {
   );
 }
 
+interface WooStatus {
+  kopplad: boolean;
+  url: string | null;
+  kopplad_at: string | null;
+  senast_synkad_at: string | null;
+  senaste_fel: string | null;
+}
+
+function WooKort({ meddela }: { meddela: Meddela }) {
+  const [woo, setWoo] = useState<WooStatus | null>(null);
+  const [adress, setAdress] = useState('');
+  const [egenNyckel, setEgenNyckel] = useState(false);
+  const [nyckel, setNyckel] = useState('');
+  const [hemlighet, setHemlighet] = useState('');
+  const [busy, setBusy] = useState<'koppla' | 'synka' | 'koppla-bort' | null>(null);
+  const startad = useRef(false);
+
+  const laddaStatus = useCallback(async () => {
+    const res = await api('/api/woocommerce');
+    if (res.ok) setWoo(await res.json());
+  }, []);
+
+  const synka = useCallback(async () => {
+    setBusy('synka');
+    try {
+      const res = await api('/api/woocommerce', { method: 'POST' });
+      const data = await res.json();
+      const aterbet = data.aterbetalningar ? ` och ${data.aterbetalningar} återbetalningar` : '';
+      meddela(!res.ok
+        ? { text: data.error ?? 'Hämtningen misslyckades.', ok: false }
+        : data.klar
+          ? { text: `Klart! ${data.ordrar} betalda ordrar${aterbet} hämtade.`, ok: true }
+          : { text: `${data.ordrar} ordrar hämtade. Det finns fler — tryck Hämta nu igen för att fortsätta.`, ok: true });
+    } catch {
+      meddela({ text: 'Hämtningen misslyckades.', ok: false });
+    }
+    setBusy(null);
+    laddaStatus();
+  }, [laddaStatus, meddela]);
+
+  useEffect(() => {
+    if (startad.current) return;
+    startad.current = true;
+    // Tillbaka från godkännandet i kundens WordPress. WooCommerce lägger till success=1 eller 0.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('woocommerce') === 'retur') {
+      window.history.replaceState(null, '', window.location.pathname);
+      if (params.get('success') === '1') {
+        meddela({ text: 'WooCommerce är kopplat! Vi hämtar butikens ordrar nu.', ok: true });
+        laddaStatus().then(synka);
+        return;
+      }
+      meddela({ text: 'Kopplingen avbröts. Du kan försöka igen när du vill.', ok: false });
+    }
+    laddaStatus();
+  }, [laddaStatus, synka, meddela]);
+
+  async function koppla() {
+    setBusy('koppla');
+    const res = await api('/api/woocommerce/koppla', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(egenNyckel ? { url: adress, key: nyckel, secret: hemlighet } : { url: adress }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.url) {
+      window.location.href = data.url;
+      return;
+    }
+    if (res.ok && data.ok) {
+      setNyckel('');
+      setHemlighet('');
+      meddela({ text: 'WooCommerce är kopplat! Vi hämtar butikens ordrar nu.', ok: true });
+      setBusy(null);
+      await laddaStatus();
+      synka();
+      return;
+    }
+    meddela({ text: data.error ?? 'Kunde inte starta kopplingen.', ok: false });
+    setBusy(null);
+  }
+
+  async function kopplaBort() {
+    if (!window.confirm('Koppla bort WooCommerce? Ordrar som redan hämtats ligger kvar.')) return;
+    setBusy('koppla-bort');
+    await api('/api/woocommerce/koppla', { method: 'DELETE' });
+    meddela(null);
+    setBusy(null);
+    laddaStatus();
+  }
+
+  // Färgerna sätts uttryckligen — annars följer fälten datorns mörka läge och texten blir vit på vitt
+  const falt = 'w-full rounded-xl border border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-200';
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-extrabold text-lg" style={{ backgroundColor: NAV_BG }}>
+          W
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-semibold text-slate-800 text-[15px]">WooCommerce</p>
+            {woo?.kopplad && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Kopplad</span>}
+          </div>
+          <p className="text-sm text-slate-400 mt-0.5 leading-snug">
+            Vi hämtar butikens betalda ordrar och återbetalningar varje morgon. Vi kan bara läsa, aldrig ändra något i butiken.
+          </p>
+
+          {woo?.kopplad && (
+            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <dt className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Butik</dt>
+                <dd className="text-slate-700 mt-0.5 truncate">{woo.url?.replace(/^https:\/\//, '')}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Senast hämtad</dt>
+                <dd className="text-slate-700 mt-0.5">{formatTid(woo.senast_synkad_at)}</dd>
+              </div>
+            </dl>
+          )}
+          {woo?.senaste_fel && <p className="mt-3 text-sm text-rose-600">{woo.senaste_fel}</p>}
+
+          {woo && !woo.kopplad && (
+            <div className="mt-4 flex flex-col gap-2">
+              <input value={adress} onChange={(e) => setAdress(e.target.value)} placeholder="https://dinbutik.se" className={falt} />
+              {egenNyckel && (
+                <>
+                  <input value={nyckel} onChange={(e) => setNyckel(e.target.value)} placeholder="Consumer key (ck_…)" className={falt} />
+                  <input value={hemlighet} onChange={(e) => setHemlighet(e.target.value)} placeholder="Consumer secret (cs_…)" className={falt} />
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Skapa nyckeln i WordPress under WooCommerce → Inställningar → Avancerat → REST API, med behörigheten Läs.
+                  </p>
+                </>
+              )}
+              <button onClick={() => setEgenNyckel(!egenNyckel)} className="self-start text-xs text-slate-400 hover:text-slate-600 underline">
+                {egenNyckel ? 'Koppla via godkännande i stället' : 'Har du skapat en API-nyckel själv?'}
+              </button>
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {woo && !woo.kopplad && (
+              <button
+                onClick={koppla}
+                disabled={busy !== null || !adress.trim() || (egenNyckel && (!nyckel.trim() || !hemlighet.trim()))}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60 transition hover:opacity-90"
+                style={{ backgroundColor: CORAL }}
+              >
+                {busy === 'koppla' ? (egenNyckel ? 'Provar nyckeln…' : 'Skickar dig till din butik…') : 'Koppla WooCommerce'}
+              </button>
+            )}
+            {woo?.kopplad && (
+              <button
+                onClick={synka}
+                disabled={busy !== null}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60 transition hover:opacity-90"
+                style={{ backgroundColor: NAV_BG }}
+              >
+                {busy === 'synka' ? 'Hämtar…' : 'Hämta nu'}
+              </button>
+            )}
+            {woo?.kopplad && (
+              <button
+                onClick={kopplaBort}
+                disabled={busy !== null}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 disabled:opacity-60 transition"
+              >
+                Koppla bort
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface BankKoppling {
   session_id: string;
   aspsp_name: string;
@@ -636,6 +814,8 @@ export default function IntegrationerPage() {
         </div>
 
         <ShopifyKort meddela={setMeddelande} />
+
+        <WooKort meddela={setMeddelande} />
 
         <BankKort meddela={setMeddelande} />
 
