@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { normalizePhone } from '@/lib/sms/phone';
 import type { MomsPeriod, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
 import { tolkaBetalsatt } from '@/lib/kontering/betalsatt';
+import { isNoReplyAddress } from '@/lib/inmail/no-reply';
 
 /**
  * Allt adminpanelen visar, samlat per person.
@@ -147,7 +148,7 @@ export async function build(): Promise<Map<string, Built>> {
 
   const [
     contacts, meetings, profiles, registrations,
-    threads, sms, optouts, orders, emails, files, underlag, links,
+    threads, sms, optouts, orders, emails, files, underlag, links, inmejl,
   ] = await Promise.all([
     supabase.from('contact_requests').select('id, name, email, phone, ref, stage, notes, package_type, contact_method, qualification_answers, redovisningsmetod, created_at'),
     supabase.from('meetings').select('id, name, email, phone, date, time, message, created_at'),
@@ -161,6 +162,7 @@ export async function build(): Promise<Map<string, Built>> {
     supabase.from('contact_files').select('id, contact_id, stage, file_name, created_at'),
     supabase.from('bokforing_underlag').select('id, user_id, sender_email, source, file_name, mime_type, status, created_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel, transaktioner_utlasta_at, transaktioner_antal, transaktioner_notering, transaktioner_fel, varningar, kontroll_status, kontroll_saknas, kontroll_at, sortering, sortering_orsak'),
     supabase.from('person_aliases').select('id, alias_email, person_key, created_at'),
+    supabase.from('mail_messages').select('customer_email, subject, sent_at').eq('direction', 'in'),
   ]);
 
   // En tabell som fallerar får inte tyst göra tidslinjen ofullständig — då ser
@@ -169,7 +171,7 @@ export async function build(): Promise<Map<string, Built>> {
     contact_requests: contacts, meetings, profiles, pending_registrations: registrations,
     email_threads: threads, sms_messages: sms, sms_optouts: optouts, orders,
     email_log: emails, contact_files: files, bokforing_underlag: underlag,
-    person_aliases: links,
+    person_aliases: links, mail_messages: inmejl,
   })) {
     if (result.error) throw new Error(`Kunde inte läsa ${name}: ${result.error.message}`);
   }
@@ -187,6 +189,7 @@ export async function build(): Promise<Map<string, Built>> {
     files: files.data ?? [],
     underlag: underlag.data ?? [],
     links: links.data ?? [],
+    inmejl: inmejl.data ?? [],
   };
 
   const groups = new Groups();
@@ -544,6 +547,22 @@ export async function build(): Promise<Map<string, Built>> {
     if (!p) continue;
     if (!p.aliases.includes(key)) p.aliases.push(key);
     p.manualEmails.push({ id: r.id, email: r.alias_email });
+  }
+
+  // Någon som mejlat oss utan att finnas någon annanstans — ett nytt lead som
+  // skrivit direkt till inkorgen. Utan det här blev hen ingen person, och
+  // både mejlet och AI:ns utkast syntes inte. Maskinavsändare hålls utanför.
+  const known = new Set(people.keys());
+  for (const r of rows.inmejl) {
+    const key = emailKey(r.customer_email);
+    if (!key || isNoReplyAddress(r.customer_email)) continue;
+    const root = groups.find(key);
+    if (known.has(root)) continue;
+    add(root, toIso(r.sent_at), {
+      type: 'mejl',
+      title: label(r.subject, 'Mejl från personen'),
+      meta: 'inkommande',
+    }, { email: r.customer_email, alias: [key] });
   }
 
   // Sortera och summera

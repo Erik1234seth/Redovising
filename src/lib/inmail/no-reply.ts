@@ -29,6 +29,12 @@ const NO_REPLY_LOCAL_PARTS = [
   'notifications',
 ];
 
+/**
+ * Ord som räcker var som helst i lokaldelen, t.ex. workspace-noreply@ eller
+ * noreply-apps-scripts-notifications@. Lokaldelen delas på - _ och punkt.
+ */
+const NO_REPLY_SEGMENTS = ['noreply', 'donotreply', 'notifications', 'bounces'];
+
 export function isNoReplyAddress(email: string | null | undefined): boolean {
   if (!email) return false;
 
@@ -36,5 +42,6 @@ export function isNoReplyAddress(email: string | null | undefined): boolean {
   if (at < 1) return false;
 
   const localPart = email.slice(0, at).toLowerCase().trim().split('+')[0];
-  return NO_REPLY_LOCAL_PARTS.includes(localPart);
+  return NO_REPLY_LOCAL_PARTS.includes(localPart)
+    || localPart.split(/[-_.]/).some((s) => NO_REPLY_SEGMENTS.includes(s));
 }
