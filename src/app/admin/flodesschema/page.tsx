@@ -1,0 +1,602 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+/**
+ * Flödesschemat: hela processen från att kunden skickar underlag till
+ * inlämningskvittot, ritat i simbanor (Kund / System / Manuellt) och faser.
+ *
+ * Bygger på BPMN-skissen EnklaBokslut20261017.pdf. Än så länge bara för att
+ * visualisera — `finns` beskriver vad i systemet som redan gör steget, så att
+ * varje steg kan kopplas till riktig funktion senare.
+ *
+ * Hela schemat syns från början. Scrolla för att zooma kring muspekaren och
+ * dra för att flytta. Slingorna tillbaka till "Ta emot underlag" ritas som
+ * hopp (A) i stället för långa pilar tvärs över schemat.
+ */
+
+type Typ = 'ai' | 'system' | 'mejl-in' | 'mejl-ut' | 'regel' | 'manuell' | 'kund' | 'start' | 'slut' | 'val' | 'hopp';
+
+interface Steg {
+  id: string;
+  namn: string;
+  typ: Typ;
+  rad: number;
+  kol: number;
+  /** Lodrät förskjutning inom raden */
+  dy?: number;
+  /** För hopp ut: vilket hopp in det fortsätter vid */
+  hopp?: string;
+  beskrivning?: string;
+  finns?: string;
+}
+
+interface Pil {
+  fran: string;
+  till: string;
+  text?: string;
+  /** vh: först lodrätt, sedan vågrätt. hv: först vågrätt, sedan lodrätt. */
+  form?: 'vh' | 'hv';
+  /** Streckad — ett mejl mellan oss och kunden */
+  mejl?: boolean;
+}
+
+// Rad 0 = kund, 1–4 = system (3 är huvudspåret), 5 = manuellt
+const RADER = [124, 78, 78, 92, 78, 96];
+const BANOR = [
+  { namn: 'Kund', fran: 0, till: 0, farg: '#fff5f5' },
+  { namn: 'System', fran: 1, till: 4, farg: '#f8fafc' },
+  { namn: 'Manuellt', fran: 5, till: 5, farg: '#fffbeb' },
+];
+const FASER = [
+  { namn: '1 · Ta emot & sortera', fran: 0, till: 4 },
+  { namn: '2 · Löpande bokföring', fran: 5, till: 11 },
+  { namn: '3 · Moms', fran: 12, till: 12 },
+  { namn: '4 · Årsbokslut', fran: 13, till: 15 },
+  { namn: '5 · Kontroll & inlämning', fran: 16, till: 18 },
+];
+
+const STEG: Steg[] = [
+  { id: 'hopp-in', namn: 'A', typ: 'hopp', rad: 3, kol: 0, beskrivning: 'Här kommer allt tillbaka när kunden svarar med mer underlag.' },
+  { id: 'kund-skickar', namn: 'Skickar underlag', typ: 'start', rad: 0, kol: 1, beskrivning: 'Kunden mejlar eller laddar upp kvitton, fakturor, kontoutdrag eller annat underlag.', finns: 'Mejl till oss och uppladdning på kundsidan' },
+  { id: 'manuell-skickar', namn: 'Skicka in/hämta underlag', typ: 'start', rad: 5, kol: 1, beskrivning: 'Vi lägger själva in underlag, eller hämtar det från bank och kassasystem.', finns: 'Bankkoppling (Enable Banking), Zettle, Shopify, WooCommerce' },
+  { id: 'ta-emot', namn: 'Ta emot underlag', typ: 'mejl-in', rad: 3, kol: 1, beskrivning: 'Allt som kommer in samlas på kunden, oavsett kanal.', finns: 'Inkorgen och underlagslistan på personkortet' },
+  { id: 'definiera', namn: 'Definiera underlaget', typ: 'ai', rad: 3, kol: 2, beskrivning: 'AI:n läser underlaget och avgör vad det är och vilket år det hör till.', finns: 'AI-avläsningen sorterar underlag och övriga filer' },
+  { id: 'val-aret', namn: 'Tillhör året?', typ: 'val', rad: 3, kol: 3 },
+  { id: 'val-typ', namn: 'Vilken sort?', typ: 'val', rad: 3, kol: 4 },
+  { id: 'separat-mapp', namn: 'Spara i separat mapp', typ: 'slut', rad: 4, kol: 4, beskrivning: 'Underlag som inte tillhör året, eller inte är bokföringsunderlag, sparas undan utan att bokföras.', finns: 'Fliken Övriga filer' },
+
+  { id: 'plocka-verif', namn: 'Plocka ut verifikationer', typ: 'system', rad: 1, kol: 5, beskrivning: 'Redan konterad historik, t.ex. en SIE-fil, läses in direkt som verifikationer.', finns: 'Ingående balans ur kundens SIE-fil' },
+  { id: 'plocka-trans', namn: 'Plocka ut transaktioner', typ: 'ai', rad: 3, kol: 5, beskrivning: 'AI:n plockar ut varje transaktion: datum, belopp, motpart och moms.' },
+  { id: 'komplettera', namn: 'Komplettera med kundhistorik', typ: 'ai', rad: 3, kol: 6, beskrivning: 'Transaktionerna kompletteras med hur kunden konterat liknande saker tidigare och med mejlarkivet.', finns: 'Mejlarkivet per kund' },
+  { id: 'val-tillrackligt', namn: 'Tillräckligt?', typ: 'val', rad: 3, kol: 7 },
+  { id: 'skriv-mejl', namn: 'Skriv mail', typ: 'ai', rad: 2, kol: 7, beskrivning: 'Saknas något skriver AI:n till kunden och frågar efter just det.', finns: 'Underlagskontrollen frågar tills underlaget är komplett' },
+  { id: 'kund-svarar-1', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 7, beskrivning: 'Kunden svarar med det som saknades.' },
+  { id: 'hopp-ut-1', namn: 'A', typ: 'hopp', rad: 0, kol: 8, hopp: 'hopp-in', beskrivning: 'Svaret tas emot som nytt underlag.' },
+  { id: 'konteras', namn: 'Konteras', typ: 'ai', rad: 3, kol: 8, beskrivning: 'Två AI-modeller konterar var för sig enligt K1. Grönt när båda är säkra och överens.', finns: 'Fliken Kontering (GPT + Claude tvåpass)' },
+  { id: 'val-resultat', namn: 'Grönt?', typ: 'val', rad: 3, kol: 9 },
+  { id: 'granska', namn: 'Granska', typ: 'manuell', rad: 5, kol: 9, beskrivning: 'Det AI:n inte är överens om eller osäker på granskar vi själva.', finns: 'Rätta kontering i fliken Kontering' },
+  { id: 'skapa-verif', namn: 'Skapa verifikationer', typ: 'system', rad: 3, kol: 10, beskrivning: 'Godkända konteringar blir verifikationer.' },
+  { id: 'huvudbok', namn: 'Uppdatera verifikationslista / huvudbok', typ: 'system', rad: 3, kol: 11, finns: 'Verifikationslistan' },
+
+  { id: 'bb-rr', namn: 'Uppdatera BB, RR, momsrapport', typ: 'system', rad: 3, kol: 12, beskrivning: 'Balansräkning, resultaträkning och momsrapport räknas om.' },
+  { id: 'momsfil', namn: 'Skapa momsfil / periodisk sammanställning', typ: 'system', rad: 4, kol: 12, finns: 'Momsfil (eSKD)' },
+  { id: 'lamna-moms', namn: 'Lämna in moms', typ: 'manuell', rad: 5, kol: 12, finns: 'Sidan Inlämning' },
+
+  { id: 'infor-bokslut', namn: 'Inför årsbokslut', typ: 'regel', rad: 3, kol: 13, beskrivning: 'När året är slut och bokföringen är ikapp startar bokslutet.', finns: 'Fliken Bokslut (checklista)' },
+  { id: 'mejl-bekrafta', namn: 'Mail: bekräfta underlag, inventarier, periodisering', typ: 'mejl-ut', rad: 2, kol: 13, beskrivning: 'Kunden får bekräfta att allt är med och svara på frågor om inventarier och periodiseringar.' },
+  { id: 'kund-svarar-2', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 13 },
+  { id: 'val-svar', namn: 'Kundens svar', typ: 'val', rad: 0, kol: 14 },
+  { id: 'hopp-ut-2', namn: 'A', typ: 'hopp', rad: 0, kol: 14, dy: -52, hopp: 'hopp-in', beskrivning: 'Kunden skickar fler transaktioner, som tas emot som nytt underlag.' },
+  { id: 'justeringar', namn: 'Bokslutsjusteringar', typ: 'ai', rad: 1, kol: 15, beskrivning: 'AI:n bokar periodiseringar, avskrivningar och andra justeringar utifrån kundens svar.' },
+  { id: 'sammanstall', namn: 'Sammanställ bokslut inkl. NE, moms', typ: 'system', rad: 3, kol: 15, finns: 'NE (SRU) och årsbokslut-PDF' },
+
+  { id: 'rimlighet-ai', namn: 'Rimlighetskontroll', typ: 'ai', rad: 3, kol: 16, beskrivning: 'AI:n jämför mot tidigare år och letar efter konstiga belopp innan vi tittar.' },
+  { id: 'rimlighet-manuell', namn: 'Rimlighetskontroll', typ: 'manuell', rad: 5, kol: 16, beskrivning: 'Vi går själva igenom bokslutet en sista gång.' },
+  { id: 'lamna-in', namn: 'Lämna in', typ: 'manuell', rad: 5, kol: 17, finns: 'Sidan Inlämning' },
+  { id: 'kvitto', namn: 'Mail med inlämningskvitto', typ: 'mejl-ut', rad: 3, kol: 17 },
+  { id: 'klart', namn: 'Klart', typ: 'slut', rad: 3, kol: 18 },
+];
+
+const PILAR: Pil[] = [
+  { fran: 'kund-skickar', till: 'ta-emot' },
+  { fran: 'manuell-skickar', till: 'ta-emot' },
+  { fran: 'hopp-in', till: 'ta-emot' },
+  { fran: 'ta-emot', till: 'definiera' },
+  { fran: 'definiera', till: 'val-aret' },
+  { fran: 'val-aret', till: 'val-typ', text: 'Tillhör året' },
+  { fran: 'val-aret', till: 'separat-mapp', text: 'Ej året' },
+  { fran: 'val-typ', till: 'plocka-trans', text: 'Transaktioner' },
+  { fran: 'val-typ', till: 'plocka-verif', text: 'Konterad historik' },
+  { fran: 'val-typ', till: 'separat-mapp', text: 'Övrigt' },
+
+  { fran: 'plocka-trans', till: 'komplettera' },
+  { fran: 'komplettera', till: 'val-tillrackligt' },
+  { fran: 'val-tillrackligt', till: 'skriv-mejl', text: 'Ej tillräckligt' },
+  { fran: 'skriv-mejl', till: 'kund-svarar-1', mejl: true },
+  { fran: 'kund-svarar-1', till: 'hopp-ut-1' },
+  { fran: 'val-tillrackligt', till: 'konteras', text: 'Tillräckligt' },
+  { fran: 'konteras', till: 'val-resultat' },
+  { fran: 'val-resultat', till: 'skapa-verif', text: 'Grönt' },
+  { fran: 'val-resultat', till: 'granska', text: 'Manuell granskning' },
+  { fran: 'granska', till: 'skapa-verif', form: 'hv' },
+  { fran: 'skapa-verif', till: 'huvudbok' },
+  { fran: 'plocka-verif', till: 'huvudbok', form: 'hv' },
+
+  { fran: 'huvudbok', till: 'bb-rr' },
+  { fran: 'bb-rr', till: 'momsfil' },
+  { fran: 'momsfil', till: 'lamna-moms' },
+  { fran: 'bb-rr', till: 'infor-bokslut' },
+
+  { fran: 'infor-bokslut', till: 'mejl-bekrafta' },
+  { fran: 'mejl-bekrafta', till: 'kund-svarar-2', mejl: true },
+  { fran: 'kund-svarar-2', till: 'val-svar' },
+  { fran: 'val-svar', till: 'hopp-ut-2', text: 'Fler transaktioner' },
+  { fran: 'val-svar', till: 'justeringar', form: 'hv', text: 'Justeringar' },
+  { fran: 'val-svar', till: 'sammanstall', text: 'Allt är inne' },
+  { fran: 'justeringar', till: 'sammanstall' },
+
+  { fran: 'sammanstall', till: 'rimlighet-ai' },
+  { fran: 'rimlighet-ai', till: 'rimlighet-manuell' },
+  { fran: 'rimlighet-manuell', till: 'lamna-in' },
+  { fran: 'lamna-in', till: 'kvitto' },
+  { fran: 'kvitto', till: 'klart' },
+];
+
+const TYPER: Record<Typ, { namn: string; fyll: string; kant: string; text: string }> = {
+  ai: { namn: 'AI-steg', fyll: '#f5f3ff', kant: '#7c3aed', text: '#4c1d95' },
+  system: { namn: 'Automatiskt', fyll: '#eff6ff', kant: '#173b57', text: '#173b57' },
+  'mejl-in': { namn: 'Tar emot', fyll: '#eff6ff', kant: '#173b57', text: '#173b57' },
+  'mejl-ut': { namn: 'Mejl till kund', fyll: '#eff6ff', kant: '#173b57', text: '#173b57' },
+  regel: { namn: 'Regel', fyll: '#eff6ff', kant: '#173b57', text: '#173b57' },
+  manuell: { namn: 'Manuellt', fyll: '#fffbeb', kant: '#d97706', text: '#78350f' },
+  kund: { namn: 'Kunden', fyll: '#fff1f2', kant: '#E95C63', text: '#881337' },
+  start: { namn: 'Start', fyll: '#ffffff', kant: '#173b57', text: '#334155' },
+  slut: { namn: 'Slut', fyll: '#ffffff', kant: '#173b57', text: '#334155' },
+  val: { namn: 'Val', fyll: '#ffffff', kant: '#64748b', text: '#334155' },
+  hopp: { namn: 'Hopp', fyll: '#ffffff', kant: '#E95C63', text: '#E95C63' },
+};
+
+const VANSTER = 34;
+// Första kolumnen har bara ett hopp och sista bara slutet, de är smalare
+const KOL_B = Array.from({ length: 19 }, (_, k) => (k === 0 ? 56 : k === 18 ? 76 : 122));
+const KOL_X = KOL_B.reduce<number[]>((acc, b, i) => [...acc, i === 0 ? VANSTER : acc[i - 1] + KOL_B[i - 1]], []);
+const TOPP = 40;
+const BREDD = KOL_X[KOL_X.length - 1] + KOL_B[KOL_B.length - 1] + 6;
+const RAD_Y = RADER.reduce<number[]>((acc, _h, i) => [...acc, i === 0 ? TOPP : acc[i - 1] + RADER[i - 1]], []);
+const HOJD = RAD_Y[RAD_Y.length - 1] + RADER[RADER.length - 1] + 6;
+const HELA = { x: 0, y: 0, b: BREDD, h: HOJD };
+
+const storlek = (t: Typ) =>
+  t === 'val' ? { b: 40, h: 40 } : t === 'start' || t === 'slut' ? { b: 34, h: 34 } : t === 'hopp' ? { b: 24, h: 24 } : { b: 106, h: 56 };
+
+function plats(s: Steg) {
+  const { b, h } = storlek(s.typ);
+  const cx = KOL_X[s.kol] + KOL_B[s.kol] / 2;
+  const cy = RAD_Y[s.rad] + RADER[s.rad] / 2 + (s.rad === 0 ? 18 : 0) + (s.dy ?? 0);
+  return { cx, cy, v: cx - b / 2, h: cx + b / 2, o: cy - h / 2, u: cy + h / 2 };
+}
+type Plats = ReturnType<typeof plats>;
+
+/** Texten på en lodrät linje står mitt på, men på väg nedåt under valets namn. */
+const textY = (y1: number, y2: number) => (y2 > y1 ? Math.max((y1 + y2) / 2 + 3, y1 + 30) : (y1 + y2) / 2 + 3);
+
+/** Vägen för en pil och var dess text ska stå. */
+function vag(p: Pil, a: Plats, b: Plats) {
+  if (Math.abs(a.cy - b.cy) < 1) {
+    const [x1, x2] = b.cx > a.cx ? [a.h, b.v] : [a.v, b.h];
+    return { d: `M${x1},${a.cy} H${x2}`, tx: (x1 + x2) / 2, ty: a.cy - 6, mitt: true };
+  }
+  if (Math.abs(a.cx - b.cx) < 1) {
+    const upp = b.cy < a.cy;
+    const y1 = upp ? a.o : a.u;
+    const y2 = upp ? b.u : b.o;
+    return { d: `M${a.cx},${y1} V${y2}`, tx: a.cx + 6, ty: textY(y1, y2), mitt: false };
+  }
+  if (p.form === 'hv') {
+    const y2 = b.cy > a.cy ? b.o : b.u;
+    return { d: `M${a.h},${a.cy} H${b.cx} V${y2}`, tx: (a.h + b.cx) / 2, ty: a.cy - 6, mitt: true };
+  }
+  const y1 = b.cy < a.cy ? a.o : a.u;
+  return { d: `M${a.cx},${y1} V${b.cy} H${b.v}`, tx: a.cx + 6, ty: textY(y1, b.cy), mitt: false };
+}
+
+/** Delar namnet på rader om högst ~15 tecken. */
+function rader(namn: string, max = 15) {
+  const ut: string[] = [];
+  for (const ord of namn.split(' ')) {
+    const sista = ut[ut.length - 1];
+    if (sista && (sista + ' ' + ord).length <= max) ut[ut.length - 1] = sista + ' ' + ord;
+    else ut.push(ord);
+  }
+  return ut;
+}
+
+function Ikon({ typ, x, y }: { typ: Typ; x: number; y: number }) {
+  const f = TYPER[typ].kant;
+  if (typ === 'ai') {
+    return (
+      <g transform={`translate(${x},${y})`} fill={f}>
+        <circle cx="6" cy="4" r="3" />
+        <path d="M0,13 C0,8 12,8 12,13 Z" />
+      </g>
+    );
+  }
+  if (typ === 'system') {
+    return (
+      <g transform={`translate(${x + 6},${y + 6})`} stroke={f} fill="none" strokeWidth="1.6">
+        <circle r="3" />
+        {[0, 45, 90, 135].map((v) => <line key={v} x1="0" y1="-6" x2="0" y2="6" transform={`rotate(${v})`} />)}
+      </g>
+    );
+  }
+  if (typ === 'mejl-in' || typ === 'mejl-ut' || typ === 'kund') {
+    return (
+      <g transform={`translate(${x},${y + 1})`}>
+        <rect width="13" height="9" rx="1" fill={typ === 'mejl-ut' ? f : 'none'} stroke={f} strokeWidth="1.3" />
+        <path d="M0,0 L6.5,5 L13,0" fill="none" stroke={typ === 'mejl-ut' ? '#fff' : f} strokeWidth="1.3" />
+      </g>
+    );
+  }
+  if (typ === 'regel') {
+    return (
+      <g transform={`translate(${x},${y})`} stroke={f} fill="none" strokeWidth="1.2">
+        <rect width="13" height="11" />
+        <line x1="0" y1="4" x2="13" y2="4" />
+        <line x1="4" y1="4" x2="4" y2="11" />
+      </g>
+    );
+  }
+  if (typ === 'manuell') {
+    return (
+      <g transform={`translate(${x},${y})`} stroke={f} fill="none" strokeWidth="1.4" strokeLinecap="round">
+        <path d="M2,12 V6 M5,12 V2 M8,12 V3 M11,12 V5 M2,12 H11" />
+      </g>
+    );
+  }
+  return null;
+}
+
+type Vy = typeof HELA;
+
+export default function FlodesschemaPage() {
+  const [vald, setVald] = useState<string | null>(null);
+  const [baraAi, setBaraAi] = useState(false);
+  const [vy, setVy] = useState<Vy>(HELA);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const drag = useRef<{ x: number; y: number; vy: Vy; ctm: DOMMatrix; flyttad: boolean } | null>(null);
+
+  const platser = useMemo(() => Object.fromEntries(STEG.map((s) => [s.id, plats(s)])), []);
+  const steg = useMemo(() => Object.fromEntries(STEG.map((s) => [s.id, s])), []);
+  const valt = vald ? steg[vald] : null;
+
+  const nara = useMemo(() => {
+    if (!vald) return null;
+    const ids = new Set([vald]);
+    PILAR.forEach((p) => { if (p.fran === vald) ids.add(p.till); if (p.till === vald) ids.add(p.fran); });
+    // Ett hopp hör ihop med sin motsvarighet
+    STEG.forEach((s) => { if (s.hopp && (s.id === vald || s.hopp === vald)) { ids.add(s.id); ids.add(s.hopp); } });
+    return ids;
+  }, [vald]);
+
+  const tonad = (id: string) => (nara ? !nara.has(id) : baraAi && steg[id].typ !== 'ai');
+  const antal = (t: Typ) => STEG.filter((s) => s.typ === t).length;
+  const procent = Math.round((BREDD / vy.b) * 100);
+
+  /** Skärmpunkt till punkt i schemat, med den skalning som gällde när `ctm` togs. */
+  const iSchemat = (cx: number, cy: number, ctm: DOMMatrix) => new DOMPoint(cx, cy).matrixTransform(ctm.inverse());
+
+  const zooma = useCallback((faktor: number, cx?: number, cy?: number) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return;
+    const r = svg.getBoundingClientRect();
+    const p = iSchemat(cx ?? r.left + r.width / 2, cy ?? r.top + r.height / 2, ctm);
+    setVy((v) => {
+      const b = Math.min(HELA.b, Math.max(HELA.b / 6, v.b / faktor));
+      const f = v.b / b;
+      return { x: p.x - (p.x - v.x) / f, y: p.y - (p.y - v.y) / f, b, h: v.h / f };
+    });
+  }, []);
+
+  // Hjulet zoomar i stället för att scrolla sidan, så lyssnaren kan inte vara passiv
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const hjul = (e: WheelEvent) => { e.preventDefault(); zooma(Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY); };
+    svg.addEventListener('wheel', hjul, { passive: false });
+    return () => svg.removeEventListener('wheel', hjul);
+  }, [zooma]);
+
+  const ner = (e: React.PointerEvent) => {
+    const ctm = svgRef.current?.getScreenCTM();
+    if (ctm) drag.current = { x: e.clientX, y: e.clientY, vy, ctm, flyttad: false };
+  };
+  const flytta = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    if (!d.flyttad && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 4) return;
+    if (!d.flyttad) svgRef.current?.setPointerCapture(e.pointerId);
+    d.flyttad = true;
+    const a = iSchemat(d.x, d.y, d.ctm);
+    const b = iSchemat(e.clientX, e.clientY, d.ctm);
+    setVy({ ...d.vy, x: d.vy.x - (b.x - a.x), y: d.vy.y - (b.y - a.y) });
+  };
+  const upp = () => { setTimeout(() => { drag.current = null; }, 0); };
+  const harDragit = () => drag.current?.flyttad ?? false;
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-3">
+        <h1 className="text-2xl font-bold text-slate-900">Flödesschema</h1>
+        <p className="text-sm text-slate-500 mr-auto">
+          {antal('ai')} AI-steg · {antal('system')} automatiska · {antal('manuell')} manuella
+        </p>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+          {(['ai', 'system', 'mejl-ut', 'regel', 'manuell', 'kund'] as Typ[]).map((t) => (
+            <span key={t} className="flex items-center gap-1.5">
+              <svg width="16" height="14"><Ikon typ={t} x={1} y={1} /></svg>
+              {TYPER[t].namn}
+            </span>
+          ))}
+          <span className="flex items-center gap-1.5">
+            <svg width="22" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 3" /></svg>
+            Mejl
+          </span>
+          <span className="flex items-center gap-1.5">
+            <svg width="16" height="16"><circle cx="8" cy="8" r="6.5" fill="#fff" stroke="#E95C63" strokeWidth="1.5" /><text x="8" y="11" textAnchor="middle" fontSize="8" fontWeight="700" fill="#E95C63">A</text></svg>
+            Hopp tillbaka
+          </span>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+          <input type="checkbox" checked={baraAi} onChange={(e) => setBaraAi(e.target.checked)} className="w-4 h-4 accent-violet-600" />
+          Markera AI-stegen
+        </label>
+      </div>
+
+      <div className="relative bg-white border border-slate-200 rounded-2xl overflow-hidden h-[calc(100vh-150px)] min-h-[420px]">
+        <svg
+          ref={svgRef}
+          viewBox={`${vy.x} ${vy.y} ${vy.b} ${vy.h}`}
+          preserveAspectRatio="xMidYMid meet"
+          className="w-full h-full block select-none cursor-grab active:cursor-grabbing touch-none"
+          onPointerDown={ner}
+          onPointerMove={flytta}
+          onPointerUp={upp}
+          onPointerCancel={upp}
+          onClick={() => { if (!harDragit()) setVald(null); }}
+        >
+          <defs>
+            <marker id="pil" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#64748b" />
+            </marker>
+            <marker id="pil-vald" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#173b57" />
+            </marker>
+          </defs>
+
+          {/* Simbanor */}
+          {BANOR.map((bana) => {
+            const y = RAD_Y[bana.fran];
+            const h = RAD_Y[bana.till] + RADER[bana.till] - y;
+            return (
+              <g key={bana.namn}>
+                <rect x={0} y={y} width={BREDD - 6} height={h} fill={bana.farg} stroke="#e2e8f0" />
+                <rect x={0} y={y} width={26} height={h} fill="#f1f5f9" stroke="#e2e8f0" />
+                <text transform={`translate(17,${y + h / 2}) rotate(-90)`} textAnchor="middle" fontSize="12" fontWeight="600" fill="#475569">{bana.namn}</text>
+              </g>
+            );
+          })}
+
+          {/* Faser */}
+          {FASER.map((f, i) => {
+            const x = KOL_X[f.fran];
+            const b = KOL_X[f.till] + KOL_B[f.till] - x;
+            return (
+              <g key={f.namn}>
+                {i % 2 === 1 && <rect x={x} y={TOPP} width={b} height={HOJD - TOPP - 6} fill="#173b57" opacity="0.03" />}
+                <rect x={x + 3} y={6} width={b - 6} height={26} rx={6} fill={i % 2 ? '#173b57' : '#e2e8f0'} />
+                <text x={x + b / 2} y={23} textAnchor="middle" fontSize="12" fontWeight="600" fill={i % 2 ? '#fff' : '#173b57'}>{f.namn}</text>
+                {i > 0 && <line x1={x} y1={TOPP} x2={x} y2={HOJD - 6} stroke="#cbd5e1" strokeDasharray="3 4" />}
+              </g>
+            );
+          })}
+
+          {/* Pilar */}
+          {PILAR.map((p, i) => {
+            const v = vag(p, platser[p.fran], platser[p.till]);
+            const aktiv = vald !== null && (p.fran === vald || p.till === vald);
+            const tona = vald !== null ? !aktiv : baraAi;
+            return (
+              <g key={i} opacity={tona ? 0.3 : 1}>
+                <path
+                  d={v.d}
+                  fill="none"
+                  stroke={aktiv ? '#173b57' : '#94a3b8'}
+                  strokeWidth={aktiv ? 2 : 1.4}
+                  strokeDasharray={p.mejl ? '5 4' : undefined}
+                  markerEnd={`url(#${aktiv ? 'pil-vald' : 'pil'})`}
+                />
+              </g>
+            );
+          })}
+
+          {/* Steg */}
+          {STEG.map((s) => {
+            const pl = platser[s.id];
+            const t = TYPER[s.typ];
+            const arVald = vald === s.id;
+            const klick = (e: React.MouseEvent) => { e.stopPropagation(); if (!harDragit()) setVald(arVald ? null : s.id); };
+            const op = tonad(s.id) ? 0.3 : 1;
+
+            if (s.typ === 'hopp') {
+              return (
+                <g key={s.id} opacity={op} onClick={klick} className="cursor-pointer">
+                  <circle cx={pl.cx} cy={pl.cy} r={12} fill="#fff" stroke={t.kant} strokeWidth={arVald ? 3 : 1.8} />
+                  <text x={pl.cx} y={pl.cy + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill={t.text}>{s.namn}</text>
+                  {s.hopp && (
+                    <text x={pl.h + 5} y={pl.cy + 3} fontSize="9.5" fill="#64748b" paintOrder="stroke" stroke="#fff" strokeWidth="3">till Ta emot</text>
+                  )}
+                </g>
+              );
+            }
+            if (s.typ === 'val') {
+              return (
+                <g key={s.id} opacity={op} onClick={klick} className="cursor-pointer">
+                  <rect x={pl.cx - 14} y={pl.cy - 14} width={28} height={28} transform={`rotate(45 ${pl.cx} ${pl.cy})`} fill="#fff" stroke={arVald ? '#173b57' : t.kant} strokeWidth={arVald ? 2.5 : 1.5} />
+                </g>
+              );
+            }
+            if (s.typ === 'start' || s.typ === 'slut') {
+              return (
+                <g key={s.id} opacity={op} onClick={klick} className="cursor-pointer">
+                  <circle cx={pl.cx} cy={pl.cy} r={17} fill="#fff" stroke={arVald ? '#E95C63' : t.kant} strokeWidth={s.typ === 'slut' ? 3.5 : 1.5} />
+                  {s.typ === 'start' && <Ikon typ="mejl-in" x={pl.cx - 6.5} y={pl.cy - 5.5} />}
+                  {rader(s.namn, 20).map((r, i) => (
+                    <text key={i} x={pl.h + 6} y={pl.cy + 3 + (i - (rader(s.namn, 20).length - 1) / 2) * 12} fontSize="10" fill="#334155" paintOrder="stroke" stroke="#fff" strokeWidth="3">{r}</text>
+                  ))}
+                </g>
+              );
+            }
+
+            const r = rader(s.namn);
+            return (
+              <g key={s.id} opacity={op} onClick={klick} className="cursor-pointer">
+                <rect x={pl.v} y={pl.o} width={pl.h - pl.v} height={pl.u - pl.o} rx={9} fill={t.fyll} stroke={arVald ? '#E95C63' : t.kant} strokeWidth={arVald ? 2.5 : s.typ === 'ai' ? 1.8 : 1.2} />
+                <Ikon typ={s.typ} x={pl.v + 6} y={pl.o + 5} />
+                {s.typ === 'ai' && (
+                  <text x={pl.h - 6} y={pl.o + 13} textAnchor="end" fontSize="8.5" fontWeight="700" fill="#7c3aed">AI</text>
+                )}
+                {r.map((rad, i) => (
+                  <text key={i} x={pl.cx} y={pl.cy + 6 + (i - (r.length - 1) / 2) * 12} textAnchor="middle" fontSize="10.5" fill={t.text} fontWeight={500}>
+                    {rad}
+                  </text>
+                ))}
+              </g>
+            );
+          })}
+
+          {/* Texter sist, så att de hamnar ovanpå linjer och rutor */}
+          {STEG.filter((s) => s.typ === 'val').map((s) => (
+            <text key={s.id} x={platser[s.id].cx} y={platser[s.id].u + 14} textAnchor="middle" fontSize="9.5" fill="#475569" fontStyle="italic" opacity={tonad(s.id) ? 0.3 : 1} paintOrder="stroke" stroke="#fff" strokeWidth="3" pointerEvents="none">
+              {s.namn}
+            </text>
+          ))}
+          {PILAR.map((p, i) => {
+            if (!p.text) return null;
+            const v = vag(p, platser[p.fran], platser[p.till]);
+            const aktiv = vald !== null && (p.fran === vald || p.till === vald);
+            return (
+              <text key={i} x={v.tx} y={v.ty} textAnchor={v.mitt ? 'middle' : 'start'} fontSize="9.5" fill={aktiv ? '#173b57' : '#64748b'} fontWeight={aktiv ? 600 : 400} opacity={(vald !== null ? !aktiv : baraAi) ? 0.3 : 1} paintOrder="stroke" stroke="#fff" strokeWidth="3" pointerEvents="none">
+                {p.text}
+              </text>
+            );
+          })}
+        </svg>
+
+        <div className="absolute bottom-3 left-3 flex items-center bg-white/95 border border-slate-200 rounded-lg shadow-sm text-sm overflow-hidden">
+          <button onClick={() => zooma(1 / 1.3)} className="px-3 py-1.5 text-slate-700 hover:bg-slate-50" title="Zooma ut">−</button>
+          <span className="px-2 text-xs text-slate-500 tabular-nums min-w-[44px] text-center">{procent}%</span>
+          <button onClick={() => zooma(1.3)} className="px-3 py-1.5 text-slate-700 hover:bg-slate-50" title="Zooma in">+</button>
+          <button onClick={() => setVy(HELA)} className="px-3 py-1.5 text-slate-700 hover:bg-slate-50 border-l border-slate-200">Visa allt</button>
+        </div>
+        <div className="absolute bottom-3 right-3 text-[11px] text-slate-400 pointer-events-none hidden sm:block">
+          Scrolla för att zooma · dra för att flytta
+        </div>
+
+        {valt && (
+          <aside className="absolute top-3 right-3 w-80 max-h-[calc(100%-24px)] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg p-4">
+            <div className="flex items-start gap-2 mb-2">
+              <TypMarke typ={valt.typ} />
+              <button onClick={() => setVald(null)} className="ml-auto -mt-1 text-slate-400 hover:text-slate-700 text-lg leading-none" title="Stäng">×</button>
+            </div>
+            <h2 className="text-base font-semibold text-slate-900 mb-1.5">
+              {valt.typ === 'hopp' ? `Hopp ${valt.namn}` : valt.namn}
+            </h2>
+            {valt.beskrivning && <p className="text-sm text-slate-600 mb-3">{valt.beskrivning}</p>}
+            {valt.typ !== 'hopp' && valt.typ !== 'val' && (
+              <>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Finns i systemet</div>
+                <p className="text-sm text-slate-700 mb-3">{valt.finns ?? 'Inget ännu'}</p>
+              </>
+            )}
+            <Grannar id={valt.id} steg={steg} onVal={setVald} />
+          </aside>
+        )}
+      </div>
+
+      <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-4 mt-6 items-start">
+        {FASER.map((f) => {
+          const iFasen = STEG.filter((s) => s.kol >= f.fran && s.kol <= f.till && !['val', 'start', 'slut', 'hopp'].includes(s.typ))
+            .sort((a, b) => a.kol - b.kol || a.rad - b.rad);
+          return (
+            <section key={f.namn} className="bg-white border border-slate-200 rounded-xl">
+              <h2 className="px-4 py-2.5 border-b border-slate-100 text-sm font-semibold text-slate-900">{f.namn}</h2>
+              <ul className="divide-y divide-slate-100">
+                {iFasen.map((s) => (
+                  <li
+                    key={s.id}
+                    onClick={() => setVald(s.id)}
+                    className={`px-4 py-2 cursor-pointer text-sm ${vald === s.id ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <TypMarke typ={s.typ} />
+                      {s.finns
+                        ? <span className="ml-auto text-[11px] text-emerald-700">Finns delvis</span>
+                        : <span className="ml-auto text-[11px] text-slate-400">Inte byggt</span>}
+                    </div>
+                    <div className="text-slate-800">{s.namn}</div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TypMarke({ typ }: { typ: Typ }) {
+  const t = TYPER[typ];
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border shrink-0"
+      style={{ background: t.fyll, borderColor: t.kant, color: t.text }}
+    >
+      {typ !== 'hopp' && <svg width="14" height="13"><Ikon typ={typ} x={0} y={0} /></svg>}
+      {t.namn}
+    </span>
+  );
+}
+
+function Grannar({ id, steg, onVal }: { id: string; steg: Record<string, Steg>; onVal: (id: string) => void }) {
+  const namn = (s: Steg) => (s.typ === 'hopp' ? `Hopp ${s.namn}` : s.namn);
+  const lista = (rubrik: string, rader: { id: string; text?: string }[]) =>
+    rader.length > 0 && (
+      <div className="mb-3">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">{rubrik}</div>
+        <ul className="space-y-1">
+          {rader.map((r, i) => (
+            <li key={i}>
+              <button onClick={() => onVal(r.id)} className="text-sm text-blue-700 hover:underline text-left">
+                {namn(steg[r.id])}
+              </button>
+              {r.text && <span className="text-xs text-slate-500"> · {r.text}</span>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+
+  const hoppHit = STEG.filter((s) => s.hopp === id).map((s) => ({ id: s.id }));
+  const hoppDit = steg[id].hopp ? [{ id: steg[id].hopp! }] : [];
+
+  return (
+    <>
+      {lista('Kommer från', [...PILAR.filter((p) => p.till === id).map((p) => ({ id: p.fran, text: p.text })), ...hoppHit])}
+      {lista('Går vidare till', [...PILAR.filter((p) => p.fran === id).map((p) => ({ id: p.till, text: p.text })), ...hoppDit])}
+    </>
+  );
+}

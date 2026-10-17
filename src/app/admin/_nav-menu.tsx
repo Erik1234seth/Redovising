@@ -25,6 +25,7 @@ const ITEMS: { href: string; label: string }[] = [
   { href: '/admin/arenden', label: 'Ärenden' },
   { href: '/admin/kalender', label: 'Kalender' },
   { href: '/admin/inlamning', label: 'Inlämning' },
+  { href: '/admin/flodesschema', label: 'Flödesschema' },
 ];
 
 const POLL_MS = 60_000;
