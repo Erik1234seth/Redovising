@@ -2,8 +2,8 @@
  * SIE4-tolk.
  *
  * SIE är ett strikt textformat, så det här är en vanlig parser — ingen AI
- * inblandad. Läser #VER-blocken med sina #TRANS-rader, kontonamn från #KONTO
- * och företagsuppgifterna i huvudet.
+ * inblandad. Läser #VER-blocken med sina #TRANS-rader, kontonamn från #KONTO,
+ * ingående balanser från #IB och företagsuppgifterna i huvudet.
  *
  * Portad från ai-test/sie.mjs, som bara körs lokalt. Den här används av
  * adminpanelen för att visa verifikationerna i inskickade SIE-filer.
@@ -50,6 +50,8 @@ export interface SieResultat {
     rakenskapsar: { id: string; start: string; slut: string }[];
   };
   kontonamn: Record<string, string>;
+  /** #IB: saldot vid räkenskapsårets början. rar är årsnumret i #RAR (0 = aktuellt, -1 = förra). */
+  ingaendeBalans: { rar: string; konto: string; belopp: number }[];
   verifikationer: SieVerifikation[];
   varningar: string[];
   summering: {
@@ -177,6 +179,7 @@ export function tolkaSie(bytes: Uint8Array): SieResultat {
     program: '', format: '', sietyp: '', orgnr: '', foretag: '', genererad: '', rakenskapsar: [],
   };
   const kontonamn: Record<string, string> = {};
+  const ingaendeBalans: SieResultat['ingaendeBalans'] = [];
   const verifikationer: SieVerifikation[] = [];
   const varningar: string[] = [];
 
@@ -227,6 +230,10 @@ export function tolkaSie(bytes: Uint8Array): SieResultat {
       case '#KONTO':
         kontonamn[f(1)] = f(2);
         break;
+      case '#IB':
+        // #IB årsnr konto saldo [kvantitet]
+        ingaendeBalans.push({ rar: f(1), konto: f(2), belopp: parseBelopp(f(3)) });
+        break;
 
       case '#VER':
         if (aktuell) {
@@ -276,7 +283,7 @@ export function tolkaSie(bytes: Uint8Array): SieResultat {
       }
 
       default:
-        break; // #IB, #UB, #RES, #PSALDO m.fl. behövs inte för verifikationslistan
+        break; // #UB, #RES, #PSALDO m.fl. behövs inte för verifikationslistan
     }
   }
 
@@ -311,6 +318,7 @@ export function tolkaSie(bytes: Uint8Array): SieResultat {
     teckenkodning,
     header,
     kontonamn,
+    ingaendeBalans,
     verifikationer,
     varningar,
     summering: {

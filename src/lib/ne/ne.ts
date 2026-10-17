@@ -7,9 +7,10 @@ import { latin1 } from '@/lib/moms/eskd';
  * Räkenskapsschemat (B1–B16, R1–R11) räknas ur verifikationerna enligt BAS
  * kopplingstabell "NE K1-regler", med kontointervall så att fullständig BAS
  * också fungerar (3041, 6040 …). Balansposterna är ingående balans plus årets
- * rörelser; ingående balans är förra årets B-rader och fylls i för hand, för
- * vi sparar inga saldon. B10 eget kapital är tillgångar minus skulder, som på
- * blanketten.
+ * rörelser; ingående balans är förra årets B-rader. Den hämtas ur #IB när
+ * kunden skickat en SIE-fil för året (ibFranSaldon) och fylls annars i för
+ * hand — det som fylls i för hand går före. B10 eget kapital är tillgångar
+ * minus skulder, som på blanketten.
  *
  * De skattemässiga raderna (R12–R48) är det bokföringen inte vet: icke
  * avdragsgilla kostnader, fjolårets underskott, periodiseringsfond och
@@ -106,6 +107,19 @@ export function balansFalt(konto: string): BKod | 'EK' | null {
   // K1: moms, personalskatt och sociala avgifter är skatteskulder
   if (k >= 2500 && k <= 2799) return '7381';
   return '7383';
+}
+
+/** Saldon per konto (#IB i en SIE-fil, debet positivt) summerade per B-rad. Eget kapital räknas fram. */
+export function ibFranSaldon(saldon: Record<string, number>): Partial<Record<BKod, number>> {
+  const ib: Partial<Record<BKod, number>> = {};
+  for (const [konto, belopp] of Object.entries(saldon)) {
+    const b = balansFalt(konto);
+    if (!b || b === 'EK') continue;
+    const skuld = B_FALT.find((f) => f.kod === b)!.skuld;
+    ib[b] = (ib[b] ?? 0) + (skuld ? -belopp : belopp);
+  }
+  for (const kod of Object.keys(ib) as BKod[]) ib[kod] = heltal(ib[kod]!);
+  return ib;
 }
 
 /**

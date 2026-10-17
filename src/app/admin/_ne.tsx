@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import type { AdminVerifikation, BokslutData, Person } from '@/lib/admin-types';
 import {
-  B_FALT, R_FALT, byggSru, neFalt, personnummer12, raknaNe,
+  B_FALT, R_FALT, byggSru, ibFranSaldon, neFalt, personnummer12, raknaNe,
   type BKod, type NeManuellt,
 } from '@/lib/ne/ne';
 import { exportArsbokslutPDF } from '@/lib/pdf';
@@ -15,7 +15,8 @@ import { DragFil } from './_dragfil';
  *
  * Räkenskapsschemat räknas ur verifikationerna. Det bokföringen inte vet —
  * ingående balanser och de skattemässiga raderna — fylls i här och sparas på
- * profilen per år. Ut kommer två filer: NE som SRU (INFO.SRU + BLANKETTER.SRU
+ * profilen per år. Ingående balans tas ur kundens SIE-fil när det finns en
+ * för året; ett ifyllt fält går före filen. Ut kommer två filer: NE som SRU (INFO.SRU + BLANKETTER.SRU
  * i en zip) för Skatteverkets filöverföring, och årsbokslutet som PDF till
  * kunden.
  */
@@ -70,6 +71,8 @@ export function NeBilaga({ verifikationer, person, data, onData, onError, fastAr
   const [visaFil, setVisaFil] = useState(false);
 
   const manuellt: NeManuellt = data?.neUppgifter?.[String(ar)] ?? {};
+  const sie = data?.sieIb?.[String(ar)];
+  const ibSie = useMemo(() => (sie ? ibFranSaldon(sie.saldon) : {}), [sie]);
   const pnr = personnummer12(data?.orgNr);
   const verksamhet = manuellt.verksamhet ?? (person.verksamhet ?? '').slice(0, 80);
 
@@ -88,14 +91,14 @@ export function NeBilaga({ verifikationer, person, data, onData, onError, fastAr
     const alla = iAret.flatMap((v) => v.transaktioner);
     const struket = alla.filter((t) => t.borttagen || t.tillagd).length;
     if (struket) varningar.push(`${st(struket, 'rad', 'rader')} markerade som borttagna eller tillagda i efterhand räknas inte med`);
-    const ne = raknaNe(alla.filter((t) => !t.borttagen && !t.tillagd), manuellt);
+    const ne = raknaNe(alla.filter((t) => !t.borttagen && !t.tillagd), { ...manuellt, ib: { ...ibSie, ...manuellt.ib } });
     return { ne, varningar: [...varningar, ...ne.varningar] };
-  }, [verifikationer, ar, manuellt]);
+  }, [verifikationer, ar, manuellt, ibSie]);
 
   const allaVarningar = [
     ...(!data?.orgNr ? ['Personnummer saknas på profilen (org_nr) — det behövs i NE-filen']
       : !pnr ? [`Personnumret ${data.orgNr} är inte ett giltigt personnummer`] : []),
-    ...(!manuellt.ib ? ['Ingen ingående balans ifylld — balansräkningen blir bara årets rörelser. Är det första året är det rätt.'] : []),
+    ...(!manuellt.ib && !sie ? ['Ingen ingående balans ifylld — balansräkningen blir bara årets rörelser. Är det första året är det rätt.'] : []),
     ...varningar,
   ];
 
@@ -283,7 +286,7 @@ export function NeBilaga({ verifikationer, person, data, onData, onError, fastAr
                           <input
                             key={`${ar}-${f.kod}`}
                             defaultValue={manuellt.ib?.[f.kod] ?? ''}
-                            placeholder="0"
+                            placeholder={ibSie[f.kod] !== undefined ? String(ibSie[f.kod]) : '0'}
                             onBlur={(e) => sattIb(f.kod, e.target.value)}
                             className={input}
                           />
@@ -297,6 +300,11 @@ export function NeBilaga({ verifikationer, person, data, onData, onError, fastAr
                   ))}
                 </tbody>
               </table>
+              {sie && (
+                <p className="text-slate-400 text-[11px] mt-2">
+                  Ingående hämtad ur {sie.fil} ({sie.start}). Tomma fält tar värdet ur filen, ifyllda går före.
+                </p>
+              )}
             </div>
           </div>
 

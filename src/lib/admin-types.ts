@@ -1,4 +1,5 @@
 import type { NeManuellt } from '@/lib/ne/ne';
+import type { SieIb } from '@/lib/sie/ingaende-balans';
 import type { Deadlineperiod } from '@/lib/deadlines';
 /**
  * Formen på det adminpanelen visar.
@@ -123,6 +124,8 @@ export interface BokslutData {
   manuellt: Partial<Record<BokslutPunktId, BokslutManuell>>;
   /** Det som fyllts i för hand till NE-bilagan, per inkomstår ("2026"). */
   neUppgifter: Record<string, NeManuellt>;
+  /** Ingående balanser ur kundens SIE-filer, per inkomstår ("2026"). */
+  sieIb?: Record<string, SieIb>;
 }
 
 /** Hur en enskild kontroll gick i systemstatusen. */

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { normalizePhone } from '@/lib/sms/phone';
 import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, BokslutData, MomsPeriod, Redovisningsmetod } from '@/lib/admin-types';
 import { importPendingSie } from '@/lib/sie/import';
+import { sieIngaendeBalans } from '@/lib/sie/ingaende-balans';
 import { build, getSupabase, locate, otherContacts, summary, toIso, type Built } from '@/lib/personer';
 
 export async function GET(request: NextRequest) {
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
       other: otherContacts(match),
       underlag: match.files,
       mail: await mailFor(match),
-      bokslut: await bokslutFor(match),
+      bokslut: await bokslutFor(match, owner),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internt fel';
@@ -224,16 +225,21 @@ async function verifikationerFor(owner: Owner): Promise<AdminVerifikation[]> {
  * Läses från huvudprofilen. Lagret räknas över alla sammanslagna konton —
  * en kund som registrerat sig två gånger kan ha lagt in sakerna på vilket som.
  */
-async function bokslutFor(p: Built): Promise<BokslutData | null> {
+async function bokslutFor(p: Built, owner: Owner): Promise<BokslutData | null> {
   if (!p.profileId) return null;
   const supabase = getSupabase();
-  const [{ data: profil, error }, { data: tillgangar }] = await Promise.all([
+  const [{ data: profil, error }, { data: tillgangar }, sieIb] = await Promise.all([
     supabase
       .from('profiles')
       .select('org_nr, momsnr, forsta_deklarationsar, start_ar, bokslut_checklista, ne_uppgifter')
       .eq('id', p.profileId)
       .maybeSingle(),
     supabase.from('lagertillgangar').select('typ').in('user_id', p.profileIds),
+    // Får inte fälla personsidan — utan den fylls ingående balans i för hand som förut
+    sieIngaendeBalans(supabase, owner).catch((err) => {
+      console.error('[admin/people] ingående balans ur SIE:', err instanceof Error ? err.message : err);
+      return {};
+    }),
   ]);
   if (error) throw new Error(`Kunde inte läsa profilen: ${error.message}`);
 
@@ -246,6 +252,7 @@ async function bokslutFor(p: Built): Promise<BokslutData | null> {
     lagerposter: (tillgangar ?? []).filter((t) => t.typ === 'lager').length,
     manuellt: profil?.bokslut_checklista ?? {},
     neUppgifter: profil?.ne_uppgifter ?? {},
+    sieIb,
   };
 }
 
