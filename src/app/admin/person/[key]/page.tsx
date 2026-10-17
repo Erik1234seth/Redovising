@@ -66,6 +66,8 @@ export default function PersonPage() {
   const [laser, setLaser] = useState<string | null>(null);
   const [mail, setMail] = useState<AdminMailMessage[]>([]);
   const [bokslut, setBokslut] = useState<BokslutData | null>(null);
+  // Perioden som valts i momsfilen — verifikationslistan under visar samma
+  const [verPeriod, setVerPeriod] = useState<{ fran: string; tom: string } | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [savingMetod, setSavingMetod] = useState(false);
@@ -1464,8 +1466,8 @@ export default function PersonPage() {
                   {verifikationer.length.toLocaleString('sv-SE')} verifikationer från {verFiler}{' '}
                   {verFiler === 1 ? 'fil' : 'filer'}.
                 </p>
-                <MomsFil verifikationer={verifikationer} orgNr={bokslut?.orgNr ?? null} momsPeriod={person.momsPeriod} />
-                <VerifikationLista verifikationer={verifikationer} showSource />
+                <MomsFil verifikationer={verifikationer} orgNr={bokslut?.orgNr ?? null} momsPeriod={person.momsPeriod} onPeriod={setVerPeriod} />
+                <VerifikationLista verifikationer={verifikationer} showSource period={verPeriod} />
               </>
             )
           )}

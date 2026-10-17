@@ -76,7 +76,16 @@ function compare(sort: Sort) {
   };
 }
 
-export function VerifikationLista({ verifikationer, showSource = false }: { verifikationer: Ver[]; showSource?: boolean }) {
+export function VerifikationLista({ verifikationer: alla, showSource = false, period }: {
+  verifikationer: Ver[];
+  showSource?: boolean;
+  /** Visar bara verifikationer i perioden — sökningen också. Ersätter årsvalet. */
+  period?: { fran: string; tom: string };
+}) {
+  const verifikationer = useMemo(
+    () => (period ? alla.filter((v) => v.datum >= period.fran && v.datum <= period.tom) : alla),
+    [alla, period],
+  );
   const [query, setQuery] = useState('');
   const [serie, setSerie] = useState('');
   const [year, setYear] = useState('');
@@ -101,7 +110,7 @@ export function VerifikationLista({ verifikationer, showSource = false }: { veri
   );
 
   // Ny sökning börjar om från första sidan
-  useEffect(() => setShown(PAGE), [query, serie, year, onlyUnbalanced, sort]);
+  useEffect(() => setShown(PAGE), [query, serie, year, onlyUnbalanced, sort, period]);
 
   // Summeringen följer filtret, så att ett år eller en serie går att stämma av för sig
   const totals = useMemo(() => {
@@ -168,7 +177,7 @@ export function VerifikationLista({ verifikationer, showSource = false }: { veri
           <option value="datum">Sortera på datum</option>
           <option value="nummer">Sortera på verifikationsnummer</option>
         </select>
-        {years.length > 1 && (
+        {!period && years.length > 1 && (
           <select
             value={year}
             onChange={(e) => setYear(e.target.value)}
@@ -198,7 +207,9 @@ export function VerifikationLista({ verifikationer, showSource = false }: { veri
 
       {filtered.length === 0 ? (
         <div className="bg-slate-50 border border-slate-200 rounded-xl text-center py-12 text-slate-600 text-sm">
-          {verifikationer.length === 0 ? 'Inga verifikationer.' : 'Inga verifikationer matchar.'}
+          {verifikationer.length === 0
+            ? (period ? `Inga verifikationer ${period.fran} – ${period.tom}.` : 'Inga verifikationer.')
+            : 'Inga verifikationer matchar.'}
         </div>
       ) : (
         <div className="space-y-3">

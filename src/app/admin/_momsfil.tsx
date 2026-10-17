@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { AdminVerifikation, MomsPeriod } from '@/lib/admin-types';
 import {
   RUTNAMN, arMomsavrakning, byggEskd, eskdOrgNr, eskdPeriod, ignoreradeKonton, latin1, periodDatum, raknaRutor,
@@ -42,12 +42,14 @@ const kr2 = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFr
 const st = (n: number, en: string, flera: string) => `${n} ${n === 1 ? en : flera}`;
 const namn = (v: AdminVerifikation) => `${v.serie}${v.nummer}`.trim() || v.datum || v.text || '?';
 
-export function MomsFil({ verifikationer, orgNr, momsPeriod, lastPeriod }: {
+export function MomsFil({ verifikationer, orgNr, momsPeriod, lastPeriod, onPeriod }: {
   verifikationer: AdminVerifikation[];
   orgNr: string | null;
   momsPeriod: MomsPeriod | null;
   /** Låser panelen till en period och döljer periodvalet, som på inlämningssidan. */
   lastPeriod?: { typ: Periodtyp; ar: number; nr: number };
+  /** Den valda perioden, så att verifikationslistan under kan visa samma. */
+  onPeriod?: (period: { fran: string; tom: string }) => void;
 }) {
   const [valdTyp, setTyp] = useState<Periodtyp>(TYP_FOR_PERIOD[momsPeriod ?? 'månadsvis']);
   const start = forraPerioden(valdTyp);
@@ -64,6 +66,7 @@ export function MomsFil({ verifikationer, orgNr, momsPeriod, lastPeriod }: {
   };
 
   const { fran, tom } = periodDatum(ar, typ, nr);
+  useEffect(() => onPeriod?.({ fran, tom }), [fran, tom, onPeriod]);
   const formatOrgNr = eskdOrgNr(orgNr);
 
   /**
