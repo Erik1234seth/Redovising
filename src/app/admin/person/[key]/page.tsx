@@ -404,7 +404,9 @@ export default function PersonPage() {
   const lasUtTransaktioner = async () => {
     if (laser || valda.length === 0) return;
     setError('');
-    const filer = underlag.filter((f) => valda.includes(f.id));
+    // Markerade filer som inte går att läsa (SIE, Excel) är markerade för att raderas
+    const filer = underlag.filter((f) => valda.includes(f.id) && kanLasasAvAi(f.fileName, f.mimeType));
+    if (filer.length === 0) return;
     for (const [i, f] of filer.entries()) {
       setLaser(filer.length > 1 ? `${f.fileName} (${i + 1}/${filer.length})` : f.fileName);
       try {
@@ -468,6 +470,30 @@ export default function PersonPage() {
     load();
   };
 
+  /** Raderar alla markerade underlag på en gång, med samma två klick som för en fil. */
+  const raderaValda = async () => {
+    if (raderar || valda.length === 0) return;
+    const ids = valda;
+    setRaderar('valda');
+    setError('');
+    const res = await fetch('/api/admin/underlag', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    }).catch(() => null);
+    const data = await res?.json().catch(() => ({}));
+    setRaderar(null);
+    setConfirmDelete(null);
+    if (!res?.ok) { setError(data?.error || 'Underlagen kunde inte raderas'); return; }
+    setUnderlag((list) => list.filter((f) => !ids.includes(f.id)));
+    setValda([]);
+    setVerifikationer(null);
+    setVerifikationerError('');
+    setTransaktioner(null);
+    setTransaktionerError('');
+    load();
+  };
+
   /**
    * Flyttar en fil mellan underlagen och övriga filer. Till övrigt tas det som
    * lästs ut ur den bort, så transaktionerna och verifikationerna hämtas om.
@@ -519,9 +545,10 @@ export default function PersonPage() {
   const bokforingsfiler = underlag.filter((f) => f.sortering !== 'ovrigt');
   const ovrigaFiler = underlag.filter((f) => f.sortering === 'ovrigt');
 
-  // SIE-filer läses med kod och hör hemma bland verifikationerna, så de går
-  // inte att kryssa i här
+  // SIE-filer läses med kod och hör hemma bland verifikationerna. De går att
+  // markera för att raderas, men AI-avläsningen hoppar över dem.
   const lasbara = bokforingsfiler.filter((f) => kanLasasAvAi(f.fileName, f.mimeType));
+  const valdaLasbara = lasbara.filter((f) => valda.includes(f.id)).length;
 
   /** Radera med två klick — samma i underlagen och bland övriga filer. */
   const raderaKnapp = (id: string, disabled: boolean) => (confirmDelete === id ? (
@@ -1212,24 +1239,51 @@ export default function PersonPage() {
               }`}
             >
               <div className="flex items-center justify-end gap-3 mb-4 flex-wrap">
+                {bokforingsfiler.length > 0 && (
+                  <button
+                    onClick={() => setValda(valda.length === bokforingsfiler.length ? [] : bokforingsfiler.map((f) => f.id))}
+                    disabled={!!laser || !!raderar}
+                    className="text-slate-500 hover:text-slate-700 text-xs transition disabled:opacity-40"
+                  >
+                    {valda.length === bokforingsfiler.length ? 'Avmarkera alla' : 'Markera alla'}
+                  </button>
+                )}
+                {valda.length > 0 && (confirmDelete === 'valda' ? (
+                  <span className="flex items-center gap-2">
+                    <button
+                      onClick={raderaValda}
+                      disabled={!!raderar}
+                      className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg transition disabled:opacity-50"
+                    >
+                      {raderar === 'valda' ? 'Raderar…' : `Ja, radera ${valda.length}`}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(null)}
+                      disabled={!!raderar}
+                      className="text-slate-500 hover:text-slate-700 text-xs transition disabled:opacity-50"
+                    >
+                      Avbryt
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDelete('valda')}
+                    disabled={!!raderar || !!laser}
+                    title="Radera de markerade filerna och allt som lästs ur dem"
+                    className="px-3 py-1.5 text-xs bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-lg transition disabled:opacity-40"
+                  >
+                    Radera markerade ({valda.length})
+                  </button>
+                ))}
                 {lasbara.length > 0 && (
-                  <>
-                    <button
-                      onClick={() => setValda(valda.length === lasbara.length ? [] : lasbara.map((f) => f.id))}
-                      disabled={!!laser}
-                      className="text-slate-500 hover:text-slate-700 text-xs transition disabled:opacity-40"
-                    >
-                      {valda.length === lasbara.length ? 'Avmarkera alla' : 'Markera alla'}
-                    </button>
-                    <button
-                      onClick={lasUtTransaktioner}
-                      disabled={valda.length === 0 || !!laser}
-                      title="Låter en AI läsa filerna. Kvitton och kontoutdrag blir transaktioner. Redan bokförda underlag med konton blir verifikationer."
-                      className="px-3 py-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {laser ? 'Läser…' : `Läs av med AI${valda.length ? ` (${valda.length})` : ''}`}
-                    </button>
-                  </>
+                  <button
+                    onClick={lasUtTransaktioner}
+                    disabled={valdaLasbara === 0 || !!laser || !!raderar}
+                    title="Låter en AI läsa filerna. Kvitton och kontoutdrag blir transaktioner. Redan bokförda underlag med konton blir verifikationer."
+                    className="px-3 py-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {laser ? 'Läser…' : `Läs av med AI${valdaLasbara ? ` (${valdaLasbara})` : ''}`}
+                  </button>
                 )}
                 <input
                   ref={fileInput}
@@ -1269,12 +1323,12 @@ export default function PersonPage() {
                       <input
                         type="checkbox"
                         checked={valda.includes(f.id)}
-                        disabled={!kanLasasAvAi(f.fileName, f.mimeType) || !!laser}
+                        disabled={!!laser || !!raderar}
                         onChange={(e) => setValda((list) =>
                           e.target.checked ? [...list, f.id] : list.filter((id) => id !== f.id))}
                         title={kanLasasAvAi(f.fileName, f.mimeType)
-                          ? 'Markera för att läsa av filen med AI'
-                          : 'Den här filtypen läser vi inte av med AI'}
+                          ? 'Markera för att läsa av eller radera filen'
+                          : 'Markera för att radera filen — den här filtypen läser vi inte av med AI'}
                         className="shrink-0 mt-1 accent-blue-600 disabled:opacity-30"
                       />
                       <span className="min-w-0 flex-1">

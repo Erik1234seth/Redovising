@@ -160,44 +160,48 @@ async function flytta(supabase: ReturnType<typeof getSupabase>, id: string, sort
 }
 
 /**
- * Raderar ett underlag — både filen i bucketen och raden.
+ * Raderar ett eller flera underlag — både filerna i bucketen och raderna.
+ * Tar `id` för ett, `ids` för flera markerade.
  *
- * Filen tas bort först. Går det sedan snett med raden ligger den kvar som
- * "Filen saknas i lagringen" och kan raderas igen, i stället för att filen
- * blir liggande i bucketen utan att någon ser den.
+ * Filerna tas bort först. Går det sedan snett med raderna ligger de kvar som
+ * "Filen saknas i lagringen" och kan raderas igen, i stället för att filerna
+ * blir liggande i bucketen utan att någon ser dem.
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const { id } = await request.json();
-    if (!id) return NextResponse.json({ error: 'id krävs' }, { status: 400 });
+    const { id, ids } = await request.json();
+    const lista: string[] = Array.isArray(ids) ? ids.filter((v) => typeof v === 'string') : id ? [id] : [];
+    if (lista.length === 0) return NextResponse.json({ error: 'id krävs' }, { status: 400 });
 
     const supabase = getSupabase();
 
-    const { data: row, error: fetchError } = await supabase
+    const { data: rows, error: fetchError } = await supabase
       .from('bokforing_underlag')
       .select('file_path, user_id, sender_email, verifikationer_antal')
-      .eq('id', id)
-      .maybeSingle();
+      .in('id', lista);
 
     if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
-    if (!row) return NextResponse.json({ ok: true });
+    if (!rows?.length) return NextResponse.json({ ok: true });
 
-    if (row.file_path) {
-      const { error: storageError } = await supabase.storage.from(BUCKET).remove([row.file_path]);
+    const sokvagar = rows.map((r) => r.file_path).filter(Boolean);
+    if (sokvagar.length) {
+      const { error: storageError } = await supabase.storage.from(BUCKET).remove(sokvagar);
       if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 });
     }
 
-    // Filens verifikationer följer med i kaskaden
-    const { error } = await supabase.from('bokforing_underlag').delete().eq('id', id);
+    // Filernas verifikationer följer med i kaskaden
+    const { error } = await supabase.from('bokforing_underlag').delete().in('id', lista);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Fanns samma verifikationer i en annan fil hos kunden tar den över dem
-    if (row.verifikationer_antal) {
-      await reimportAfterDelete(supabase, {
-        userId: row.user_id,
-        email: row.sender_email?.trim().toLowerCase() || null,
-      });
+    // Fanns samma verifikationer i en annan fil hos kunden tar den över dem —
+    // en gång per kund, hur många av kundens filer som än raderades
+    const agare = new Map<string, { userId: string | null; email: string | null }>();
+    for (const r of rows) {
+      if (!r.verifikationer_antal) continue;
+      const email = r.sender_email?.trim().toLowerCase() || null;
+      agare.set(`${r.user_id ?? ''}|${email ?? ''}`, { userId: r.user_id, email });
     }
+    for (const owner of agare.values()) await reimportAfterDelete(supabase, owner);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
