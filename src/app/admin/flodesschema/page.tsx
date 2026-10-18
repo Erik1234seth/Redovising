@@ -17,7 +17,7 @@ import type { FlodesKund, FlodesUnderlag } from '@/lib/admin-types';
  * hopp (A) i stället för långa pilar tvärs över schemat.
  */
 
-type Typ = 'ai' | 'system' | 'mejl-in' | 'mejl-ut' | 'regel' | 'manuell' | 'kund' | 'start' | 'slut' | 'val' | 'hopp';
+type Typ = 'ai' | 'system' | 'mejl-in' | 'mejl-ut' | 'regel' | 'manuell' | 'kund' | 'start' | 'slut' | 'val' | 'hopp' | 'vanta';
 
 interface Steg {
   id: string;
@@ -29,6 +29,10 @@ interface Steg {
   dy?: number;
   /** För hopp ut: vilket hopp in det fortsätter vid */
   hopp?: string;
+  /** Texten bredvid ett hopp ut, om det inte går till Ta emot */
+  etikett?: string;
+  /** Namnet ovanför i stället för till höger, när en pil kommer in från höger */
+  textOvan?: boolean;
   beskrivning?: string;
   finns?: string;
 }
@@ -43,61 +47,81 @@ interface Pil {
   mejl?: boolean;
 }
 
-// Rad 0 = kund, 1–4 = system (3 är huvudspåret), 5 = manuellt
-const RADER = [124, 78, 78, 92, 78, 96];
+// Rad 0 = kund, 1–2 = bank, 3–6 = system (5 är huvudspåret), 7 = manuellt
+const RADER = [124, 66, 84, 78, 78, 92, 78, 96];
 const BANOR = [
   { namn: 'Kund', fran: 0, till: 0, farg: '#fff5f5' },
-  { namn: 'System', fran: 1, till: 4, farg: '#f8fafc' },
-  { namn: 'Manuellt', fran: 5, till: 5, farg: '#fffbeb' },
+  { namn: 'Bank', fran: 1, till: 2, farg: '#f0fdf4' },
+  { namn: 'System', fran: 3, till: 6, farg: '#f8fafc' },
+  { namn: 'Manuellt', fran: 7, till: 7, farg: '#fffbeb' },
 ];
 const FASER = [
   { namn: '1 · Ta emot & sortera', fran: 0, till: 4 },
-  { namn: '2 · Löpande bokföring', fran: 5, till: 11 },
-  { namn: '3 · Moms', fran: 12, till: 12 },
-  { namn: '4 · Årsbokslut', fran: 13, till: 15 },
-  { namn: '5 · Kontroll & inlämning', fran: 16, till: 18 },
+  { namn: '2 · Löpande bokföring', fran: 5, till: 12 },
+  { namn: '3 · Moms', fran: 13, till: 13 },
+  { namn: '4 · Årsbokslut', fran: 14, till: 16 },
+  { namn: '5 · Kontroll & inlämning', fran: 17, till: 19 },
 ];
 
 const STEG: Steg[] = [
-  { id: 'hopp-in', namn: 'A', typ: 'hopp', rad: 3, kol: 0, beskrivning: 'Här kommer allt tillbaka när kunden svarar med mer underlag.' },
+  { id: 'hopp-in', namn: 'A', typ: 'hopp', rad: 5, kol: 0, beskrivning: 'Här kommer allt tillbaka när kunden svarar med mer underlag.' },
   { id: 'kund-skickar', namn: 'Skickar underlag', typ: 'start', rad: 0, kol: 1, beskrivning: 'Kunden mejlar eller laddar upp kvitton, fakturor, kontoutdrag eller annat underlag.', finns: 'Mejl till oss och uppladdning på kundsidan' },
-  { id: 'manuell-skickar', namn: 'Skicka in/hämta underlag', typ: 'start', rad: 5, kol: 1, beskrivning: 'Vi lägger själva in underlag, eller hämtar det från bank och kassasystem.', finns: 'Bankkoppling (Enable Banking), Zettle, Shopify, WooCommerce' },
-  { id: 'ta-emot', namn: 'Ta emot underlag', typ: 'mejl-in', rad: 3, kol: 1, beskrivning: 'Allt som kommer in samlas på kunden, oavsett kanal.', finns: 'Inkorgen och underlagslistan på personkortet' },
-  { id: 'definiera', namn: 'Definiera underlaget', typ: 'ai', rad: 3, kol: 2, beskrivning: 'AI:n läser underlaget och avgör vad det är och vilket år det hör till.', finns: 'AI-avläsningen sorterar underlag och övriga filer' },
-  { id: 'val-aret', namn: 'Tillhör året?', typ: 'val', rad: 3, kol: 3 },
-  { id: 'val-typ', namn: 'Vilken sort?', typ: 'val', rad: 3, kol: 4 },
-  { id: 'separat-mapp', namn: 'Spara i separat mapp', typ: 'slut', rad: 4, kol: 4, beskrivning: 'Underlag som inte tillhör året, eller inte är bokföringsunderlag, sparas undan utan att bokföras.', finns: 'Fliken Övriga filer' },
+  { id: 'manuell-skickar', namn: 'Skicka in/hämta underlag', typ: 'start', rad: 7, kol: 1, beskrivning: 'Vi lägger själva in underlag eller hämtar det från kunden.', finns: 'Uppladdning i adminpanelen' },
+  { id: 'ta-emot', namn: 'Ta emot underlag', typ: 'mejl-in', rad: 5, kol: 1, beskrivning: 'Allt som kommer in samlas på kunden, oavsett kanal.', finns: 'Inkorgen och underlagslistan på personkortet' },
+  { id: 'definiera', namn: 'Definiera underlaget', typ: 'ai', rad: 5, kol: 2, beskrivning: 'AI:n läser underlaget och avgör vad det är och vilket år det hör till.', finns: 'AI-avläsningen sorterar underlag och övriga filer' },
+  { id: 'val-aret', namn: 'Räkenskapsåret?', typ: 'val', rad: 5, kol: 3 },
+  { id: 'val-typ', namn: 'Vilken sort?', typ: 'val', rad: 5, kol: 4 },
+  { id: 'separat-mapp', namn: 'Spara i separat mapp', typ: 'slut', rad: 6, kol: 4, beskrivning: 'Underlag som inte tillhör räkenskapsåret, eller inte är bokföringsunderlag, sparas undan utan att bokföras.', finns: 'Fliken Övriga filer' },
 
-  { id: 'plocka-verif', namn: 'Plocka ut verifikationer', typ: 'system', rad: 1, kol: 5, beskrivning: 'Redan konterad historik, t.ex. en SIE-fil, läses in direkt som verifikationer.', finns: 'Ingående balans ur kundens SIE-fil' },
-  { id: 'plocka-trans', namn: 'Plocka ut transaktioner', typ: 'ai', rad: 3, kol: 5, beskrivning: 'AI:n plockar ut varje transaktion: datum, belopp, motpart och moms.' },
-  { id: 'komplettera', namn: 'Komplettera med kundhistorik', typ: 'ai', rad: 3, kol: 6, beskrivning: 'Transaktionerna kompletteras med hur kunden konterat liknande saker tidigare och med mejlarkivet.', finns: 'Mejlarkivet per kund' },
-  { id: 'val-tillrackligt', namn: 'Tillräckligt?', typ: 'val', rad: 3, kol: 7 },
-  { id: 'skriv-mejl', namn: 'Skriv mail', typ: 'ai', rad: 2, kol: 7, beskrivning: 'Saknas något skriver AI:n till kunden och frågar efter just det.', finns: 'Underlagskontrollen frågar tills underlaget är komplett' },
-  { id: 'kund-svarar-1', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 7, beskrivning: 'Kunden svarar med det som saknades.' },
-  { id: 'hopp-ut-1', namn: 'A', typ: 'hopp', rad: 0, kol: 8, hopp: 'hopp-in', beskrivning: 'Svaret tas emot som nytt underlag.' },
-  { id: 'konteras', namn: 'Konteras', typ: 'ai', rad: 3, kol: 8, beskrivning: 'Två AI-modeller konterar var för sig enligt K1. Grönt när båda är säkra och överens.', finns: 'Fliken Kontering (GPT + Claude tvåpass)' },
-  { id: 'val-resultat', namn: 'Grönt?', typ: 'val', rad: 3, kol: 9 },
-  { id: 'granska', namn: 'Granska', typ: 'manuell', rad: 5, kol: 9, beskrivning: 'Det AI:n inte är överens om eller osäker på granskar vi själva.', finns: 'Rätta kontering i fliken Kontering' },
-  { id: 'skapa-verif', namn: 'Skapa verifikationer', typ: 'system', rad: 3, kol: 10, beskrivning: 'Godkända konteringar blir verifikationer.' },
-  { id: 'huvudbok', namn: 'Uppdatera verifikationslista / huvudbok', typ: 'system', rad: 3, kol: 11, finns: 'Verifikationslistan' },
+  { id: 'plocka-verif', namn: 'Plocka ut verifikationer', typ: 'system', rad: 3, kol: 5, beskrivning: 'Redan konterad historik, t.ex. en SIE-fil, läses in direkt som verifikationer.', finns: 'Ingående balans ur kundens SIE-fil' },
+  { id: 'integration', namn: 'Integration', typ: 'start', rad: 4, kol: 5, beskrivning: 'Ordrar och utbetalningar som hämtas direkt från kassasystem och webbshop, utan något underlag att läsa av. Banken har en egen bana.', finns: 'Zettle, Shopify, WooCommerce' },
+  { id: 'plocka-trans', namn: 'Plocka ut transaktioner', typ: 'ai', rad: 5, kol: 5, beskrivning: 'AI:n plockar ut varje transaktion: datum, belopp, motpart och moms.' },
+  { id: 'komplettera', namn: 'Komplettera med kundhistorik', typ: 'ai', rad: 5, kol: 6, beskrivning: 'Transaktionerna kompletteras med hur kunden konterat liknande saker tidigare och med mejlarkivet.', finns: 'Mejlarkivet per kund' },
+  { id: 'val-dublett', namn: 'Dublettcheck', typ: 'val', rad: 5, kol: 7, beskrivning: 'Finns transaktionen redan, t.ex. både som kvitto och som bankrad, ska den bara bokföras en gång.' },
+  { id: 'radera', namn: 'Radera', typ: 'slut', rad: 4, kol: 7, beskrivning: 'Dubbletter tas bort och bokförs inte.', finns: 'Bankrader som troligen redan bokförts markeras som dubbletter' },
+  { id: 'val-tillrackligt', namn: 'Tillräckligt?', typ: 'val', rad: 5, kol: 8 },
+  { id: 'skriv-mejl', namn: 'Skriv mail', typ: 'ai', rad: 4, kol: 8, beskrivning: 'Saknas något skriver AI:n till kunden och frågar efter just det.', finns: 'Underlagskontrollen frågar tills underlaget är komplett' },
+  { id: 'kund-svarar-1', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 8, beskrivning: 'Kunden svarar med det som saknades.' },
+  { id: 'hopp-ut-1', namn: 'A', typ: 'hopp', rad: 0, kol: 9, hopp: 'hopp-in', beskrivning: 'Svaret tas emot som nytt underlag.' },
 
-  { id: 'bb-rr', namn: 'Uppdatera BB, RR, momsrapport', typ: 'system', rad: 3, kol: 12, beskrivning: 'Balansräkning, resultaträkning och momsrapport räknas om.' },
-  { id: 'momsfil', namn: 'Skapa momsfil / periodisk sammanställning', typ: 'system', rad: 4, kol: 12, finns: 'Momsfil (eSKD)' },
-  { id: 'lamna-moms', namn: 'Lämna in moms', typ: 'manuell', rad: 5, kol: 12, finns: 'Sidan Inlämning' },
+  // Bankkopplingen: bankrader sparas och väntar på ett underlag att matchas mot
+  { id: 'bank-in', namn: 'Banktransaktion', typ: 'start', rad: 2, kol: 2, beskrivning: 'En transaktion kommer in från kundens bank via bankkopplingen.', finns: 'Bankkoppling (Enable Banking)' },
+  { id: 'bank-spara', namn: 'Spara banktransaktion', typ: 'system', rad: 2, kol: 4, beskrivning: 'Bankraden sparas så att den kan matchas mot ett underlag som kommer in senare.', finns: 'Bankrader sparas som transaktioner' },
+  { id: 'val-bank-match', namn: 'Matchar underlag?', typ: 'val', rad: 2, kol: 5, beskrivning: 'Finns ett underlag hos kunden som är samma köp — samma belopp, datum och motpart?' },
+  { id: 'bank-matchad', namn: 'Kopplad till underlaget', typ: 'slut', rad: 1, kol: 6, textOvan: true, beskrivning: 'Bankraden och underlaget är samma köp och bokförs en gång, via underlaget.', finns: 'Bankrader markeras som troliga dubbletter av ett underlag' },
+  { id: 'bank-vanta', namn: 'Vänta till momsperiodens slut', typ: 'vanta', rad: 2, kol: 6, beskrivning: 'Omatchade bankrader samlas. Kunder med månadsmoms: varje månad. Alla andra: varje kvartal.' },
+  { id: 'val-bank-match-2', namn: 'Matchad nu?', typ: 'val', rad: 2, kol: 7, beskrivning: 'Har ett underlag kommit in under perioden som matchar bankraden?' },
+  { id: 'bank-skriv-mejl', namn: 'Mail: underlag saknas', typ: 'ai', rad: 2, kol: 10, beskrivning: 'AI:n skriver ihop ett mejl med alla bankrader i perioden som saknar underlag och ber kunden skicka in dem.' },
+  { id: 'kund-svarar-bank', namn: 'Skickar underlag', typ: 'kund', rad: 0, kol: 10, beskrivning: 'Kunden skickar in underlag till bankraderna.' },
+  { id: 'hopp-ut-3', namn: 'A', typ: 'hopp', rad: 0, kol: 11, hopp: 'hopp-in', beskrivning: 'Underlaget tas emot och matchas mot bankraden.' },
+  { id: 'val-bank-svar', namn: 'Svar före momsdeadline?', typ: 'val', rad: 2, kol: 11, beskrivning: 'Har kunden skickat underlaget innan perioden ska lämnas in?' },
+  { id: 'bank-vantar-underlag', namn: 'Matchas när underlaget kommer', typ: 'slut', rad: 1, kol: 11 },
+  { id: 'bank-till-bokslut', namn: 'Spara till årsbokslutet', typ: 'system', rad: 2, kol: 12, beskrivning: 'Bankrader utan underlag vid momsdeadline sparas och tas upp igen inför årsbokslutet.' },
+  { id: 'hopp-ut-b', namn: 'B', typ: 'hopp', rad: 2, kol: 13, hopp: 'hopp-in-b', etikett: 'till Inför årsbokslut', beskrivning: 'Fortsätter vid Inför årsbokslut.' },
+  { id: 'hopp-in-b', namn: 'B', typ: 'hopp', rad: 6, kol: 14, beskrivning: 'Bankrader utan underlag kommer in i bokslutet här.' },
+  { id: 'konteras', namn: 'Konteras', typ: 'ai', rad: 5, kol: 9, beskrivning: 'Två AI-modeller konterar var för sig enligt K1. Grönt när båda är säkra och överens.', finns: 'Fliken Kontering (GPT + Claude tvåpass)' },
+  { id: 'val-resultat', namn: 'Grönt?', typ: 'val', rad: 5, kol: 10 },
+  { id: 'granska', namn: 'Granska', typ: 'manuell', rad: 7, kol: 10, beskrivning: 'Det AI:n inte är överens om eller osäker på granskar vi själva.', finns: 'Rätta kontering i fliken Kontering' },
+  { id: 'skapa-verif', namn: 'Skapa verifikationer / lägg in i databas', typ: 'system', rad: 5, kol: 11, beskrivning: 'Godkända konteringar blir verifikationer och sparas i databasen.' },
+  { id: 'huvudbok', namn: 'Uppdatera verifikationslista / huvudbok', typ: 'system', rad: 5, kol: 12, finns: 'Verifikationslistan' },
 
-  { id: 'infor-bokslut', namn: 'Inför årsbokslut', typ: 'regel', rad: 3, kol: 13, beskrivning: 'När året är slut och bokföringen är ikapp startar bokslutet.', finns: 'Fliken Bokslut (checklista)' },
-  { id: 'mejl-bekrafta', namn: 'Mail: bekräfta underlag, inventarier, periodisering', typ: 'mejl-ut', rad: 2, kol: 13, beskrivning: 'Kunden får bekräfta att allt är med och svara på frågor om inventarier och periodiseringar.' },
-  { id: 'kund-svarar-2', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 13 },
-  { id: 'val-svar', namn: 'Kundens svar', typ: 'val', rad: 0, kol: 14 },
-  { id: 'hopp-ut-2', namn: 'A', typ: 'hopp', rad: 0, kol: 14, dy: -52, hopp: 'hopp-in', beskrivning: 'Kunden skickar fler transaktioner, som tas emot som nytt underlag.' },
-  { id: 'justeringar', namn: 'Bokslutsjusteringar', typ: 'ai', rad: 1, kol: 15, beskrivning: 'AI:n bokar periodiseringar, avskrivningar och andra justeringar utifrån kundens svar.' },
-  { id: 'sammanstall', namn: 'Sammanställ bokslut inkl. NE, moms', typ: 'system', rad: 3, kol: 15, finns: 'NE (SRU) och årsbokslut-PDF' },
+  { id: 'bb-rr', namn: 'Uppdatera BB, RR, momsrapport', typ: 'system', rad: 5, kol: 13, beskrivning: 'Balansräkning, resultaträkning och momsrapport räknas om.' },
+  { id: 'momsfil', namn: 'Skapa momsfil / periodisk sammanställning', typ: 'system', rad: 6, kol: 13, finns: 'Momsfil (eSKD)' },
+  { id: 'lamna-moms', namn: 'Lämna in moms', typ: 'manuell', rad: 7, kol: 13, finns: 'Sidan Inlämning' },
 
-  { id: 'rimlighet-ai', namn: 'Rimlighetskontroll', typ: 'ai', rad: 3, kol: 16, beskrivning: 'AI:n jämför mot tidigare år och letar efter konstiga belopp innan vi tittar.' },
-  { id: 'rimlighet-manuell', namn: 'Rimlighetskontroll', typ: 'manuell', rad: 5, kol: 16, beskrivning: 'Vi går själva igenom bokslutet en sista gång.' },
-  { id: 'lamna-in', namn: 'Lämna in', typ: 'manuell', rad: 5, kol: 17, finns: 'Sidan Inlämning' },
-  { id: 'kvitto', namn: 'Mail med inlämningskvitto', typ: 'mejl-ut', rad: 3, kol: 17 },
-  { id: 'klart', namn: 'Klart', typ: 'slut', rad: 3, kol: 18 },
+  { id: 'infor-bokslut', namn: 'Inför årsbokslut', typ: 'regel', rad: 5, kol: 14, beskrivning: 'När året är slut och bokföringen är ikapp startar bokslutet.', finns: 'Fliken Bokslut (checklista)' },
+  { id: 'mejl-bekrafta', namn: 'Mail: bekräfta underlag, inventarier, periodisering', typ: 'mejl-ut', rad: 4, kol: 14, beskrivning: 'Kunden får bekräfta att allt är med och svara på frågor om inventarier och periodiseringar.' },
+  { id: 'kund-svarar-2', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 14 },
+  { id: 'val-svar', namn: 'Kundens svar', typ: 'val', rad: 0, kol: 15 },
+  { id: 'hopp-ut-2', namn: 'A', typ: 'hopp', rad: 0, kol: 15, dy: -52, hopp: 'hopp-in', beskrivning: 'Kunden skickar fler transaktioner, som tas emot som nytt underlag.' },
+  { id: 'justeringar', namn: 'Bokslutsjusteringar', typ: 'ai', rad: 3, kol: 16, beskrivning: 'AI:n bokar periodiseringar, avskrivningar och andra justeringar utifrån kundens svar.' },
+  { id: 'sammanstall', namn: 'Sammanställ bokslut inkl. NE, moms', typ: 'system', rad: 5, kol: 16, finns: 'NE (SRU) och årsbokslut-PDF' },
+
+  { id: 'rimlighet-ai', namn: 'Rimlighetskontroll', typ: 'ai', rad: 5, kol: 17, beskrivning: 'AI:n jämför mot tidigare år och letar efter konstiga belopp innan vi tittar.' },
+  { id: 'rimlighet-manuell', namn: 'Rimlighetskontroll', typ: 'manuell', rad: 7, kol: 17, beskrivning: 'Vi går själva igenom bokslutet en sista gång.' },
+  { id: 'lamna-in', namn: 'Lämna in', typ: 'manuell', rad: 7, kol: 18, finns: 'Sidan Inlämning' },
+  { id: 'kvitto', namn: 'Mail med inlämningskvitto', typ: 'mejl-ut', rad: 5, kol: 18 },
+  { id: 'klart', namn: 'Klart', typ: 'slut', rad: 5, kol: 19 },
 ];
 
 const PILAR: Pil[] = [
@@ -106,14 +130,17 @@ const PILAR: Pil[] = [
   { fran: 'hopp-in', till: 'ta-emot' },
   { fran: 'ta-emot', till: 'definiera' },
   { fran: 'definiera', till: 'val-aret' },
-  { fran: 'val-aret', till: 'val-typ', text: 'Tillhör året' },
-  { fran: 'val-aret', till: 'separat-mapp', text: 'Ej året' },
+  { fran: 'val-aret', till: 'val-typ', text: 'Tillhör' },
+  { fran: 'val-aret', till: 'separat-mapp', text: 'Tillhör ej' },
   { fran: 'val-typ', till: 'plocka-trans', text: 'Transaktioner' },
   { fran: 'val-typ', till: 'plocka-verif', text: 'Konterad historik' },
   { fran: 'val-typ', till: 'separat-mapp', text: 'Övrigt' },
 
+  { fran: 'integration', till: 'plocka-trans' },
   { fran: 'plocka-trans', till: 'komplettera' },
-  { fran: 'komplettera', till: 'val-tillrackligt' },
+  { fran: 'komplettera', till: 'val-dublett' },
+  { fran: 'val-dublett', till: 'radera', text: 'Dublett' },
+  { fran: 'val-dublett', till: 'val-tillrackligt', text: 'Ej dublett' },
   { fran: 'val-tillrackligt', till: 'skriv-mejl', text: 'Ej tillräckligt' },
   { fran: 'skriv-mejl', till: 'kund-svarar-1', mejl: true },
   { fran: 'kund-svarar-1', till: 'hopp-ut-1' },
@@ -124,6 +151,21 @@ const PILAR: Pil[] = [
   { fran: 'granska', till: 'skapa-verif', form: 'hv' },
   { fran: 'skapa-verif', till: 'huvudbok' },
   { fran: 'plocka-verif', till: 'huvudbok', form: 'hv' },
+
+  { fran: 'bank-in', till: 'bank-spara' },
+  { fran: 'bank-spara', till: 'val-bank-match' },
+  { fran: 'val-bank-match', till: 'bank-matchad', text: 'Ja' },
+  { fran: 'val-bank-match', till: 'bank-vanta', text: 'Nej' },
+  { fran: 'bank-vanta', till: 'val-bank-match-2' },
+  { fran: 'val-bank-match-2', till: 'bank-matchad', text: 'Ja' },
+  { fran: 'val-bank-match-2', till: 'bank-skriv-mejl', text: 'Nej' },
+  { fran: 'bank-skriv-mejl', till: 'kund-svarar-bank', mejl: true },
+  { fran: 'kund-svarar-bank', till: 'hopp-ut-3' },
+  { fran: 'bank-skriv-mejl', till: 'val-bank-svar' },
+  { fran: 'val-bank-svar', till: 'bank-vantar-underlag', text: 'Ja' },
+  { fran: 'val-bank-svar', till: 'bank-till-bokslut', text: 'Nej' },
+  { fran: 'bank-till-bokslut', till: 'hopp-ut-b' },
+  { fran: 'hopp-in-b', till: 'infor-bokslut' },
 
   { fran: 'huvudbok', till: 'bb-rr' },
   { fran: 'bb-rr', till: 'momsfil' },
@@ -157,11 +199,12 @@ const TYPER: Record<Typ, { namn: string; fyll: string; kant: string; text: strin
   slut: { namn: 'Slut', fyll: '#ffffff', kant: '#173b57', text: '#334155' },
   val: { namn: 'Val', fyll: '#ffffff', kant: '#64748b', text: '#334155' },
   hopp: { namn: 'Hopp', fyll: '#ffffff', kant: '#E95C63', text: '#E95C63' },
+  vanta: { namn: 'Väntar', fyll: '#f0fdf4', kant: '#15803d', text: '#14532d' },
 };
 
 const VANSTER = 34;
 // Första kolumnen har bara ett hopp och sista bara slutet, de är smalare
-const KOL_B = Array.from({ length: 19 }, (_, k) => (k === 0 ? 56 : k === 18 ? 76 : 122));
+const KOL_B = Array.from({ length: 20 }, (_, k) => (k === 0 ? 56 : k === 19 ? 76 : 122));
 const KOL_X = KOL_B.reduce<number[]>((acc, b, i) => [...acc, i === 0 ? VANSTER : acc[i - 1] + KOL_B[i - 1]], []);
 const TOPP = 40;
 const BREDD = KOL_X[KOL_X.length - 1] + KOL_B[KOL_B.length - 1] + 6;
@@ -200,7 +243,8 @@ function vag(p: Pil, a: Plats, b: Plats) {
     return { d: `M${a.h},${a.cy} H${b.cx} V${y2}`, tx: (a.h + b.cx) / 2, ty: a.cy - 6, mitt: true };
   }
   const y1 = b.cy < a.cy ? a.o : a.u;
-  return { d: `M${a.cx},${y1} V${b.cy} H${b.v}`, tx: a.cx + 6, ty: textY(y1, b.cy), mitt: false };
+  // Målet kan ligga till vänster, då går pilen in från höger
+  return { d: `M${a.cx},${y1} V${b.cy} H${b.cx > a.cx ? b.v : b.h}`, tx: a.cx + 6, ty: textY(y1, b.cy), mitt: false };
 }
 
 /** Delar namnet på rader om högst ~15 tecken. */
@@ -237,6 +281,14 @@ function Ikon({ typ, x, y }: { typ: Typ; x: number; y: number }) {
       <g transform={`translate(${x},${y + 1})`}>
         <rect width="13" height="9" rx="1" fill={typ === 'mejl-ut' ? f : 'none'} stroke={f} strokeWidth="1.3" />
         <path d="M0,0 L6.5,5 L13,0" fill="none" stroke={typ === 'mejl-ut' ? '#fff' : f} strokeWidth="1.3" />
+      </g>
+    );
+  }
+  if (typ === 'vanta') {
+    return (
+      <g transform={`translate(${x + 6},${y + 6})`} stroke={f} fill="none" strokeWidth="1.4" strokeLinecap="round">
+        <circle r="6" />
+        <path d="M0,-3.5 V0 L2.5,2" />
       </g>
     );
   }
@@ -297,7 +349,7 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
   if (!u.sortering) { satt('definiera', 'har', 'Inte sorterat än'); return { steg, pilar }; }
   satt('definiera', 'klar', `Sorterat som ${u.sortering === 'ovrigt' ? 'övrig fil' : 'underlag'}${u.sorteringOrsak ? ` — ${u.sorteringOrsak}` : ''}`);
   ga('definiera', 'val-aret');
-  satt('val-aret', 'oppen', 'Årskontrollen finns inte än, underlaget antas tillhöra året');
+  satt('val-aret', 'oppen', 'Kontrollen av räkenskapsåret finns inte än, underlaget antas tillhöra det');
   ga('val-aret', 'val-typ');
 
   if (u.sortering === 'ovrigt') {
@@ -324,7 +376,10 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
   satt('plocka-trans', 'klar', `${u.utlasning.antal} transaktioner utlästa ${kort(u.utlasning.at)}`);
   ga('plocka-trans', 'komplettera');
   satt('komplettera', 'oppen', 'Finns inte som eget steg än');
-  ga('komplettera', 'val-tillrackligt');
+  ga('komplettera', 'val-dublett');
+  // Dubletter letas bara bland bankrader än, inte bland ett underlags egna transaktioner
+  satt('val-dublett', 'oppen', 'Dublettkollen görs bara på bankrader än');
+  ga('val-dublett', 'val-tillrackligt');
 
   const T = u.transaktioner;
   const konterade = T.filter((t) => t.kontering !== 'ingen');
@@ -499,7 +554,7 @@ export default function FlodesschemaPage() {
           {antal('ai')} AI-steg · {antal('system')} automatiska · {antal('manuell')} manuella
         </p>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-          {(['ai', 'system', 'mejl-ut', 'regel', 'manuell', 'kund'] as Typ[]).map((t) => (
+          {(['ai', 'system', 'mejl-ut', 'regel', 'vanta', 'manuell', 'kund'] as Typ[]).map((t) => (
             <span key={t} className="flex items-center gap-1.5">
               <svg width="16" height="14"><Ikon typ={t} x={1} y={1} /></svg>
               {TYPER[t].namn}
@@ -637,7 +692,7 @@ export default function FlodesschemaPage() {
                   <circle cx={pl.cx} cy={pl.cy} r={12} fill="#fff" stroke={t.kant} strokeWidth={arVald ? 3 : 1.8} />
                   <text x={pl.cx} y={pl.cy + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill={t.text}>{s.namn}</text>
                   {s.hopp && (
-                    <text x={pl.h + 5} y={pl.cy + 3} fontSize="9.5" fill="#64748b" paintOrder="stroke" stroke="#fff" strokeWidth="3">till Ta emot</text>
+                    <text x={pl.h + 5} y={pl.cy + 3} fontSize="9.5" fill="#64748b" paintOrder="stroke" stroke="#fff" strokeWidth="3">{s.etikett ?? 'till Ta emot'}</text>
                   )}
                 </g>
               );
@@ -654,9 +709,11 @@ export default function FlodesschemaPage() {
                 <g key={s.id} opacity={op} onClick={klick} className="cursor-pointer">
                   <circle cx={pl.cx} cy={pl.cy} r={17} fill="#fff" stroke={arVald ? '#E95C63' : t.kant} strokeWidth={s.typ === 'slut' ? 3.5 : 1.5} />
                   {s.typ === 'start' && <Ikon typ="mejl-in" x={pl.cx - 6.5} y={pl.cy - 5.5} />}
-                  {rader(s.namn, 20).map((r, i) => (
-                    <text key={i} x={pl.h + 6} y={pl.cy + 3 + (i - (rader(s.namn, 20).length - 1) / 2) * 12} fontSize="10" fill="#334155" paintOrder="stroke" stroke="#fff" strokeWidth="3">{r}</text>
-                  ))}
+                  {s.textOvan
+                    ? <text x={pl.cx} y={pl.o - 6} textAnchor="middle" fontSize="10" fill="#334155" paintOrder="stroke" stroke="#fff" strokeWidth="3">{s.namn}</text>
+                    : rader(s.namn, 20).map((r, i) => (
+                      <text key={i} x={pl.h + 6} y={pl.cy + 3 + (i - (rader(s.namn, 20).length - 1) / 2) * 12} fontSize="10" fill="#334155" paintOrder="stroke" stroke="#fff" strokeWidth="3">{r}</text>
+                    ))}
                 </g>
               );
             }
