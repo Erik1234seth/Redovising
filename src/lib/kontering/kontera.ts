@@ -53,6 +53,7 @@ interface Transaktion {
   uppgifter: Record<string, unknown> | null;
   komplettering: Komplettering | null;
   dublettkoll: { status: string; motivering: string; avFil: string | null } | null;
+  tillrackligt: { antaganden: string } | null;
   kalla: string;
 }
 
@@ -131,6 +132,7 @@ Regler:
 - motivering: en eller två meningar om varför, på svenska.
 - Använd kundens verksamhet för att avgöra vad ett köp är till för. Har kunden i ett mejl förklarat vad ett köp eller en inbetalning avser, väger det tyngre än en gissning — säg det i motiveringen.
 - Står det en instruktion från byrån i anteckningen följer du den. Den väger tyngst av allt.
+- Kontot väljs bara utifrån K1-kontoplanen och kontobeskrivningarna nedan — byråns egen dokumentation. Använd ingen annan källa. Hur kunden eller andra kunder bokfört liknande saker tidigare är en ledtråd om vad affären är, inte om vilket konto som är rätt: tidigare bokföringar kan vara gjorda i ett annat program, med BAS-underkonton eller fel. Stämmer historiken inte med kontobeskrivningarna gäller beskrivningarna.
 
 K1-KONTOPLAN (konto namn — beskrivning [sökord]):
 ${kontolista()}`;
@@ -186,6 +188,7 @@ function transaktionText(t: Transaktion, betalsatt: Betalsatt): string {
     t.detaljer ? `Allt som står om transaktionen på underlaget:\n${t.detaljer}` : '',
     t.uppgifter ? `Uppgifter utplockade ur underlaget:\n${JSON.stringify(t.uppgifter, null, 1)}` : '',
     kompletteringText(t.komplettering),
+    t.tillrackligt?.antaganden ? `Antaganden när underlaget kontrollerades: ${t.tillrackligt.antaganden}` : '',
     `Källa: ${t.kalla === 'bank' ? 'rad på kontoutdrag (inget kvitto)'
       : t.kalla === 'woocommerce' ? 'order eller återbetalning i kundens webbutik (WooCommerce), hämtad direkt från butiken'
       : 'utläst ur kundens underlag'}`,
@@ -345,7 +348,7 @@ export async function konteraTransaktioner(
   supabase: SupabaseClient,
   userId: string,
   transaktionIds: string[],
-  { torrkorning = false }: { torrkorning?: boolean } = {},
+  { torrkorning = false, bokforGrona = true }: { torrkorning?: boolean; /** false = spara konteringarna men bokför inte, även när de är gröna. */ bokforGrona?: boolean } = {},
 ): Promise<Utfall[]> {
   const { data: profil, error: profilFel } = await supabase
     .from('profiles').select(KUND_KOLUMNER).eq('id', userId).maybeSingle();
@@ -377,7 +380,7 @@ export async function konteraTransaktioner(
 
   const utfall: Utfall[] = [];
   for (let i = 0; i < kvar.length; i += SAMTIDIGA) {
-    utfall.push(...await Promise.all(kvar.slice(i, i + SAMTIDIGA).map((t) => konteraEn(supabase, t, betalsatt, kund, torrkorning))));
+    utfall.push(...await Promise.all(kvar.slice(i, i + SAMTIDIGA).map((t) => konteraEn(supabase, t, betalsatt, kund, torrkorning, bokforGrona))));
   }
   return utfall;
 }
@@ -389,6 +392,7 @@ async function konteraEn(
   betalsatt: Betalsatt,
   kund: string,
   torrkorning: boolean,
+  bokforGrona = true,
 ): Promise<Utfall> {
   let konteringar: Kontering[];
   try {
@@ -409,6 +413,8 @@ async function konteraEn(
       granskning: k.granskning ? { ...k.granskning, svarade: k.svarade } : { svarade: k.svarade },
       flaggor: k.flaggor,
       omdome: k.omdome,
+      // När konteringen gjordes — upserten skriver annars inte om tiden
+      created_at: new Date().toISOString(),
     })),
     { onConflict: 'transaktion_id,modell' },
   );
@@ -416,7 +422,7 @@ async function konteraEn(
 
   const [a, b] = konteringar;
   const overens = a.omdome === 'gron' && b.omdome === 'gron' && a.konto === b.konto && a.momssats === b.momssats;
-  if (!overens) return { transaktionId: t.id, konteringar, bokford: false };
+  if (!overens || !bokforGrona) return { transaktionId: t.id, konteringar, bokford: false };
 
   try {
     await bokfor(supabase, t, a.konto!, a.momssats ?? 0, betalsatt, 'AI');
@@ -427,7 +433,7 @@ async function konteraEn(
 }
 
 export const TRANSAKTION_KOLUMNER =
-  'id, user_id, customer_email, underlag_id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, anteckning, detaljer, vat_nummer, uppgifter, komplettering, dublettkoll, kalla';
+  'id, user_id, customer_email, underlag_id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, anteckning, detaljer, vat_nummer, uppgifter, komplettering, dublettkoll, tillrackligt, kalla';
 
 /**
  * Erik väljer konto för hand — ett av modellernas förslag eller ett eget.

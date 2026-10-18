@@ -582,6 +582,10 @@ export interface FlodesUnderlag {
     /** ingen = inte konterad, gron = båda modellerna gröna och överens, granska = allt annat. */
     kontering: 'ingen' | 'gron' | 'granska';
     bokford: boolean;
+    /** Modellernas konteringar — förslagen när transaktionen ska granskas. */
+    forslag: { modell: string; konto: string | null; kontonamn: string | null; momssats: number; omdome: string; motivering: string }[];
+    /** Verifikationen transaktionen blev, med sina rader. */
+    verifikation: { id: string; datum: string | null; signatur: string; rader: { konto: string; kontonamn: string | null; belopp: number }[] } | null;
   }[];
   /** Verifikationer som pekar på underlaget. */
   verifikationer: number;

@@ -76,11 +76,16 @@ function compare(sort: Sort) {
   };
 }
 
-export function VerifikationLista({ verifikationer: alla, showSource = false, period }: {
+export function VerifikationLista({ verifikationer: alla, showSource = false, period, onRaderade }: {
   verifikationer: Ver[];
   showSource?: boolean;
   /** Visar bara verifikationer i perioden — sökningen också. Ersätter årsvalet. */
   period?: { fran: string; tom: string };
+  /**
+   * Med den går verifikationer att markera och radera. Anropas med id:na som
+   * raderats, så att sidan kan hämta om det som räknas ur verifikationerna.
+   */
+  onRaderade?: (ids: string[]) => void;
 }) {
   const verifikationer = useMemo(
     () => (period ? alla.filter((v) => v.datum >= period.fran && v.datum <= period.tom) : alla),
@@ -92,6 +97,11 @@ export function VerifikationLista({ verifikationer: alla, showSource = false, pe
   const [onlyUnbalanced, setOnlyUnbalanced] = useState(false);
   const [sort, setSort] = useState<Sort>('datum');
   const [shown, setShown] = useState(PAGE);
+  const [markerade, setMarkerade] = useState<Set<string>>(new Set());
+  // Raderingen kräver ett andra klick — den går inte att ångra
+  const [bekrafta, setBekrafta] = useState(false);
+  const [raderar, setRaderar] = useState(false);
+  const [raderaFel, setRaderaFel] = useState('');
 
   const series = useMemo(() => [...new Set(verifikationer.map((v) => v.serie))].sort(), [verifikationer]);
   const years = useMemo(
@@ -129,6 +139,43 @@ export function VerifikationLista({ verifikationer: alla, showSource = false, pe
   }, [filtered]);
 
   const unbalanced = filtered.filter((v) => !v.balanserad);
+
+  // Bara verifikationer med id finns i databasen och går att radera
+  const markerbara = filtered.filter((v) => v.id);
+  const allaMarkerade = markerbara.length > 0 && markerbara.every((v) => markerade.has(v.id!));
+  const vaxla = (id: string) => {
+    setBekrafta(false);
+    setMarkerade((m) => { const n = new Set(m); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  };
+  const vaxlaAlla = () => {
+    setBekrafta(false);
+    setMarkerade((m) => {
+      const n = new Set(m);
+      for (const v of markerbara) { if (allaMarkerade) n.delete(v.id!); else n.add(v.id!); }
+      return n;
+    });
+  };
+  const radera = async () => {
+    const ids = [...markerade];
+    setRaderar(true);
+    setRaderaFel('');
+    try {
+      const res = await fetch('/api/admin/verifikationer', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Kunde inte radera verifikationerna');
+      setMarkerade(new Set());
+      setBekrafta(false);
+      onRaderade?.(ids);
+    } catch (e) {
+      setRaderaFel(e instanceof Error ? e.message : 'Kunde inte radera verifikationerna');
+    } finally {
+      setRaderar(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -205,6 +252,32 @@ export function VerifikationLista({ verifikationer: alla, showSource = false, pe
         )}
       </div>
 
+      {onRaderade && markerbara.length > 0 && (
+        <div className="flex gap-3 flex-wrap items-center text-sm">
+          <label className="flex items-center gap-2 text-slate-700 cursor-pointer">
+            <input type="checkbox" checked={allaMarkerade} onChange={vaxlaAlla} />
+            Markera alla {markerbara.length.toLocaleString('sv-SE')} som visas
+          </label>
+          {markerade.size > 0 && (bekrafta ? (
+            <span className="flex items-center gap-2">
+              <span className="text-red-700">Radera {markerade.size} {markerade.size === 1 ? 'verifikation' : 'verifikationer'}? Det går inte att ångra.</span>
+              <button onClick={radera} disabled={raderar} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold rounded-lg">
+                {raderar ? 'Raderar…' : 'Ja, radera'}
+              </button>
+              <button onClick={() => setBekrafta(false)} disabled={raderar} className="px-3 py-1.5 border border-slate-300 hover:bg-slate-50 rounded-lg text-slate-700">Avbryt</button>
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <button onClick={() => setBekrafta(true)} className="px-3 py-1.5 border border-red-300 text-red-700 hover:bg-red-50 font-semibold rounded-lg">
+                Radera markerade ({markerade.size})
+              </button>
+              <button onClick={() => setMarkerade(new Set())} className="text-slate-500 hover:text-slate-800">Avmarkera</button>
+            </span>
+          ))}
+          {raderaFel && <span className="text-red-600">{raderaFel}</span>}
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <div className="bg-slate-50 border border-slate-200 rounded-xl text-center py-12 text-slate-600 text-sm">
           {verifikationer.length === 0
@@ -214,7 +287,13 @@ export function VerifikationLista({ verifikationer: alla, showSource = false, pe
       ) : (
         <div className="space-y-3">
           {filtered.slice(0, shown).map((v, i) => (
-            <Verifikation key={v.id ?? `${v.serie}-${v.nummer}-${i}`} v={v} showSource={showSource} />
+            <Verifikation
+              key={v.id ?? `${v.serie}-${v.nummer}-${i}`}
+              v={v}
+              showSource={showSource}
+              markerad={onRaderade && v.id ? markerade.has(v.id) : undefined}
+              onMarkera={() => v.id && vaxla(v.id)}
+            />
           ))}
           {filtered.length > shown && (
             <button
@@ -230,15 +309,22 @@ export function VerifikationLista({ verifikationer: alla, showSource = false, pe
   );
 }
 
-function Verifikation({ v, showSource }: { v: Ver; showSource: boolean }) {
+function Verifikation({ v, showSource, markerad, onMarkera }: {
+  v: Ver; showSource: boolean;
+  /** Undefined när verifikationen inte går att markera. */
+  markerad?: boolean; onMarkera: () => void;
+}) {
   const rows = giltiga(v);
   const debet = rows.filter((t) => t.belopp > 0).reduce((s, t) => s + t.belopp, 0);
   const kredit = rows.filter((t) => t.belopp < 0).reduce((s, t) => s - t.belopp, 0);
 
   return (
-    <div className={`bg-slate-50 border rounded-xl p-4 ${v.balanserad ? 'border-slate-200' : 'border-red-500/60'}`}>
+    <div className={`border rounded-xl p-4 ${markerad ? 'bg-red-50/60 border-red-300' : v.balanserad ? 'bg-slate-50 border-slate-200' : 'bg-slate-50 border-red-500/60'}`}>
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <p className="text-slate-900 text-sm font-semibold min-w-0 break-words">
+          {markerad !== undefined && (
+            <input type="checkbox" checked={markerad} onChange={onMarkera} className="mr-2 align-middle" aria-label="Markera verifikationen" />
+          )}
           <span className="text-blue-700 tabular-nums mr-2">{v.serie}{v.nummer}</span>
           {v.text || <span className="text-slate-500 font-normal italic">(ingen text)</span>}
         </p>

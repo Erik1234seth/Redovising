@@ -98,11 +98,11 @@ const STEG: Steg[] = [
   { id: 'bank-till-bokslut', namn: 'Spara till årsbokslutet', typ: 'system', rad: 2, kol: 11, beskrivning: 'Bankrader utan underlag vid momsdeadline sparas och tas upp igen inför årsbokslutet.' },
   { id: 'hopp-ut-b', namn: 'B', typ: 'hopp', rad: 2, kol: 12, hopp: 'hopp-in-b', etikett: 'till Inför årsbokslut', beskrivning: 'Fortsätter vid Inför årsbokslut.' },
   { id: 'hopp-in-b', namn: 'B', typ: 'hopp', rad: 6, kol: 13, beskrivning: 'Bankrader utan underlag kommer in i bokslutet här.' },
-  { id: 'konteras', namn: 'Konteras', typ: 'ai', rad: 5, kol: 8, beskrivning: 'Två AI-modeller konterar var för sig enligt K1. Grönt när båda är säkra och överens.', finns: 'Fliken Kontering (GPT + Claude tvåpass)' },
+  { id: 'konteras', namn: 'Konteras', typ: 'ai', rad: 5, kol: 8, beskrivning: 'Två AI-modeller (GPT-5.5 och Claude Opus) konterar var för sig enligt K1, i två pass: först väljs konto, sedan prövas det mot kontots regler. Grönt när båda är säkra och överens om konto och moms. Kontot väljs bara ur byråns egen K1-dokumentation — kundhistoriken är en ledtråd om vad affären är, inte om kontot. Dubbletter och transaktioner som saknar uppgifter konteras inte.', finns: 'Fliken Kontering i personvyn. Körs när man följer ett underlag här, utan att bokföra — det är nästa steg.' },
   { id: 'val-resultat', namn: 'Grönt?', typ: 'val', rad: 5, kol: 9 },
   { id: 'granska', namn: 'Granska', typ: 'manuell', rad: 7, kol: 9, beskrivning: 'Det AI:n inte är överens om eller osäker på granskar vi själva.', finns: 'Rätta kontering i fliken Kontering' },
-  { id: 'skapa-verif', namn: 'Skapa verifikationer / lägg in i databas', typ: 'system', rad: 5, kol: 10, beskrivning: 'Godkända konteringar blir verifikationer och sparas i databasen.' },
-  { id: 'huvudbok', namn: 'Uppdatera verifikationslista / huvudbok', typ: 'system', rad: 5, kol: 11, finns: 'Verifikationslistan' },
+  { id: 'skapa-verif', namn: 'Skapa verifikationer / lägg in i databas', typ: 'system', rad: 5, kol: 10, beskrivning: 'Varje godkänd transaktion blir en verifikation i databasen: kostnads- eller intäktskontot, momsen och betalkontot (1930 företagskonto, 2013/2017 privat) enligt Kundkontext. Gröna bokförs med kontot båda modellerna valt, signerade AI. Granskade bokförs på kontot man väljer, signerade Erik.', finns: 'Verifikationer i serie AI, kopplade till transaktionen och underlaget. Bokförs när man följer ett underlag här eller i fliken Kontering.' },
+  { id: 'huvudbok', namn: 'Uppdatera verifikationslista / huvudbok', typ: 'system', rad: 5, kol: 11, beskrivning: 'Verifikationerna hamnar i huvudboken på det räkenskapsår deras datum hör till — ett underlag från förra året läggs in på förra året av sig självt.', finns: 'Fliken Huvudbok i personvyn: per konto med ingående balans, rader och utgående balans, per räkenskapsår. Går att ladda ner som Excel.' },
 
   { id: 'bb-rr', namn: 'Uppdatera BB, RR, momsrapport', typ: 'system', rad: 5, kol: 12, beskrivning: 'Balansräkning, resultaträkning och momsrapport räknas om.' },
   { id: 'momsfil', namn: 'Skapa momsfil / periodisk sammanställning', typ: 'system', rad: 6, kol: 12, finns: 'Momsfil (eSKD)' },
@@ -375,7 +375,7 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
     if (u.sie.fel) { satt('plocka-verif', 'fel', u.sie.fel); return { steg, pilar }; }
     satt('plocka-verif', 'klar', `${u.sie.antal} verifikationer inlagda${u.sie.dubbletter ? `, ${u.sie.dubbletter} dubbletter` : ''}`);
     ga('plocka-verif', 'huvudbok');
-    satt('huvudbok', 'klar', `${u.verifikationer} verifikationer i listan`);
+    satt('huvudbok', 'klar', `${u.verifikationer} verifikationer i huvudboken`);
     return { steg, pilar };
   }
 
@@ -455,12 +455,16 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
 
   ga('val-tillrackligt', 'konteras');
   if (T.length === 0) { satt('konteras', 'fel', 'Avläsningen gav inga transaktioner'); return { steg, pilar }; }
-  if (konterade.length === 0) { satt('konteras', 'har', `Ingen av ${T.length} transaktioner konterad än`); return { steg, pilar }; }
-  satt('konteras', konterade.length < T.length ? 'har' : 'klar', `${konterade.length} av ${T.length} konterade`);
+  // Dubbletter och de som saknar uppgifter konteras inte
+  const attKontera = T.filter((t) => !t.dublettAv && t.tillrackligt?.status !== 'saknar');
+  const konteradeNu = attKontera.filter((t) => t.kontering !== 'ingen' || t.bokford);
+  if (attKontera.length === 0) { satt('konteras', 'oppen', 'Inget att kontera — resten väntar på uppgifter'); return { steg, pilar }; }
+  if (konteradeNu.length === 0) { satt('konteras', 'har', `Ingen av ${attKontera.length} transaktioner konterad än`); return { steg, pilar }; }
+  satt('konteras', konteradeNu.length < attKontera.length ? 'har' : 'klar', `${konteradeNu.length} av ${attKontera.length} konterade av båda modellerna`);
   ga('konteras', 'val-resultat');
 
-  const gron = T.filter((t) => t.kontering === 'gron');
-  const granska = T.filter((t) => t.kontering === 'granska');
+  const gron = attKontera.filter((t) => t.kontering === 'gron');
+  const granska = attKontera.filter((t) => t.kontering === 'granska');
   satt('val-resultat', 'klar', `${gron.length} gröna, ${granska.length} till granskning`);
 
   if (granska.length) {
@@ -476,9 +480,12 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
     if (gron.length) satt('skapa-verif', 'har', `${gron.length} gröna men inte bokförda än`);
     return { steg, pilar };
   }
-  satt('skapa-verif', bokforda < konterade.length ? 'har' : 'klar', `${bokforda} av ${T.length} bokförda`);
+  const attBokfora = attKontera.filter((t) => t.kontering !== 'ingen' || t.bokford).length;
+  satt('skapa-verif', bokforda < attBokfora ? 'har' : 'klar', `${bokforda} av ${attBokfora} verifikationer skapade`);
   ga('skapa-verif', 'huvudbok');
-  satt('huvudbok', 'klar', `${u.verifikationer} verifikationer i listan`);
+  // Verifikationen hamnar på det räkenskapsår dess datum hör till
+  const ar = [...new Set(T.map((t) => t.verifikation?.datum?.slice(0, 4)).filter(Boolean))].sort();
+  satt('huvudbok', 'klar', `${u.verifikationer} verifikationer i huvudboken${ar.length ? ` för ${ar.join(' och ')}` : ''}`);
   return { steg, pilar };
 }
 
@@ -537,22 +544,51 @@ export default function FlodesschemaPage() {
 
   // Steget som körs på underlaget just nu — ett i taget
   const [kor, setKor] = useState<KorSteg | null>(null);
-  const korSteg = (stegId: KorSteg) => {
+  // Vad som körs just nu, för knappen: "Konterar (3 kvar)"
+  const [korText, setKorText] = useState('');
+  const korSteg = async (stegId: KorSteg, val?: { transaktionId: string; konto: string; momssats: number }) => {
     if (!foljer) return;
+    const id = foljer.id;
     setKor(stegId);
     setSparFel('');
-    fetch('/api/admin/flodesschema/underlag', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: foljer.id, steg: stegId }),
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.underlag) setFoljer(d.underlag);
-        if (d.error) setSparFel(d.error);
-      })
-      .catch(() => setSparFel('Kunde inte nå servern'))
-      .finally(() => setKor(null));
+    /** Ett steg på servern. Null när det gick fel — felet visas då. */
+    const ett = async (steg: Exclude<KorSteg, 'alla'>, extra: Record<string, unknown> = {}) => {
+      setKorText(STEG.find((s) => s.id === STEG_I_SCHEMAT[steg])?.namn ?? steg);
+      const d = await fetch('/api/admin/flodesschema/underlag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, steg, ...extra }),
+      }).then((r) => r.json()).catch(() => ({ error: 'Kunde inte nå servern' }));
+      if (d.underlag) setFoljer(d.underlag);
+      if (d.error) { setSparFel(d.error); return null; }
+      return d as { kategori?: string; typ?: string; kvar?: number };
+    };
+    // Konteringen görs några transaktioner i taget, tills inga är kvar
+    const kontera = async () => {
+      const fran = new Date().toISOString();
+      for (let varv = 0; varv < 100; varv++) {
+        const d = await ett('konteras', { fran });
+        if (!d) return false;
+        if (!d.kvar) return true;
+        setKorText(`Konteras — ${d.kvar} kvar`);
+      }
+      return true;
+    };
+    try {
+      if (stegId === 'konteras') { await kontera(); return; }
+      if (stegId !== 'alla') { await ett(stegId, val ? { val } : {}); return; }
+      // Från början så långt flödet är byggt. Vägen tar slut för övriga
+      // filer och verifikationer, och vid fel.
+      const def = await ett('definiera');
+      if (!def || def.kategori !== 'transaktioner') return;
+      const ut = await ett('plocka-trans');
+      if (!ut || ut.typ !== 'transaktioner') return;
+      for (const steg of ['komplettera', 'dublett', 'tillrackligt'] as const) if (!(await ett(steg))) return;
+      if (await kontera()) await ett('skapa-verif');
+    } finally {
+      setKor(null);
+      setKorText('');
+    }
   };
 
   const spar = useMemo(() => (foljer ? foljUnderlag(foljer) : null), [foljer]);
@@ -860,7 +896,7 @@ export default function FlodesschemaPage() {
           Scrolla för att zooma · dra för att flytta
         </div>
 
-        {foljer && spar && <Sparpanel u={foljer} spar={spar} steg={steg} onVal={setVald} onKor={korSteg} kor={kor} />}
+        {foljer && spar && <Sparpanel u={foljer} spar={spar} steg={steg} onVal={setVald} onKor={korSteg} kor={kor} korText={korText} />}
         {valt && <Detaljer key={valt.id} valt={valt} steg={steg} spar={spar?.steg[valt.id]} onVal={setVald} onSpara={spara} />}
       </div>
 
@@ -898,11 +934,17 @@ export default function FlodesschemaPage() {
 
 /** Underlaget som följs: vad det är, var det står och dess transaktioner. */
 /** AI-stegen som går att köra på underlaget härifrån. */
-type KorSteg = 'alla' | 'definiera' | 'plocka-trans' | 'komplettera' | 'dublett' | 'tillrackligt';
+type KorSteg = 'alla' | 'definiera' | 'plocka-trans' | 'komplettera' | 'dublett' | 'tillrackligt' | 'konteras' | 'skapa-verif';
 
-function Sparpanel({ u, spar, steg, onVal, onKor, kor }: {
+/** Var i schemat varje körbart steg står. */
+const STEG_I_SCHEMAT: Record<Exclude<KorSteg, 'alla'>, string> = {
+  definiera: 'definiera', 'plocka-trans': 'plocka-trans', komplettera: 'komplettera',
+  dublett: 'val-dublett', tillrackligt: 'val-tillrackligt', konteras: 'konteras', 'skapa-verif': 'skapa-verif',
+};
+
+function Sparpanel({ u, spar, steg, onVal, onKor, kor, korText }: {
   u: FlodesUnderlag; spar: Spar; steg: Record<string, Steg>; onVal: (id: string) => void;
-  onKor: (s: KorSteg) => void; kor: KorSteg | null;
+  onKor: (s: KorSteg, val?: { transaktionId: string; konto: string; momssats: number }) => void; kor: KorSteg | null; korText: string;
 }) {
   const [oppenTrans, setOppenTrans] = useState<string | null>(null);
   // Övriga filer och verifikationer går inte till avläsningen i schemat
@@ -953,10 +995,10 @@ function Sparpanel({ u, spar, steg, onVal, onKor, kor }: {
         disabled={kor !== null}
         className="w-full mb-1 px-3 py-2 bg-slate-900 hover:bg-slate-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg"
       >
-        {kor === 'alla' ? 'Kör flödet…' : 'Skicka in i flödet'}
+        {kor === 'alla' ? `${korText || 'Kör flödet'}…` : 'Skicka in i flödet'}
       </button>
       <p className="text-[11px] text-slate-500 mb-3">
-        {kor === 'alla' ? 'Definierar, plockar ut, kompletterar, letar dubbletter och kollar att det räcker — kan ta ett par minuter.' : 'Börjar från första steget och kör varje steg efter så långt flödet är byggt.'}
+        {kor === 'alla' ? 'Ett steg i taget. Konteringen tar ungefär en minut per transaktion.' : 'Börjar från första steget och kör varje steg efter så långt flödet är byggt.'}
       </p>
 
       <div className="mb-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
@@ -1061,6 +1103,50 @@ function Sparpanel({ u, spar, steg, onVal, onKor, kor }: {
         </div>
       )}
 
+      {vag === 'transaktioner' && u.transaktioner.length > 0 && (() => {
+        const att = u.transaktioner.filter((t) => !t.dublettAv && t.tillrackligt?.status !== 'saknar');
+        const gron = att.filter((t) => t.kontering === 'gron').length;
+        const granska = att.filter((t) => t.kontering === 'granska').length;
+        const ingen = att.filter((t) => t.kontering === 'ingen' && !t.bokford).length;
+        return (
+          <div className="mb-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700 mb-1">Konteras</div>
+            <p className="text-xs text-slate-700 mb-2">
+              {kor === 'konteras' && korText ? `${korText}.` : `${gron} gröna, ${granska} till granskning, ${ingen} inte konterade av ${att.length}.`}
+              {att.length < u.transaktioner.length && ` ${u.transaktioner.length - att.length} är dubbletter eller saknar uppgifter och konteras inte.`}
+            </p>
+            <button
+              onClick={() => onKor('konteras')}
+              disabled={kor !== null || att.length === 0}
+              className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md"
+            >
+              {kor === 'konteras' ? 'Två modeller konterar…' : gron + granska ? 'Kontera igen' : 'Kontera med AI'}
+            </button>
+          </div>
+        );
+      })()}
+
+      {vag === 'transaktioner' && u.transaktioner.length > 0 && (() => {
+        const bokforda = u.transaktioner.filter((t) => t.bokford).length;
+        const gronaKvar = u.transaktioner.filter((t) => t.kontering === 'gron' && !t.bokford && !t.dublettAv).length;
+        const granskaKvar = u.transaktioner.filter((t) => t.kontering === 'granska' && !t.bokford && !t.dublettAv).length;
+        return (
+          <div className="mb-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 mb-1">Skapa verifikationer</div>
+            <p className="text-xs text-slate-700 mb-2">
+              {bokforda} bokförda, {gronaKvar} gröna väntar{granskaKvar ? `, ${granskaKvar} väntar på granskning — välj konto under transaktionen` : ''}.
+            </p>
+            <button
+              onClick={() => onKor('skapa-verif')}
+              disabled={kor !== null || gronaKvar === 0}
+              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md"
+            >
+              {kor === 'skapa-verif' ? 'Bokför…' : `Bokför gröna${gronaKvar ? ` (${gronaKvar})` : ''}`}
+            </button>
+          </div>
+        );
+      })()}
+
       <ol className="space-y-1.5 mb-3">
         {ordning.map((s) => {
           const { lage, text } = spar.steg[s.id];
@@ -1108,7 +1194,7 @@ function Sparpanel({ u, spar, steg, onVal, onKor, kor }: {
                     </span>
                   )}
                 </button>
-                {oppenTrans === t.id && <TransaktionDetaljer t={t} format={belopp.format} />}
+                {oppenTrans === t.id && <TransaktionDetaljer t={t} format={belopp.format} onBokfor={(konto, momssats) => onKor('skapa-verif', { transaktionId: t.id, konto, momssats })} bokfor={kor === 'skapa-verif'} />}
               </li>
             ))}
           </ul>
@@ -1119,7 +1205,10 @@ function Sparpanel({ u, spar, steg, onVal, onKor, kor }: {
 }
 
 /** Allt som plockats ut om en transaktion, under raden i spårpanelen. */
-function TransaktionDetaljer({ t, format }: { t: FlodesUnderlag['transaktioner'][number]; format: (n: number) => string }) {
+function TransaktionDetaljer({ t, format, onBokfor, bokfor }: {
+  t: FlodesUnderlag['transaktioner'][number]; format: (n: number) => string;
+  onBokfor: (konto: string, momssats: number) => void; bokfor: boolean;
+}) {
   const visa = (v: unknown): string => {
     if (typeof v === 'number') return format(v);
     if (typeof v === 'boolean') return v ? 'Ja' : 'Nej';
@@ -1161,6 +1250,26 @@ function TransaktionDetaljer({ t, format }: { t: FlodesUnderlag['transaktioner']
           {t.dublettkoll.motivering && <p className="text-slate-600">{t.dublettkoll.motivering}</p>}
         </div>
       )}
+      {t.verifikation ? (
+        <div className="mt-2 pt-2 border-t border-slate-200">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Verifikation</div>
+          <div className="text-slate-500">{t.verifikation.datum ?? 'Utan datum'} · signerad {t.verifikation.signatur || '—'}</div>
+          <table className="w-full mt-0.5">
+            <tbody>
+              {t.verifikation.rader.map((r, i) => (
+                <tr key={i}>
+                  <td className="font-mono pr-1.5 align-top">{r.konto}</td>
+                  <td className="text-slate-600 pr-1.5">{r.kontonamn}</td>
+                  <td className="text-right whitespace-nowrap font-mono">{r.belopp > 0 ? format(r.belopp) : ''}</td>
+                  <td className="text-right whitespace-nowrap font-mono pl-1.5">{r.belopp < 0 ? format(-r.belopp) : ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : t.forslag.length > 0 && !t.dublettAv && (
+        <Bokforingsval t={t} onBokfor={onBokfor} bokfor={bokfor} />
+      )}
       {t.tillrackligt && (
         <div className="mt-2 pt-2 border-t border-slate-200">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Tillräckligt?</div>
@@ -1180,6 +1289,60 @@ function TransaktionDetaljer({ t, format }: { t: FlodesUnderlag['transaktioner']
         </div>
       )}
       {t.komplettering && <KompletteringVy k={t.komplettering} />}
+    </div>
+  );
+}
+
+/**
+ * Modellernas konteringar för en transaktion som inte är bokförd. Grönt
+ * bokförs med knappen i panelen; här väljer man konto för hand — ett av
+ * förslagen eller ett eget — och bokför bara den här.
+ */
+function Bokforingsval({ t, onBokfor, bokfor }: {
+  t: FlodesUnderlag['transaktioner'][number]; onBokfor: (konto: string, momssats: number) => void; bokfor: boolean;
+}) {
+  const [konto, setKonto] = useState(t.forslag[0]?.konto ?? '');
+  const [sats, setSats] = useState(t.forslag[0]?.momssats ?? 0);
+  const OMDOME: Record<string, string> = { gron: 'text-emerald-700', gul: 'text-amber-700', rod: 'text-red-700' };
+  // Samma förslag från båda modellerna visas en gång
+  const unika = t.forslag.filter((f, i, a) => f.konto && a.findIndex((x) => x.konto === f.konto && x.momssats === f.momssats) === i);
+  return (
+    <div className="mt-2 pt-2 border-t border-slate-200">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Kontering</div>
+      <ul className="space-y-1 mt-0.5">
+        {t.forslag.map((f, i) => (
+          <li key={i}>
+            <span className="text-slate-500">{f.modell.startsWith('claude') ? 'Claude' : 'GPT'}: </span>
+            <span className="font-mono">{f.konto ?? '—'}</span> {f.kontonamn} · {f.momssats} % <span className={OMDOME[f.omdome] ?? ''}>({f.omdome})</span>
+            {f.motivering && <span className="block text-slate-500">{f.motivering}</span>}
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap gap-1 mt-1.5">
+        {unika.map((f) => (
+          <button
+            key={`${f.konto}-${f.momssats}`}
+            onClick={() => onBokfor(f.konto!, f.momssats)}
+            disabled={bokfor}
+            className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white rounded"
+          >
+            Bokför på {f.konto} ({f.momssats} %)
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-1 mt-1.5">
+        <input value={konto} onChange={(e) => setKonto(e.target.value)} placeholder="Konto" className="w-16 px-1.5 py-0.5 border border-slate-300 rounded font-mono" />
+        <select value={sats} onChange={(e) => setSats(Number(e.target.value))} className="px-1 py-0.5 border border-slate-300 rounded">
+          {[25, 12, 6, 0].map((s) => <option key={s} value={s}>{s} %</option>)}
+        </select>
+        <button
+          onClick={() => onBokfor(konto.trim(), sats)}
+          disabled={bokfor || !/^\d{4}$/.test(konto.trim())}
+          className="px-2 py-0.5 border border-slate-300 hover:bg-white disabled:opacity-50 rounded"
+        >
+          Bokför eget konto
+        </button>
+      </div>
     </div>
   );
 }

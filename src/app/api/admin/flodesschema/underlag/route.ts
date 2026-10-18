@@ -6,6 +6,9 @@ import { lasUtTransaktioner } from '@/lib/transaktioner/import';
 import { kompletteraUnderlag } from '@/lib/transaktioner/komplettera';
 import { kollaDubbletter } from '@/lib/transaktioner/dublettkoll';
 import { kollaTillrackligt } from '@/lib/transaktioner/tillrackligt';
+import { TRANSAKTION_KOLUMNER, bokfor, bokforManuellt, konteraTransaktioner } from '@/lib/kontering/kontera';
+import { tolkaBetalsatt } from '@/lib/kontering/betalsatt';
+import { slaUppKonto } from '@/lib/kontering/regelverk';
 
 export const maxDuration = 300;
 
@@ -14,8 +17,14 @@ export const maxDuration = 300;
  *
  * GET        → { kunder: FlodesKund[] }, kunderna med sina underlag, nyast först
  * GET ?id=   → { underlag: FlodesUnderlag }, allt som hänt med ett underlag
- * POST { id, steg: 'alla' | 'definiera' | 'plocka-trans' | 'komplettera' | 'dublett' | 'tillrackligt' } → kör steget (alla = från början så långt
- *            flödet är kodat) på underlaget och svarar som GET ?id=
+ * POST { id, steg } → kör ett steg på underlaget och svarar { underlag, ... } som GET ?id=
+ *            steg: definiera | plocka-trans | komplettera | dublett | tillrackligt | konteras | skapa-verif
+ *            (skapa-verif med val: { transaktionId, konto, momssats } bokför en granskad för hand)
+ *
+ * Varje steg är ett eget anrop, så att vart och ett har hela tidsgränsen på
+ * sig. "Skicka in i flödet" på sidan kör dem efter varandra. Konteringen tar
+ * ungefär en minut per transaktion och görs några i taget: { steg: 'konteras',
+ * fran } konterar dem som inte konterats sedan fran och svarar med kvar.
  *
  * Här hämtas bara fakta. Vilket steg i schemat de motsvarar avgörs på sidan,
  * där stegen finns.
@@ -30,35 +39,130 @@ export async function GET(request: NextRequest) {
   }
 }
 
+const STEG = ['definiera', 'plocka-trans', 'komplettera', 'dublett', 'tillrackligt', 'konteras', 'skapa-verif'];
+/** Transaktioner per konteringsanrop. Båda modellerna, två pass var, ryms inom tidsgränsen. */
+const KONTERA_PER_ANROP = 3;
+
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   if (typeof body.id !== 'string' || !body.id) return NextResponse.json({ error: 'Underlag saknas' }, { status: 400 });
-  if (!['alla', 'definiera', 'plocka-trans', 'komplettera', 'dublett', 'tillrackligt'].includes(body.steg)) return NextResponse.json({ error: 'Okänt steg' }, { status: 400 });
+  if (!STEG.includes(body.steg)) return NextResponse.json({ error: 'Okänt steg' }, { status: 400 });
   const supabase = createServerClient();
-  const alla = body.steg === 'alla';
+  const extra: Record<string, unknown> = {};
   try {
-    // 'alla' kör de steg som är kodade, i schemats ordning, och stannar där
-    // vägen tar slut — övriga filer och verifikationer läses inte ut här
-    if (alla || body.steg === 'definiera') {
-      const definition = await definieraUnderlag(supabase, body.id);
-      if (alla && definition.kategori !== 'transaktioner') return NextResponse.json({ underlag: await ettUnderlag(body.id) });
-    }
-    if (alla || body.steg === 'plocka-trans') {
+    if (body.steg === 'definiera') extra.kategori = (await definieraUnderlag(supabase, body.id)).kategori;
+    if (body.steg === 'plocka-trans') {
       // Felet i avläsningen skrivs på underlaget och syns i spåret
       const res = await lasUtTransaktioner(supabase, body.id);
       if (res.fel) throw new Error(res.fel);
-      if (alla && res.typ !== 'transaktioner') return NextResponse.json({ underlag: await ettUnderlag(body.id) });
+      extra.typ = res.typ;
     }
-    if (alla || body.steg === 'komplettera') await kompletteraUnderlag(supabase, body.id);
-    if (alla || body.steg === 'dublett') await kollaDubbletter(supabase, body.id);
-    if (alla || body.steg === 'tillrackligt') await kollaTillrackligt(supabase, body.id);
+    if (body.steg === 'komplettera') await kompletteraUnderlag(supabase, body.id);
+    if (body.steg === 'dublett') await kollaDubbletter(supabase, body.id);
+    if (body.steg === 'tillrackligt') await kollaTillrackligt(supabase, body.id);
+    if (body.steg === 'konteras') extra.kvar = await kontera(body.id, typeof body.fran === 'string' ? body.fran : new Date().toISOString());
+    if (body.steg === 'skapa-verif') extra.bokforda = await skapaVerifikationer(body.id, body.val);
   } catch (e) {
     // Felet står på underlaget och syns i spåret, så underlaget skickas med ändå
     const fel = e instanceof Error ? e.message : 'Internt fel';
     const underlag = await ettUnderlag(body.id).catch(() => null);
     return NextResponse.json({ error: fel, underlag }, { status: 500 });
   }
-  return NextResponse.json({ underlag: await ettUnderlag(body.id) });
+  return NextResponse.json({ underlag: await ettUnderlag(body.id), ...extra });
+}
+
+/**
+ * Konterar nästa omgång av underlagets transaktioner med båda modellerna och
+ * sparar konteringarna — utan att bokföra, det är nästa steg i schemat.
+ * Dubbletter och de som saknar uppgifter konteras inte. Svarar med hur många
+ * som är kvar.
+ */
+async function kontera(underlagId: string, fran: string): Promise<number> {
+  const supabase = createServerClient();
+  const { data: u } = await supabase.from('bokforing_underlag').select('user_id').eq('id', underlagId).maybeSingle();
+  if (!u?.user_id) throw new Error('Underlaget hör inte till ett kundkonto — det går inte att kontera');
+
+  const { data: trans, error } = await supabase.from('transaktioner')
+    .select('id, belopp, dublett_av, dublett_orsak, tillrackligt').eq('underlag_id', underlagId).order('radnr');
+  if (error) throw new Error(error.message);
+  const ids = (trans ?? []).map((t) => t.id);
+  if (!ids.length) throw new Error('Underlaget har inga transaktioner att kontera');
+  const [{ data: k }, { data: v }] = await Promise.all([
+    supabase.from('konteringar').select('transaktion_id, created_at').in('transaktion_id', ids),
+    supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', ids),
+  ]);
+  const bokforda = new Set((v ?? []).map((x) => x.transaktion_id));
+  const konteradSedan = new Set((k ?? []).filter((x) => x.created_at >= fran).map((x) => x.transaktion_id));
+
+  const att = (trans ?? []).filter((t) => !t.dublett_av && !t.dublett_orsak && Number(t.belopp) > 0
+    && (t.tillrackligt as { status?: string } | null)?.status !== 'saknar' && !bokforda.has(t.id));
+  const kvar = att.filter((t) => !konteradSedan.has(t.id));
+  if (!kvar.length) return 0;
+
+  const omgang = kvar.slice(0, KONTERA_PER_ANROP).map((t) => t.id);
+  const utfall = await konteraTransaktioner(supabase, u.user_id, omgang, { bokforGrona: false });
+  const fel = utfall.filter((x) => x.fel);
+  // Går ingen i omgången att kontera stannar körningen här — annars försöker
+  // sidan med samma transaktioner igen och igen
+  if (fel.length === omgang.length) throw new Error(fel.map((x) => x.fel).join('; '));
+  return kvar.length - omgang.length + fel.length;
+}
+
+/**
+ * Steget "Skapa verifikationer": konteringarna blir verifikationer.
+ *
+ * Utan val bokförs varje grön transaktion — båda modellerna gröna och överens
+ * — på kontot de valt, signerad AI. Med val bokförs en granskad transaktion
+ * på det konto och den moms Erik valt, signerad Erik. Det som redan är bokfört
+ * rörs inte, och dubbletter bokförs aldrig. Svarar med hur många som bokfördes.
+ */
+async function skapaVerifikationer(underlagId: string, val: unknown): Promise<number> {
+  const supabase = createServerClient();
+  const { data: u } = await supabase.from('bokforing_underlag').select('user_id').eq('id', underlagId).maybeSingle();
+  if (!u?.user_id) throw new Error('Underlaget hör inte till ett kundkonto — det går inte att bokföra');
+
+  if (val && typeof val === 'object') {
+    const v = val as { transaktionId?: unknown; konto?: unknown; momssats?: unknown };
+    if (typeof v.transaktionId !== 'string' || typeof v.konto !== 'string') throw new Error('Välj transaktion och konto');
+    const { data: t } = await supabase.from('transaktioner').select('underlag_id, dublett_av').eq('id', v.transaktionId).maybeSingle();
+    if (t?.underlag_id !== underlagId) throw new Error('Transaktionen hör inte till underlaget');
+    if (t.dublett_av) throw new Error('Transaktionen är markerad som dublett och bokförs inte');
+    await bokforManuellt(supabase, u.user_id, v.transaktionId, v.konto.trim(), Number(v.momssats ?? 0));
+    return 1;
+  }
+
+  const { data: profil } = await supabase.from('profiles').select('har_foretagskonto').eq('id', u.user_id).maybeSingle();
+  const betalsatt = tolkaBetalsatt(profil?.har_foretagskonto ?? null);
+  if (!betalsatt) throw new Error('Välj först om kunden betalar via företagskonto eller privatkonto (Kundkontext)');
+
+  const { data: trans, error } = await supabase.from('transaktioner').select(TRANSAKTION_KOLUMNER)
+    .eq('underlag_id', underlagId).is('dublett_av', null).is('dublett_orsak', null);
+  if (error) throw new Error(error.message);
+  const ids = (trans ?? []).map((t) => t.id as string);
+  if (!ids.length) return 0;
+  const [{ data: k }, { data: v }] = await Promise.all([
+    supabase.from('konteringar').select('transaktion_id, konto, momssats, omdome').in('transaktion_id', ids),
+    supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', ids),
+  ]);
+  const bokforda = new Set((v ?? []).map((x) => x.transaktion_id));
+
+  let antal = 0;
+  const fel: string[] = [];
+  for (const t of (trans ?? []) as unknown as Parameters<typeof bokfor>[1][]) {
+    if (bokforda.has(t.id)) continue;
+    const kk = (k ?? []).filter((x) => x.transaktion_id === t.id);
+    // Samma regel som konteringen: båda gröna och överens om konto och moms
+    const gron = kk.length >= 2 && kk.every((x) => x.omdome === 'gron' && x.konto === kk[0].konto && Number(x.momssats) === Number(kk[0].momssats));
+    if (!gron) continue;
+    try {
+      await bokfor(supabase, t, kk[0].konto, Number(kk[0].momssats ?? 0), betalsatt, 'AI');
+      antal++;
+    } catch (e) {
+      fel.push(`${t.motpart || t.beskrivning || t.id}: ${e instanceof Error ? e.message : 'okänt fel'}`);
+    }
+  }
+  if (fel.length) throw new Error(`${antal} bokförda, ${fel.length} gick inte: ${fel.join('; ')}`);
+  return antal;
 }
 
 async function allaKunder(): Promise<FlodesKund[]> {
@@ -101,7 +205,7 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
 
   const [trans, verif, profil] = await Promise.all([
     supabase.from('transaktioner').select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, vat_nummer, anteckning, detaljer, uppgifter, komplettering, dublettkoll, dublett_av, tillrackligt').eq('underlag_id', id).order('radnr'),
-    supabase.from('verifikationer').select('transaktion_id').eq('underlag_id', id),
+    supabase.from('verifikationer').select('id, transaktion_id, serie, nummer, datum, signatur, verifikation_rader(radnr, konto, kontonamn, belopp, borttagen)').eq('underlag_id', id),
     u.user_id ? supabase.from('profiles').select('email').eq('id', u.user_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
   ]);
   const fel = trans.error ?? verif.error;
@@ -109,7 +213,7 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
 
   const transIds = (trans.data ?? []).map((t) => t.id);
   const { data: konteringar, error: kFel } = transIds.length
-    ? await supabase.from('konteringar').select('transaktion_id, konto, momssats, omdome').in('transaktion_id', transIds)
+    ? await supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, omdome, motivering').in('transaktion_id', transIds)
     : { data: [], error: null };
   if (kFel) throw new Error(kFel.message);
 
@@ -161,6 +265,15 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
         tillrackligt: t.tillrackligt ?? null,
         kontering: k.length === 0 ? 'ingen' : gron ? 'gron' : 'granska',
         bokford: bokforda.has(t.id),
+        forslag: k.map((x) => ({ modell: x.modell, konto: x.konto, kontonamn: x.konto ? slaUppKonto(x.konto)?.namn ?? null : null, momssats: Number(x.momssats ?? 0), omdome: x.omdome, motivering: x.motivering ?? '' })),
+        verifikation: (() => {
+          const v = (verif.data ?? []).find((x) => x.transaktion_id === t.id);
+          if (!v) return null;
+          const rader = ((v.verifikation_rader ?? []) as { radnr: number; konto: string; kontonamn: string | null; belopp: number; borttagen: boolean }[])
+            .filter((r) => !r.borttagen).sort((a, b) => a.radnr - b.radnr)
+            .map((r) => ({ konto: r.konto, kontonamn: r.kontonamn, belopp: Number(r.belopp) }));
+          return { id: v.id, datum: v.datum, signatur: v.signatur ?? '', rader };
+        })(),
       };
     }),
     verifikationer: (verif.data ?? []).length,

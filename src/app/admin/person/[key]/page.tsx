@@ -9,6 +9,7 @@ import SmsComposer from '../../_sms-composer';
 import { formatPhone } from '@/lib/sms/phone';
 import { isSieFile } from '@/lib/sie/parse';
 import { VerifikationLista } from '../../_verifikationer';
+import { Huvudbok } from '../../_huvudbok';
 import { TransaktionsLista } from '../../_transaktioner';
 import { kanLasasAvAi } from '@/lib/underlag/filtyp';
 import { BokslutChecklista, bokslutPunkter, type UppladdningsPunkt } from '../../_bokslut';
@@ -40,12 +41,13 @@ const TABS = [
   { id: 'transaktioner', label: 'Transaktioner' },
   { id: 'kontering', label: 'Kontering' },
   { id: 'verifikationer', label: 'Verifikationer' },
+  { id: 'huvudbok', label: 'Huvudbok' },
 ] as const;
 
 type Tab = (typeof TABS)[number]['id'];
 
 /** Flikarna som ligger i Bokföring-menyn i stället för på raden. */
-const BOKFORING: Tab[] = ['underlag', 'transaktioner', 'kontering', 'verifikationer'];
+const BOKFORING: Tab[] = ['underlag', 'transaktioner', 'kontering', 'verifikationer', 'huvudbok'];
 
 export default function PersonPage() {
   const params = useParams<{ key: string }>();
@@ -136,7 +138,7 @@ export default function PersonPage() {
    */
   useEffect(() => {
     // Bokslutet behöver dem också — NE-bilagan räknas ur verifikationerna
-    if ((tab !== 'verifikationer' && tab !== 'bokslut') || verifikationer || verifikationerError || !rawKey) return;
+    if ((tab !== 'verifikationer' && tab !== 'bokslut' && tab !== 'huvudbok') || verifikationer || verifikationerError || !rawKey) return;
     fetch(`/api/admin/people?key=${encodeURIComponent(decodeURIComponent(rawKey))}&view=verifikationer`)
       .then((r) => r.json())
       .then((data) => {
@@ -1601,8 +1603,35 @@ export default function PersonPage() {
                   {verFiler === 1 ? 'fil' : 'filer'}.
                 </p>
                 <MomsFil verifikationer={verifikationer} orgNr={bokslut?.orgNr ?? null} momsPeriod={person.momsPeriod} onPeriod={setVerPeriod} />
-                <VerifikationLista verifikationer={verifikationer} showSource period={verPeriod} />
+                <VerifikationLista
+                  verifikationer={verifikationer}
+                  showSource
+                  period={verPeriod}
+                  onRaderade={(ids) => {
+                    const borta = new Set(ids);
+                    setVerifikationer((vs) => vs?.filter((v) => !v.id || !borta.has(v.id)) ?? null);
+                    setVerifikationerCount((n) => Math.max(0, n - ids.length));
+                    // Transaktioner som bokförts med dem är obokförda igen
+                    setTransaktioner(null);
+                  }}
+                />
               </>
+            )
+          )}
+
+          {tab === 'huvudbok' && (
+            verifikationerError ? (
+              <p className="text-red-600 text-sm">{verifikationerError}</p>
+            ) : !verifikationer ? (
+              <p className="text-slate-500 text-sm">Hämtar verifikationerna…</p>
+            ) : (
+              <Huvudbok
+                verifikationer={verifikationer}
+                sieIb={bokslut?.sieIb ?? {}}
+                startAr={person.startAr}
+                forlangt={person.forlangtRakenskapsar}
+                kundnamn={person.name ?? person.key}
+              />
             )
           )}
 
