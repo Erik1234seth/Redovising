@@ -251,6 +251,28 @@ export default function PersonPage() {
     }
   };
 
+  // Verksamheten: null = visas, en sträng = redigeras. Sparas via bokslutsrouten, som redan skriver fältet.
+  const [verksamhetUtkast, setVerksamhetUtkast] = useState<string | null>(null);
+  const [savingVerksamhet, setSavingVerksamhet] = useState(false);
+  const sparaVerksamhet = async () => {
+    if (!person?.profileId || verksamhetUtkast === null) return;
+    const varde = verksamhetUtkast.trim() || null;
+    if (varde === (person.verksamhet ?? null)) { setVerksamhetUtkast(null); return; }
+    setSavingVerksamhet(true);
+    const res = await fetch('/api/admin/people/bokslut', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: person.profileId, verksamhet: verksamhetUtkast }),
+    }).catch(() => null);
+    setSavingVerksamhet(false);
+    if (!res?.ok) {
+      setError((await res?.json().catch(() => null))?.error ?? 'Verksamheten kunde inte sparas');
+      return;
+    }
+    setPerson((p) => (p ? { ...p, verksamhet: varde } : p));
+    setVerksamhetUtkast(null);
+  };
+
   const [savingPeriodisk, setSavingPeriodisk] = useState(false);
   const setPeriodisk = async (value: boolean) => {
     if (!person?.profileId || savingPeriodisk) return;
@@ -808,8 +830,39 @@ export default function PersonPage() {
           {tab === 'kontext' && (
             <div className="space-y-8">
               <section>
-                <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-4">Verksamhet</h3>
-                {person.verksamhet ? (
+                <div className="flex items-center gap-3 mb-4">
+                  <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest">Verksamhet</h3>
+                  {person.profileId && verksamhetUtkast === null && (
+                    <button onClick={() => setVerksamhetUtkast(person.verksamhet ?? '')} className="text-xs text-blue-700 hover:underline">
+                      {person.verksamhet ? 'Ändra' : 'Lägg till'}
+                    </button>
+                  )}
+                </div>
+                {verksamhetUtkast !== null ? (
+                  <>
+                    <textarea
+                      autoFocus
+                      rows={4}
+                      value={verksamhetUtkast}
+                      onChange={(e) => setVerksamhetUtkast(e.target.value)}
+                      placeholder="Vad kunden gör, t.ex. frisörsalong med försäljning av hårprodukter"
+                      className="w-full px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        onClick={sparaVerksamhet}
+                        disabled={savingVerksamhet}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg"
+                      >
+                        {savingVerksamhet ? 'Sparar…' : 'Spara'}
+                      </button>
+                      <button onClick={() => setVerksamhetUtkast(null)} className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">
+                        Avbryt
+                      </button>
+                      <span className="text-slate-400 text-xs ml-1">Samma text som AI:n får med sig om kunden.</span>
+                    </div>
+                  </>
+                ) : person.verksamhet ? (
                   <p className="text-slate-900 text-sm whitespace-pre-wrap break-words">{person.verksamhet}</p>
                 ) : (
                   <p className="text-slate-500 text-sm">
