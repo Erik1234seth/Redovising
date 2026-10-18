@@ -558,6 +558,12 @@ export interface FlodesUnderlag {
   dublettkoll: { at: string; fel: string | null } | null;
   /** Steget Tillräckligt?. */
   tillrackligt: { at: string; fel: string | null } | null;
+  /**
+   * Steget Skriv mail: det senaste frågemejlet till kunden som underlagets
+   * transaktioner kom med i (ett per kund och dygn). Null = inte frågat än.
+   * `antal` är hur många av underlagets transaktioner mejlet frågar om.
+   */
+  mejl: { id: string; status: string; till: string; amne: string | null; text: string; at: string; skickat: string | null; antal: number } | null;
   /** SIE-filen inlagd som verifikationer. */
   sie: { at: string; antal: number; dubbletter: number; fel: string | null } | null;
   transaktioner: {

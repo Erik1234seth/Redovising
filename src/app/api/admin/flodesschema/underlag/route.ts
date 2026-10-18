@@ -6,6 +6,7 @@ import { lasUtTransaktioner } from '@/lib/transaktioner/import';
 import { kompletteraUnderlag } from '@/lib/transaktioner/komplettera';
 import { kollaDubbletter } from '@/lib/transaktioner/dublettkoll';
 import { kollaTillrackligt } from '@/lib/transaktioner/tillrackligt';
+import { skrivFragemejl } from '@/lib/transaktioner/fragemejl';
 import { TRANSAKTION_KOLUMNER, bokfor, bokforManuellt, konteraTransaktioner } from '@/lib/kontering/kontera';
 import { tolkaBetalsatt } from '@/lib/kontering/betalsatt';
 import { slaUppKonto } from '@/lib/kontering/regelverk';
@@ -19,6 +20,7 @@ export const maxDuration = 300;
  * GET ?id=   → { underlag: FlodesUnderlag }, allt som hänt med ett underlag
  * POST { id, steg } → kör ett steg på underlaget och svarar { underlag, ... } som GET ?id=
  *            steg: definiera | plocka-trans | komplettera | dublett | tillrackligt | konteras | skapa-verif
+ *            | skriv-mejl (kundens samlade frågemejl nu, i stället för kl 18)
  *            (skapa-verif med val: { transaktionId, konto, momssats } bokför en granskad för hand)
  *
  * Varje steg är ett eget anrop, så att vart och ett har hela tidsgränsen på
@@ -39,7 +41,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-const STEG = ['definiera', 'plocka-trans', 'komplettera', 'dublett', 'tillrackligt', 'konteras', 'skapa-verif'];
+const STEG = ['definiera', 'plocka-trans', 'komplettera', 'dublett', 'tillrackligt', 'skriv-mejl', 'konteras', 'skapa-verif'];
 /** Transaktioner per konteringsanrop. Båda modellerna, två pass var, ryms inom tidsgränsen. */
 const KONTERA_PER_ANROP = 3;
 
@@ -60,6 +62,7 @@ export async function POST(request: NextRequest) {
     if (body.steg === 'komplettera') await kompletteraUnderlag(supabase, body.id);
     if (body.steg === 'dublett') await kollaDubbletter(supabase, body.id);
     if (body.steg === 'tillrackligt') await kollaTillrackligt(supabase, body.id);
+    if (body.steg === 'skriv-mejl') await fragemejl(body.id);
     if (body.steg === 'konteras') extra.kvar = await kontera(body.id, typeof body.fran === 'string' ? body.fran : new Date().toISOString());
     if (body.steg === 'skapa-verif') extra.bokforda = await skapaVerifikationer(body.id, body.val);
   } catch (e) {
@@ -69,6 +72,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: fel, underlag }, { status: 500 });
   }
   return NextResponse.json({ underlag: await ettUnderlag(body.id), ...extra });
+}
+
+/** Skriver underlagets kunds frågemejl nu, med alla frågor kunden inte fått än — inte bara det här underlagets. */
+async function fragemejl(underlagId: string) {
+  const supabase = createServerClient();
+  const { data: u } = await supabase.from('bokforing_underlag').select('user_id').eq('id', underlagId).maybeSingle();
+  if (!u?.user_id) throw new Error('Underlaget hör inte till någon kund');
+  if (!(await skrivFragemejl(supabase, u.user_id))) throw new Error('Inget att fråga om — allt är redan frågat, eller inget saknas');
 }
 
 /**
@@ -204,7 +215,7 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
   if (!u) throw new Error('Underlaget finns inte');
 
   const [trans, verif, profil] = await Promise.all([
-    supabase.from('transaktioner').select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, vat_nummer, anteckning, detaljer, uppgifter, komplettering, dublettkoll, dublett_av, tillrackligt').eq('underlag_id', id).order('radnr'),
+    supabase.from('transaktioner').select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, vat_nummer, anteckning, detaljer, uppgifter, komplettering, dublettkoll, dublett_av, tillrackligt, fraga_utkast_id').eq('underlag_id', id).order('radnr'),
     supabase.from('verifikationer').select('id, transaktion_id, serie, nummer, datum, signatur, verifikation_rader(radnr, konto, kontonamn, belopp, borttagen)').eq('underlag_id', id),
     u.user_id ? supabase.from('profiles').select('email').eq('id', u.user_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
   ]);
@@ -216,6 +227,13 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
     ? await supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, omdome, motivering').in('transaktion_id', transIds)
     : { data: [], error: null };
   if (kFel) throw new Error(kFel.message);
+
+  // Frågemejlet: det senaste utkastet som underlagets transaktioner frågats om i
+  const utkastIds = [...new Set((trans.data ?? []).map((t) => t.fraga_utkast_id).filter(Boolean))];
+  const { data: utkast } = utkastIds.length
+    ? await supabase.from('mejl_utkast').select('id, status, till_email, amne, text, created_at, sent_at').in('id', utkastIds)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle()
+    : { data: null };
 
   const bokforda = new Set((verif.data ?? []).map((v) => v.transaktion_id).filter(Boolean));
   const epost = (profil.data?.email?.trim() || u.sender_email?.trim() || '').toLowerCase();
@@ -236,6 +254,11 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
     komplettering: u.kompletterad_at ? { at: u.kompletterad_at, fel: u.komplettering_fel } : null,
     dublettkoll: u.dublettkollad_at ? { at: u.dublettkollad_at, fel: u.dublettkoll_fel } : null,
     tillrackligt: u.tillrackligt_at ? { at: u.tillrackligt_at, fel: u.tillrackligt_fel } : null,
+    mejl: utkast ? {
+      id: utkast.id, status: utkast.status, till: utkast.till_email, amne: utkast.amne,
+      text: utkast.text, at: utkast.created_at, skickat: utkast.sent_at,
+      antal: (trans.data ?? []).filter((t) => t.fraga_utkast_id === utkast.id).length,
+    } : null,
     sie: u.verifikationer_inlagda_at ? {
       at: u.verifikationer_inlagda_at,
       antal: u.verifikationer_antal ?? 0,

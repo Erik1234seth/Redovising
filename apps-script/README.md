@@ -10,6 +10,7 @@ erik@enklabokslut.se. Projektet äger både Gmail-inkorgen och utskicken.
 | `save-attachments.gs` | Gmail → oss | Anropas från `checkInbox` innan mail-AI:n. Laddar upp varje bilaga direkt till lagringen (via `/api/inmail/underlag`) och sparar den som underlag på avsändarens adress. Alla filtyper, ingen tolkning. Varken `doGet` eller `doPost`. |
 | `sync-mail.gs` | Gmail → oss | Tidsstyrd trigger varje timme speglar alla konversationer, åt båda hållen, till `/api/inmail/messages/import` (tabellen `mail_messages`). Syns under fliken Mejl på personsidan. Varken `doGet` eller `doPost`. |
 | `export-sent.gs` | Gmail → oss | Tidsstyrd trigger skickar nattligen upp dina skickade svar till `/api/inmail/examples/import`, så AI:n kan härma din ton. Varken `doGet` eller `doPost`. |
+| `fragemejl.gs` | oss → inkorgen | Tidsstyrd trigger kl 18 ber `/api/inmail/fragemejl` skriva ett frågemejl per kund om alla transaktioner som saknar uppgifter. Blir utkast i inkorgen. Kör `setUpFragemejl()` en gång. Varken `doGet` eller `doPost`. |
 
 Ett Apps Script-projekt får ha **en** `doGet` och **en** `doPost`. `check-inbox`
 äger den ena och `send-mail` den andra, så lägg inte till fler av dem.

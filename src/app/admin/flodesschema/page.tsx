@@ -79,7 +79,7 @@ const STEG: Steg[] = [
   { id: 'val-dublett', namn: 'Dublettcheck', typ: 'val', rad: 5, kol: 6, beskrivning: 'Finns samma affär redan i ett tidigare underlag hos kunden? Samma kvitto inskickat två gånger, eller samma köp på olika papper (order och kvitto, faktura och betalkvitto). Koden letar fram transaktioner med riktning, belopp och datum i närheten, och AI:n jämför beskrivning, motpart, datum, belopp och nummer. Säkra dubbletter går till Radera, tveksamma flaggas och stoppas i konteringen.', finns: 'Underlagens transaktioner mot kundens tidigare underlag. Bankrader har en egen koll mot kvitton.' },
   { id: 'radera', namn: 'Radera', typ: 'slut', rad: 4, kol: 6, beskrivning: 'Dubbletter bokförs inte. De markeras i stället för att raderas, så att det går att ångra.', finns: 'Säkra dubbletter från dublettkollen, och bankrader som troligen redan bokförts' },
   { id: 'val-tillrackligt', namn: 'Tillräckligt?', typ: 'val', rad: 5, kol: 7, beskrivning: 'AI:n avgör om det vi samlat — underlaget, kompletteringen med historik och mejl, och kundkontexten — räcker för att bokföra varje transaktion: datum, belopp, moms och vad den gäller. Pekar transaktionen på något som kräver mer ska det också finnas, t.ex. köparens VAT-nummer vid försäljning inom EU, omvänd byggmoms, deltagare vid representation eller personnummer vid ROT/RUT. Rimliga antaganden görs hellre än onödiga frågor.', finns: 'Kontrollen per transaktion. Körs när man följer ett underlag här. Mejlflödet har en egen kontroll per fil.' },
-  { id: 'skriv-mejl', namn: 'Skriv mail', typ: 'ai', rad: 4, kol: 7, beskrivning: 'Saknas något skriver AI:n till kunden och frågar efter just det.', finns: 'Underlagskontrollen frågar tills underlaget är komplett' },
+  { id: 'skriv-mejl', namn: 'Skriv mail', typ: 'ai', rad: 4, kol: 7, beskrivning: 'Saknas något skriver AI:n till kunden och frågar efter just det. Frågorna samlas per kund: kl 18 varje dag skrivs ett mejl per kund om alla transaktioner vi har frågor om och inte frågat om än. Mejlet blir ett utkast i inkorgen — svar i tråden om allt kom i samma mejl, annars ett nytt mejl.', finns: 'Dygnsmejlet kl 18 (Apps Script: fragemejl.gs), eller direkt härifrån när man följer ett underlag. Underlagskontrollen i mejlflödet frågar tills underlaget är komplett.' },
   { id: 'kund-svarar-1', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 7, beskrivning: 'Kunden svarar med det som saknades.' },
   { id: 'hopp-ut-1', namn: 'A', typ: 'hopp', rad: 0, kol: 8, hopp: 'hopp-in', beskrivning: 'Svaret tas emot som nytt underlag.' },
 
@@ -430,8 +430,13 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
     const vad = [...new Set(saknar.flatMap((t) => t.tillrackligt!.saknas.map((s) => s.vad)))].join(', ');
     satt('val-tillrackligt', 'klar', `Ej tillräckligt: ${saknar.length} av ${T.length} saknar ${vad}`);
     ga('val-tillrackligt', 'skriv-mejl');
-    // Nästa steg — mejlet till kunden — är inte kopplat till den här kontrollen än
-    satt('skriv-mejl', 'har', 'Kunden har inte fått frågorna än');
+    const utkast = u.mejl?.status === 'discarded' ? null : u.mejl;
+    if (!utkast) satt('skriv-mejl', 'har', 'Frågas i dygnsmejlet kl 18');
+    else if (utkast.status === 'sent') {
+      satt('skriv-mejl', 'klar', `Skickat till ${utkast.till} ${kort(utkast.skickat ?? utkast.at)}`);
+      ga('skriv-mejl', 'kund-svarar-1');
+      satt('kund-svarar-1', 'har', 'Väntar på kundens svar');
+    } else satt('skriv-mejl', 'har', `Utkast i inkorgen till ${utkast.till} — inte skickat än`);
     if (konterade.length === 0) return { steg, pilar };
   } else if (u.tillrackligt) {
     satt('val-tillrackligt', 'klar', `Tillräckligt — alla ${T.filter((t) => t.tillrackligt).length} har det som behövs ${kort(u.tillrackligt.at)}`);
@@ -583,6 +588,7 @@ export default function FlodesschemaPage() {
       if (!def || def.kategori !== 'transaktioner') return;
       const ut = await ett('plocka-trans');
       if (!ut || ut.typ !== 'transaktioner') return;
+      // Det som saknas frågas i dygnsmejlet kl 18; resten konteras ändå
       for (const steg of ['komplettera', 'dublett', 'tillrackligt'] as const) if (!(await ett(steg))) return;
       if (await kontera()) await ett('skapa-verif');
     } finally {
@@ -934,12 +940,12 @@ export default function FlodesschemaPage() {
 
 /** Underlaget som följs: vad det är, var det står och dess transaktioner. */
 /** AI-stegen som går att köra på underlaget härifrån. */
-type KorSteg = 'alla' | 'definiera' | 'plocka-trans' | 'komplettera' | 'dublett' | 'tillrackligt' | 'konteras' | 'skapa-verif';
+type KorSteg = 'alla' | 'definiera' | 'plocka-trans' | 'komplettera' | 'dublett' | 'tillrackligt' | 'skriv-mejl' | 'konteras' | 'skapa-verif';
 
 /** Var i schemat varje körbart steg står. */
 const STEG_I_SCHEMAT: Record<Exclude<KorSteg, 'alla'>, string> = {
   definiera: 'definiera', 'plocka-trans': 'plocka-trans', komplettera: 'komplettera',
-  dublett: 'val-dublett', tillrackligt: 'val-tillrackligt', konteras: 'konteras', 'skapa-verif': 'skapa-verif',
+  dublett: 'val-dublett', tillrackligt: 'val-tillrackligt', 'skriv-mejl': 'skriv-mejl', konteras: 'konteras', 'skapa-verif': 'skapa-verif',
 };
 
 function Sparpanel({ u, spar, steg, onVal, onKor, kor, korText }: {
@@ -1102,6 +1108,36 @@ function Sparpanel({ u, spar, steg, onVal, onKor, kor, korText }: {
           </button>
         </div>
       )}
+
+      {vag === 'transaktioner' && (u.mejl || u.transaktioner.some((t) => !t.dublettAv && t.tillrackligt?.status === 'saknar')) && (() => {
+        const utkast = u.mejl && u.mejl.status !== 'discarded' ? u.mejl : null;
+        const nar = (at: string) => new Date(at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' });
+        return (
+          <div className="mb-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700 mb-1">Skriv mail</div>
+            <p className="text-xs text-slate-700 mb-2">
+              {!utkast ? 'Frågas i kundens dygnsmejl kl 18, tillsammans med kundens övriga frågor.'
+                : utkast.status === 'sent' ? `Skickat till ${utkast.till} ${nar(utkast.skickat ?? utkast.at)}.`
+                  : <>Utkast till {utkast.till} med {utkast.antal} av underlagets transaktioner, skrivet {nar(utkast.at)} — skickas från <Link href="/admin/inkorg" className="text-violet-700 underline">inkorgen</Link>.</>}
+            </p>
+            {utkast && (
+              <div className="mb-2 p-2 rounded-md bg-white border border-violet-100 text-xs text-slate-700">
+                {utkast.amne && <div className="font-semibold mb-1">{utkast.amne}</div>}
+                <div className="whitespace-pre-wrap max-h-64 overflow-y-auto">{utkast.text}</div>
+              </div>
+            )}
+            {utkast?.status !== 'sent' && (
+              <button
+                onClick={() => onKor('skriv-mejl')}
+                disabled={kor !== null}
+                className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md"
+              >
+                {kor === 'skriv-mejl' ? 'AI:n skriver…' : utkast ? 'Skriv om' : 'Skriv kundens mejl nu'}
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {vag === 'transaktioner' && u.transaktioner.length > 0 && (() => {
         const att = u.transaktioner.filter((t) => !t.dublettAv && t.tillrackligt?.status !== 'saknar');
