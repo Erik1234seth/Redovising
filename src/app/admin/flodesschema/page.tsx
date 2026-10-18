@@ -35,7 +35,20 @@ interface Steg {
   textOvan?: boolean;
   beskrivning?: string;
   finns?: string;
+  /** Färdigbyggt. Går att ändra på sidan — det sparade går före. */
+  klar?: boolean;
+  /** Sparad status från sidan. */
+  status?: Status;
 }
+
+type Status = 'klar' | 'delvis' | 'inte';
+const STATUS: Record<Status, { namn: string; klass: string }> = {
+  klar: { namn: 'Klar', klass: 'text-emerald-700' },
+  delvis: { namn: 'Finns delvis', klass: 'text-amber-700' },
+  inte: { namn: 'Inte byggt', klass: 'text-slate-400' },
+};
+/** Sparad status först, annars det koden säger: klar, något finns, eller inget. */
+const stegStatus = (s: Steg): Status => s.status ?? (s.klar ? 'klar' : s.finns ? 'delvis' : 'inte');
 
 interface Pil {
   fran: string;
@@ -67,25 +80,25 @@ const STEG: Steg[] = [
   { id: 'hopp-in', namn: 'A', typ: 'hopp', rad: 5, kol: 0, beskrivning: 'Här kommer allt tillbaka när kunden svarar med mer underlag.' },
   { id: 'kund-skickar', namn: 'Skickar underlag', typ: 'start', rad: 0, kol: 1, beskrivning: 'Kunden mejlar eller laddar upp kvitton, fakturor, kontoutdrag eller annat underlag.', finns: 'Mejl till oss och uppladdning på kundsidan' },
   { id: 'manuell-skickar', namn: 'Skicka in/hämta underlag', typ: 'start', rad: 7, kol: 1, beskrivning: 'Vi lägger själva in underlag eller hämtar det från kunden.', finns: 'Uppladdning i adminpanelen' },
-  { id: 'ta-emot', namn: 'Ta emot underlag', typ: 'mejl-in', rad: 5, kol: 1, beskrivning: 'Allt som kommer in samlas på kunden, oavsett kanal.', finns: 'Inkorgen och underlagslistan på personkortet' },
-  { id: 'definiera', namn: 'Definiera underlaget', typ: 'ai', rad: 5, kol: 2, beskrivning: 'AI:n läser underlaget och avgör vad det är, vilket år det hör till och om det gäller transaktioner, verifikationer eller övrigt. Året styr inte vägen — det hanteras i huvudboken.', finns: 'Körs automatiskt när underlaget kommer in. Går att köra om när man följer ett underlag här.' },
+  { id: 'ta-emot', klar: true, namn: 'Ta emot underlag', typ: 'mejl-in', rad: 5, kol: 1, beskrivning: 'Allt som kommer in samlas på kunden, oavsett kanal.', finns: 'Inkorgen och underlagslistan på personkortet' },
+  { id: 'definiera', klar: true, namn: 'Definiera underlaget', typ: 'ai', rad: 5, kol: 2, beskrivning: 'AI:n läser underlaget och avgör vad det är, vilket år det hör till och om det gäller transaktioner, verifikationer eller övrigt. Året styr inte vägen — det hanteras i huvudboken.', finns: 'Körs automatiskt när underlaget kommer in. Går att köra om när man följer ett underlag här.' },
   { id: 'val-typ', namn: 'Vilken sort?', typ: 'val', rad: 5, kol: 3 },
   { id: 'separat-mapp', namn: 'Spara i separat mapp', typ: 'slut', rad: 6, kol: 3, beskrivning: 'Underlag som inte tillhör räkenskapsåret, eller inte är bokföringsunderlag, sparas undan utan att bokföras.', finns: 'Fliken Övriga filer' },
 
   { id: 'plocka-verif', namn: 'Plocka ut verifikationer', typ: 'system', rad: 3, kol: 4, beskrivning: 'Redan konterad historik, t.ex. en SIE-fil, läses in direkt som verifikationer.', finns: 'Ingående balans ur kundens SIE-fil' },
   { id: 'integration', namn: 'Integration', typ: 'start', rad: 4, kol: 4, beskrivning: 'Ordrar och utbetalningar som hämtas direkt från kassasystem och webbshop, utan något underlag att läsa av. Banken har en egen bana.', finns: 'Zettle, Shopify, WooCommerce' },
-  { id: 'plocka-trans', namn: 'Plocka ut transaktioner', typ: 'ai', rad: 5, kol: 4, beskrivning: 'AI:n plockar ut varje transaktion: datum, belopp, motpart, moms, VAT-nummer och beskrivning — och allt annat som kan vara relevant, som fakturanummer, momsrader per sats, betalsätt och kvittots artiklar. Dessutom en ordagrann avskrift av allt som står.', finns: 'Körs av sig själv när ett underlag kommer med mejl. Går att köra (om) när man följer ett underlag här.' },
-  { id: 'komplettera', namn: 'Komplettera med kundhistorik', typ: 'ai', rad: 5, kol: 5, beskrivning: 'Varje transaktion kompletteras med hur kunden bokfört liknande saker tidigare, hur andra kunder bokfört liknande, kundens verksamhetsbeskrivning och det mejlen säger om just den. Koden letar fram liknande verifikationer, AI:n väljer ut de som verkligen liknar och läser mejlen. Allt följer med till konteringen.', finns: 'Kundens verifikationer (SIE och bokförda), andra kunders verifikationer, Kundkontext och mejlarkivet. Körs när man följer ett underlag här.' },
-  { id: 'val-dublett', namn: 'Dublettcheck', typ: 'val', rad: 5, kol: 6, beskrivning: 'Finns samma affär redan i ett tidigare underlag hos kunden? Samma kvitto inskickat två gånger, eller samma köp på olika papper (order och kvitto, faktura och betalkvitto). Koden letar fram transaktioner med riktning, belopp och datum i närheten, och AI:n jämför beskrivning, motpart, datum, belopp och nummer. Säkra dubbletter går till Radera, tveksamma flaggas och stoppas i konteringen.', finns: 'Underlagens transaktioner mot kundens tidigare underlag. Bankrader har en egen koll mot kvitton.' },
+  { id: 'plocka-trans', klar: true, namn: 'Plocka ut transaktioner', typ: 'ai', rad: 5, kol: 4, beskrivning: 'AI:n plockar ut varje transaktion: datum, belopp, motpart, moms, VAT-nummer och beskrivning — och allt annat som kan vara relevant, som fakturanummer, momsrader per sats, betalsätt och kvittots artiklar. Dessutom en ordagrann avskrift av allt som står.', finns: 'Körs av sig själv när ett underlag kommer med mejl. Går att köra (om) när man följer ett underlag här.' },
+  { id: 'komplettera', klar: true, namn: 'Komplettera med kundhistorik', typ: 'ai', rad: 5, kol: 5, beskrivning: 'Varje transaktion kompletteras med hur kunden bokfört liknande saker tidigare, hur andra kunder bokfört liknande, kundens verksamhetsbeskrivning och det mejlen säger om just den. Koden letar fram liknande verifikationer, AI:n väljer ut de som verkligen liknar och läser mejlen. Allt följer med till konteringen.', finns: 'Kundens verifikationer (SIE och bokförda), andra kunders verifikationer, Kundkontext och mejlarkivet. Körs när man följer ett underlag här.' },
+  { id: 'val-dublett', klar: true, namn: 'Dublettcheck', typ: 'val', rad: 5, kol: 6, beskrivning: 'Finns samma affär redan i ett tidigare underlag hos kunden? Samma kvitto inskickat två gånger, eller samma köp på olika papper (order och kvitto, faktura och betalkvitto). Koden letar fram transaktioner med riktning, belopp och datum i närheten, och AI:n jämför beskrivning, motpart, datum, belopp och nummer. Säkra dubbletter går till Radera, tveksamma flaggas och stoppas i konteringen.', finns: 'Underlagens transaktioner mot kundens tidigare underlag. Bankrader har en egen koll mot kvitton.' },
   { id: 'radera', namn: 'Radera', typ: 'slut', rad: 4, kol: 6, beskrivning: 'Dubbletter bokförs inte. De markeras i stället för att raderas, så att det går att ångra.', finns: 'Säkra dubbletter från dublettkollen, och bankrader som troligen redan bokförts' },
-  { id: 'val-tillrackligt', namn: 'Tillräckligt?', typ: 'val', rad: 5, kol: 7, beskrivning: 'AI:n avgör om det vi samlat — underlaget, kompletteringen med historik och mejl, och kundkontexten — räcker för att bokföra varje transaktion: datum, belopp, moms och vad den gäller. Pekar transaktionen på något som kräver mer ska det också finnas, t.ex. köparens VAT-nummer vid försäljning inom EU, omvänd byggmoms, deltagare vid representation eller personnummer vid ROT/RUT. Rimliga antaganden görs hellre än onödiga frågor.', finns: 'Kontrollen per transaktion. Körs när man följer ett underlag här. Mejlflödet har en egen kontroll per fil.' },
-  { id: 'skriv-mejl', namn: 'Skriv mail', typ: 'ai', rad: 4, kol: 7, beskrivning: 'Saknas något skriver AI:n till kunden och frågar efter just det. Frågorna samlas per kund: kl 18 varje dag skrivs ett mejl per kund om alla transaktioner vi har frågor om och inte frågat om än. Mejlet blir ett utkast i inkorgen — svar i tråden om allt kom i samma mejl, annars ett nytt mejl.', finns: 'Dygnsmejlet kl 18 (Apps Script: fragemejl.gs), eller direkt härifrån när man följer ett underlag. Underlagskontrollen i mejlflödet frågar tills underlaget är komplett.' },
+  { id: 'val-tillrackligt', klar: true, namn: 'Tillräckligt?', typ: 'val', rad: 5, kol: 7, beskrivning: 'AI:n avgör om det vi samlat — underlaget, kompletteringen med historik och mejl, och kundkontexten — räcker för att bokföra varje transaktion: datum, belopp, moms och vad den gäller. Pekar transaktionen på något som kräver mer ska det också finnas, t.ex. köparens VAT-nummer vid försäljning inom EU, omvänd byggmoms, deltagare vid representation eller personnummer vid ROT/RUT. Rimliga antaganden görs hellre än onödiga frågor.', finns: 'Kontrollen per transaktion. Körs när man följer ett underlag här. Mejlflödet har en egen kontroll per fil.' },
+  { id: 'skriv-mejl', klar: true, namn: 'Skriv mail', typ: 'ai', rad: 4, kol: 7, beskrivning: 'Saknas något skriver AI:n till kunden och frågar efter just det. Frågorna samlas per kund: kl 18 varje dag skrivs ett mejl per kund om alla transaktioner vi har frågor om och inte frågat om än. Mejlet blir ett utkast i inkorgen — svar i tråden om allt kom i samma mejl, annars ett nytt mejl.', finns: 'Dygnsmejlet kl 18 (Apps Script: fragemejl.gs), eller direkt härifrån när man följer ett underlag. Underlagskontrollen i mejlflödet frågar tills underlaget är komplett.' },
   { id: 'kund-svarar-1', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 7, beskrivning: 'Kunden svarar med det som saknades.' },
   { id: 'hopp-ut-1', namn: 'A', typ: 'hopp', rad: 0, kol: 8, hopp: 'hopp-in', beskrivning: 'Svaret tas emot som nytt underlag.' },
 
   // Bankkopplingen: bankrader sparas och väntar på ett underlag att matchas mot
   { id: 'bank-in', namn: 'Banktransaktion', typ: 'start', rad: 2, kol: 2, textOvan: true, beskrivning: 'En transaktion kommer in från kundens bank via bankkopplingen.', finns: 'Bankkoppling (Enable Banking)' },
-  { id: 'bank-spara', namn: 'Spara banktransaktion', typ: 'system', rad: 2, kol: 3, beskrivning: 'Bankraden sparas så att den kan matchas mot ett underlag som kommer in senare.', finns: 'Bankrader sparas som transaktioner' },
+  { id: 'bank-spara', klar: true, namn: 'Spara banktransaktion', typ: 'system', rad: 2, kol: 3, beskrivning: 'Bankraden sparas så att den kan matchas mot ett underlag som kommer in senare.', finns: 'Bankrader sparas som transaktioner' },
   { id: 'val-bank-match', namn: 'Matchar underlag?', typ: 'val', rad: 2, kol: 4, beskrivning: 'Finns ett underlag hos kunden som är samma köp — samma belopp, datum och motpart?' },
   { id: 'bank-matchad', namn: 'Kopplad till underlaget', typ: 'slut', rad: 1, kol: 5, textOvan: true, beskrivning: 'Bankraden och underlaget är samma köp och bokförs en gång, via underlaget.', finns: 'Bankrader markeras som troliga dubbletter av ett underlag' },
   { id: 'bank-vanta', namn: 'Vänta till momsperiodens slut', typ: 'vanta', rad: 2, kol: 5, beskrivning: 'Omatchade bankrader samlas. Kunder med månadsmoms: varje månad. Alla andra: varje kvartal.' },
@@ -98,11 +111,11 @@ const STEG: Steg[] = [
   { id: 'bank-till-bokslut', namn: 'Spara till årsbokslutet', typ: 'system', rad: 2, kol: 11, beskrivning: 'Bankrader utan underlag vid momsdeadline sparas och tas upp igen inför årsbokslutet.' },
   { id: 'hopp-ut-b', namn: 'B', typ: 'hopp', rad: 2, kol: 12, hopp: 'hopp-in-b', etikett: 'till Inför årsbokslut', beskrivning: 'Fortsätter vid Inför årsbokslut.' },
   { id: 'hopp-in-b', namn: 'B', typ: 'hopp', rad: 6, kol: 13, beskrivning: 'Bankrader utan underlag kommer in i bokslutet här.' },
-  { id: 'konteras', namn: 'Konteras', typ: 'ai', rad: 5, kol: 8, beskrivning: 'Två AI-modeller (GPT-5.5 och Claude Opus) konterar var för sig enligt K1, i två pass: först väljs konto, sedan prövas det mot kontots regler. Grönt när båda är säkra och överens om konto och moms. Kontot väljs bara ur byråns egen K1-dokumentation — kundhistoriken är en ledtråd om vad affären är, inte om kontot. Dubbletter och transaktioner som saknar uppgifter konteras inte.', finns: 'Fliken Kontering i personvyn. Körs när man följer ett underlag här, utan att bokföra — det är nästa steg.' },
+  { id: 'konteras', klar: true, namn: 'Konteras', typ: 'ai', rad: 5, kol: 8, beskrivning: 'Två AI-modeller (GPT-5.5 och Claude Opus) konterar var för sig enligt K1, i två pass: först väljs konto, sedan prövas det mot kontots regler. Grönt när båda är säkra och överens om konto och moms. Kontot väljs bara ur byråns egen K1-dokumentation — kundhistoriken är en ledtråd om vad affären är, inte om kontot. Dubbletter och transaktioner som saknar uppgifter konteras inte.', finns: 'Fliken Kontering i personvyn. Körs när man följer ett underlag här, utan att bokföra — det är nästa steg.' },
   { id: 'val-resultat', namn: 'Grönt?', typ: 'val', rad: 5, kol: 9 },
   { id: 'granska', namn: 'Granska', typ: 'manuell', rad: 7, kol: 9, beskrivning: 'Det AI:n inte är överens om eller osäker på granskar vi själva.', finns: 'Rätta kontering i fliken Kontering' },
-  { id: 'skapa-verif', namn: 'Skapa verifikationer / lägg in i databas', typ: 'system', rad: 5, kol: 10, beskrivning: 'Varje godkänd transaktion blir en verifikation i databasen: kostnads- eller intäktskontot, momsen och betalkontot (1930 företagskonto, 2013/2017 privat) enligt Kundkontext. Gröna bokförs med kontot båda modellerna valt, signerade AI. Granskade bokförs på kontot man väljer, signerade Erik.', finns: 'Verifikationer i serie AI, kopplade till transaktionen och underlaget. Bokförs när man följer ett underlag här eller i fliken Kontering.' },
-  { id: 'huvudbok', namn: 'Uppdatera verifikationslista / huvudbok', typ: 'system', rad: 5, kol: 11, beskrivning: 'Verifikationerna hamnar i huvudboken på det räkenskapsår deras datum hör till — ett underlag från förra året läggs in på förra året av sig självt.', finns: 'Fliken Huvudbok i personvyn: per konto med ingående balans, rader och utgående balans, per räkenskapsår. Går att ladda ner som Excel.' },
+  { id: 'skapa-verif', klar: true, namn: 'Skapa verifikationer / lägg in i databas', typ: 'system', rad: 5, kol: 10, beskrivning: 'Varje godkänd transaktion blir en verifikation i databasen: kostnads- eller intäktskontot, momsen och betalkontot (1930 företagskonto, 2013/2017 privat) enligt Kundkontext. Gröna bokförs med kontot båda modellerna valt, signerade AI. Granskade bokförs på kontot man väljer, signerade Erik.', finns: 'Verifikationer i serie AI, kopplade till transaktionen och underlaget. Bokförs när man följer ett underlag här eller i fliken Kontering.' },
+  { id: 'huvudbok', klar: true, namn: 'Uppdatera verifikationslista / huvudbok', typ: 'system', rad: 5, kol: 11, beskrivning: 'Verifikationerna hamnar i huvudboken på det räkenskapsår deras datum hör till — ett underlag från förra året läggs in på förra året av sig självt.', finns: 'Fliken Huvudbok i personvyn: per konto med ingående balans, rader och utgående balans, per räkenskapsår. Går att ladda ner som Excel.' },
 
   { id: 'bb-rr', namn: 'Uppdatera BB, RR, momsrapport', typ: 'system', rad: 5, kol: 12, beskrivning: 'Balansräkning, resultaträkning och momsrapport räknas om.' },
   { id: 'momsfil', namn: 'Skapa momsfil / periodisk sammanställning', typ: 'system', rad: 6, kol: 12, finns: 'Momsfil (eSKD)' },
@@ -309,7 +322,7 @@ function Ikon({ typ, x, y }: { typ: Typ; x: number; y: number }) {
 }
 
 type Vy = typeof HELA;
-type Texter = { beskrivning: string; finns: string };
+type Texter = { beskrivning: string; finns: string; status: Status | null };
 
 /** klar = gjort, har = här står underlaget nu, fel = gick fel, oppen = passerat men steget finns inte eller kördes inte */
 type Lage = 'klar' | 'har' | 'fel' | 'oppen';
@@ -496,22 +509,25 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
 
 export default function FlodesschemaPage() {
   const [vald, setVald] = useState<string | null>(null);
-  const [baraAi, setBaraAi] = useState(false);
   const [vy, setVy] = useState<Vy>(HELA);
   const svgRef = useRef<SVGSVGElement>(null);
   const drag = useRef<{ x: number; y: number; vy: Vy; ctm: DOMMatrix; flyttad: boolean } | null>(null);
 
   const platser = useMemo(() => Object.fromEntries(STEG.map((s) => [s.id, plats(s)])), []);
   const [texter, setTexter] = useState<Record<string, Texter>>({});
+  const [anteckningar, setAnteckningar] = useState<Anteckning[] | null>(null);
 
   useEffect(() => {
-    fetch('/api/admin/flodesschema').then((r) => r.json()).then((d) => { if (d.texter) setTexter(d.texter); }).catch(() => {});
+    fetch('/api/admin/flodesschema').then((r) => r.json()).then((d) => {
+      if (d.texter) setTexter(d.texter);
+      setAnteckningar(d.anteckningar ?? []);
+    }).catch(() => setAnteckningar([]));
   }, []);
 
   // Sparade texter går före dem i koden. En tom sparad text betyder att den medvetet tömts.
   const steg = useMemo(() => Object.fromEntries(STEG.map((s) => {
     const t = texter[s.id];
-    return [s.id, t ? { ...s, beskrivning: t.beskrivning || undefined, finns: t.finns || undefined } : s];
+    return [s.id, t ? { ...s, beskrivning: t.beskrivning || undefined, finns: t.finns || undefined, status: t.status ?? undefined } : s];
   })), [texter]);
 
   const spara = async (id: string, nya: Texter) => {
@@ -521,7 +537,7 @@ export default function FlodesschemaPage() {
       body: JSON.stringify({ id, ...nya }),
     }).then((r) => r.json()).catch(() => ({ error: 'Kunde inte spara' }));
     if (svar.error) throw new Error(svar.error);
-    setTexter((t) => ({ ...t, [id]: { beskrivning: nya.beskrivning.trim(), finns: nya.finns.trim() } }));
+    setTexter((t) => ({ ...t, [id]: { beskrivning: nya.beskrivning.trim(), finns: nya.finns.trim(), status: nya.status } }));
   };
   const valt = vald ? steg[vald] : null;
 
@@ -609,12 +625,12 @@ export default function FlodesschemaPage() {
     return ids;
   }, [vald]);
 
-  const tonad = (id: string) => (spar ? !spar.steg[id] && vald !== id : nara ? !nara.has(id) : baraAi && steg[id].typ !== 'ai');
+  const tonad = (id: string) => (spar ? !spar.steg[id] && vald !== id : nara ? !nara.has(id) : false);
   /** Hur en pil ska se ut: följd av underlaget, kopplad till valt steg, eller nedtonad. */
   const pilLage = (p: Pil) => {
     const aktiv = vald !== null && (p.fran === vald || p.till === vald);
     if (spar) return { gangen: spar.pilar.has(pilNyckel(p.fran, p.till)), aktiv: false, tona: !spar.pilar.has(pilNyckel(p.fran, p.till)) };
-    return { gangen: false, aktiv, tona: vald !== null ? !aktiv : baraAi };
+    return { gangen: false, aktiv, tona: vald !== null && !aktiv };
   };
   const antal = (t: Typ) => STEG.filter((s) => s.typ === t).length;
   const procent = Math.round((BREDD / vy.b) * 100);
@@ -667,28 +683,8 @@ export default function FlodesschemaPage() {
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-3">
         <h1 className="text-2xl font-bold text-slate-900">Flödesschema</h1>
         <p className="text-sm text-slate-500 mr-auto">
-          {antal('ai')} AI-steg · {antal('system')} automatiska · {antal('manuell')} manuella
+          {antal('ai')} AI-steg · {antal('system')} automatiska · {antal('manuell')} manuella · {Object.values(steg).filter((s) => !['val', 'start', 'slut', 'hopp'].includes(s.typ) && stegStatus(s) === 'klar').length} klara
         </p>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-          {(['ai', 'system', 'mejl-ut', 'regel', 'vanta', 'manuell', 'kund'] as Typ[]).map((t) => (
-            <span key={t} className="flex items-center gap-1.5">
-              <svg width="16" height="14"><Ikon typ={t} x={1} y={1} /></svg>
-              {TYPER[t].namn}
-            </span>
-          ))}
-          <span className="flex items-center gap-1.5">
-            <svg width="22" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 3" /></svg>
-            Mejl
-          </span>
-          <span className="flex items-center gap-1.5">
-            <svg width="16" height="16"><circle cx="8" cy="8" r="6.5" fill="#fff" stroke="#E95C63" strokeWidth="1.5" /><text x="8" y="11" textAnchor="middle" fontSize="8" fontWeight="700" fill="#E95C63">A</text></svg>
-            Hopp tillbaka
-          </span>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-          <input type="checkbox" checked={baraAi} onChange={(e) => setBaraAi(e.target.checked)} className="w-4 h-4 accent-violet-600" />
-          Markera AI-stegen
-        </label>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
@@ -922,9 +918,7 @@ export default function FlodesschemaPage() {
                   >
                     <div className="flex items-center gap-2 mb-0.5">
                       <TypMarke typ={s.typ} />
-                      {s.finns
-                        ? <span className="ml-auto text-[11px] text-emerald-700">Finns delvis</span>
-                        : <span className="ml-auto text-[11px] text-slate-400">Inte byggt</span>}
+                      <span className={`ml-auto text-[11px] ${STATUS[stegStatus(s)].klass}`}>{STATUS[stegStatus(s)].namn}</span>
                     </div>
                     <div className="text-slate-800">{s.namn}</div>
                   </li>
@@ -934,6 +928,8 @@ export default function FlodesschemaPage() {
           );
         })}
       </div>
+
+      <Anteckningar lista={anteckningar} onAndrad={setAnteckningar} />
     </div>
   );
 }
@@ -1452,7 +1448,7 @@ function Detaljer({ valt, steg, spar, onVal, onSpara }: {
         <TypMarke typ={valt.typ} />
         {!utkast && (
           <button
-            onClick={() => setUtkast({ beskrivning: valt.beskrivning ?? '', finns: valt.finns ?? '' })}
+            onClick={() => setUtkast({ beskrivning: valt.beskrivning ?? '', finns: valt.finns ?? '', status: valt.status ?? null })}
             className="ml-auto text-xs text-blue-700 hover:underline"
           >
             Redigera
@@ -1493,6 +1489,15 @@ function Detaljer({ valt, steg, spar, onVal, onSpara }: {
                 onChange={(e) => setUtkast({ ...utkast, finns: e.target.value })}
                 className={falt}
               />
+              <label className={rubrik}>Status</label>
+              <select
+                value={utkast.status ?? ''}
+                onChange={(e) => setUtkast({ ...utkast, status: (e.target.value || null) as Status | null })}
+                className={falt}
+              >
+                <option value="">Som i koden ({STATUS[stegStatus({ ...valt, status: undefined })].namn})</option>
+                {(Object.keys(STATUS) as Status[]).map((k) => <option key={k} value={k}>{STATUS[k].namn}</option>)}
+              </select>
             </>
           )}
           {fel && <p className="text-xs text-red-600 mb-2">{fel}</p>}
@@ -1514,6 +1519,8 @@ function Detaljer({ valt, steg, spar, onVal, onSpara }: {
           {valt.beskrivning && <p className="text-sm text-slate-600 mb-3 whitespace-pre-line">{valt.beskrivning}</p>}
           {harFinns && (
             <>
+              <div className={rubrik}>Status</div>
+              <p className={`text-sm font-medium mb-3 ${STATUS[stegStatus(valt)].klass}`}>{STATUS[stegStatus(valt)].namn}</p>
               <div className={rubrik}>Finns i systemet</div>
               <p className="text-sm text-slate-700 mb-3 whitespace-pre-line">{valt.finns ?? 'Inget ännu'}</p>
             </>
@@ -1565,5 +1572,132 @@ function Grannar({ id, steg, onVal }: { id: string; steg: Record<string, Steg>; 
       {lista('Kommer från', [...PILAR.filter((p) => p.till === id).map((p) => ({ id: p.fran, text: p.text })), ...hoppHit])}
       {lista('Går vidare till', [...PILAR.filter((p) => p.fran === id).map((p) => ({ id: p.till, text: p.text })), ...hoppDit])}
     </>
+  );
+}
+
+interface Anteckning { id: string; rubrik: string; text: string; at: string }
+
+/** Anteckningar under schemat: hur saker är uppsatta, vad som är kvar att göra. */
+function Anteckningar({ lista, onAndrad }: { lista: Anteckning[] | null; onAndrad: (l: Anteckning[]) => void }) {
+  // Id på den som redigeras, 'ny' för en ny anteckning
+  const [redigerar, setRedigerar] = useState<string | null>(null);
+  const [utkast, setUtkast] = useState({ rubrik: '', text: '' });
+  const [sparar, setSparar] = useState(false);
+  const [fel, setFel] = useState('');
+  const [raderar, setRaderar] = useState<string | null>(null);
+
+  const anrop = async (method: string, body: Record<string, unknown>) => {
+    const d = await fetch('/api/admin/flodesschema', {
+      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }).then((r) => r.json()).catch(() => ({ error: 'Kunde inte nå servern' }));
+    if (d.error) throw new Error(d.error);
+    return d;
+  };
+  const borja = (a?: Anteckning) => {
+    setRedigerar(a?.id ?? 'ny');
+    setUtkast({ rubrik: a?.rubrik ?? '', text: a?.text ?? '' });
+    setFel('');
+  };
+  const spara = async () => {
+    if (!lista || (!utkast.rubrik.trim() && !utkast.text.trim())) return;
+    setSparar(true);
+    setFel('');
+    try {
+      if (redigerar === 'ny') {
+        const d = await anrop('POST', utkast);
+        onAndrad([...lista, d.anteckning]);
+      } else {
+        const d = await anrop('PATCH', { anteckning: redigerar, ...utkast });
+        onAndrad(lista.map((a) => (a.id === redigerar ? { ...a, rubrik: utkast.rubrik.trim(), text: utkast.text.trim(), at: d.at } : a)));
+      }
+      setRedigerar(null);
+    } catch (e) {
+      setFel(e instanceof Error ? e.message : 'Kunde inte spara');
+    } finally {
+      setSparar(false);
+    }
+  };
+  const radera = async (id: string) => {
+    if (!lista) return;
+    try {
+      await anrop('DELETE', { anteckning: id });
+      onAndrad(lista.filter((a) => a.id !== id));
+    } catch (e) {
+      setFel(e instanceof Error ? e.message : 'Kunde inte ta bort');
+    } finally {
+      setRaderar(null);
+    }
+  };
+
+  const falt = 'w-full px-2.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const formular = (
+    <div className="p-4">
+      <input
+        autoFocus
+        value={utkast.rubrik}
+        onChange={(e) => setUtkast({ ...utkast, rubrik: e.target.value })}
+        placeholder="Rubrik"
+        className={`${falt} mb-2 font-semibold`}
+      />
+      <textarea
+        rows={8}
+        value={utkast.text}
+        onChange={(e) => setUtkast({ ...utkast, text: e.target.value })}
+        placeholder="Skriv en anteckning…"
+        className={`${falt} mb-2`}
+      />
+      {fel && <p className="text-xs text-red-600 mb-2">{fel}</p>}
+      <div className="flex gap-2">
+        <button onClick={spara} disabled={sparar} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">
+          {sparar ? 'Sparar…' : 'Spara'}
+        </button>
+        <button onClick={() => { setRedigerar(null); setFel(''); }} className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Avbryt</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <section className="mt-6 bg-white border border-slate-200 rounded-xl">
+      <div className="flex items-center px-4 py-2.5 border-b border-slate-100">
+        <h2 className="text-sm font-semibold text-slate-900">Anteckningar</h2>
+        {redigerar === null && lista && (
+          <button onClick={() => borja()} className="ml-auto text-xs text-blue-700 hover:underline">+ Ny anteckning</button>
+        )}
+      </div>
+      {!lista ? (
+        <p className="px-4 py-3 text-sm text-slate-400">Hämtar…</p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {lista.length === 0 && redigerar !== 'ny' && <li className="px-4 py-3 text-sm text-slate-400">Inga anteckningar än.</li>}
+          {lista.map((a) => (
+            <li key={a.id}>
+              {redigerar === a.id ? formular : (
+                <div className="px-4 py-3">
+                  <div className="flex items-start gap-3 mb-1">
+                    <h3 className="text-sm font-semibold text-slate-900">{a.rubrik || 'Utan rubrik'}</h3>
+                    <span className="ml-auto text-[11px] text-slate-400 whitespace-nowrap">
+                      {new Date(a.at).toLocaleDateString('sv-SE')}
+                    </span>
+                    {redigerar === null && (raderar === a.id ? (
+                      <span className="flex gap-2 text-xs whitespace-nowrap">
+                        <button onClick={() => radera(a.id)} className="text-red-600 font-semibold hover:underline">Ja, ta bort</button>
+                        <button onClick={() => setRaderar(null)} className="text-slate-500 hover:underline">Avbryt</button>
+                      </span>
+                    ) : (
+                      <span className="flex gap-3 text-xs whitespace-nowrap">
+                        <button onClick={() => borja(a)} className="text-blue-700 hover:underline">Redigera</button>
+                        <button onClick={() => setRaderar(a.id)} className="text-slate-500 hover:text-red-600 hover:underline">Ta bort</button>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-sm text-slate-700 whitespace-pre-line">{a.text}</p>
+                </div>
+              )}
+            </li>
+          ))}
+          {redigerar === 'ny' && <li>{formular}</li>}
+        </ul>
+      )}
+    </section>
   );
 }
