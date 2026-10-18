@@ -258,6 +258,7 @@ function Ikon({ typ, x, y }: { typ: Typ; x: number; y: number }) {
 }
 
 type Vy = typeof HELA;
+type Texter = { beskrivning: string; finns: string };
 
 export default function FlodesschemaPage() {
   const [vald, setVald] = useState<string | null>(null);
@@ -267,7 +268,27 @@ export default function FlodesschemaPage() {
   const drag = useRef<{ x: number; y: number; vy: Vy; ctm: DOMMatrix; flyttad: boolean } | null>(null);
 
   const platser = useMemo(() => Object.fromEntries(STEG.map((s) => [s.id, plats(s)])), []);
-  const steg = useMemo(() => Object.fromEntries(STEG.map((s) => [s.id, s])), []);
+  const [texter, setTexter] = useState<Record<string, Texter>>({});
+
+  useEffect(() => {
+    fetch('/api/admin/flodesschema').then((r) => r.json()).then((d) => { if (d.texter) setTexter(d.texter); }).catch(() => {});
+  }, []);
+
+  // Sparade texter går före dem i koden. En tom sparad text betyder att den medvetet tömts.
+  const steg = useMemo(() => Object.fromEntries(STEG.map((s) => {
+    const t = texter[s.id];
+    return [s.id, t ? { ...s, beskrivning: t.beskrivning || undefined, finns: t.finns || undefined } : s];
+  })), [texter]);
+
+  const spara = async (id: string, nya: Texter) => {
+    const svar = await fetch('/api/admin/flodesschema', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...nya }),
+    }).then((r) => r.json()).catch(() => ({ error: 'Kunde inte spara' }));
+    if (svar.error) throw new Error(svar.error);
+    setTexter((t) => ({ ...t, [id]: { beskrivning: nya.beskrivning.trim(), finns: nya.finns.trim() } }));
+  };
   const valt = vald ? steg[vald] : null;
 
   const nara = useMemo(() => {
@@ -505,30 +526,12 @@ export default function FlodesschemaPage() {
           Scrolla för att zooma · dra för att flytta
         </div>
 
-        {valt && (
-          <aside className="absolute top-3 right-3 w-80 max-h-[calc(100%-24px)] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg p-4">
-            <div className="flex items-start gap-2 mb-2">
-              <TypMarke typ={valt.typ} />
-              <button onClick={() => setVald(null)} className="ml-auto -mt-1 text-slate-400 hover:text-slate-700 text-lg leading-none" title="Stäng">×</button>
-            </div>
-            <h2 className="text-base font-semibold text-slate-900 mb-1.5">
-              {valt.typ === 'hopp' ? `Hopp ${valt.namn}` : valt.namn}
-            </h2>
-            {valt.beskrivning && <p className="text-sm text-slate-600 mb-3">{valt.beskrivning}</p>}
-            {valt.typ !== 'hopp' && valt.typ !== 'val' && (
-              <>
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Finns i systemet</div>
-                <p className="text-sm text-slate-700 mb-3">{valt.finns ?? 'Inget ännu'}</p>
-              </>
-            )}
-            <Grannar id={valt.id} steg={steg} onVal={setVald} />
-          </aside>
-        )}
+        {valt && <Detaljer key={valt.id} valt={valt} steg={steg} onVal={setVald} onSpara={spara} />}
       </div>
 
       <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-4 mt-6 items-start">
         {FASER.map((f) => {
-          const iFasen = STEG.filter((s) => s.kol >= f.fran && s.kol <= f.till && !['val', 'start', 'slut', 'hopp'].includes(s.typ))
+          const iFasen = Object.values(steg).filter((s) => s.kol >= f.fran && s.kol <= f.till && !['val', 'start', 'slut', 'hopp'].includes(s.typ))
             .sort((a, b) => a.kol - b.kol || a.rad - b.rad);
           return (
             <section key={f.namn} className="bg-white border border-slate-200 rounded-xl">
@@ -555,6 +558,101 @@ export default function FlodesschemaPage() {
         })}
       </div>
     </div>
+  );
+}
+
+function Detaljer({ valt, steg, onVal, onSpara }: {
+  valt: Steg; steg: Record<string, Steg>; onVal: (id: string | null) => void; onSpara: (id: string, t: Texter) => Promise<void>;
+}) {
+  const [utkast, setUtkast] = useState<Texter | null>(null);
+  const [sparar, setSparar] = useState(false);
+  const [fel, setFel] = useState('');
+  const harFinns = valt.typ !== 'hopp' && valt.typ !== 'val';
+
+  const sparaUtkast = async () => {
+    if (!utkast) return;
+    setSparar(true);
+    setFel('');
+    try {
+      await onSpara(valt.id, utkast);
+      setUtkast(null);
+    } catch (e) {
+      setFel(e instanceof Error ? e.message : 'Kunde inte spara');
+    } finally {
+      setSparar(false);
+    }
+  };
+
+  const falt = 'w-full mb-3 px-2.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const rubrik = 'block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1';
+
+  return (
+    <aside className="absolute top-3 right-3 w-80 max-h-[calc(100%-24px)] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg p-4">
+      <div className="flex items-center gap-3 mb-2">
+        <TypMarke typ={valt.typ} />
+        {!utkast && (
+          <button
+            onClick={() => setUtkast({ beskrivning: valt.beskrivning ?? '', finns: valt.finns ?? '' })}
+            className="ml-auto text-xs text-blue-700 hover:underline"
+          >
+            Redigera
+          </button>
+        )}
+        <button onClick={() => onVal(null)} className={`${utkast ? 'ml-auto' : ''} text-slate-400 hover:text-slate-700 text-lg leading-none`} title="Stäng">×</button>
+      </div>
+      <h2 className="text-base font-semibold text-slate-900 mb-1.5">
+        {valt.typ === 'hopp' ? `Hopp ${valt.namn}` : valt.namn}
+      </h2>
+
+      {utkast ? (
+        <div className="mb-4">
+          <label className={rubrik}>Beskrivning</label>
+          <textarea
+            autoFocus
+            rows={5}
+            value={utkast.beskrivning}
+            onChange={(e) => setUtkast({ ...utkast, beskrivning: e.target.value })}
+            className={falt}
+          />
+          {harFinns && (
+            <>
+              <label className={rubrik}>Finns i systemet</label>
+              <textarea
+                rows={3}
+                value={utkast.finns}
+                placeholder="Tomt = inget ännu"
+                onChange={(e) => setUtkast({ ...utkast, finns: e.target.value })}
+                className={falt}
+              />
+            </>
+          )}
+          {fel && <p className="text-xs text-red-600 mb-2">{fel}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={sparaUtkast}
+              disabled={sparar}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg"
+            >
+              {sparar ? 'Sparar…' : 'Spara'}
+            </button>
+            <button onClick={() => { setUtkast(null); setFel(''); }} className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">
+              Avbryt
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {valt.beskrivning && <p className="text-sm text-slate-600 mb-3 whitespace-pre-line">{valt.beskrivning}</p>}
+          {harFinns && (
+            <>
+              <div className={rubrik}>Finns i systemet</div>
+              <p className="text-sm text-slate-700 mb-3 whitespace-pre-line">{valt.finns ?? 'Inget ännu'}</p>
+            </>
+          )}
+        </>
+      )}
+      <Grannar id={valt.id} steg={steg} onVal={onVal} />
+    </aside>
   );
 }
 
