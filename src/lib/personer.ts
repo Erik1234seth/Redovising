@@ -152,7 +152,7 @@ export async function build(): Promise<Map<string, Built>> {
   ] = await Promise.all([
     supabase.from('contact_requests').select('id, name, email, phone, ref, stage, notes, package_type, contact_method, qualification_answers, redovisningsmetod, created_at'),
     supabase.from('meetings').select('id, name, email, phone, date, time, message, created_at'),
-    supabase.from('profiles').select('id, email, full_name, phone, company_name, verksamhet, redovisningsmetod, moms_period, start_ar, har_foretagskonto, periodisk_sammanfattning, created_at, onboarding_done, subscription_status'),
+    supabase.from('profiles').select('id, email, full_name, phone, company_name, verksamhet, redovisningsmetod, moms_period, start_ar, har_foretagskonto, periodisk_sammanfattning, forlangt_rakenskapsar, created_at, onboarding_done, subscription_status'),
     supabase.from('pending_registrations').select('id, email, source, created_at, expires_at, used_at'),
     supabase.from('email_threads').select('id, user_id, state, created_at, updated_at'),
     supabase.from('sms_messages').select('id, phone, direction, body, status, error, kind, created_at, issue_dismissed_at').order('created_at'),
@@ -235,7 +235,7 @@ export async function build(): Promise<Map<string, Built>> {
       found = {
         key: root, name: null, email: null, phone: null, company: null,
         verksamhet: null, source: null, stage: null, contactId: null, profileId: null,
-        redovisningsmetod: null, momsPeriod: null, startAr: null, betalsatt: null, periodiskSammanfattning: false, manualEmails: [], isCustomer: false,
+        redovisningsmetod: null, momsPeriod: null, startAr: null, betalsatt: null, periodiskSammanfattning: false, forlangtRakenskapsar: false, manualEmails: [], isCustomer: false,
         optedOut: false, emailCount: 0, smsCount: 0, issues: [],
         firstSeen: '', lastActivity: '', events: [], aliases: [], seen: [], files: [], profileIds: [],
       };
@@ -328,6 +328,7 @@ export async function build(): Promise<Map<string, Built>> {
       if (r.start_ar) p.startAr = Number(r.start_ar);
       if (r.har_foretagskonto) p.betalsatt = tolkaBetalsatt(r.har_foretagskonto);
       if (r.periodisk_sammanfattning) p.periodiskSammanfattning = true;
+      if (r.forlangt_rakenskapsar) p.forlangtRakenskapsar = true;
     }
   }
 

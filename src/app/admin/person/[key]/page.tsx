@@ -273,6 +273,23 @@ export default function PersonPage() {
     setVerksamhetUtkast(null);
   };
 
+  const [savingForlangt, setSavingForlangt] = useState(false);
+  const setForlangt = async (value: boolean) => {
+    if (!person?.profileId || savingForlangt) return;
+    setPerson({ ...person, forlangtRakenskapsar: value });
+    setSavingForlangt(true);
+    const res = await fetch('/api/admin/people', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: person.profileId, forlangtRakenskapsar: value }),
+    }).catch(() => null);
+    setSavingForlangt(false);
+    if (!res?.ok) {
+      setPerson((p) => (p ? { ...p, forlangtRakenskapsar: !value } : p));
+      setError('Förlängt räkenskapsår kunde inte sparas');
+    }
+  };
+
   const [savingPeriodisk, setSavingPeriodisk] = useState(false);
   const setPeriodisk = async (value: boolean) => {
     if (!person?.profileId || savingPeriodisk) return;
@@ -935,6 +952,16 @@ export default function PersonPage() {
                       inputMode="numeric"
                       className="w-28 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
                     />
+                    <label className="ml-4 inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer align-middle">
+                      <input
+                        type="checkbox"
+                        checked={person.forlangtRakenskapsar}
+                        onChange={(e) => setForlangt(e.target.checked)}
+                        disabled={savingForlangt}
+                        className="w-4 h-4 accent-blue-600"
+                      />
+                      Förlängt räkenskapsår
+                    </label>
                     <p className="text-slate-400 text-xs mt-3">
                       {person.startAr && person.redovisningsmetod
                         ? 'Startår och bokföringsmetod finns — kunden ligger under Kunder i inkorgen.'

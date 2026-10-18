@@ -303,7 +303,7 @@ const MOMSPERIODER: MomsPeriod[] = ['månadsvis', 'kvartalsvis', 'helår', 'inge
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const { contactId, profileId, stage, redovisningsmetod, momsPeriod, betalsatt, periodiskSammanfattning, startAr, neUppgifter } = await request.json();
+    const { contactId, profileId, stage, redovisningsmetod, momsPeriod, betalsatt, periodiskSammanfattning, forlangtRakenskapsar, startAr, neUppgifter } = await request.json();
     const supabase = getSupabase();
 
     // NE-uppgifterna för ett inkomstår ersätter det som fanns för just det året
@@ -346,6 +346,18 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Personen har inget konto att spara startåret på' }, { status: 400 });
       }
       const { error } = await supabase.from('profiles').update({ start_ar: ar }).eq('id', profileId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (forlangtRakenskapsar !== undefined) {
+      if (typeof forlangtRakenskapsar !== 'boolean') {
+        return NextResponse.json({ error: 'forlangtRakenskapsar måste vara true eller false' }, { status: 400 });
+      }
+      if (!profileId) {
+        return NextResponse.json({ error: 'Personen har inget konto att spara det på' }, { status: 400 });
+      }
+      const { error } = await supabase.from('profiles').update({ forlangt_rakenskapsar: forlangtRakenskapsar }).eq('id', profileId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true });
     }

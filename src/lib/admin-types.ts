@@ -76,6 +76,8 @@ export interface Person {
   betalsatt: Betalsatt | null;
   /** Säljer till företag i andra EU-länder och ska lämna periodisk sammanfattning. Sätts för hand. */
   periodiskSammanfattning: boolean;
+  /** Första räkenskapsåret är förlängt, längre än tolv månader (`profiles.forlangt_rakenskapsar`). Sätts för hand. */
+  forlangtRakenskapsar: boolean;
   /**
    * Adresser som kopplats hit för hand, för att personen svarat från en annan
    * mejl än den vi kände till. Skiljda från de sammanslagna adresserna i
