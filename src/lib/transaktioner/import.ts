@@ -113,6 +113,12 @@ export async function lasUtTransaktioner(
       verifikationer_antal: null,
       verifikationer_dubbletter: null,
       verifikationer_fel: null,
+      kompletterad_at: null,
+      komplettering_fel: null,
+      dublettkollad_at: null,
+      dublettkoll_fel: null,
+      tillrackligt_at: null,
+      tillrackligt_fel: null,
       kontroll_status: null,
       kontroll_saknas: null,
       kontroll_at: null,
@@ -135,6 +141,12 @@ export async function lasUtTransaktioner(
     transaktioner_antal: null,
     transaktioner_notering: result.notering || null,
     transaktioner_fel: null,
+    kompletterad_at: null,
+    komplettering_fel: null,
+    dublettkollad_at: null,
+    dublettkoll_fel: null,
+    tillrackligt_at: null,
+    tillrackligt_fel: null,
   } : {
     ...sortering,
     transaktioner_utlasta_at: nu,
@@ -146,6 +158,12 @@ export async function lasUtTransaktioner(
     verifikationer_antal: null,
     verifikationer_dubbletter: null,
     verifikationer_fel: null,
+    kompletterad_at: null, // transaktionerna är nya och har inte kompletterats
+    komplettering_fel: null,
+    dublettkollad_at: null,
+    dublettkoll_fel: null,
+    tillrackligt_at: null,
+    tillrackligt_fel: null,
   }).eq('id', row.id);
 
   return result;
@@ -224,6 +242,8 @@ async function sparaTransaktioner(
     riktning: t.riktning,
     anteckning: t.anteckning || null,
     detaljer: t.detaljer || null,
+    vat_nummer: t.vatNummer || null,
+    uppgifter: t.uppgifter,
     kalla: 'ai',
     modell,
   }));

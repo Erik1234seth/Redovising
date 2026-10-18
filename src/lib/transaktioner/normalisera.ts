@@ -29,6 +29,49 @@ export const MEJLREGEL = `- Ibland följer kundens mejlväxling med. Saknas någ
 export const DETALJREGEL = `- "detaljer": skriv av ALLT som står på underlaget om transaktionen, ord för ord, så att den som konterar aldrig behöver se originalet. Det är en fullständig avskrift, inte ett urval — välj inte ut det du tror är viktigt. All text som finns ska med: tryckt text, rubriker, logotyper, stämplar, handskrivna anteckningar och klotter, marginaltext, meddelanden till kunden, reklam, villkor, finstilt, text i QR- och streckkodsfält, kort sagt även det som verkar oviktigt eller slumpmässigt. Beskriv också kort det som inte är text men kan betyda något, t.ex. att något är överstruket, att en stämpel säger "betald" eller att underlaget är ett foto av en skärm. Behåll ordningen och strukturen från underlaget så gott det går, rad för rad. I en lista med många transaktioner (kontoutdrag, kalkylblad) tar du med radens alla kolumner och det som står i anslutning till raden. Står inget mer än det som redan finns i de andra fälten lämnar du det tomt.`;
 
 /**
+ * Beskrivningen är det som syns i listorna och det konteringen går på först.
+ * Den ska säga vad affären gällde, inte vad pappret är — "Kvitto
+ * Ordernummer: 1156-058-752" säger ingenting om vad som köpts.
+ * Gäller båda vägarna: synen och sandlådan.
+ */
+export const BESKRIVNINGSREGEL = `- "beskrivning": kort, på svenska, VAD som köpts, sålts eller betalats — inte vad dokumentet är. Skriv t.ex. "Flygresa Köpenhamn–Düsseldorf t/r 21–22 nov", "Kontorsmaterial: pärmar och skrivarpapper", "Bensin" eller "Försäljning hårklippning". Ord som "kvitto", "faktura" eller "order" och nummer hör inte hit — nummer läggs i "uppgifter". Har underlaget flera artiklar sammanfattar du dem. Står bara en rad på ett kontoutdrag och det inte går att se vad betalningen gällde, skriv av radens text som den står.`;
+
+/**
+ * De uppgifter som konteringen och momsen behöver, plockade ur underlaget i
+ * fasta fält — så att de går att använda med kod, inte bara läsas i
+ * `detaljer`. Det som inte passar i något fält hamnar i `ovrigt`.
+ * Gäller båda vägarna: synen och sandlådan.
+ */
+export const UPPGIFTSREGEL = `- "vat_nummer": motpartens momsregistreringsnummer (VAT-nummer) som det står, t.ex. "SE556677889901" eller "IE9692928F". Tom sträng om det inte står. Hitta aldrig på eller räkna fram ett VAT-nummer ur ett organisationsnummer.
+- "uppgifter": allt som går att plocka ut om transaktionen, i fasta fält. Ta med varje fält som står på underlaget och utelämna det som inte står — gissa aldrig. Spara hellre för mycket än för lite.
+  {
+    "org_nummer": "motpartens organisationsnummer",
+    "motpart_adress": "motpartens adress",
+    "motpart_land": "landet motparten finns i, som landskod (SE, DE, IE, US …)",
+    "kopare": "köparen som står på underlaget — namn, orgnummer eller adress",
+    "kopare_vat_nummer": "köparens VAT-nummer om det står (vanligt vid köp från EU)",
+    "dokumenttyp": "kvitto, faktura, kreditfaktura, kontoutdrag, kassarapport …",
+    "fakturanummer": "", "kvittonummer": "", "ordernummer": "", "ocr": "", "referens": "",
+    "fakturadatum": "YYYY-MM-DD", "forfallodatum": "YYYY-MM-DD", "leveransdatum": "YYYY-MM-DD", "betaldatum": "YYYY-MM-DD",
+    "belopp_exkl_moms": tal,
+    "momsrader": [ { "sats": tal i procent (25, 12, 6, 0), "underlag": tal exkl. moms, "moms": tal } ],
+    "ores_avrundning": tal,
+    "dricks": tal,
+    "rabatt": tal,
+    "betalsatt": "kort, swish, faktura, kontant, autogiro, banköverföring …",
+    "kort": "kortets typ och de siffror som syns, t.ex. \"Visa ****1234\"",
+    "bankgiro": "", "plusgiro": "", "iban": "", "bic": "",
+    "omvand_skattskyldighet": true när underlaget säger omvänd skattskyldighet / reverse charge,
+    "momsfri": true när underlaget säger att det är momsfritt eller undantaget från moms,
+    "valutakurs": tal när underlaget anger en kurs mot SEK,
+    "belopp_sek": tal när underlaget anger beloppet i SEK för en utländsk valuta,
+    "period": "perioden det gäller, t.ex. en prenumeration eller hyra — \"2026-09-01 – 2026-09-30\"",
+    "artiklar": [ { "text": "", "antal": tal, "a_pris": tal, "belopp": tal, "momssats": tal } ],
+    "ovrigt": { "fritt namn": "allt annat som kan vara relevant och inte passar ovan" }
+  }
+  "artiklar" är kvittots eller fakturans rader. De är inte egna transaktioner, men skrivs av här — alla, med belopp.`;
+
+/**
  * Kassasystemens redovisningsunderlag (t.ex. Bokadirekt) är ordnade per konto
  * och saknar verifikationsnummer — det är kvittot som binder ihop raderna.
  * Läses bara sammanställningen blir hela perioden en verifikation utan
@@ -48,6 +91,48 @@ export interface ExtraheradTransaktion {
   riktning: 'in' | 'ut';
   anteckning: string;
   detaljer: string;
+  /** Motpartens VAT-nummer, utan mellanslag. Tom när det inte står. */
+  vatNummer: string;
+  /** De fasta fälten i UPPGIFTSREGEL, bara de som stod. Null när inget stod. */
+  uppgifter: Uppgifter | null;
+}
+
+export type Uppgifter = Record<string, unknown>;
+
+const DATUMFALT = new Set(['fakturadatum', 'forfallodatum', 'leveransdatum', 'betaldatum']);
+const TALFALT = new Set(['belopp_exkl_moms', 'ores_avrundning', 'dricks', 'rabatt', 'valutakurs', 'belopp_sek']);
+
+/**
+ * Tar bort det som är tomt, så att bara det som faktiskt stod sparas. Datum
+ * och belopp tolkas som i de andra fälten — går de inte att tolka behålls
+ * texten, hellre det än att uppgiften försvinner.
+ */
+function rensaUppgifter(value: unknown): Uppgifter | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const ut: Uppgifter = {};
+  for (const [nyckel, v] of Object.entries(value as Record<string, unknown>)) {
+    if (v === null || v === undefined || v === false) continue;
+    if (typeof v === 'string') {
+      const text = v.trim();
+      if (!text) continue;
+      if (DATUMFALT.has(nyckel)) { ut[nyckel] = tolkaDatum(text) || text; continue; }
+      if (TALFALT.has(nyckel)) { const n = tolkaTal(text); ut[nyckel] = n ?? text; continue; }
+      ut[nyckel] = text;
+    } else if (Array.isArray(v)) {
+      const lista = v
+        .map((x) => (x && typeof x === 'object' ? rensaUppgifter(x) : typeof x === 'string' && x.trim() ? x.trim() : null))
+        .filter((x) => x !== null);
+      if (lista.length) ut[nyckel] = lista;
+    } else if (typeof v === 'object') {
+      const inre = rensaUppgifter(v);
+      if (inre) ut[nyckel] = inre;
+    } else if (typeof v === 'number') {
+      if (Number.isFinite(v)) ut[nyckel] = v;
+    } else {
+      ut[nyckel] = v;
+    }
+  }
+  return Object.keys(ut).length ? ut : null;
 }
 
 const rensa = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -110,6 +195,8 @@ export function normaliseraRader(rader: unknown[]): { rader: ExtraheradTransakti
       riktning: belopp < 0 ? 'ut' : t.riktning === 'in' ? 'in' : 'ut',
       anteckning: rensa(t.anteckning),
       detaljer: rensa(t.detaljer),
+      vatNummer: rensa(t.vat_nummer).replace(/[\s.-]/g, '').toUpperCase(),
+      uppgifter: rensaUppgifter(t.uppgifter),
     } satisfies ExtraheradTransaktion;
   });
   // Rader utan både belopp och text säger ingenting — de är oftast rubriker

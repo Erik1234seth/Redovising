@@ -1,9 +1,11 @@
+import { after } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isSieFile } from '@/lib/sie/parse';
 import { importSieUnderlag } from '@/lib/sie/import';
 import { profilForAdress } from './profil';
 import { arVarAdress } from '@/lib/underlag/var-fil';
 import { sorteringVidUppladdning } from '@/lib/underlag/sortering';
+import { definieraTyst } from '@/lib/underlag/definiera';
 
 /**
  * Sparar bilagorna i inkommande mejl som underlag — alla, oavsett filtyp.
@@ -163,6 +165,9 @@ async function insertRow(
     await importSieUnderlag(supabase, saved.id).catch((err) =>
       console.error(`[inmail/underlag] SIE-import av ${info.fileName}:`, err instanceof Error ? err.message : err));
   }
+
+  // AI:n definierar underlaget efter att svaret gått iväg — mejlflödet ska inte vänta på den
+  after(() => definieraTyst(supabase, saved.id));
 
   return { status: 'saved' };
 }

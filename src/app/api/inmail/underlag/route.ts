@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { prepareMailUpload, confirmMailUpload } from '@/lib/inmail/save-attachments';
 
+// Definieringen av underlaget körs efter svaret och behöver tid för AI-anropet
+export const maxDuration = 300;
+
 /**
  * Tar emot bilagor från Apps Script (save-attachments.gs), en fil i taget.
  *

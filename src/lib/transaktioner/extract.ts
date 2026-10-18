@@ -1,7 +1,7 @@
 import { buildImageParts } from '@/lib/underlag/fil-delar';
 import { arBildEllerPdf, arTabellfil, kanLasasAvAi } from '@/lib/underlag/filtyp';
 import {
-  DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, OVRIGTREGEL, tolkaSvar,
+  BESKRIVNINGSREGEL, DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, OVRIGTREGEL, UPPGIFTSREGEL, tolkaSvar,
   type ExtraheradTransaktion, type ExtraheradVerifikation, type TolkatSvar,
 } from './normalisera';
 import { lasMedSandlada } from './sandlada';
@@ -64,14 +64,16 @@ Fyll bara listan som hör till typen. Den andra är tom. Vid "ovrigt" är båda 
 Varje transaktion har exakt dessa fält:
 {
   "datum": "YYYY-MM-DD" (tom sträng om datumet inte framgår),
-  "beskrivning": "det som står på raden — butik, text, fakturanummer",
+  "beskrivning": "vad som köpts, sålts eller betalats, se nedan",
   "motpart": "säljare, leverantör eller kund om det framgår, annars tom sträng",
   "belopp": number (positivt tal, totalbelopp inklusive moms),
   "moms": number (momsbeloppet, 0 om det inte framgår),
   "valuta": "SEK" eller valutan som står på underlaget,
   "riktning": "in" (pengar in till företaget) eller "ut" (pengar ut från företaget),
   "anteckning": "kort notering när något är oläsligt eller osäkert, annars tom sträng",
-  "detaljer": "allt annat som står om transaktionen på underlaget, se nedan"
+  "detaljer": "allt annat som står om transaktionen på underlaget, se nedan",
+  "vat_nummer": "motpartens VAT-nummer, se nedan",
+  "uppgifter": { se nedan }
 }
 
 Varje verifikation har exakt dessa fält:
@@ -92,7 +94,9 @@ Regler för transaktioner:
 - Ett negativt belopp i underlaget betyder "ut", ett positivt betyder "in". Fältet "belopp" är alltid ett positivt tal.
 - En kolumn med löpande saldo eller balans är INTE transaktionens belopp — använd beloppskolumnen.
 - Skippa rader som är rubriker, adresser, summor, saldobesked eller tomma.
+${BESKRIVNINGSREGEL}
 ${DETALJREGEL}
+${UPPGIFTSREGEL}
 - Framgår inte datumet lämnar du fältet tomt i stället för att gissa, och skriver varför i "anteckning".
 ${MEJLREGEL}
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { FlodesKund, FlodesUnderlag } from '@/lib/admin-types';
 
@@ -56,11 +56,11 @@ const BANOR = [
   { namn: 'Manuellt', fran: 7, till: 7, farg: '#fffbeb' },
 ];
 const FASER = [
-  { namn: '1 · Ta emot & sortera', fran: 0, till: 4 },
-  { namn: '2 · Löpande bokföring', fran: 5, till: 12 },
-  { namn: '3 · Moms', fran: 13, till: 13 },
-  { namn: '4 · Årsbokslut', fran: 14, till: 16 },
-  { namn: '5 · Kontroll & inlämning', fran: 17, till: 19 },
+  { namn: '1 · Ta emot & sortera', fran: 0, till: 3 },
+  { namn: '2 · Löpande bokföring', fran: 4, till: 11 },
+  { namn: '3 · Moms', fran: 12, till: 12 },
+  { namn: '4 · Årsbokslut', fran: 13, till: 15 },
+  { namn: '5 · Kontroll & inlämning', fran: 16, till: 18 },
 ];
 
 const STEG: Steg[] = [
@@ -68,60 +68,59 @@ const STEG: Steg[] = [
   { id: 'kund-skickar', namn: 'Skickar underlag', typ: 'start', rad: 0, kol: 1, beskrivning: 'Kunden mejlar eller laddar upp kvitton, fakturor, kontoutdrag eller annat underlag.', finns: 'Mejl till oss och uppladdning på kundsidan' },
   { id: 'manuell-skickar', namn: 'Skicka in/hämta underlag', typ: 'start', rad: 7, kol: 1, beskrivning: 'Vi lägger själva in underlag eller hämtar det från kunden.', finns: 'Uppladdning i adminpanelen' },
   { id: 'ta-emot', namn: 'Ta emot underlag', typ: 'mejl-in', rad: 5, kol: 1, beskrivning: 'Allt som kommer in samlas på kunden, oavsett kanal.', finns: 'Inkorgen och underlagslistan på personkortet' },
-  { id: 'definiera', namn: 'Definiera underlaget', typ: 'ai', rad: 5, kol: 2, beskrivning: 'AI:n läser underlaget och avgör vad det är och vilket år det hör till.', finns: 'AI-avläsningen sorterar underlag och övriga filer' },
-  { id: 'val-aret', namn: 'Räkenskapsåret?', typ: 'val', rad: 5, kol: 3 },
-  { id: 'val-typ', namn: 'Vilken sort?', typ: 'val', rad: 5, kol: 4 },
-  { id: 'separat-mapp', namn: 'Spara i separat mapp', typ: 'slut', rad: 6, kol: 4, beskrivning: 'Underlag som inte tillhör räkenskapsåret, eller inte är bokföringsunderlag, sparas undan utan att bokföras.', finns: 'Fliken Övriga filer' },
+  { id: 'definiera', namn: 'Definiera underlaget', typ: 'ai', rad: 5, kol: 2, beskrivning: 'AI:n läser underlaget och avgör vad det är, vilket år det hör till och om det gäller transaktioner, verifikationer eller övrigt. Året styr inte vägen — det hanteras i huvudboken.', finns: 'Körs automatiskt när underlaget kommer in. Går att köra om när man följer ett underlag här.' },
+  { id: 'val-typ', namn: 'Vilken sort?', typ: 'val', rad: 5, kol: 3 },
+  { id: 'separat-mapp', namn: 'Spara i separat mapp', typ: 'slut', rad: 6, kol: 3, beskrivning: 'Underlag som inte tillhör räkenskapsåret, eller inte är bokföringsunderlag, sparas undan utan att bokföras.', finns: 'Fliken Övriga filer' },
 
-  { id: 'plocka-verif', namn: 'Plocka ut verifikationer', typ: 'system', rad: 3, kol: 5, beskrivning: 'Redan konterad historik, t.ex. en SIE-fil, läses in direkt som verifikationer.', finns: 'Ingående balans ur kundens SIE-fil' },
-  { id: 'integration', namn: 'Integration', typ: 'start', rad: 4, kol: 5, beskrivning: 'Ordrar och utbetalningar som hämtas direkt från kassasystem och webbshop, utan något underlag att läsa av. Banken har en egen bana.', finns: 'Zettle, Shopify, WooCommerce' },
-  { id: 'plocka-trans', namn: 'Plocka ut transaktioner', typ: 'ai', rad: 5, kol: 5, beskrivning: 'AI:n plockar ut varje transaktion: datum, belopp, motpart och moms.' },
-  { id: 'komplettera', namn: 'Komplettera med kundhistorik', typ: 'ai', rad: 5, kol: 6, beskrivning: 'Transaktionerna kompletteras med hur kunden konterat liknande saker tidigare och med mejlarkivet.', finns: 'Mejlarkivet per kund' },
-  { id: 'val-dublett', namn: 'Dublettcheck', typ: 'val', rad: 5, kol: 7, beskrivning: 'Finns transaktionen redan, t.ex. både som kvitto och som bankrad, ska den bara bokföras en gång.' },
-  { id: 'radera', namn: 'Radera', typ: 'slut', rad: 4, kol: 7, beskrivning: 'Dubbletter tas bort och bokförs inte.', finns: 'Bankrader som troligen redan bokförts markeras som dubbletter' },
-  { id: 'val-tillrackligt', namn: 'Tillräckligt?', typ: 'val', rad: 5, kol: 8 },
-  { id: 'skriv-mejl', namn: 'Skriv mail', typ: 'ai', rad: 4, kol: 8, beskrivning: 'Saknas något skriver AI:n till kunden och frågar efter just det.', finns: 'Underlagskontrollen frågar tills underlaget är komplett' },
-  { id: 'kund-svarar-1', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 8, beskrivning: 'Kunden svarar med det som saknades.' },
-  { id: 'hopp-ut-1', namn: 'A', typ: 'hopp', rad: 0, kol: 9, hopp: 'hopp-in', beskrivning: 'Svaret tas emot som nytt underlag.' },
+  { id: 'plocka-verif', namn: 'Plocka ut verifikationer', typ: 'system', rad: 3, kol: 4, beskrivning: 'Redan konterad historik, t.ex. en SIE-fil, läses in direkt som verifikationer.', finns: 'Ingående balans ur kundens SIE-fil' },
+  { id: 'integration', namn: 'Integration', typ: 'start', rad: 4, kol: 4, beskrivning: 'Ordrar och utbetalningar som hämtas direkt från kassasystem och webbshop, utan något underlag att läsa av. Banken har en egen bana.', finns: 'Zettle, Shopify, WooCommerce' },
+  { id: 'plocka-trans', namn: 'Plocka ut transaktioner', typ: 'ai', rad: 5, kol: 4, beskrivning: 'AI:n plockar ut varje transaktion: datum, belopp, motpart, moms, VAT-nummer och beskrivning — och allt annat som kan vara relevant, som fakturanummer, momsrader per sats, betalsätt och kvittots artiklar. Dessutom en ordagrann avskrift av allt som står.', finns: 'Körs av sig själv när ett underlag kommer med mejl. Går att köra (om) när man följer ett underlag här.' },
+  { id: 'komplettera', namn: 'Komplettera med kundhistorik', typ: 'ai', rad: 5, kol: 5, beskrivning: 'Varje transaktion kompletteras med hur kunden bokfört liknande saker tidigare, hur andra kunder bokfört liknande, kundens verksamhetsbeskrivning och det mejlen säger om just den. Koden letar fram liknande verifikationer, AI:n väljer ut de som verkligen liknar och läser mejlen. Allt följer med till konteringen.', finns: 'Kundens verifikationer (SIE och bokförda), andra kunders verifikationer, Kundkontext och mejlarkivet. Körs när man följer ett underlag här.' },
+  { id: 'val-dublett', namn: 'Dublettcheck', typ: 'val', rad: 5, kol: 6, beskrivning: 'Finns samma affär redan i ett tidigare underlag hos kunden? Samma kvitto inskickat två gånger, eller samma köp på olika papper (order och kvitto, faktura och betalkvitto). Koden letar fram transaktioner med riktning, belopp och datum i närheten, och AI:n jämför beskrivning, motpart, datum, belopp och nummer. Säkra dubbletter går till Radera, tveksamma flaggas och stoppas i konteringen.', finns: 'Underlagens transaktioner mot kundens tidigare underlag. Bankrader har en egen koll mot kvitton.' },
+  { id: 'radera', namn: 'Radera', typ: 'slut', rad: 4, kol: 6, beskrivning: 'Dubbletter bokförs inte. De markeras i stället för att raderas, så att det går att ångra.', finns: 'Säkra dubbletter från dublettkollen, och bankrader som troligen redan bokförts' },
+  { id: 'val-tillrackligt', namn: 'Tillräckligt?', typ: 'val', rad: 5, kol: 7, beskrivning: 'AI:n avgör om det vi samlat — underlaget, kompletteringen med historik och mejl, och kundkontexten — räcker för att bokföra varje transaktion: datum, belopp, moms och vad den gäller. Pekar transaktionen på något som kräver mer ska det också finnas, t.ex. köparens VAT-nummer vid försäljning inom EU, omvänd byggmoms, deltagare vid representation eller personnummer vid ROT/RUT. Rimliga antaganden görs hellre än onödiga frågor.', finns: 'Kontrollen per transaktion. Körs när man följer ett underlag här. Mejlflödet har en egen kontroll per fil.' },
+  { id: 'skriv-mejl', namn: 'Skriv mail', typ: 'ai', rad: 4, kol: 7, beskrivning: 'Saknas något skriver AI:n till kunden och frågar efter just det.', finns: 'Underlagskontrollen frågar tills underlaget är komplett' },
+  { id: 'kund-svarar-1', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 7, beskrivning: 'Kunden svarar med det som saknades.' },
+  { id: 'hopp-ut-1', namn: 'A', typ: 'hopp', rad: 0, kol: 8, hopp: 'hopp-in', beskrivning: 'Svaret tas emot som nytt underlag.' },
 
   // Bankkopplingen: bankrader sparas och väntar på ett underlag att matchas mot
-  { id: 'bank-in', namn: 'Banktransaktion', typ: 'start', rad: 2, kol: 2, beskrivning: 'En transaktion kommer in från kundens bank via bankkopplingen.', finns: 'Bankkoppling (Enable Banking)' },
-  { id: 'bank-spara', namn: 'Spara banktransaktion', typ: 'system', rad: 2, kol: 4, beskrivning: 'Bankraden sparas så att den kan matchas mot ett underlag som kommer in senare.', finns: 'Bankrader sparas som transaktioner' },
-  { id: 'val-bank-match', namn: 'Matchar underlag?', typ: 'val', rad: 2, kol: 5, beskrivning: 'Finns ett underlag hos kunden som är samma köp — samma belopp, datum och motpart?' },
-  { id: 'bank-matchad', namn: 'Kopplad till underlaget', typ: 'slut', rad: 1, kol: 6, textOvan: true, beskrivning: 'Bankraden och underlaget är samma köp och bokförs en gång, via underlaget.', finns: 'Bankrader markeras som troliga dubbletter av ett underlag' },
-  { id: 'bank-vanta', namn: 'Vänta till momsperiodens slut', typ: 'vanta', rad: 2, kol: 6, beskrivning: 'Omatchade bankrader samlas. Kunder med månadsmoms: varje månad. Alla andra: varje kvartal.' },
-  { id: 'val-bank-match-2', namn: 'Matchad nu?', typ: 'val', rad: 2, kol: 7, beskrivning: 'Har ett underlag kommit in under perioden som matchar bankraden?' },
-  { id: 'bank-skriv-mejl', namn: 'Mail: underlag saknas', typ: 'ai', rad: 2, kol: 10, beskrivning: 'AI:n skriver ihop ett mejl med alla bankrader i perioden som saknar underlag och ber kunden skicka in dem.' },
-  { id: 'kund-svarar-bank', namn: 'Skickar underlag', typ: 'kund', rad: 0, kol: 10, beskrivning: 'Kunden skickar in underlag till bankraderna.' },
-  { id: 'hopp-ut-3', namn: 'A', typ: 'hopp', rad: 0, kol: 11, hopp: 'hopp-in', beskrivning: 'Underlaget tas emot och matchas mot bankraden.' },
-  { id: 'val-bank-svar', namn: 'Svar före momsdeadline?', typ: 'val', rad: 2, kol: 11, beskrivning: 'Har kunden skickat underlaget innan perioden ska lämnas in?' },
-  { id: 'bank-vantar-underlag', namn: 'Matchas när underlaget kommer', typ: 'slut', rad: 1, kol: 11 },
-  { id: 'bank-till-bokslut', namn: 'Spara till årsbokslutet', typ: 'system', rad: 2, kol: 12, beskrivning: 'Bankrader utan underlag vid momsdeadline sparas och tas upp igen inför årsbokslutet.' },
-  { id: 'hopp-ut-b', namn: 'B', typ: 'hopp', rad: 2, kol: 13, hopp: 'hopp-in-b', etikett: 'till Inför årsbokslut', beskrivning: 'Fortsätter vid Inför årsbokslut.' },
-  { id: 'hopp-in-b', namn: 'B', typ: 'hopp', rad: 6, kol: 14, beskrivning: 'Bankrader utan underlag kommer in i bokslutet här.' },
-  { id: 'konteras', namn: 'Konteras', typ: 'ai', rad: 5, kol: 9, beskrivning: 'Två AI-modeller konterar var för sig enligt K1. Grönt när båda är säkra och överens.', finns: 'Fliken Kontering (GPT + Claude tvåpass)' },
-  { id: 'val-resultat', namn: 'Grönt?', typ: 'val', rad: 5, kol: 10 },
-  { id: 'granska', namn: 'Granska', typ: 'manuell', rad: 7, kol: 10, beskrivning: 'Det AI:n inte är överens om eller osäker på granskar vi själva.', finns: 'Rätta kontering i fliken Kontering' },
-  { id: 'skapa-verif', namn: 'Skapa verifikationer / lägg in i databas', typ: 'system', rad: 5, kol: 11, beskrivning: 'Godkända konteringar blir verifikationer och sparas i databasen.' },
-  { id: 'huvudbok', namn: 'Uppdatera verifikationslista / huvudbok', typ: 'system', rad: 5, kol: 12, finns: 'Verifikationslistan' },
+  { id: 'bank-in', namn: 'Banktransaktion', typ: 'start', rad: 2, kol: 2, textOvan: true, beskrivning: 'En transaktion kommer in från kundens bank via bankkopplingen.', finns: 'Bankkoppling (Enable Banking)' },
+  { id: 'bank-spara', namn: 'Spara banktransaktion', typ: 'system', rad: 2, kol: 3, beskrivning: 'Bankraden sparas så att den kan matchas mot ett underlag som kommer in senare.', finns: 'Bankrader sparas som transaktioner' },
+  { id: 'val-bank-match', namn: 'Matchar underlag?', typ: 'val', rad: 2, kol: 4, beskrivning: 'Finns ett underlag hos kunden som är samma köp — samma belopp, datum och motpart?' },
+  { id: 'bank-matchad', namn: 'Kopplad till underlaget', typ: 'slut', rad: 1, kol: 5, textOvan: true, beskrivning: 'Bankraden och underlaget är samma köp och bokförs en gång, via underlaget.', finns: 'Bankrader markeras som troliga dubbletter av ett underlag' },
+  { id: 'bank-vanta', namn: 'Vänta till momsperiodens slut', typ: 'vanta', rad: 2, kol: 5, beskrivning: 'Omatchade bankrader samlas. Kunder med månadsmoms: varje månad. Alla andra: varje kvartal.' },
+  { id: 'val-bank-match-2', namn: 'Matchad nu?', typ: 'val', rad: 2, kol: 6, beskrivning: 'Har ett underlag kommit in under perioden som matchar bankraden?' },
+  { id: 'bank-skriv-mejl', namn: 'Mail: underlag saknas', typ: 'ai', rad: 2, kol: 9, beskrivning: 'AI:n skriver ihop ett mejl med alla bankrader i perioden som saknar underlag och ber kunden skicka in dem.' },
+  { id: 'kund-svarar-bank', namn: 'Skickar underlag', typ: 'kund', rad: 0, kol: 9, beskrivning: 'Kunden skickar in underlag till bankraderna.' },
+  { id: 'hopp-ut-3', namn: 'A', typ: 'hopp', rad: 0, kol: 10, hopp: 'hopp-in', beskrivning: 'Underlaget tas emot och matchas mot bankraden.' },
+  { id: 'val-bank-svar', namn: 'Svar före momsdeadline?', typ: 'val', rad: 2, kol: 10, beskrivning: 'Har kunden skickat underlaget innan perioden ska lämnas in?' },
+  { id: 'bank-vantar-underlag', namn: 'Matchas när underlaget kommer', typ: 'slut', rad: 1, kol: 10 },
+  { id: 'bank-till-bokslut', namn: 'Spara till årsbokslutet', typ: 'system', rad: 2, kol: 11, beskrivning: 'Bankrader utan underlag vid momsdeadline sparas och tas upp igen inför årsbokslutet.' },
+  { id: 'hopp-ut-b', namn: 'B', typ: 'hopp', rad: 2, kol: 12, hopp: 'hopp-in-b', etikett: 'till Inför årsbokslut', beskrivning: 'Fortsätter vid Inför årsbokslut.' },
+  { id: 'hopp-in-b', namn: 'B', typ: 'hopp', rad: 6, kol: 13, beskrivning: 'Bankrader utan underlag kommer in i bokslutet här.' },
+  { id: 'konteras', namn: 'Konteras', typ: 'ai', rad: 5, kol: 8, beskrivning: 'Två AI-modeller konterar var för sig enligt K1. Grönt när båda är säkra och överens.', finns: 'Fliken Kontering (GPT + Claude tvåpass)' },
+  { id: 'val-resultat', namn: 'Grönt?', typ: 'val', rad: 5, kol: 9 },
+  { id: 'granska', namn: 'Granska', typ: 'manuell', rad: 7, kol: 9, beskrivning: 'Det AI:n inte är överens om eller osäker på granskar vi själva.', finns: 'Rätta kontering i fliken Kontering' },
+  { id: 'skapa-verif', namn: 'Skapa verifikationer / lägg in i databas', typ: 'system', rad: 5, kol: 10, beskrivning: 'Godkända konteringar blir verifikationer och sparas i databasen.' },
+  { id: 'huvudbok', namn: 'Uppdatera verifikationslista / huvudbok', typ: 'system', rad: 5, kol: 11, finns: 'Verifikationslistan' },
 
-  { id: 'bb-rr', namn: 'Uppdatera BB, RR, momsrapport', typ: 'system', rad: 5, kol: 13, beskrivning: 'Balansräkning, resultaträkning och momsrapport räknas om.' },
-  { id: 'momsfil', namn: 'Skapa momsfil / periodisk sammanställning', typ: 'system', rad: 6, kol: 13, finns: 'Momsfil (eSKD)' },
-  { id: 'lamna-moms', namn: 'Lämna in moms', typ: 'manuell', rad: 7, kol: 13, finns: 'Sidan Inlämning' },
+  { id: 'bb-rr', namn: 'Uppdatera BB, RR, momsrapport', typ: 'system', rad: 5, kol: 12, beskrivning: 'Balansräkning, resultaträkning och momsrapport räknas om.' },
+  { id: 'momsfil', namn: 'Skapa momsfil / periodisk sammanställning', typ: 'system', rad: 6, kol: 12, finns: 'Momsfil (eSKD)' },
+  { id: 'lamna-moms', namn: 'Lämna in moms', typ: 'manuell', rad: 7, kol: 12, finns: 'Sidan Inlämning' },
 
-  { id: 'infor-bokslut', namn: 'Inför årsbokslut', typ: 'regel', rad: 5, kol: 14, beskrivning: 'När året är slut och bokföringen är ikapp startar bokslutet.', finns: 'Fliken Bokslut (checklista)' },
-  { id: 'mejl-bekrafta', namn: 'Mail: bekräfta underlag, inventarier, periodisering', typ: 'mejl-ut', rad: 4, kol: 14, beskrivning: 'Kunden får bekräfta att allt är med och svara på frågor om inventarier och periodiseringar.' },
-  { id: 'kund-svarar-2', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 14 },
-  { id: 'val-svar', namn: 'Kundens svar', typ: 'val', rad: 0, kol: 15 },
-  { id: 'hopp-ut-2', namn: 'A', typ: 'hopp', rad: 0, kol: 15, dy: -52, hopp: 'hopp-in', beskrivning: 'Kunden skickar fler transaktioner, som tas emot som nytt underlag.' },
-  { id: 'justeringar', namn: 'Bokslutsjusteringar', typ: 'ai', rad: 3, kol: 16, beskrivning: 'AI:n bokar periodiseringar, avskrivningar och andra justeringar utifrån kundens svar.' },
-  { id: 'sammanstall', namn: 'Sammanställ bokslut inkl. NE, moms', typ: 'system', rad: 5, kol: 16, finns: 'NE (SRU) och årsbokslut-PDF' },
+  { id: 'infor-bokslut', namn: 'Inför årsbokslut', typ: 'regel', rad: 5, kol: 13, beskrivning: 'När året är slut och bokföringen är ikapp startar bokslutet.', finns: 'Fliken Bokslut (checklista)' },
+  { id: 'mejl-bekrafta', namn: 'Mail: bekräfta underlag, inventarier, periodisering', typ: 'mejl-ut', rad: 4, kol: 13, beskrivning: 'Kunden får bekräfta att allt är med och svara på frågor om inventarier och periodiseringar.' },
+  { id: 'kund-svarar-2', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 13 },
+  { id: 'val-svar', namn: 'Kundens svar', typ: 'val', rad: 0, kol: 14 },
+  { id: 'hopp-ut-2', namn: 'A', typ: 'hopp', rad: 0, kol: 14, dy: -52, hopp: 'hopp-in', beskrivning: 'Kunden skickar fler transaktioner, som tas emot som nytt underlag.' },
+  { id: 'justeringar', namn: 'Bokslutsjusteringar', typ: 'ai', rad: 3, kol: 15, beskrivning: 'AI:n bokar periodiseringar, avskrivningar och andra justeringar utifrån kundens svar.' },
+  { id: 'sammanstall', namn: 'Sammanställ bokslut inkl. NE, moms', typ: 'system', rad: 5, kol: 15, finns: 'NE (SRU) och årsbokslut-PDF' },
 
-  { id: 'rimlighet-ai', namn: 'Rimlighetskontroll', typ: 'ai', rad: 5, kol: 17, beskrivning: 'AI:n jämför mot tidigare år och letar efter konstiga belopp innan vi tittar.' },
-  { id: 'rimlighet-manuell', namn: 'Rimlighetskontroll', typ: 'manuell', rad: 7, kol: 17, beskrivning: 'Vi går själva igenom bokslutet en sista gång.' },
-  { id: 'lamna-in', namn: 'Lämna in', typ: 'manuell', rad: 7, kol: 18, finns: 'Sidan Inlämning' },
-  { id: 'kvitto', namn: 'Mail med inlämningskvitto', typ: 'mejl-ut', rad: 5, kol: 18 },
-  { id: 'klart', namn: 'Klart', typ: 'slut', rad: 5, kol: 19 },
+  { id: 'rimlighet-ai', namn: 'Rimlighetskontroll', typ: 'ai', rad: 5, kol: 16, beskrivning: 'AI:n jämför mot tidigare år och letar efter konstiga belopp innan vi tittar.' },
+  { id: 'rimlighet-manuell', namn: 'Rimlighetskontroll', typ: 'manuell', rad: 7, kol: 16, beskrivning: 'Vi går själva igenom bokslutet en sista gång.' },
+  { id: 'lamna-in', namn: 'Lämna in', typ: 'manuell', rad: 7, kol: 17, finns: 'Sidan Inlämning' },
+  { id: 'kvitto', namn: 'Mail med inlämningskvitto', typ: 'mejl-ut', rad: 5, kol: 17 },
+  { id: 'klart', namn: 'Klart', typ: 'slut', rad: 5, kol: 18 },
 ];
 
 const PILAR: Pil[] = [
@@ -129,9 +128,7 @@ const PILAR: Pil[] = [
   { fran: 'manuell-skickar', till: 'ta-emot' },
   { fran: 'hopp-in', till: 'ta-emot' },
   { fran: 'ta-emot', till: 'definiera' },
-  { fran: 'definiera', till: 'val-aret' },
-  { fran: 'val-aret', till: 'val-typ', text: 'Tillhör' },
-  { fran: 'val-aret', till: 'separat-mapp', text: 'Tillhör ej' },
+  { fran: 'definiera', till: 'val-typ' },
   { fran: 'val-typ', till: 'plocka-trans', text: 'Transaktioner' },
   { fran: 'val-typ', till: 'plocka-verif', text: 'Konterad historik' },
   { fran: 'val-typ', till: 'separat-mapp', text: 'Övrigt' },
@@ -204,7 +201,7 @@ const TYPER: Record<Typ, { namn: string; fyll: string; kant: string; text: strin
 
 const VANSTER = 34;
 // Första kolumnen har bara ett hopp och sista bara slutet, de är smalare
-const KOL_B = Array.from({ length: 20 }, (_, k) => (k === 0 ? 56 : k === 19 ? 76 : 122));
+const KOL_B = Array.from({ length: 19 }, (_, k) => (k === 0 ? 56 : k === 18 ? 76 : 122));
 const KOL_X = KOL_B.reduce<number[]>((acc, b, i) => [...acc, i === 0 ? VANSTER : acc[i - 1] + KOL_B[i - 1]], []);
 const TOPP = 40;
 const BREDD = KOL_X[KOL_X.length - 1] + KOL_B[KOL_B.length - 1] + 6;
@@ -346,22 +343,35 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
   satt('ta-emot', 'klar', `Mottaget ${kort(u.at)}`);
   ga('ta-emot', 'definiera');
 
-  if (!u.sortering) { satt('definiera', 'har', 'Inte sorterat än'); return { steg, pilar }; }
-  satt('definiera', 'klar', `Sorterat som ${u.sortering === 'ovrigt' ? 'övrig fil' : 'underlag'}${u.sorteringOrsak ? ` — ${u.sorteringOrsak}` : ''}`);
-  ga('definiera', 'val-aret');
-  satt('val-aret', 'oppen', 'Kontrollen av räkenskapsåret finns inte än, underlaget antas tillhöra det');
-  ga('val-aret', 'val-typ');
+  const d = u.definition;
+  if (d) {
+    satt('definiera', 'klar', `${d.dokumenttyp}${d.ar ? `, ${d.ar}` : ', år framgår inte'}${d.beskrivning ? ` — ${d.beskrivning}` : ''}`);
+  } else if (u.definitionFel) {
+    satt('definiera', 'fel', u.definitionFel);
+    return { steg, pilar };
+  } else if (u.sortering) {
+    // Sorterat innan definieringen fanns, av avläsningen eller för hand
+    satt('definiera', 'oppen', `Inte definierat av AI:n, men sorterat som ${u.sortering === 'ovrigt' ? 'övrig fil' : 'underlag'}`);
+  } else {
+    satt('definiera', 'har', 'Inte definierat än');
+    return { steg, pilar };
+  }
+  ga('definiera', 'val-typ');
 
-  if (u.sortering === 'ovrigt') {
+  // Flyttad till Övriga filer gäller alltid. Annars avgör definitionen, och utan den vad som lästs in.
+  const kategori = u.sortering === 'ovrigt' ? 'ovrigt' : d?.kategori ?? (u.sie ? 'verifikationer' : 'transaktioner');
+
+  if (kategori === 'ovrigt') {
     satt('val-typ', 'klar', 'Övrigt');
     ga('val-typ', 'separat-mapp');
-    satt('separat-mapp', 'klar', 'Ligger under Övriga filer');
+    satt('separat-mapp', u.sortering === 'ovrigt' ? 'klar' : 'har', u.sortering === 'ovrigt' ? 'Ligger under Övriga filer' : 'Ska flyttas till Övriga filer');
     return { steg, pilar };
   }
 
-  if (u.sie) {
-    satt('val-typ', 'klar', 'Redan konterad historik (SIE)');
+  if (kategori === 'verifikationer') {
+    satt('val-typ', 'klar', 'Redan konterad historik');
     ga('val-typ', 'plocka-verif');
+    if (!u.sie) { satt('plocka-verif', 'har', 'Verifikationerna har inte lästs in än'); return { steg, pilar }; }
     if (u.sie.fel) { satt('plocka-verif', 'fel', u.sie.fel); return { steg, pilar }; }
     satt('plocka-verif', 'klar', `${u.sie.antal} verifikationer inlagda${u.sie.dubbletter ? `, ${u.sie.dubbletter} dubbletter` : ''}`);
     ga('plocka-verif', 'huvudbok');
@@ -375,16 +385,57 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
   if (u.utlasning.fel) { satt('plocka-trans', 'fel', u.utlasning.fel); return { steg, pilar }; }
   satt('plocka-trans', 'klar', `${u.utlasning.antal} transaktioner utlästa ${kort(u.utlasning.at)}`);
   ga('plocka-trans', 'komplettera');
-  satt('komplettera', 'oppen', 'Finns inte som eget steg än');
+  const harKonterats = u.transaktioner.some((t) => t.kontering !== 'ingen');
+  if (u.komplettering?.fel) {
+    satt('komplettera', 'fel', u.komplettering.fel);
+    if (!harKonterats) return { steg, pilar };
+  } else if (!u.komplettering) {
+    // Äldre underlag konterades innan steget fanns — då fortsätter spåret
+    if (!harKonterats) { satt('komplettera', 'har', 'Inte kompletterat än'); return { steg, pilar }; }
+    satt('komplettera', 'oppen', 'Konterades utan komplettering');
+  } else {
+    const medHistorik = u.transaktioner.filter((t) => t.komplettering && (t.komplettering.kundensHistorik.length || t.komplettering.andraKunder.length)).length;
+    const medMejl = u.transaktioner.filter((t) => t.komplettering?.mejl).length;
+    satt('komplettera', 'klar', `${medHistorik} av ${u.transaktioner.length} med historik, ${medMejl} med mejl ${kort(u.komplettering.at)}`);
+  }
   ga('komplettera', 'val-dublett');
-  // Dubletter letas bara bland bankrader än, inte bland ett underlags egna transaktioner
-  satt('val-dublett', 'oppen', 'Dublettkollen görs bara på bankrader än');
+  const dubletter = u.transaktioner.filter((t) => t.dublettkoll?.status === 'dublett').length;
+  const tveksamma = u.transaktioner.filter((t) => t.dublettkoll?.status === 'tveksam').length;
+  if (u.dublettkoll?.fel) {
+    satt('val-dublett', 'fel', u.dublettkoll.fel);
+    if (!harKonterats) return { steg, pilar };
+  } else if (!u.dublettkoll) {
+    if (!harKonterats) { satt('val-dublett', 'har', 'Inte kollat än'); return { steg, pilar }; }
+    satt('val-dublett', 'oppen', 'Konterades utan dublettkoll');
+  } else {
+    const delar = [`${dubletter} dubletter`, `${tveksamma} tveksamma`, `${u.transaktioner.length - dubletter - tveksamma} unika`];
+    satt('val-dublett', tveksamma ? 'oppen' : 'klar', `${delar.join(', ')} ${kort(u.dublettkoll.at)}`);
+    if (dubletter) {
+      ga('val-dublett', 'radera');
+      satt('radera', 'klar', `${dubletter} ${dubletter === 1 ? 'transaktion markerad' : 'transaktioner markerade'} som dubblett och bokförs inte`);
+    }
+    // Är allt dubletter tar vägen slut här
+    if (dubletter === u.transaktioner.length) return { steg, pilar };
+  }
   ga('val-dublett', 'val-tillrackligt');
 
   const T = u.transaktioner;
   const konterade = T.filter((t) => t.kontering !== 'ingen');
 
-  if (u.kontroll?.status === 'fel') {
+  const saknar = T.filter((t) => t.tillrackligt?.status === 'saknar');
+  if (u.tillrackligt?.fel) {
+    satt('val-tillrackligt', 'fel', u.tillrackligt.fel);
+    if (konterade.length === 0) return { steg, pilar };
+  } else if (u.tillrackligt && saknar.length) {
+    const vad = [...new Set(saknar.flatMap((t) => t.tillrackligt!.saknas.map((s) => s.vad)))].join(', ');
+    satt('val-tillrackligt', 'klar', `Ej tillräckligt: ${saknar.length} av ${T.length} saknar ${vad}`);
+    ga('val-tillrackligt', 'skriv-mejl');
+    // Nästa steg — mejlet till kunden — är inte kopplat till den här kontrollen än
+    satt('skriv-mejl', 'har', 'Kunden har inte fått frågorna än');
+    if (konterade.length === 0) return { steg, pilar };
+  } else if (u.tillrackligt) {
+    satt('val-tillrackligt', 'klar', `Tillräckligt — alla ${T.filter((t) => t.tillrackligt).length} har det som behövs ${kort(u.tillrackligt.at)}`);
+  } else if (u.kontroll?.status === 'fel') {
     satt('val-tillrackligt', 'fel', 'Underlagskontrollen gick inte att köra');
   } else if (u.kontroll?.status === 'saknar') {
     const vad = u.kontroll.saknas.map((s) => s.vad).filter(Boolean).join(', ');
@@ -395,8 +446,11 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
     // Är inget konterat än står underlaget och väntar på svaret
     if (konterade.length === 0) { satt('kund-svarar-1', 'har', 'Väntar på kundens svar'); return { steg, pilar }; }
     satt('kund-svarar-1', 'klar', 'Kunden har svarat');
+  } else if (u.kontroll) {
+    satt('val-tillrackligt', 'klar', 'Underlaget är komplett enligt mejlkontrollen');
   } else {
-    satt('val-tillrackligt', u.kontroll ? 'klar' : 'oppen', u.kontroll ? 'Underlaget är komplett' : 'Ingen underlagskontroll gjord');
+    if (konterade.length === 0) { satt('val-tillrackligt', 'har', 'Inte kontrollerat än'); return { steg, pilar }; }
+    satt('val-tillrackligt', 'oppen', 'Konterades utan kontroll');
   }
 
   ga('val-tillrackligt', 'konteras');
@@ -479,6 +533,26 @@ export default function FlodesschemaPage() {
       .then((d) => (d.error ? setSparFel(d.error) : setFoljer(d.underlag)))
       .catch(() => setSparFel('Kunde inte hämta underlaget'))
       .finally(() => setLaddar(false));
+  };
+
+  // Steget som körs på underlaget just nu — ett i taget
+  const [kor, setKor] = useState<KorSteg | null>(null);
+  const korSteg = (stegId: KorSteg) => {
+    if (!foljer) return;
+    setKor(stegId);
+    setSparFel('');
+    fetch('/api/admin/flodesschema/underlag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: foljer.id, steg: stegId }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.underlag) setFoljer(d.underlag);
+        if (d.error) setSparFel(d.error);
+      })
+      .catch(() => setSparFel('Kunde inte nå servern'))
+      .finally(() => setKor(null));
   };
 
   const spar = useMemo(() => (foljer ? foljUnderlag(foljer) : null), [foljer]);
@@ -786,7 +860,7 @@ export default function FlodesschemaPage() {
           Scrolla för att zooma · dra för att flytta
         </div>
 
-        {foljer && spar && <Sparpanel u={foljer} spar={spar} steg={steg} onVal={setVald} />}
+        {foljer && spar && <Sparpanel u={foljer} spar={spar} steg={steg} onVal={setVald} onKor={korSteg} kor={kor} />}
         {valt && <Detaljer key={valt.id} valt={valt} steg={steg} spar={spar?.steg[valt.id]} onVal={setVald} onSpara={spara} />}
       </div>
 
@@ -823,7 +897,16 @@ export default function FlodesschemaPage() {
 }
 
 /** Underlaget som följs: vad det är, var det står och dess transaktioner. */
-function Sparpanel({ u, spar, steg, onVal }: { u: FlodesUnderlag; spar: Spar; steg: Record<string, Steg>; onVal: (id: string) => void }) {
+/** AI-stegen som går att köra på underlaget härifrån. */
+type KorSteg = 'alla' | 'definiera' | 'plocka-trans' | 'komplettera' | 'dublett' | 'tillrackligt';
+
+function Sparpanel({ u, spar, steg, onVal, onKor, kor }: {
+  u: FlodesUnderlag; spar: Spar; steg: Record<string, Steg>; onVal: (id: string) => void;
+  onKor: (s: KorSteg) => void; kor: KorSteg | null;
+}) {
+  const [oppenTrans, setOppenTrans] = useState<string | null>(null);
+  // Övriga filer och verifikationer går inte till avläsningen i schemat
+  const vag = u.definition?.kategori ?? (u.sortering === 'ovrigt' ? 'ovrigt' : 'transaktioner');
   const ordning = STEG.filter((s) => spar.steg[s.id]).sort((a, b) => a.kol - b.kol || a.rad - b.rad);
   const belopp = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const KONTERING = {
@@ -831,15 +914,152 @@ function Sparpanel({ u, spar, steg, onVal }: { u: FlodesUnderlag; spar: Spar; st
     gron: { text: 'Grön', klass: 'bg-emerald-50 text-emerald-700' },
     granska: { text: 'Granska', klass: 'bg-amber-50 text-amber-800' },
   };
+  // Nedfälld syns bara en rad, så att schemat bakom går att se
+  const [nere, setNere] = useState(false);
+  const harNu = ordning.filter((s) => spar.steg[s.id].lage === 'har');
+
+  if (nere) {
+    return (
+      <button
+        onClick={() => setNere(false)}
+        className="absolute top-3 left-3 max-w-80 flex items-center gap-2 bg-white border border-slate-200 rounded-xl shadow-lg px-3 py-2 text-left hover:bg-slate-50"
+        title="Visa sammanfattningen"
+      >
+        <span className="text-slate-400 text-xs">▸</span>
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-slate-900 truncate">{u.fileName}</span>
+          {harNu.length > 0 && <span className="block text-xs text-amber-700 truncate">Här nu: {harNu.map((s) => steg[s.id].namn).join(', ')}</span>}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <aside className="absolute top-3 left-3 w-80 max-h-[calc(100%-70px)] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg p-4">
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Följer underlag</div>
+      <div className="flex items-center mb-1">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mr-auto">Följer underlag</div>
+        <button onClick={() => setNere(true)} className="text-xs text-slate-500 hover:text-slate-800" title="Fäll ner sammanfattningen">
+          Fäll ner ▴
+        </button>
+      </div>
       <h2 className="text-base font-semibold text-slate-900 break-words mb-1">{u.fileName}</h2>
       <div className="flex gap-3 text-xs mb-3">
         <Link href={`/admin/underlag/${u.id}`} className="text-blue-700 hover:underline">Öppna underlaget</Link>
         {u.personKey && <Link href={`/admin/person/${encodeURIComponent(u.personKey)}`} className="text-blue-700 hover:underline">Kundens sida</Link>}
       </div>
+
+      <button
+        onClick={() => onKor('alla')}
+        disabled={kor !== null}
+        className="w-full mb-1 px-3 py-2 bg-slate-900 hover:bg-slate-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg"
+      >
+        {kor === 'alla' ? 'Kör flödet…' : 'Skicka in i flödet'}
+      </button>
+      <p className="text-[11px] text-slate-500 mb-3">
+        {kor === 'alla' ? 'Definierar, plockar ut, kompletterar, letar dubbletter och kollar att det räcker — kan ta ett par minuter.' : 'Börjar från första steget och kör varje steg efter så långt flödet är byggt.'}
+      </p>
+
+      <div className="mb-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700 mb-1">Definiera underlaget</div>
+        {u.definition ? (
+          <dl className="text-xs text-slate-700 grid grid-cols-[70px_1fr] gap-x-2 gap-y-0.5 mb-2">
+            <dt className="text-slate-500">Vad</dt><dd>{u.definition.dokumenttyp}</dd>
+            <dt className="text-slate-500">År</dt><dd>{u.definition.ar ?? 'Framgår inte'}</dd>
+            <dt className="text-slate-500">Väg</dt>
+            <dd>{u.definition.kategori === 'ovrigt' ? 'Övrigt' : u.definition.kategori === 'verifikationer' ? 'Verifikationer' : 'Transaktioner'}</dd>
+            {u.definition.motivering && <><dt className="text-slate-500">Varför</dt><dd>{u.definition.motivering}</dd></>}
+          </dl>
+        ) : (
+          <p className="text-xs text-slate-600 mb-2">{u.definitionFel ? `Gick inte: ${u.definitionFel}` : 'Inte definierat än.'}</p>
+        )}
+        <button
+          onClick={() => onKor('definiera')}
+          disabled={kor !== null}
+          className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md"
+        >
+          {kor === 'definiera' ? 'AI:n läser…' : u.definition ? 'Definiera igen' : 'Definiera med AI'}
+        </button>
+      </div>
+
+      {vag === 'transaktioner' && (
+        <div className="mb-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700 mb-1">Plocka ut transaktioner</div>
+          <p className="text-xs text-slate-700 mb-2">
+            {u.utlasning
+              ? u.utlasning.fel ? `Gick inte: ${u.utlasning.fel}` : `${u.utlasning.antal} transaktioner utlästa ${new Date(u.utlasning.at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}. Körs den igen ersätts de.`
+              : 'Inte utläst än.'}
+          </p>
+          <button
+            onClick={() => onKor('plocka-trans')}
+            disabled={kor !== null}
+            className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md"
+          >
+            {kor === 'plocka-trans' ? 'AI:n läser…' : u.utlasning ? 'Plocka ut igen' : 'Plocka ut med AI'}
+          </button>
+        </div>
+      )}
+
+      {vag === 'transaktioner' && u.transaktioner.length > 0 && (
+        <div className="mb-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700 mb-1">Komplettera med kundhistorik</div>
+          <p className="text-xs text-slate-700 mb-2">
+            {u.komplettering
+              ? u.komplettering.fel ? `Gick inte: ${u.komplettering.fel}` : `Kompletterat ${new Date(u.komplettering.at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}. Klicka på en transaktion för att se historiken.`
+              : 'Inte kompletterat än.'}
+          </p>
+          <button
+            onClick={() => onKor('komplettera')}
+            disabled={kor !== null}
+            className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md"
+          >
+            {kor === 'komplettera' ? 'AI:n letar…' : u.komplettering ? 'Komplettera igen' : 'Komplettera med AI'}
+          </button>
+        </div>
+      )}
+
+      {vag === 'transaktioner' && u.transaktioner.length > 0 && (
+        <div className="mb-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700 mb-1">Dublettcheck</div>
+          <p className="text-xs text-slate-700 mb-2">
+            {u.dublettkoll
+              ? u.dublettkoll.fel ? `Gick inte: ${u.dublettkoll.fel}` : (() => {
+                const d = u.transaktioner.filter((t) => t.dublettkoll?.status === 'dublett').length;
+                const tv = u.transaktioner.filter((t) => t.dublettkoll?.status === 'tveksam').length;
+                return `${d} dubletter, ${tv} tveksamma. Kollat ${new Date(u.dublettkoll.at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}.`;
+              })()
+              : 'Inte kollat än.'}
+          </p>
+          <button
+            onClick={() => onKor('dublett')}
+            disabled={kor !== null}
+            className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md"
+          >
+            {kor === 'dublett' ? 'AI:n jämför…' : u.dublettkoll ? 'Kolla igen' : 'Leta dubbletter'}
+          </button>
+        </div>
+      )}
+
+      {vag === 'transaktioner' && u.transaktioner.length > 0 && (
+        <div className="mb-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700 mb-1">Tillräckligt?</div>
+          <p className="text-xs text-slate-700 mb-2">
+            {u.tillrackligt
+              ? u.tillrackligt.fel ? `Gick inte: ${u.tillrackligt.fel}` : (() => {
+                const s = u.transaktioner.filter((t) => t.tillrackligt?.status === 'saknar').length;
+                const ok = u.transaktioner.filter((t) => t.tillrackligt?.status === 'tillrackligt').length;
+                return `${ok} tillräckliga, ${s} saknar uppgifter. Kollat ${new Date(u.tillrackligt.at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}.`;
+              })()
+              : 'Inte kontrollerat än.'}
+          </p>
+          <button
+            onClick={() => onKor('tillrackligt')}
+            disabled={kor !== null}
+            className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md"
+          >
+            {kor === 'tillrackligt' ? 'AI:n kontrollerar…' : u.tillrackligt ? 'Kontrollera igen' : 'Kontrollera med AI'}
+          </button>
+        </div>
+      )}
 
       <ol className="space-y-1.5 mb-3">
         {ordning.map((s) => {
@@ -869,20 +1089,135 @@ function Sparpanel({ u, spar, steg, onVal }: { u: FlodesUnderlag; spar: Spar; st
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Transaktioner ({u.transaktioner.length})</div>
           <ul className="divide-y divide-slate-100 text-xs">
             {u.transaktioner.map((t) => (
-              <li key={t.id} className="py-1.5 flex items-start gap-2">
-                <span className="min-w-0 flex-1">
-                  <span className="block text-slate-800 truncate">{t.motpart || t.beskrivning || 'Utan beskrivning'}</span>
-                  <span className="text-slate-500">{t.datum ?? 'Inget datum'} · {belopp.format(t.belopp)} {t.valuta}</span>
-                </span>
-                <span className={`shrink-0 px-1.5 py-0.5 rounded ${t.bokford ? 'bg-emerald-600 text-white' : KONTERING[t.kontering].klass}`}>
-                  {t.bokford ? 'Bokförd' : KONTERING[t.kontering].text}
-                </span>
+              <li key={t.id} className="py-1.5">
+                <button onClick={() => setOppenTrans(oppenTrans === t.id ? null : t.id)} className="w-full flex items-start gap-2 text-left hover:bg-slate-50 rounded">
+                  <span className="text-slate-400 mt-0.5">{oppenTrans === t.id ? '▾' : '▸'}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-slate-800 truncate">{t.beskrivning || t.motpart || 'Utan beskrivning'}</span>
+                    <span className="block text-slate-500 truncate">{t.datum ?? 'Inget datum'} · {t.riktning === 'in' ? '+' : '−'}{belopp.format(t.belopp)} {t.valuta}{t.motpart && t.beskrivning ? ` · ${t.motpart}` : ''}</span>
+                  </span>
+                  {t.dublettAv && !t.bokford ? (
+                    <span className="shrink-0 px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Dublett</span>
+                  ) : t.dublettkoll?.status === 'tveksam' && !t.bokford ? (
+                    <span className="shrink-0 px-1.5 py-0.5 rounded bg-red-50 text-red-700">Möjlig dublett</span>
+                  ) : t.tillrackligt?.status === 'saknar' && !t.bokford && t.kontering === 'ingen' ? (
+                    <span className="shrink-0 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">Saknar uppgifter</span>
+                  ) : (
+                    <span className={`shrink-0 px-1.5 py-0.5 rounded ${t.bokford ? 'bg-emerald-600 text-white' : KONTERING[t.kontering].klass}`}>
+                      {t.bokford ? 'Bokförd' : KONTERING[t.kontering].text}
+                    </span>
+                  )}
+                </button>
+                {oppenTrans === t.id && <TransaktionDetaljer t={t} format={belopp.format} />}
               </li>
             ))}
           </ul>
         </>
       )}
     </aside>
+  );
+}
+
+/** Allt som plockats ut om en transaktion, under raden i spårpanelen. */
+function TransaktionDetaljer({ t, format }: { t: FlodesUnderlag['transaktioner'][number]; format: (n: number) => string }) {
+  const visa = (v: unknown): string => {
+    if (typeof v === 'number') return format(v);
+    if (typeof v === 'boolean') return v ? 'Ja' : 'Nej';
+    if (Array.isArray(v)) return v.map(visa).join('\n');
+    if (v && typeof v === 'object') return Object.entries(v).map(([k, x]) => `${k}: ${visa(x)}`).join(', ');
+    return String(v ?? '');
+  };
+  const exkl = t.uppgifter?.belopp_exkl_moms;
+  const rader: [string, string][] = [
+    ['Beskrivning', t.beskrivning],
+    ['Datum', t.datum ?? ''],
+    ['Motpart', t.motpart],
+    ['Belopp', `${format(t.belopp)} ${t.valuta} inkl. moms, pengar ${t.riktning === 'in' ? 'in' : 'ut'}${typeof exkl === 'number' ? ` (${format(exkl)} exkl. moms)` : ''}`],
+    ['Moms', t.moms ? `${format(t.moms)} ${t.valuta}` : ''],
+    ['VAT-nummer', t.vatNummer],
+    ...Object.entries(t.uppgifter ?? {}).filter(([k]) => k !== 'belopp_exkl_moms').map(([k, v]): [string, string] => [k.replace(/_/g, ' '), visa(v)]),
+    ['Anteckning', t.anteckning],
+  ];
+  return (
+    <div className="mt-1 ml-4 p-2 rounded bg-slate-50 border border-slate-100">
+      <dl className="grid grid-cols-[90px_1fr] gap-x-2 gap-y-0.5">
+        {rader.filter(([, v]) => v).map(([k, v]) => (
+          <Fragment key={k}><dt className="text-slate-500 first-letter:uppercase">{k}</dt><dd className="text-slate-800 whitespace-pre-wrap break-words">{v}</dd></Fragment>
+        ))}
+      </dl>
+      {t.detaljer && (
+        <details className="mt-1.5">
+          <summary className="text-slate-500 cursor-pointer">Avskrift av underlaget</summary>
+          <p className="mt-1 text-slate-600 whitespace-pre-wrap break-words">{t.detaljer}</p>
+        </details>
+      )}
+      {t.dublettkoll && (
+        <div className="mt-2 pt-2 border-t border-slate-200">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Dublettcheck</div>
+          <div className={t.dublettkoll.status === 'dublett' ? 'text-slate-800 font-medium' : t.dublettkoll.status === 'tveksam' ? 'text-red-700 font-medium' : 'text-slate-800'}>
+            {t.dublettkoll.status === 'dublett' ? 'Dublett' : t.dublettkoll.status === 'tveksam' ? 'Tveksam — kan vara en dublett' : 'Unik'}
+            {t.dublettkoll.avFil && <span className="font-normal text-slate-500"> · liknar en transaktion i {t.dublettkoll.avFil}</span>}
+          </div>
+          {t.dublettkoll.motivering && <p className="text-slate-600">{t.dublettkoll.motivering}</p>}
+        </div>
+      )}
+      {t.tillrackligt && (
+        <div className="mt-2 pt-2 border-t border-slate-200">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Tillräckligt?</div>
+          {t.tillrackligt.status === 'tillrackligt' ? (
+            <div className="text-slate-800 font-medium">Tillräckligt</div>
+          ) : (
+            <>
+              <div className="text-amber-800 font-medium">Saknas:</div>
+              <ul className="list-disc ml-4">
+                {t.tillrackligt.saknas.map((s, i) => (
+                  <li key={i}><span className="text-slate-800">{s.vad}</span>{s.varfor && <span className="text-slate-500"> — {s.varfor}</span>}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          {t.tillrackligt.antaganden && <p className="text-slate-500 mt-0.5">Antaganden: {t.tillrackligt.antaganden}</p>}
+        </div>
+      )}
+      {t.komplettering && <KompletteringVy k={t.komplettering} />}
+    </div>
+  );
+}
+
+/** Det steget Komplettera med kundhistorik lade till på transaktionen. */
+function KompletteringVy({ k }: { k: NonNullable<FlodesUnderlag['transaktioner'][number]['komplettering']> }) {
+  const lista = (rubrik: string, poster: typeof k.kundensHistorik) => (
+    <div className="mt-1.5">
+      <div className="text-slate-500">{rubrik}</div>
+      {poster.length === 0 ? <div className="text-slate-400">Inget liknande</div> : (
+        <ul className="space-y-1 mt-0.5">
+          {poster.map((p, i) => (
+            <li key={i}>
+              <span className="text-slate-800">{p.text}</span>
+              <span className="text-slate-500"> · {p.antal} st{p.datum ? `, senast ${p.datum}` : ''}</span>
+              <span className="block font-mono text-[11px] text-slate-700">{p.rader.map((r) => r.konto).join(' · ')}</span>
+              {p.varfor && <span className="block text-slate-500">{p.varfor}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+  return (
+    <div className="mt-2 pt-2 border-t border-slate-200">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Kundhistorik</div>
+      {k.sammanfattning && <p className="text-slate-800 mt-0.5">{k.sammanfattning}</p>}
+      {lista('Kunden har bokfört', k.kundensHistorik)}
+      {lista('Andra kunder har bokfört', k.andraKunder)}
+      <div className="mt-1.5">
+        <div className="text-slate-500">Mejlen</div>
+        <div className={k.mejl ? 'text-slate-800 whitespace-pre-wrap' : 'text-slate-400'}>{k.mejl || 'Säger inget om transaktionen'}</div>
+      </div>
+      <div className="mt-1.5">
+        <div className="text-slate-500">Verksamhet</div>
+        <div className={k.verksamhet ? 'text-slate-800' : 'text-slate-400'}>{k.verksamhet || 'Saknas i Kundkontext'}</div>
+      </div>
+    </div>
   );
 }
 

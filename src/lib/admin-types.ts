@@ -1,6 +1,9 @@
 import type { NeManuellt } from '@/lib/ne/ne';
 import type { SieIb } from '@/lib/sie/ingaende-balans';
 import type { Deadlineperiod } from '@/lib/deadlines';
+import type { Komplettering } from '@/lib/transaktioner/komplettera';
+import type { Dublettkoll } from '@/lib/transaktioner/dublettkoll';
+import type { Tillrackligt } from '@/lib/transaktioner/tillrackligt';
 /**
  * Formen på det adminpanelen visar.
  *
@@ -535,9 +538,26 @@ export interface FlodesUnderlag {
   personKey: string | null;
   sortering: 'underlag' | 'ovrigt' | null;
   sorteringOrsak: string | null;
+  /** AI:ns definition (se `@/lib/underlag/definiera`). Null = inte definierat än. */
+  definition: {
+    kategori: 'transaktioner' | 'verifikationer' | 'ovrigt';
+    dokumenttyp: string;
+    beskrivning: string;
+    ar: number | null;
+    motivering: string;
+    modell: string;
+  } | null;
+  definieradAt: string | null;
+  definitionFel: string | null;
   kontroll: { status: 'komplett' | 'saknar' | 'fel'; saknas: { rad: string; vad: string }[]; at: string } | null;
   /** AI-avläsningen till transaktioner. */
   utlasning: { at: string; antal: number; fel: string | null } | null;
+  /** Steget Komplettera med kundhistorik. */
+  komplettering: { at: string; fel: string | null } | null;
+  /** Steget Dublettcheck. */
+  dublettkoll: { at: string; fel: string | null } | null;
+  /** Steget Tillräckligt?. */
+  tillrackligt: { at: string; fel: string | null } | null;
   /** SIE-filen inlagd som verifikationer. */
   sie: { at: string; antal: number; dubbletter: number; fel: string | null } | null;
   transaktioner: {
@@ -546,7 +566,19 @@ export interface FlodesUnderlag {
     beskrivning: string;
     motpart: string;
     belopp: number;
+    moms: number;
     valuta: string;
+    riktning: 'in' | 'ut';
+    vatNummer: string;
+    anteckning: string;
+    detaljer: string;
+    /** Det AI:n plockat ut i fasta fält (se UPPGIFTSREGEL i `@/lib/transaktioner/normalisera`). */
+    uppgifter: Record<string, unknown> | null;
+    komplettering: Komplettering | null;
+    dublettkoll: Dublettkoll | null;
+    /** Satt när transaktionen är en dubblett och inte ska bokföras — av dublettkollen eller bankens koll. */
+    dublettAv: string | null;
+    tillrackligt: Tillrackligt | null;
     /** ingen = inte konterad, gron = båda modellerna gröna och överens, granska = allt annat. */
     kontering: 'ingen' | 'gron' | 'granska';
     bokford: boolean;

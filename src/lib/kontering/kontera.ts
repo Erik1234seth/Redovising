@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkontext';
 import { svenskDag } from '@/lib/dagskassa';
 import { byggMejlkontext } from '@/lib/mejlkontext';
+import { kompletteringText, type Komplettering } from '@/lib/transaktioner/komplettera';
 import { tolkaBetalsatt, type Betalsatt } from './betalsatt';
 import { MODELLER, fraga, type Modell, type System } from './modeller';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
@@ -48,6 +49,10 @@ interface Transaktion {
   riktning: 'in' | 'ut';
   anteckning: string | null;
   detaljer: string | null;
+  vat_nummer: string | null;
+  uppgifter: Record<string, unknown> | null;
+  komplettering: Komplettering | null;
+  dublettkoll: { status: string; motivering: string; avFil: string | null } | null;
   kalla: string;
 }
 
@@ -175,9 +180,12 @@ function transaktionText(t: Transaktion, betalsatt: Betalsatt): string {
     `Belopp: ${t.belopp} ${t.valuta || 'SEK'}`,
     `Moms enligt underlaget: ${t.moms ? `${t.moms} kr` : 'framgår inte'}`,
     t.motpart ? `Motpart: ${t.motpart}` : '',
+    t.vat_nummer ? `Motpartens VAT-nummer: ${t.vat_nummer}` : '',
     `Beskrivning: ${t.beskrivning || '—'}`,
     t.anteckning ? `Anteckning: ${t.anteckning}` : '',
     t.detaljer ? `Allt som står om transaktionen på underlaget:\n${t.detaljer}` : '',
+    t.uppgifter ? `Uppgifter utplockade ur underlaget:\n${JSON.stringify(t.uppgifter, null, 1)}` : '',
+    kompletteringText(t.komplettering),
     `Källa: ${t.kalla === 'bank' ? 'rad på kontoutdrag (inget kvitto)'
       : t.kalla === 'woocommerce' ? 'order eller återbetalning i kundens webbutik (WooCommerce), hämtad direkt från butiken'
       : 'utläst ur kundens underlag'}`,
@@ -308,6 +316,10 @@ async function konteraMedModell(
   if (!motkonto) flaggor.push({ typ: 'betalsatt', allvar: 'granskning', text: 'Kunden betalar via både företags- och privatkonto — välj betalkonto.' });
   if (motkonto && konto === motkonto) flaggor.push({ typ: 'samma-konto', allvar: 'stopp', text: `${konto} är också betalkontot.` });
   if (!t.datum) flaggor.push({ typ: 'datum', allvar: 'granskning', text: 'Transaktionen saknar datum.' });
+  // Dublettkollen var osäker — då bokförs den inte förrän någon tittat
+  if (t.dublettkoll?.status === 'tveksam') {
+    flaggor.push({ typ: 'dublett', allvar: 'granskning', text: `Kan vara en dubblett${t.dublettkoll.avFil ? ` av en transaktion i ${t.dublettkoll.avFil}` : ''}: ${t.dublettkoll.motivering}` });
+  }
   if (t.valuta && t.valuta !== 'SEK') flaggor.push({ typ: 'valuta', allvar: 'granskning', text: `Beloppet är i ${t.valuta} och måste räknas om till kronor.` });
   if (p1.sakerhet !== 'hog') flaggor.push({ typ: 'osaker', allvar: 'granskning', text: `Modellens säkerhet: ${p1.sakerhet === 'lag' ? 'låg' : 'medel'}.` });
 
@@ -415,7 +427,7 @@ async function konteraEn(
 }
 
 export const TRANSAKTION_KOLUMNER =
-  'id, user_id, customer_email, underlag_id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, anteckning, detaljer, kalla';
+  'id, user_id, customer_email, underlag_id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, anteckning, detaljer, vat_nummer, uppgifter, komplettering, dublettkoll, kalla';
 
 /**
  * Erik väljer konto för hand — ett av modellernas förslag eller ett eget.

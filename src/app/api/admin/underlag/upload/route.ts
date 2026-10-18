@@ -1,9 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { UNDERLAG_BUCKET, folderFor, resolveUserId } from '@/lib/inmail/save-attachments';
 import { isSieFile } from '@/lib/sie/parse';
 import { importSieUnderlag } from '@/lib/sie/import';
 import { sorteringVidUppladdning } from '@/lib/underlag/sortering';
+import { definieraTyst } from '@/lib/underlag/definiera';
+
+// Definieringen av underlaget körs efter svaret och behöver tid för AI-anropet
+export const maxDuration = 300;
 
 /**
  * Laddar upp underlag åt en kund från personsidan i adminpanelen.
@@ -112,6 +116,7 @@ export async function POST(request: NextRequest) {
           inlagda: 0, dubbletter: 0, fel: err instanceof Error ? err.message : 'Okänt fel',
         }))
         : null;
+      after(() => definieraTyst(supabase, data.id));
       return NextResponse.json({ ok: true, id: data.id, sie });
     }
 

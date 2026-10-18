@@ -1,4 +1,4 @@
-import { DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, OVRIGTREGEL, tolkaSvar, type TolkatSvar } from './normalisera';
+import { BESKRIVNINGSREGEL, DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, OVRIGTREGEL, UPPGIFTSREGEL, tolkaSvar, type TolkatSvar } from './normalisera';
 
 /**
  * Läser ett kalkylblad eller en textlista genom att låta modellen köra Python
@@ -35,14 +35,16 @@ Fyll bara listan som hör till typen. Den andra är tom. Vid "ovrigt" är båda 
 Varje transaktion:
 {
   "datum": "YYYY-MM-DD" (tom sträng om datumet inte framgår),
-  "beskrivning": "texten som står på raden",
+  "beskrivning": "vad som köpts, sålts eller betalats, se nedan",
   "motpart": "butik, leverantör eller kund om det framgår, annars tom sträng",
   "belopp": tal med tecknet från filen (negativt = pengar ut),
   "moms": tal, 0 om momsen inte framgår,
   "valuta": "SEK" eller valutan som står i filen,
   "riktning": "in" eller "ut",
   "anteckning": "kort notering när något är oklart, annars tom sträng",
-  "detaljer": "allt annat som står om transaktionen i filen, se nedan"
+  "detaljer": "allt annat som står om transaktionen i filen, se nedan",
+  "vat_nummer": "motpartens VAT-nummer, se nedan",
+  "uppgifter": { se nedan }
 }
 
 Varje verifikation:
@@ -58,7 +60,9 @@ Regler för transaktioner:
 - Du ska INTE kontera. Inga konton, ingen bokföringsmässig bedömning — skriv bara av det som står.
 - En kolumn med löpande saldo eller balans är inte beloppet. Använd beloppskolumnen. Är du osäker: saldot ändras med beloppet mellan raderna, det kan du kontrollera i koden.
 - Hoppa över rubriker, adresser, summarader, saldobesked och tomma rader.
+${BESKRIVNINGSREGEL}
 ${DETALJREGEL}
+${UPPGIFTSREGEL}
 - Gissa inte datum som saknas. Lämna fältet tomt och skriv varför i "anteckning".
 ${MEJLREGEL}
 
