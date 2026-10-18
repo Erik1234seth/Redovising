@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import type { FlodesKund, FlodesUnderlag } from '@/lib/admin-types';
 
 /**
  * Flödesschemat: hela processen från att kunden skickar underlag till
@@ -260,6 +262,117 @@ function Ikon({ typ, x, y }: { typ: Typ; x: number; y: number }) {
 type Vy = typeof HELA;
 type Texter = { beskrivning: string; finns: string };
 
+/** klar = gjort, har = här står underlaget nu, fel = gick fel, oppen = passerat men steget finns inte eller kördes inte */
+type Lage = 'klar' | 'har' | 'fel' | 'oppen';
+interface Spar { steg: Record<string, { lage: Lage; text: string }>; pilar: Set<string> }
+
+const LAGE: Record<Lage, { farg: string; tecken: string; namn: string }> = {
+  klar: { farg: '#16a34a', tecken: '✓', namn: 'Klart' },
+  har: { farg: '#f59e0b', tecken: '•', namn: 'Här nu' },
+  fel: { farg: '#dc2626', tecken: '!', namn: 'Fel' },
+  oppen: { farg: '#94a3b8', tecken: '–', namn: 'Inte kontrollerat' },
+};
+
+const pilNyckel = (fran: string, till: string) => `${fran}>${till}`;
+const kort = (d: string) => new Date(d).toLocaleDateString('sv-SE');
+
+/**
+ * Var i flödet ett underlag har gått, utifrån det som faktiskt finns sparat.
+ *
+ * Stegen efter huvudboken gäller hela perioden och inte ett enskilt underlag,
+ * så spåret slutar där.
+ */
+function foljUnderlag(u: FlodesUnderlag): Spar {
+  const steg: Spar['steg'] = {};
+  const pilar = new Set<string>();
+  const satt = (id: string, lage: Lage, text: string) => { steg[id] = { lage, text }; };
+  const ga = (fran: string, till: string) => pilar.add(pilNyckel(fran, till));
+
+  const start = u.source === 'admin' ? 'manuell-skickar' : 'kund-skickar';
+  satt(start, 'klar', u.source === 'mejl' ? 'Kom som bilaga i ett mejl' : u.source === 'app' ? 'Uppladdat i appen' : 'Uppladdat av oss');
+  ga(start, 'ta-emot');
+  satt('ta-emot', 'klar', `Mottaget ${kort(u.at)}`);
+  ga('ta-emot', 'definiera');
+
+  if (!u.sortering) { satt('definiera', 'har', 'Inte sorterat än'); return { steg, pilar }; }
+  satt('definiera', 'klar', `Sorterat som ${u.sortering === 'ovrigt' ? 'övrig fil' : 'underlag'}${u.sorteringOrsak ? ` — ${u.sorteringOrsak}` : ''}`);
+  ga('definiera', 'val-aret');
+  satt('val-aret', 'oppen', 'Årskontrollen finns inte än, underlaget antas tillhöra året');
+  ga('val-aret', 'val-typ');
+
+  if (u.sortering === 'ovrigt') {
+    satt('val-typ', 'klar', 'Övrigt');
+    ga('val-typ', 'separat-mapp');
+    satt('separat-mapp', 'klar', 'Ligger under Övriga filer');
+    return { steg, pilar };
+  }
+
+  if (u.sie) {
+    satt('val-typ', 'klar', 'Redan konterad historik (SIE)');
+    ga('val-typ', 'plocka-verif');
+    if (u.sie.fel) { satt('plocka-verif', 'fel', u.sie.fel); return { steg, pilar }; }
+    satt('plocka-verif', 'klar', `${u.sie.antal} verifikationer inlagda${u.sie.dubbletter ? `, ${u.sie.dubbletter} dubbletter` : ''}`);
+    ga('plocka-verif', 'huvudbok');
+    satt('huvudbok', 'klar', `${u.verifikationer} verifikationer i listan`);
+    return { steg, pilar };
+  }
+
+  satt('val-typ', 'klar', 'Transaktioner');
+  ga('val-typ', 'plocka-trans');
+  if (!u.utlasning) { satt('plocka-trans', 'har', 'AI-avläsningen har inte körts'); return { steg, pilar }; }
+  if (u.utlasning.fel) { satt('plocka-trans', 'fel', u.utlasning.fel); return { steg, pilar }; }
+  satt('plocka-trans', 'klar', `${u.utlasning.antal} transaktioner utlästa ${kort(u.utlasning.at)}`);
+  ga('plocka-trans', 'komplettera');
+  satt('komplettera', 'oppen', 'Finns inte som eget steg än');
+  ga('komplettera', 'val-tillrackligt');
+
+  const T = u.transaktioner;
+  const konterade = T.filter((t) => t.kontering !== 'ingen');
+
+  if (u.kontroll?.status === 'fel') {
+    satt('val-tillrackligt', 'fel', 'Underlagskontrollen gick inte att köra');
+  } else if (u.kontroll?.status === 'saknar') {
+    const vad = u.kontroll.saknas.map((s) => s.vad).filter(Boolean).join(', ');
+    satt('val-tillrackligt', 'klar', 'Ej tillräckligt');
+    ga('val-tillrackligt', 'skriv-mejl');
+    satt('skriv-mejl', 'klar', vad ? `Frågade efter: ${vad}` : 'Kunden har fått frågor');
+    ga('skriv-mejl', 'kund-svarar-1');
+    // Är inget konterat än står underlaget och väntar på svaret
+    if (konterade.length === 0) { satt('kund-svarar-1', 'har', 'Väntar på kundens svar'); return { steg, pilar }; }
+    satt('kund-svarar-1', 'klar', 'Kunden har svarat');
+  } else {
+    satt('val-tillrackligt', u.kontroll ? 'klar' : 'oppen', u.kontroll ? 'Underlaget är komplett' : 'Ingen underlagskontroll gjord');
+  }
+
+  ga('val-tillrackligt', 'konteras');
+  if (T.length === 0) { satt('konteras', 'fel', 'Avläsningen gav inga transaktioner'); return { steg, pilar }; }
+  if (konterade.length === 0) { satt('konteras', 'har', `Ingen av ${T.length} transaktioner konterad än`); return { steg, pilar }; }
+  satt('konteras', konterade.length < T.length ? 'har' : 'klar', `${konterade.length} av ${T.length} konterade`);
+  ga('konteras', 'val-resultat');
+
+  const gron = T.filter((t) => t.kontering === 'gron');
+  const granska = T.filter((t) => t.kontering === 'granska');
+  satt('val-resultat', 'klar', `${gron.length} gröna, ${granska.length} till granskning`);
+
+  if (granska.length) {
+    ga('val-resultat', 'granska');
+    const kvar = granska.filter((t) => !t.bokford).length;
+    satt('granska', kvar ? 'har' : 'klar', kvar ? `${kvar} väntar på granskning` : 'Alla granskade');
+    if (kvar < granska.length) ga('granska', 'skapa-verif');
+  }
+  if (gron.length) ga('val-resultat', 'skapa-verif');
+
+  const bokforda = T.filter((t) => t.bokford).length;
+  if (bokforda === 0) {
+    if (gron.length) satt('skapa-verif', 'har', `${gron.length} gröna men inte bokförda än`);
+    return { steg, pilar };
+  }
+  satt('skapa-verif', bokforda < konterade.length ? 'har' : 'klar', `${bokforda} av ${T.length} bokförda`);
+  ga('skapa-verif', 'huvudbok');
+  satt('huvudbok', 'klar', `${u.verifikationer} verifikationer i listan`);
+  return { steg, pilar };
+}
+
 export default function FlodesschemaPage() {
   const [vald, setVald] = useState<string | null>(null);
   const [baraAi, setBaraAi] = useState(false);
@@ -291,6 +404,31 @@ export default function FlodesschemaPage() {
   };
   const valt = vald ? steg[vald] : null;
 
+  // Följ ett underlag: kunderna hämtas en gång, underlaget när det väljs
+  const [kunder, setKunder] = useState<FlodesKund[] | null>(null);
+  const [kundKey, setKundKey] = useState('');
+  const [foljer, setFoljer] = useState<FlodesUnderlag | null>(null);
+  const [laddar, setLaddar] = useState(false);
+  const [sparFel, setSparFel] = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/flodesschema/underlag').then((r) => r.json()).then((d) => setKunder(d.kunder ?? [])).catch(() => setKunder([]));
+  }, []);
+
+  const valjUnderlag = (id: string) => {
+    setSparFel('');
+    if (!id) { setFoljer(null); return; }
+    setLaddar(true);
+    fetch(`/api/admin/flodesschema/underlag?id=${encodeURIComponent(id)}`)
+      .then((r) => r.json())
+      .then((d) => (d.error ? setSparFel(d.error) : setFoljer(d.underlag)))
+      .catch(() => setSparFel('Kunde inte hämta underlaget'))
+      .finally(() => setLaddar(false));
+  };
+
+  const spar = useMemo(() => (foljer ? foljUnderlag(foljer) : null), [foljer]);
+  const kund = kunder?.find((k) => k.key === kundKey) ?? null;
+
   const nara = useMemo(() => {
     if (!vald) return null;
     const ids = new Set([vald]);
@@ -300,7 +438,13 @@ export default function FlodesschemaPage() {
     return ids;
   }, [vald]);
 
-  const tonad = (id: string) => (nara ? !nara.has(id) : baraAi && steg[id].typ !== 'ai');
+  const tonad = (id: string) => (spar ? !spar.steg[id] && vald !== id : nara ? !nara.has(id) : baraAi && steg[id].typ !== 'ai');
+  /** Hur en pil ska se ut: följd av underlaget, kopplad till valt steg, eller nedtonad. */
+  const pilLage = (p: Pil) => {
+    const aktiv = vald !== null && (p.fran === vald || p.till === vald);
+    if (spar) return { gangen: spar.pilar.has(pilNyckel(p.fran, p.till)), aktiv: false, tona: !spar.pilar.has(pilNyckel(p.fran, p.till)) };
+    return { gangen: false, aktiv, tona: vald !== null ? !aktiv : baraAi };
+  };
   const antal = (t: Typ) => STEG.filter((s) => s.typ === t).length;
   const procent = Math.round((BREDD / vy.b) * 100);
 
@@ -376,7 +520,41 @@ export default function FlodesschemaPage() {
         </label>
       </div>
 
-      <div className="relative bg-white border border-slate-200 rounded-2xl overflow-hidden h-[calc(100vh-150px)] min-h-[420px]">
+      <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
+        <span className="font-medium text-slate-700">Följ ett underlag:</span>
+        <select
+          value={kundKey}
+          onChange={(e) => { setKundKey(e.target.value); setFoljer(null); setSparFel(''); }}
+          disabled={!kunder}
+          className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 max-w-[260px]"
+        >
+          <option value="">{kunder ? 'Välj kund…' : 'Hämtar kunder…'}</option>
+          {kunder?.map((k) => <option key={k.key} value={k.key}>{k.namn} ({k.underlag.length})</option>)}
+        </select>
+        {kund && (
+          <select
+            value={foljer?.id ?? ''}
+            onChange={(e) => valjUnderlag(e.target.value)}
+            className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 max-w-[360px]"
+          >
+            <option value="">Välj underlag…</option>
+            {kund.underlag.map((u) => (
+              <option key={u.id} value={u.id}>
+                {kort(u.at)} · {u.fileName}{u.sortering === 'ovrigt' ? ' (övrig fil)' : ''}
+              </option>
+            ))}
+          </select>
+        )}
+        {laddar && <span className="text-slate-400">Hämtar…</span>}
+        {sparFel && <span className="text-red-600">{sparFel}</span>}
+        {foljer && (
+          <button onClick={() => { setFoljer(null); setKundKey(''); }} className="text-slate-500 hover:text-slate-800 underline">
+            Sluta följa
+          </button>
+        )}
+      </div>
+
+      <div className="relative bg-white border border-slate-200 rounded-2xl overflow-hidden h-[calc(100vh-190px)] min-h-[420px]">
         <svg
           ref={svgRef}
           viewBox={`${vy.x} ${vy.y} ${vy.b} ${vy.h}`}
@@ -394,6 +572,9 @@ export default function FlodesschemaPage() {
             </marker>
             <marker id="pil-vald" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0,0 L10,5 L0,10 z" fill="#173b57" />
+            </marker>
+            <marker id="pil-gangen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#16a34a" />
             </marker>
           </defs>
 
@@ -427,17 +608,16 @@ export default function FlodesschemaPage() {
           {/* Pilar */}
           {PILAR.map((p, i) => {
             const v = vag(p, platser[p.fran], platser[p.till]);
-            const aktiv = vald !== null && (p.fran === vald || p.till === vald);
-            const tona = vald !== null ? !aktiv : baraAi;
+            const { gangen, aktiv, tona } = pilLage(p);
             return (
-              <g key={i} opacity={tona ? 0.3 : 1}>
+              <g key={i} opacity={tona ? (spar ? 0.15 : 0.3) : 1}>
                 <path
                   d={v.d}
                   fill="none"
-                  stroke={aktiv ? '#173b57' : '#94a3b8'}
-                  strokeWidth={aktiv ? 2 : 1.4}
+                  stroke={gangen ? '#16a34a' : aktiv ? '#173b57' : '#94a3b8'}
+                  strokeWidth={gangen ? 2.6 : aktiv ? 2 : 1.4}
                   strokeDasharray={p.mejl ? '5 4' : undefined}
-                  markerEnd={`url(#${aktiv ? 'pil-vald' : 'pil'})`}
+                  markerEnd={`url(#${gangen ? 'pil-gangen' : aktiv ? 'pil-vald' : 'pil'})`}
                 />
               </g>
             );
@@ -449,7 +629,7 @@ export default function FlodesschemaPage() {
             const t = TYPER[s.typ];
             const arVald = vald === s.id;
             const klick = (e: React.MouseEvent) => { e.stopPropagation(); if (!harDragit()) setVald(arVald ? null : s.id); };
-            const op = tonad(s.id) ? 0.3 : 1;
+            const op = tonad(s.id) ? (spar ? 0.2 : 0.3) : 1;
 
             if (s.typ === 'hopp') {
               return (
@@ -507,11 +687,34 @@ export default function FlodesschemaPage() {
           {PILAR.map((p, i) => {
             if (!p.text) return null;
             const v = vag(p, platser[p.fran], platser[p.till]);
-            const aktiv = vald !== null && (p.fran === vald || p.till === vald);
+            const { gangen, aktiv, tona } = pilLage(p);
             return (
-              <text key={i} x={v.tx} y={v.ty} textAnchor={v.mitt ? 'middle' : 'start'} fontSize="9.5" fill={aktiv ? '#173b57' : '#64748b'} fontWeight={aktiv ? 600 : 400} opacity={(vald !== null ? !aktiv : baraAi) ? 0.3 : 1} paintOrder="stroke" stroke="#fff" strokeWidth="3" pointerEvents="none">
+              <text key={i} x={v.tx} y={v.ty} textAnchor={v.mitt ? 'middle' : 'start'} fontSize="9.5" fill={gangen ? '#15803d' : aktiv ? '#173b57' : '#64748b'} fontWeight={gangen || aktiv ? 600 : 400} opacity={tona ? (spar ? 0.2 : 0.3) : 1} paintOrder="stroke" stroke="#fff" strokeWidth="3" pointerEvents="none">
                 {p.text}
               </text>
+            );
+          })}
+
+          {/* Märken för underlaget som följs: klart, här nu, fel */}
+          {spar && Object.entries(spar.steg).map(([id, { lage }]) => {
+            const s = steg[id];
+            const pl = platser[id];
+            const rund = s.typ === 'val' || s.typ === 'start' || s.typ === 'slut' || s.typ === 'hopp';
+            // Rutor får märket mitt på överkanten, där varken ikonen eller AI-märket sitter
+            const x = rund ? pl.cx + (pl.h - pl.cx) * 0.75 : pl.cx;
+            const y = rund ? pl.cy - (pl.cy - pl.o) * 0.75 : pl.o;
+            const l = LAGE[lage];
+            return (
+              <g key={id} pointerEvents="none">
+                {lage === 'har' && (
+                  <circle cx={x} cy={y} r={8} fill="none" stroke={l.farg} strokeWidth="2">
+                    <animate attributeName="r" values="8;16" dur="1.4s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" values="0.8;0" dur="1.4s" repeatCount="indefinite" />
+                  </circle>
+                )}
+                <circle cx={x} cy={y} r={8} fill={l.farg} stroke="#fff" strokeWidth="1.5" />
+                <text x={x} y={y + 3.5} textAnchor="middle" fontSize="10" fontWeight="700" fill="#fff">{l.tecken}</text>
+              </g>
             );
           })}
         </svg>
@@ -526,7 +729,8 @@ export default function FlodesschemaPage() {
           Scrolla för att zooma · dra för att flytta
         </div>
 
-        {valt && <Detaljer key={valt.id} valt={valt} steg={steg} onVal={setVald} onSpara={spara} />}
+        {foljer && spar && <Sparpanel u={foljer} spar={spar} steg={steg} onVal={setVald} />}
+        {valt && <Detaljer key={valt.id} valt={valt} steg={steg} spar={spar?.steg[valt.id]} onVal={setVald} onSpara={spara} />}
       </div>
 
       <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-4 mt-6 items-start">
@@ -561,8 +765,73 @@ export default function FlodesschemaPage() {
   );
 }
 
-function Detaljer({ valt, steg, onVal, onSpara }: {
-  valt: Steg; steg: Record<string, Steg>; onVal: (id: string | null) => void; onSpara: (id: string, t: Texter) => Promise<void>;
+/** Underlaget som följs: vad det är, var det står och dess transaktioner. */
+function Sparpanel({ u, spar, steg, onVal }: { u: FlodesUnderlag; spar: Spar; steg: Record<string, Steg>; onVal: (id: string) => void }) {
+  const ordning = STEG.filter((s) => spar.steg[s.id]).sort((a, b) => a.kol - b.kol || a.rad - b.rad);
+  const belopp = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const KONTERING = {
+    ingen: { text: 'Ej konterad', klass: 'bg-slate-100 text-slate-600' },
+    gron: { text: 'Grön', klass: 'bg-emerald-50 text-emerald-700' },
+    granska: { text: 'Granska', klass: 'bg-amber-50 text-amber-800' },
+  };
+
+  return (
+    <aside className="absolute top-3 left-3 w-80 max-h-[calc(100%-70px)] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg p-4">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Följer underlag</div>
+      <h2 className="text-base font-semibold text-slate-900 break-words mb-1">{u.fileName}</h2>
+      <div className="flex gap-3 text-xs mb-3">
+        <Link href={`/admin/underlag/${u.id}`} className="text-blue-700 hover:underline">Öppna underlaget</Link>
+        {u.personKey && <Link href={`/admin/person/${encodeURIComponent(u.personKey)}`} className="text-blue-700 hover:underline">Kundens sida</Link>}
+      </div>
+
+      <ol className="space-y-1.5 mb-3">
+        {ordning.map((s) => {
+          const { lage, text } = spar.steg[s.id];
+          return (
+            <li key={s.id}>
+              <button onClick={() => onVal(s.id)} className="flex items-start gap-2 text-left w-full hover:bg-slate-50 rounded px-1 -mx-1 py-0.5">
+                <span
+                  className="mt-0.5 w-4 h-4 shrink-0 rounded-full text-[10px] font-bold leading-4 text-center text-white"
+                  style={{ background: LAGE[lage].farg }}
+                  title={LAGE[lage].namn}
+                >
+                  {LAGE[lage].tecken}
+                </span>
+                <span className="text-sm">
+                  <span className={`text-slate-900 ${lage === 'har' ? 'font-semibold' : ''}`}>{steg[s.id].namn}</span>
+                  <span className="block text-xs text-slate-500">{text}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+
+      {u.transaktioner.length > 0 && (
+        <>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Transaktioner ({u.transaktioner.length})</div>
+          <ul className="divide-y divide-slate-100 text-xs">
+            {u.transaktioner.map((t) => (
+              <li key={t.id} className="py-1.5 flex items-start gap-2">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-slate-800 truncate">{t.motpart || t.beskrivning || 'Utan beskrivning'}</span>
+                  <span className="text-slate-500">{t.datum ?? 'Inget datum'} · {belopp.format(t.belopp)} {t.valuta}</span>
+                </span>
+                <span className={`shrink-0 px-1.5 py-0.5 rounded ${t.bokford ? 'bg-emerald-600 text-white' : KONTERING[t.kontering].klass}`}>
+                  {t.bokford ? 'Bokförd' : KONTERING[t.kontering].text}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </aside>
+  );
+}
+
+function Detaljer({ valt, steg, spar, onVal, onSpara }: {
+  valt: Steg; steg: Record<string, Steg>; spar?: { lage: Lage; text: string };
+  onVal: (id: string | null) => void; onSpara: (id: string, t: Texter) => Promise<void>;
 }) {
   const [utkast, setUtkast] = useState<Texter | null>(null);
   const [sparar, setSparar] = useState(false);
@@ -603,6 +872,15 @@ function Detaljer({ valt, steg, onVal, onSpara }: {
       <h2 className="text-base font-semibold text-slate-900 mb-1.5">
         {valt.typ === 'hopp' ? `Hopp ${valt.namn}` : valt.namn}
       </h2>
+
+      {spar && (
+        <div className="mb-3 px-3 py-2 rounded-lg text-sm border" style={{ borderColor: LAGE[spar.lage].farg, background: `${LAGE[spar.lage].farg}12` }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: LAGE[spar.lage].farg }}>
+            Underlaget · {LAGE[spar.lage].namn}
+          </div>
+          <div className="text-slate-800">{spar.text}</div>
+        </div>
+      )}
 
       {utkast ? (
         <div className="mb-4">

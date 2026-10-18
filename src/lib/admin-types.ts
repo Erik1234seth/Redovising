@@ -514,3 +514,41 @@ export interface AiAnteckning {
   omfang: 'kund' | 'generell';
   at: string;
 }
+
+/** En kund med underlag, i flödesschemats väljare. */
+export interface FlodesKund {
+  /** Nyckel till personvyn, e:<adress>. */
+  key: string;
+  namn: string;
+  underlag: { id: string; fileName: string; at: string; source: string; sortering: 'underlag' | 'ovrigt' | null }[];
+}
+
+/** Allt som hänt med ett underlag, för att följa det genom flödesschemat. */
+export interface FlodesUnderlag {
+  id: string;
+  fileName: string;
+  /** app, mejl eller admin (uppladdat av oss). */
+  source: string;
+  at: string;
+  personKey: string | null;
+  sortering: 'underlag' | 'ovrigt' | null;
+  sorteringOrsak: string | null;
+  kontroll: { status: 'komplett' | 'saknar' | 'fel'; saknas: { rad: string; vad: string }[]; at: string } | null;
+  /** AI-avläsningen till transaktioner. */
+  utlasning: { at: string; antal: number; fel: string | null } | null;
+  /** SIE-filen inlagd som verifikationer. */
+  sie: { at: string; antal: number; dubbletter: number; fel: string | null } | null;
+  transaktioner: {
+    id: string;
+    datum: string | null;
+    beskrivning: string;
+    motpart: string;
+    belopp: number;
+    valuta: string;
+    /** ingen = inte konterad, gron = båda modellerna gröna och överens, granska = allt annat. */
+    kontering: 'ingen' | 'gron' | 'granska';
+    bokford: boolean;
+  }[];
+  /** Verifikationer som pekar på underlaget. */
+  verifikationer: number;
+}
