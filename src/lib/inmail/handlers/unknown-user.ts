@@ -3,6 +3,15 @@ import { callOpenAI, parseJSON } from '../openai-client';
 import { ENKLA_BOKSLUT_CONTEXT } from '../service-context';
 import { REPLY_RULES } from '../reply-rules';
 import { anteckningarForPrompt } from '../../inkorg/anteckningar';
+import { byggMejlkontext } from '../../mejlkontext';
+
+// Förut 1000 tecken av mejlet och de sista 3000 av tråden. Ett långt frågemejl
+// från ett lead blev då början (hälsningen) plus slutet (sista frågorna, som
+// ligger sist i tråden) — allt däremellan föll bort och besvarades aldrig.
+// Taken finns bara som skydd mot extremfall. Historiken är redan kapad till
+// 40 000 tecken i byggMejlkontext; resten är marginal för SMS-konversationen.
+const MEJL_MAX_TECKEN = 20000;
+const HISTORIK_MAX_TECKEN = 50000;
 
 interface InitialReply {
   isInterested: boolean;
@@ -44,8 +53,8 @@ Returnera JSON:
   const userContent = [
     `Ämne: ${subject || '(inget ämne)'}`,
     attachmentNames.length ? `Bilagor: ${attachmentNames.join(', ')}` : '',
-    history ? `\nTidigare i tråden:\n${history.slice(-3000)}` : '',
-    `\nMejltext:\n${body.slice(0, 1000)}`,
+    history ? `\nTidigare i tråden:\n${history.slice(-HISTORIK_MAX_TECKEN)}` : '',
+    `\nMejltext:\n${body.slice(0, MEJL_MAX_TECKEN)}`,
   ].join('\n');
 
   const raw = await callOpenAI({
@@ -76,7 +85,12 @@ export async function handleUnknownUser(params: {
   smsKontext?: string;
 }): Promise<{ action: string; replyBody: string }> {
   const { supabase, senderEmail, subject, body, gmailThreadId, messageId, smsKontext } = params;
-  const emailHistory = [params.emailHistory, smsKontext].filter(Boolean).join('\n\n') || undefined;
+  // Historiken ur mejlarkivet, utan mejlet som besvaras — det står för sig som
+  // "Mejltext". Tråden från Apps Script har det nya mejlet sist, så med den kom
+  // samma text med två gånger. Tråden används bara om arkivet inte gick att läsa.
+  const arkiv = await byggMejlkontext(supabase, { userId: null, emails: [senderEmail], utanMessageId: messageId })
+    .catch(() => '');
+  const emailHistory = [arkiv || params.emailHistory, smsKontext].filter(Boolean).join('\n\n') || undefined;
   const attachmentNames = params.attachmentNames ?? [];
 
   // Skapa konto-länken ur länkregistret (knowledge/lankregister.md). Förut gick

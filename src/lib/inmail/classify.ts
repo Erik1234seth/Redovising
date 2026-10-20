@@ -1,5 +1,9 @@
 import { callOpenAI, parseJSON } from './openai-client';
 
+// Hela mejlet, inte bara början. En fråga eller begäran längre ner i ett långt
+// mejl ska också kunna avgöra vad mejlet handlar om.
+const MEJL_MAX_TECKEN = 20000;
+
 export type Intent =
   | 'NEW_TRANSACTION'    // skickar kvitto/faktura att bokföra
   | 'EDIT_TRANSACTION'   // vill ändra en befintlig transaktion
@@ -52,7 +56,7 @@ Returnera JSON med exakt dessa fält:
   const userMsg = `Ämne: ${subject || '(inget ämne)'}
 Bilagor: ${hasAttachments ? 'ja' : 'nej'}
 Mejltext:
-${body.slice(0, 1500)}`;
+${body.slice(0, MEJL_MAX_TECKEN)}`;
 
   try {
     const raw = await callOpenAI({
