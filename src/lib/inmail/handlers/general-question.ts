@@ -5,6 +5,9 @@ import { buildGeneralQuestionPrompt } from '../general-question-prompt';
 import { anteckningarForPrompt } from '../../inkorg/anteckningar';
 import { byggMejlkontext } from '../../mejlkontext';
 
+/** Hur mycket av mejlet som besvaras som skickas till AI:n. */
+const MEJL_MAX_TECKEN = 20000;
+
 const MOMS_PERIOD_TEXT: Record<string, string> = {
   monthly: 'månadsvis',
   quarterly: 'kvartalsvis',
@@ -128,12 +131,16 @@ export async function handleGeneralQuestion(params: {
     attachmentNames,
   }) + anteckningar;
 
-  const aktuellt = `Ämne: ${subject || '(inget ämne)'}\n\n${body.slice(0, 3000)}`;
+  // Mejlet som besvaras är kundens egen text och ska komma med i sin helhet.
+  // Med 3000 tecken föll de sista frågorna i ett långt frågemejl bort, trots
+  // att inkorgen visade hela mejlet. Taket finns bara som skydd mot extremfall.
+  const fraga = body.slice(0, MEJL_MAX_TECKEN);
+  const aktuellt = `Ämne: ${subject || '(inget ämne)'}\n\n${fraga}`;
   const mejl = historik
     ? `${historik}\n\nMEJLET DU SVARAR PÅ:\n${aktuellt}`
     : emailHistory
       ? `Mailkonversation:\n\n${emailHistory}`
-      : `Ämne: ${subject || '(inget ämne)'}\n\nFråga:\n${body.slice(0, 1500)}`;
+      : `Ämne: ${subject || '(inget ämne)'}\n\nFråga:\n${fraga}`;
   const userContent = [smsKontext, mejl, underlagKontext].filter(Boolean).join('\n\n');
 
   const answer = await callOpenAI({
