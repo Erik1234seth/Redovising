@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { husavdragEtikett, type Husavdrag } from '@/lib/husavdrag';
+import { formatBelopp } from '@/lib/valuta';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -22,17 +23,15 @@ interface EmailBody {
   betalningsinfo?: string | null;
   husavdrag?: Husavdrag | null;
   dokumenttyp?: 'faktura' | 'offert';
-}
-
-function fmt(n: number) {
-  return n.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kr';
+  valuta?: string | null;
 }
 
 export async function POST(request: Request) {
   try {
     const body: EmailBody = await request.json();
-    const { to, pdfBase64, fakturaName, fakturaInfo, säljarInfo, kundInfo, rader, momsByRate, totalExkl, totalInkl, betalningsinfo, husavdrag, dokumenttyp } = body;
+    const { to, pdfBase64, fakturaName, fakturaInfo, säljarInfo, kundInfo, rader, momsByRate, totalExkl, totalInkl, betalningsinfo, husavdrag, dokumenttyp, valuta } = body;
     const offert = dokumenttyp === 'offert';
+    const fmt = (n: number) => formatBelopp(n, valuta);
 
     if (!to || !pdfBase64 || !fakturaName) {
       return NextResponse.json({ error: 'Saknar e-post, PDF eller fakturanummer' }, { status: 400 });

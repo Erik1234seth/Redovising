@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase';
 import {
   HUSAVDRAG_PROCENT, beraknaAvdrag, husavdragEtikett, type Husavdrag, type HusavdragTyp,
 } from '@/lib/husavdrag';
+import { VALUTOR, STANDARD_VALUTA, formatBelopp, type Valuta } from '@/lib/valuta';
 
 const NAV_BG = '#173b57';
 
@@ -100,6 +101,8 @@ export default function NyFakturaPage() {
   const [forfalloTyp, setForfalloTyp] = useState<'30' | '15' | '10' | 'custom'>('30');
   const [forfalloDatum, setForfalloDatum] = useState(datePlus(30));
 
+  const [valuta, setValuta] = useState<Valuta>(STANDARD_VALUTA);
+  const utlandskValuta = valuta !== 'SEK';
   const [rader, setRader] = useState<Rad[]>([nyRad()]);
   const [betalsatt, setBetalsatt] = useState<'bankgiro' | 'kontonummer' | 'swish' | 'anpassat'>('bankgiro');
   const [bankgiro, setBankgiro] = useState('');
@@ -235,11 +238,21 @@ export default function NyFakturaPage() {
       ...r,
       produktId: produkt.id,
       beskrivning: produkt.namn + (produkt.beskrivning ? ` – ${produkt.beskrivning}` : ''),
-      apris: String(produkt.pris_exkl_moms),
+      // Produktpriserna är i SEK, så i annan valuta får man skriva in priset själv
+      apris: utlandskValuta ? '' : String(produkt.pris_exkl_moms),
       momssats: produkt.momssats,
       enhet: produkt.enhet,
     } : r));
     setProduktDropdownRadId(null);
+  }
+
+  function bytValuta(ny: Valuta) {
+    setValuta(ny);
+    if (ny !== 'SEK') setHusavdragTyp(null);
+    setRader(prev => prev.map(r => {
+      const p = sparadeProdukter.find(p => p.id === r.produktId);
+      return p ? { ...r, apris: ny === 'SEK' ? String(p.pris_exkl_moms) : '' } : r;
+    }));
   }
 
   function uppdateraRad(id: string, field: keyof Rad, value: string | number) {
@@ -274,6 +287,7 @@ export default function NyFakturaPage() {
     if (!user) return;
     if (!valdKundId) { setError('Välj en kund'); return; }
     if (rader.some(r => !r.produktId)) { setError('Alla rader måste ha en produkt vald'); return; }
+    if (utlandskValuta && rader.some(r => !(parseFloat(r.apris) > 0))) { setError(`Ange à-pris i ${valuta} för alla rader`); return; }
     if (husavdragTyp && totalInkl <= 0) { setError('Fakturan saknar belopp att dra av'); return; }
     if (husavdragTyp && !personnummer.trim()) { setError('Fyll i köparens personnummer'); return; }
 
@@ -319,6 +333,7 @@ export default function NyFakturaPage() {
         meddelande: meddelande || null,
         husavdrag,
         dokumenttyp,
+        valuta,
         status: arOffert ? 'offert' : 'obetald',
       }).select('id').single();
       if (dbErr) throw dbErr;
@@ -487,9 +502,19 @@ export default function NyFakturaPage() {
                   className={inputCls} style={ringStyle} />
               </div>
             )}
+            <div>
+              <label className={labelCls}>Valuta</label>
+              <select value={valuta} onChange={e => bytValuta(e.target.value as Valuta)}
+                className={inputCls} style={ringStyle}>
+                {VALUTOR.map(v => <option key={v.kod} value={v.kod}>{v.kod} – {v.namn}</option>)}
+              </select>
+            </div>
           </div>
           {forfalloTyp !== 'custom' && (
             <p className="text-xs text-slate-400 mt-2">{arOffert ? 'Giltig till' : 'Förfaller'}: {new Date(forfalloDatum).toLocaleDateString('sv-SE')}</p>
+          )}
+          {utlandskValuta && (
+            <p className="text-xs text-slate-500 mt-2">Dina sparade produktpriser är i kronor, så skriv in à-priset i {valuta} på varje rad.</p>
           )}
         </Section>
 
@@ -517,7 +542,7 @@ export default function NyFakturaPage() {
                   style={{ gridTemplateColumns: '1fr 60px 90px 80px 28px' }}>
                   <span>Produkt</span>
                   <span className="text-center">Antal</span>
-                  <span className="text-right">À-pris exkl.</span>
+                  <span className="text-right">À-pris exkl.{utlandskValuta ? ` (${valuta})` : ''}</span>
                   <span className="text-right">Summa inkl.</span>
                   <span />
                 </div>
@@ -590,10 +615,17 @@ export default function NyFakturaPage() {
                           className="px-2 py-2 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 text-center transition"
                           style={ringStyle} />
 
-                        {/* À-pris — skrivskyddat */}
-                        <div className="px-2 py-2 text-sm text-slate-600 bg-slate-50 border border-slate-100 rounded-xl text-right tabular-nums">
-                          {rad.apris ? `${Number(rad.apris).toLocaleString('sv-SE')} kr` : '—'}
-                        </div>
+                        {/* À-pris — skrivskyddat i SEK, skrivs in vid annan valuta */}
+                        {utlandskValuta ? (
+                          <input type="number" value={rad.apris} onChange={e => uppdateraRad(rad.id, 'apris', e.target.value)}
+                            min="0" step={valuta === 'JPY' ? '1' : '0.01'} placeholder="0"
+                            className="px-2 py-2 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 text-right tabular-nums transition"
+                            style={ringStyle} />
+                        ) : (
+                          <div className="px-2 py-2 text-sm text-slate-600 bg-slate-50 border border-slate-100 rounded-xl text-right tabular-nums">
+                            {rad.apris ? `${Number(rad.apris).toLocaleString('sv-SE')} kr` : '—'}
+                          </div>
+                        )}
 
                         {/* Summa inkl moms */}
                         <p className="text-sm font-semibold text-slate-700 text-right tabular-nums">
@@ -630,6 +662,7 @@ export default function NyFakturaPage() {
         </Section>
 
         {/* ── ROT & RUT ── */}
+        {!utlandskValuta && (
         <Section title="ROT- & RUT-avdrag" optional>
           <div className="grid grid-cols-3 gap-2">
             {([
@@ -676,23 +709,24 @@ export default function NyFakturaPage() {
             </div>
           )}
         </Section>
+        )}
 
         {/* ── Summering ── */}
         <Section title="Summering">
           <div className="flex flex-col gap-2">
             <div className="flex justify-between text-sm text-slate-500">
               <span>Belopp exkl. moms</span>
-              <span className="font-medium text-slate-700 tabular-nums">{totalExkl.toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr</span>
+              <span className="font-medium text-slate-700 tabular-nums">{formatBelopp(totalExkl, valuta)}</span>
             </div>
             {momsByRate.map(m => (
               <div key={m.sats} className="flex justify-between text-sm text-slate-500">
                 <span>Moms {m.sats}%</span>
-                <span className="font-medium text-slate-700 tabular-nums">{m.belopp.toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr</span>
+                <span className="font-medium text-slate-700 tabular-nums">{formatBelopp(m.belopp, valuta)}</span>
               </div>
             ))}
             <div className="flex justify-between pt-3 border-t border-slate-100 mt-1">
               <span className="font-bold text-slate-800">Totalt inkl. moms</span>
-              <span className="font-bold text-slate-800 text-lg tabular-nums">{totalInkl.toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr</span>
+              <span className="font-bold text-slate-800 text-lg tabular-nums">{formatBelopp(totalInkl, valuta)}</span>
             </div>
             {husavdragTyp && (
               <>

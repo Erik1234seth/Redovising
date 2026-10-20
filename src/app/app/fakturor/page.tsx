@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
+import { valutaEtikett } from '@/lib/valuta';
 
 const NAV_BG = '#173b57';
 
@@ -18,6 +19,7 @@ interface Faktura {
   faktura_datum: string;
   status: string;
   dokumenttyp: 'faktura' | 'offert';
+  valuta: string | null;
 }
 
 const STATUS_LABEL: Record<string, { label: string; bg: string; color: string }> = {
@@ -44,7 +46,7 @@ export default function FakturorPage() {
     const supabase = createClient();
     supabase
       .from('fakturor')
-      .select('id,faktura_nr,kund_namn,belopp_inkl_moms,husavdrag,forfallo_datum,faktura_datum,status,dokumenttyp')
+      .select('id,faktura_nr,kund_namn,belopp_inkl_moms,husavdrag,forfallo_datum,faktura_datum,status,dokumenttyp,valuta')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         if (data) setFakturor(data);
@@ -141,7 +143,7 @@ export default function FakturorPage() {
                     <span className="text-sm text-slate-600 truncate">{f.kund_namn}</span>
                     <span className="text-sm font-semibold text-slate-700 text-right">
                       {f.husavdrag && <span className="mr-1.5 text-[10px] font-bold uppercase text-emerald-600">{f.husavdrag.typ}</span>}
-                      {Number(f.husavdrag?.att_betala ?? f.belopp_inkl_moms).toLocaleString('sv-SE')} kr
+                      {Number(f.husavdrag?.att_betala ?? f.belopp_inkl_moms).toLocaleString('sv-SE')} {valutaEtikett(f.valuta)}
                     </span>
                     <span className="text-sm text-slate-500 pl-4">
                       {new Date(f.forfallo_datum).toLocaleDateString('sv-SE')}

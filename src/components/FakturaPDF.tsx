@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, Svg, Path } from '@react-pdf/renderer';
 import { husavdragEtikett, type Husavdrag } from '@/lib/husavdrag';
+import { formatBelopp } from '@/lib/valuta';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ export interface FakturaPDFData {
   rader: FakturaRad[];
   husavdrag?: Husavdrag | null;
   dokumenttyp?: 'faktura' | 'offert';
+  valuta?: string | null;
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -115,10 +117,6 @@ const s = StyleSheet.create({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(n: number) {
-  return n.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kr';
-}
-
 function fmtDatum(s: string) {
   return new Date(s).toLocaleDateString('sv-SE');
 }
@@ -127,6 +125,7 @@ function fmtDatum(s: string) {
 
 export function FakturaPDF({ data }: { data: FakturaPDFData }) {
   const offert = data.dokumenttyp === 'offert';
+  const fmt = (n: number) => formatBelopp(n, data.valuta);
   const radSummor = data.rader.map(r => {
     const exkl = r.antal * r.apris;
     const moms = exkl * (r.momssats / 100);

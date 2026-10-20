@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
 import { husavdragEtikett, type Husavdrag } from '@/lib/husavdrag';
+import { formatBelopp } from '@/lib/valuta';
 
 const NAV_BG = '#173b57';
 
@@ -38,10 +39,7 @@ interface Faktura {
   status: string;
   husavdrag: Husavdrag | null;
   dokumenttyp: 'faktura' | 'offert';
-}
-
-function fmt(n: number) {
-  return n.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kr';
+  valuta: string | null;
 }
 
 function fmtDatum(s: string) {
@@ -139,6 +137,7 @@ export default function FakturaVyPage() {
         rader: faktura!.rader,
         husavdrag: faktura!.husavdrag,
         dokumenttyp: faktura!.dokumenttyp,
+        valuta: faktura!.valuta,
       },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any);
@@ -219,6 +218,7 @@ export default function FakturaVyPage() {
           betalningsinfo: faktura!.betalningsinfo,
           husavdrag: faktura!.husavdrag,
           dokumenttyp: faktura!.dokumenttyp,
+          valuta: faktura!.valuta,
         }),
       });
       const data = await res.json();
@@ -342,6 +342,7 @@ function FakturaInnehall({
   profile: { full_name: string | null; company_name: string | null; org_nr: string | null; phone: string | null; email: string; adress: string | null; postnummer: string | null; ort: string | null; momsnr: string | null } | null;
 }) {
   const offert = faktura.dokumenttyp === 'offert';
+  const fmt = (n: number) => formatBelopp(n, faktura.valuta);
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', color: '#1e293b' }}>
 
