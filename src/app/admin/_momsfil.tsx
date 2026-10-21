@@ -8,6 +8,7 @@ import {
 } from '@/lib/moms/eskd';
 import { Varningar } from './_varningar';
 import { DragFil } from './_dragfil';
+import type { Ver } from './_verifikationer';
 
 /**
  * Momsdeklarationen som fil för en period, räknad ur kundens verifikationer.
@@ -40,7 +41,46 @@ function forraPerioden(typ: Periodtyp): { ar: number; nr: number } {
 const kr = new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 });
 const kr2 = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const st = (n: number, en: string, flera: string) => `${n} ${n === 1 ? en : flera}`;
-const namn = (v: AdminVerifikation) => `${v.serie}${v.nummer}`.trim() || v.datum || v.text || '?';
+const namn = (v: Ver) => `${v.serie}${v.nummer}`.trim() || v.datum || v.text || '?';
+
+/**
+ * Momsrutorna för en period, räknade ur verifikationerna. Allt som inte kommer
+ * med i rutorna räknas upp som varningar — en rad som tyst faller bort syns
+ * annars först när Skatteverket hör av sig. Rapporterna räknar med samma.
+ */
+export function momsForPeriod(verifikationer: Ver[], fran: string, tom: string) {
+  const varningar: string[] = [];
+  const iPerioden = verifikationer.filter((v) => v.datum >= fran && v.datum <= tom);
+
+  const odaterade = verifikationer.filter((v) => !v.datum);
+  if (odaterade.length) {
+    varningar.push(`${st(odaterade.length, 'verifikation', 'verifikationer')} saknar datum och kan inte hamna i någon period: ${odaterade.slice(0, 5).map(namn).join(', ')}${odaterade.length > 5 ? ' …' : ''}`);
+  }
+
+  const avrakningar = iPerioden.filter((v) => arMomsavrakning(v.transaktioner.filter((t) => !t.borttagen && !t.tillagd)));
+  if (avrakningar.length) {
+    varningar.push(`${st(avrakningar.length, 'verifikation', 'verifikationer')} mot 2650 (momsavräkning) räknas inte med: ${avrakningar.slice(0, 5).map(namn).join(', ')}`);
+  }
+  const medrakade = iPerioden.filter((v) => !avrakningar.includes(v));
+
+  const obalanserade = medrakade.filter((v) => !v.balanserad);
+  if (obalanserade.length) {
+    varningar.push(`${st(obalanserade.length, 'verifikation', 'verifikationer')} i perioden går inte jämnt ut men är medräknade: ${obalanserade.slice(0, 5).map(namn).join(', ')}${obalanserade.length > 5 ? ' …' : ''}`);
+  }
+
+  const allaRader = medrakade.flatMap((v) => v.transaktioner);
+  const struket = allaRader.filter((t) => t.borttagen || t.tillagd).length;
+  if (struket) {
+    varningar.push(`${st(struket, 'rad', 'rader')} markerade som borttagna eller tillagda i efterhand (SIE #BTRANS/#RTRANS) räknas inte med`);
+  }
+  const rader = allaRader.filter((t) => !t.borttagen && !t.tillagd);
+
+  for (const k of ignoreradeKonton(rader)) {
+    varningar.push(`Konto ${k.konto}${k.kontonamn ? ` ${k.kontonamn}` : ''} (${kr2.format(k.belopp)} kr) hamnar inte i någon ruta`);
+  }
+
+  return { rutor: raknaRutor(rader), antal: medrakade.length, varningar };
+}
 
 export function MomsFil({ verifikationer, orgNr, momsPeriod, lastPeriod, onPeriod }: {
   verifikationer: AdminVerifikation[];
@@ -69,43 +109,7 @@ export function MomsFil({ verifikationer, orgNr, momsPeriod, lastPeriod, onPerio
   useEffect(() => onPeriod?.({ fran, tom }), [fran, tom, onPeriod]);
   const formatOrgNr = eskdOrgNr(orgNr);
 
-  /**
-   * Allt som inte kommer med i rutorna räknas upp som varningar — en rad som
-   * tyst faller bort syns annars först när Skatteverket hör av sig.
-   */
-  const { rutor, antal, varningar } = useMemo(() => {
-    const varningar: string[] = [];
-    const iPerioden = verifikationer.filter((v) => v.datum >= fran && v.datum <= tom);
-
-    const odaterade = verifikationer.filter((v) => !v.datum);
-    if (odaterade.length) {
-      varningar.push(`${st(odaterade.length, 'verifikation', 'verifikationer')} saknar datum och kan inte hamna i någon period: ${odaterade.slice(0, 5).map(namn).join(', ')}${odaterade.length > 5 ? ' …' : ''}`);
-    }
-
-    const avrakningar = iPerioden.filter((v) => arMomsavrakning(v.transaktioner.filter((t) => !t.borttagen && !t.tillagd)));
-    if (avrakningar.length) {
-      varningar.push(`${st(avrakningar.length, 'verifikation', 'verifikationer')} mot 2650 (momsavräkning) räknas inte med: ${avrakningar.slice(0, 5).map(namn).join(', ')}`);
-    }
-    const medrakade = iPerioden.filter((v) => !avrakningar.includes(v));
-
-    const obalanserade = medrakade.filter((v) => !v.balanserad);
-    if (obalanserade.length) {
-      varningar.push(`${st(obalanserade.length, 'verifikation', 'verifikationer')} i perioden går inte jämnt ut men är medräknade: ${obalanserade.slice(0, 5).map(namn).join(', ')}${obalanserade.length > 5 ? ' …' : ''}`);
-    }
-
-    const allaRader = medrakade.flatMap((v) => v.transaktioner);
-    const struket = allaRader.filter((t) => t.borttagen || t.tillagd).length;
-    if (struket) {
-      varningar.push(`${st(struket, 'rad', 'rader')} markerade som borttagna eller tillagda i efterhand (SIE #BTRANS/#RTRANS) räknas inte med`);
-    }
-    const rader = allaRader.filter((t) => !t.borttagen && !t.tillagd);
-
-    for (const k of ignoreradeKonton(rader)) {
-      varningar.push(`Konto ${k.konto}${k.kontonamn ? ` ${k.kontonamn}` : ''} (${kr2.format(k.belopp)} kr) hamnar inte i någon ruta`);
-    }
-
-    return { rutor: raknaRutor(rader), antal: medrakade.length, varningar };
-  }, [verifikationer, fran, tom]);
+  const { rutor, antal, varningar } = useMemo(() => momsForPeriod(verifikationer, fran, tom), [verifikationer, fran, tom]);
 
   const ar0 = new Date().getFullYear();
   const ars = [ar0 - 2, ar0 - 1, ar0];

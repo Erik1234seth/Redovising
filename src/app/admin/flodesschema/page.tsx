@@ -117,7 +117,7 @@ const STEG: Steg[] = [
   { id: 'skapa-verif', klar: true, namn: 'Skapa verifikationer / lägg in i databas', typ: 'system', rad: 5, kol: 10, beskrivning: 'Varje godkänd transaktion blir en verifikation i databasen: kostnads- eller intäktskontot, momsen och betalkontot (1930 företagskonto, 2013/2017 privat) enligt Kundkontext. Gröna bokförs med kontot båda modellerna valt, signerade AI. Granskade bokförs på kontot man väljer, signerade Erik.', finns: 'Verifikationer i serie AI, kopplade till transaktionen och underlaget. Bokförs när man följer ett underlag här eller i fliken Kontering.' },
   { id: 'huvudbok', klar: true, namn: 'Uppdatera verifikationslista / huvudbok', typ: 'system', rad: 5, kol: 11, beskrivning: 'Verifikationerna hamnar i huvudboken på det räkenskapsår deras datum hör till — ett underlag från förra året läggs in på förra året av sig självt.', finns: 'Fliken Huvudbok i personvyn: per konto med ingående balans, rader och utgående balans, per räkenskapsår. Går att ladda ner som Excel.' },
 
-  { id: 'bb-rr', namn: 'Uppdatera BB, RR, momsrapport', typ: 'system', rad: 5, kol: 12, beskrivning: 'Balansräkning, resultaträkning och momsrapport räknas om.' },
+  { id: 'bb-rr', klar: true, namn: 'Uppdatera BB, RR, momsrapport', typ: 'system', rad: 5, kol: 12, beskrivning: 'Balansräkning, resultaträkning och momsrapport räknas ur huvudboken varje gång de öppnas, så en ny verifikation syns direkt. Per räkenskapsår, kvartal eller månad. Resultaträkningen visar perioden och året hittills, balansräkningen ingående balans, förändring och utgående balans, och kontrollerar att den går ihop. Momsrapporten räknas som momsfilen.', finns: 'Fliken Rapporter i personvyn. Går att ladda ner som Excel.' },
   { id: 'momsfil', namn: 'Skapa momsfil / periodisk sammanställning', typ: 'system', rad: 6, kol: 12, finns: 'Momsfil (eSKD)' },
   { id: 'lamna-moms', namn: 'Lämna in moms', typ: 'manuell', rad: 7, kol: 12, finns: 'Sidan Inlämning' },
 
@@ -341,14 +341,19 @@ const kort = (d: string) => new Date(d).toLocaleDateString('sv-SE');
 /**
  * Var i flödet ett underlag har gått, utifrån det som faktiskt finns sparat.
  *
- * Stegen efter huvudboken gäller hela perioden och inte ett enskilt underlag,
- * så spåret slutar där.
+ * Stegen efter rapporterna gäller hela perioden och inte ett enskilt
+ * underlag, så spåret slutar där.
  */
 function foljUnderlag(u: FlodesUnderlag): Spar {
   const steg: Spar['steg'] = {};
   const pilar = new Set<string>();
   const satt = (id: string, lage: Lage, text: string) => { steg[id] = { lage, text }; };
   const ga = (fran: string, till: string) => pilar.add(pilNyckel(fran, till));
+  // Rapporterna räknas ur huvudboken när de öppnas — är verifikationerna där är de med
+  const rapporter = () => {
+    ga('huvudbok', 'bb-rr');
+    satt('bb-rr', 'klar', 'Med i balans- och resultaträkningen och momsrapporten');
+  };
 
   const start = u.source === 'admin' ? 'manuell-skickar' : 'kund-skickar';
   satt(start, 'klar', u.source === 'mejl' ? 'Kom som bilaga i ett mejl' : u.source === 'app' ? 'Uppladdat i appen' : 'Uppladdat av oss');
@@ -389,6 +394,7 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
     satt('plocka-verif', 'klar', `${u.sie.antal} verifikationer inlagda${u.sie.dubbletter ? `, ${u.sie.dubbletter} fanns redan hos kunden` : ''}`);
     ga('plocka-verif', 'huvudbok');
     satt('huvudbok', 'klar', `${u.verifikationer} verifikationer i huvudboken`);
+    rapporter();
     return { steg, pilar };
   }
 
@@ -504,6 +510,7 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
   // Verifikationen hamnar på det räkenskapsår dess datum hör till
   const ar = [...new Set(T.map((t) => t.verifikation?.datum?.slice(0, 4)).filter(Boolean))].sort();
   satt('huvudbok', 'klar', `${u.verifikationer} verifikationer i huvudboken${ar.length ? ` för ${ar.join(' och ')}` : ''}`);
+  rapporter();
   return { steg, pilar };
 }
 

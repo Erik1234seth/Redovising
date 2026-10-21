@@ -20,7 +20,7 @@ import { kr, type Ver } from './_verifikationer';
  * Resultatkonton (3000–8999) börjar på noll varje år.
  */
 
-interface Period { id: string; namn: string; fran: string; tom: string }
+export interface Period { id: string; namn: string; fran: string; tom: string }
 
 interface Rad { datum: string; ver: string; text: string; belopp: number }
 
@@ -33,7 +33,7 @@ interface Konto {
 
 // Som i verifikationslistan: borttagna rader gäller inte, och en rad
 // "tillagd i efterhand" (#RTRANS) följs av samma rad som vanlig rad
-const giltiga = (v: Ver) => v.transaktioner.filter((t) => !t.borttagen && !t.tillagd);
+export const giltiga = (v: Ver) => v.transaktioner.filter((t) => !t.borttagen && !t.tillagd);
 const arBalanskonto = (k: string) => /^[12]\d{3}$/.test(k);
 const arResultatkonto = (k: string) => /^[3-8]\d{3}$/.test(k);
 const ore = (n: number) => Math.round(n * 100) / 100;
