@@ -434,6 +434,12 @@ export interface Arende {
   kalla: 'manuell' | 'mejl' | 'sms';
   skapad: string;
   klar: string | null;
+  /** 'osaker' när AI:n tror att ärendet kan vara gjort men vill att någon bekräftar. */
+  aiStatus?: 'osaker' | null;
+  /** AI:ns senaste bedömning, t.ex. varför den stängde ärendet. */
+  aiMotivering?: string | null;
+  /** AI:n har skrivit ett mejlutkast för ärendet. */
+  aiUtkast?: boolean;
 }
 
 /** Ett bokat möte (`meetings`), som det visas bland ärendena. */

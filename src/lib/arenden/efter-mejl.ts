@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase-server';
 import { isNoReplyAddress } from '@/lib/inmail/no-reply';
 import { profilForAdress } from '@/lib/inmail/profil';
 import { skapaArendenFranMeddelande } from './fran-meddelande';
+import { kollaArenden } from './ai-koll';
 
 /**
  * Läggs runt /api/inmail och /api/inmail/reply, precis som underlagskvittot:
@@ -38,6 +39,9 @@ export function arendenEfterMejl(request: Request, response: Response): void {
         historik: body.emailHistory,
         vartSvar: replyBody ?? null,
       });
+
+      // Mejlet kan också betyda att ett äldre ärende är gjort
+      await kollaArenden({ supabase, personKey: email });
     } catch (err) {
       console.error('[arenden] efter mejl:', err instanceof Error ? err.message : err);
     }

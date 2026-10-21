@@ -6,6 +6,7 @@ import { identifySender } from '@/lib/sms/identify';
 import { generateSmsReply } from '@/lib/sms/answer';
 import { notifyIncomingSms } from '@/lib/sms/notify';
 import { skapaArendenFranMeddelande } from '@/lib/arenden/fran-meddelande';
+import { kollaArenden } from '@/lib/arenden/ai-koll';
 
 // o3 plus två vektorsökningar tar längre tid än Twilios webhook-timeout på 15 s.
 // Därför kvitteras webhooken direkt och svaret genereras efteråt, via Twilios
@@ -211,6 +212,10 @@ export async function POST(request: Request) {
           .join('\n'),
         vartSvar: reply,
       });
+
+      // SMS:et kan också betyda att ett äldre ärende är gjort
+      await kollaArenden({ supabase: sb, personKey: sender.email ?? from })
+        .catch((err) => console.error('[sms] ai-koll av ärenden:', err instanceof Error ? err.message : err));
 
       console.log(
         `[sms] utkast till ${from} väntar på godkännande ` +

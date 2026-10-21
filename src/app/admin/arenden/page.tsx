@@ -11,6 +11,11 @@ import { PersonValjare, type ValdPerson } from '../_personvaljare';
  * Mail- och SMS-AI:n lägger in ärenden själva när ett meddelande kräver att vi
  * gör något senare. De behöver inte godkännas, men allt går att ändra: klicka
  * på ett ärende för att redigera det.
+ *
+ * AI:n kollar också om öppna ärenden redan är gjorda: när ett nytt mejl eller
+ * SMS kommer in och varje morgon. Det som är gjort stängs med en motivering,
+ * det den tvekar om markeras "Troligen klar?", och för det som passerat sitt
+ * datum kan den skriva ett mejlutkast i inkorgen.
  */
 
 const idag = () => new Date().toLocaleDateString('sv-SE');
@@ -185,8 +190,23 @@ function ArendeRad({ arende, forsenad, onKlar, onRedigera }: {
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-sm font-medium ${klar ? 'line-through text-slate-400' : 'text-slate-900'}`}>{arende.titel}</span>
           <KallaMarke kalla={arende.kalla} />
+          {!klar && arende.aiStatus === 'osaker' && (
+            <span title="Bekräfta med bocken om det stämmer"
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+              Troligen klar?
+            </span>
+          )}
+          {!klar && arende.aiUtkast && (
+            <Link href="/admin/inkorg" onClick={(e) => e.stopPropagation()}
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100">
+              Mejlutkast i inkorgen
+            </Link>
+          )}
         </div>
         {arende.beskrivning && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{arende.beskrivning}</p>}
+        {arende.aiMotivering && (klar || arende.aiStatus === 'osaker') && (
+          <p className="text-xs text-violet-700 mt-0.5">AI: {arende.aiMotivering}</p>
+        )}
       </div>
       <div className="text-right shrink-0">
         {arende.datum && <p className={`text-xs ${forsenad ? 'text-red-600 font-medium' : 'text-slate-500'}`}>{datum(arende.datum)}</p>}

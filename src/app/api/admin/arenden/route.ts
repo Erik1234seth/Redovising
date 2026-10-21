@@ -8,19 +8,23 @@ import type { Arende, AdminMote } from '@/lib/admin-types';
  * GET                      → öppna ärenden, klara de senaste 30 dagarna, och möten
  * POST   { titel, … }      → nytt ärende
  * PATCH  { id, …fält }     → ändra (status 'klar' sätter klar_at)
+ *
+ * AI:n kollar också om öppna ärenden redan är gjorda, se `lib/arenden/ai-koll.ts`.
  * DELETE ?id=              → ta bort
  */
 
-const FALT = 'id, titel, beskrivning, datum, status, person_key, person_namn, kalla, created_at, klar_at';
+const FALT = 'id, titel, beskrivning, datum, status, person_key, person_namn, kalla, created_at, klar_at, ai_status, ai_motivering, ai_utkast_id';
 
 type Rad = {
   id: string; titel: string; beskrivning: string | null; datum: string | null; status: 'oppen' | 'klar';
   person_key: string | null; person_namn: string | null; kalla: Arende['kalla']; created_at: string; klar_at: string | null;
+  ai_status: 'osaker' | null; ai_motivering: string | null; ai_utkast_id: string | null;
 };
 
 const tillArende = (r: Rad): Arende => ({
   id: r.id, titel: r.titel, beskrivning: r.beskrivning, datum: r.datum, status: r.status,
   personKey: r.person_key, personNamn: r.person_namn, kalla: r.kalla, skapad: r.created_at, klar: r.klar_at,
+  aiStatus: r.ai_status, aiMotivering: r.ai_motivering, aiUtkast: !!r.ai_utkast_id,
 });
 
 const datumEllerNull = (d: unknown) => (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null);
@@ -82,6 +86,9 @@ export async function PATCH(request: NextRequest) {
     if (body.status !== 'oppen' && body.status !== 'klar') return NextResponse.json({ error: 'Ogiltig status' }, { status: 400 });
     andring.status = body.status;
     andring.klar_at = body.status === 'klar' ? new Date().toISOString() : null;
+    // Någon har tagit ställning själv, AI:ns bedömning gäller inte längre
+    andring.ai_status = null;
+    andring.ai_motivering = null;
   }
 
   const { data, error } = await createServerClient().from('arenden').update(andring).eq('id', body.id).select(FALT).single();
