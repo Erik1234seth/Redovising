@@ -15,7 +15,7 @@ import { FLYTTAD_FOR_HAND } from '@/lib/underlag/sortering';
  * skillnad från SIE-importen, som sker av sig själv när filen kommer in,
  * kostar det här pengar per fil och ska ske när någon vill det.
  *
- * AI:n avgör vad filen är. Ett kvitto eller kontoutdrag blir transaktioner,
+ * AI:n avgör vad filen är, med steget Definieras svar som utgångsläge. Ett kvitto eller kontoutdrag blir transaktioner,
  * ett redan bokfört underlag blir verifikationer med kontona som står i det.
  * En fil som inte är ett underlag alls — en NE-bilaga, ett avtal — sorteras
  * till övriga filer, och ingenting läses ut ur den.
@@ -51,6 +51,7 @@ interface UnderlagRad {
   mime_type: string | null;
   sortering: string | null;
   sortering_orsak: string | null;
+  definition: { kategori?: string; dokumenttyp?: string } | null;
 }
 
 export async function lasUtTransaktioner(
@@ -59,7 +60,7 @@ export async function lasUtTransaktioner(
 ): Promise<TransaktionResultat> {
   const { data: row, error } = await supabase
     .from('bokforing_underlag')
-    .select('id, user_id, sender_email, file_name, file_path, mime_type, sortering, sortering_orsak')
+    .select('id, user_id, sender_email, file_name, file_path, mime_type, sortering, sortering_orsak, definition')
     .eq('id', underlagId)
     .maybeSingle<UnderlagRad>();
   if (error) throw new Error(`Kunde inte läsa underlaget: ${error.message}`);
@@ -192,6 +193,7 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
     mimeType: row.mime_type,
     lagradSom: row.file_path.split('/').pop(),
     mejl: mejl || undefined,
+    definition: definitionen(row.definition),
   });
   // Samma ägarskap som SIE-verifikationerna: kontot när det finns, adressen
   // när filen bara hör ihop med en mejladress
@@ -216,6 +218,13 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
   return antal === 0
     ? { typ: 'transaktioner', antal: 0, notering: svar.notering, varningar: svar.varningar, fel: 'AI:n hittade inga transaktioner i filen' }
     : { typ: 'transaktioner', antal, notering: svar.notering, varningar: svar.varningar };
+}
+
+/** Steget Definieras svar, om det finns och är giltigt. */
+function definitionen(d: UnderlagRad['definition']): { kategori: Underlagstyp; dokumenttyp: string } | null {
+  const kategori = d?.kategori;
+  if (kategori !== 'transaktioner' && kategori !== 'verifikationer' && kategori !== 'ovrigt') return null;
+  return { kategori, dokumenttyp: d?.dokumenttyp ?? '' };
 }
 
 async function sparaTransaktioner(

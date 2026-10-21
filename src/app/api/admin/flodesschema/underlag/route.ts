@@ -3,6 +3,8 @@ import { createServerClient } from '@/lib/supabase-server';
 import type { FlodesKund, FlodesUnderlag } from '@/lib/admin-types';
 import { definieraUnderlag } from '@/lib/underlag/definiera';
 import { lasUtTransaktioner } from '@/lib/transaktioner/import';
+import { importSieUnderlag } from '@/lib/sie/import';
+import { isSieFile } from '@/lib/sie/parse';
 import { kompletteraUnderlag } from '@/lib/transaktioner/komplettera';
 import { kollaDubbletter } from '@/lib/transaktioner/dublettkoll';
 import { kollaTillrackligt } from '@/lib/transaktioner/tillrackligt';
@@ -19,7 +21,7 @@ export const maxDuration = 300;
  * GET        → { kunder: FlodesKund[] }, kunderna med sina underlag, nyast först
  * GET ?id=   → { underlag: FlodesUnderlag }, allt som hänt med ett underlag
  * POST { id, steg } → kör ett steg på underlaget och svarar { underlag, ... } som GET ?id=
- *            steg: definiera | plocka-trans | komplettera | dublett | tillrackligt | konteras | skapa-verif
+ *            steg: definiera | plocka-trans | plocka-verif | komplettera | dublett | tillrackligt | konteras | skapa-verif
  *            | skriv-mejl (kundens samlade frågemejl nu, i stället för kl 18)
  *            (skapa-verif med val: { transaktionId, konto, momssats } bokför en granskad för hand)
  *
@@ -41,7 +43,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-const STEG = ['definiera', 'plocka-trans', 'komplettera', 'dublett', 'tillrackligt', 'skriv-mejl', 'konteras', 'skapa-verif'];
+const STEG = ['definiera', 'plocka-trans', 'plocka-verif', 'komplettera', 'dublett', 'tillrackligt', 'skriv-mejl', 'konteras', 'skapa-verif'];
 /** Transaktioner per konteringsanrop. Båda modellerna, två pass var, ryms inom tidsgränsen. */
 const KONTERA_PER_ANROP = 3;
 
@@ -59,6 +61,7 @@ export async function POST(request: NextRequest) {
       if (res.fel) throw new Error(res.fel);
       extra.typ = res.typ;
     }
+    if (body.steg === 'plocka-verif') extra.typ = await plockaVerifikationer(supabase, body.id);
     if (body.steg === 'komplettera') await kompletteraUnderlag(supabase, body.id);
     if (body.steg === 'dublett') await kollaDubbletter(supabase, body.id);
     if (body.steg === 'tillrackligt') await kollaTillrackligt(supabase, body.id);
@@ -72,6 +75,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: fel, underlag }, { status: 500 });
   }
   return NextResponse.json({ underlag: await ettUnderlag(body.id), ...extra });
+}
+
+/**
+ * Läser in verifikationerna ur ett redan bokfört underlag. SIE-filer tolkas
+ * med kod, allt annat (PDF, Excel, CSV, TSV …) läses av AI:n med Definieras
+ * svar som utgångsläge. Körs det igen ersätts det som lästes förra gången.
+ * Svarar med vad filen blev, ifall AI:n ändå kom fram till något annat.
+ */
+async function plockaVerifikationer(supabase: ReturnType<typeof createServerClient>, underlagId: string): Promise<string> {
+  const { data: u } = await supabase.from('bokforing_underlag').select('file_name').eq('id', underlagId).maybeSingle();
+  if (!u) throw new Error('Underlaget finns inte');
+  if (isSieFile(u.file_name)) {
+    // Importen läser bara filer som inte lästs in. Det filen redan lagt in
+    // känns igen och läggs inte in igen.
+    await supabase.from('bokforing_underlag').update({ verifikationer_inlagda_at: null }).eq('id', underlagId);
+    const res = await importSieUnderlag(supabase, underlagId);
+    if (res?.fel) throw new Error(res.fel);
+    return 'verifikationer';
+  }
+  const res = await lasUtTransaktioner(supabase, underlagId);
+  if (res.fel) throw new Error(res.fel);
+  return res.typ;
 }
 
 /** Skriver underlagets kunds frågemejl nu, med alla frågor kunden inte fått än — inte bara det här underlagets. */

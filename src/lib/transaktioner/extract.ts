@@ -1,8 +1,8 @@
 import { buildImageParts } from '@/lib/underlag/fil-delar';
 import { arBildEllerPdf, arTabellfil, kanLasasAvAi } from '@/lib/underlag/filtyp';
 import {
-  BESKRIVNINGSREGEL, DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, OVRIGTREGEL, UPPGIFTSREGEL, tolkaSvar,
-  type ExtraheradTransaktion, type ExtraheradVerifikation, type TolkatSvar,
+  BESKRIVNINGSREGEL, DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, OVRIGTREGEL, UPPGIFTSREGEL, definitionsDel, tolkaSvar,
+  type ExtraheradTransaktion, type ExtraheradVerifikation, type TolkatSvar, type Underlagstyp,
 } from './normalisera';
 import { lasMedSandlada } from './sandlada';
 
@@ -186,6 +186,8 @@ export async function extraheraTransaktioner(file: {
   lagradSom?: string;
   /** Kundens mejlväxling (se `@/lib/mejlkontext`), när den finns. */
   mejl?: string;
+  /** Vad steget Definiera kom fram till, när det körts. */
+  definition?: { kategori: Underlagstyp; dokumenttyp: string } | null;
 }): Promise<ExtraktionsResultat> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
@@ -203,22 +205,40 @@ export async function extraheraTransaktioner(file: {
     ? pdfDel(file.buffer, file.fileName)
     : buildImageParts(file.buffer, file.mimeType ?? '', file.fileName)[0] as unknown[];
 
-  const svar = await las([...del, ...mejlDel(file)], apiKey, file.fileName);
+  // Är PDF:en redan definierad som verifikationer går den direkt till
+  // sandlådan, se nedan. Synen behövs bara om sandlådan inte klarar den.
+  let sandladaFel: string | null = null;
+  if (arPdf && file.definition?.kategori === 'verifikationer') {
+    try {
+      const forst = await lasMedSandlada(file);
+      if (forst.typ === 'verifikationer' && forst.verifikationer.length > 0) return forst;
+      sandladaFel = 'den hittade inga verifikationer';
+    } catch (err) {
+      console.error('[transaktioner] sandlådan kunde inte läsa PDF:en:', err);
+      sandladaFel = err instanceof Error ? err.message : 'okänt fel';
+    }
+  }
+
+  const definition = definitionsDel(file.definition);
+  const svar = await las([...del, ...(definition ? [{ type: 'text', text: definition }] : []), ...mejlDel(file)], apiKey, file.fileName);
 
   // En PDF med verifikationer är en export ur ett system och har text. Ordnad
   // per konto ligger ett kvittos rader utspridda över många sidor, och synen
   // tar då genvägen via sammanställningen på första sidan. Sandlådan läser
   // texten med kod och grupperar på kvitto — den får göra om läsningen.
+  // Har sandlådan redan provats ovan görs det inte igen.
   if (arPdf && svar.typ === 'verifikationer') {
-    let orsak: string;
-    try {
-      const omlast = await lasMedSandlada(file);
-      if (omlast.typ === 'verifikationer' && omlast.verifikationer.length > 0) return omlast;
-      orsak = 'den hittade inga verifikationer';
-    } catch (err) {
-      // Inskannad PDF eller annat fel i sandlådan — då gäller synens svar
-      console.error('[transaktioner] sandlådan kunde inte läsa PDF:en:', err);
-      orsak = err instanceof Error ? err.message : 'okänt fel';
+    let orsak = sandladaFel;
+    if (!orsak) {
+      try {
+        const omlast = await lasMedSandlada(file);
+        if (omlast.typ === 'verifikationer' && omlast.verifikationer.length > 0) return omlast;
+        orsak = 'den hittade inga verifikationer';
+      } catch (err) {
+        // Inskannad PDF eller annat fel i sandlådan — då gäller synens svar
+        console.error('[transaktioner] sandlådan kunde inte läsa PDF:en:', err);
+        orsak = err instanceof Error ? err.message : 'okänt fel';
+      }
     }
     svar.varningar.push(
       `Sandlådan kunde inte läsa om PDF:en (${orsak}). Synens läsning användes — kontrollera att alla sidor kom med`,

@@ -85,7 +85,7 @@ const STEG: Steg[] = [
   { id: 'val-typ', namn: 'Vilken sort?', typ: 'val', rad: 5, kol: 3 },
   { id: 'separat-mapp', namn: 'Spara i separat mapp', typ: 'slut', rad: 6, kol: 3, beskrivning: 'Underlag som inte tillhör räkenskapsåret, eller inte är bokföringsunderlag, sparas undan utan att bokföras.', finns: 'Fliken Övriga filer' },
 
-  { id: 'plocka-verif', namn: 'Plocka ut verifikationer', typ: 'system', rad: 3, kol: 4, beskrivning: 'Redan konterad historik, t.ex. en SIE-fil, läses in direkt som verifikationer.', finns: 'Ingående balans ur kundens SIE-fil' },
+  { id: 'plocka-verif', klar: true, namn: 'Plocka ut verifikationer', typ: 'ai', rad: 3, kol: 4, beskrivning: 'Redan konterad historik läses in som verifikationer med sina konton. SIE-filer tolkas med kod. Verifikationslistor, grundböcker och huvudböcker som PDF, Excel, CSV eller TSV läses av AI:n, som kör kod mot filen i stället för att skriva av den. Bara verifikationer som går jämnt ut läggs in, och de som redan finns hos kunden (samma serie, nummer och datum) läggs inte in igen.', finns: 'SIE läses in av sig själv när filen kommer in. Allt annat körs när man följer ett underlag här, eller med Läs av med AI på personkortet.' },
   { id: 'integration', namn: 'Integration', typ: 'start', rad: 4, kol: 4, beskrivning: 'Ordrar och utbetalningar som hämtas direkt från kassasystem och webbshop, utan något underlag att läsa av. Banken har en egen bana.', finns: 'Zettle, Shopify, WooCommerce' },
   { id: 'plocka-trans', klar: true, namn: 'Plocka ut transaktioner', typ: 'ai', rad: 5, kol: 4, beskrivning: 'AI:n plockar ut varje transaktion: datum, belopp, motpart, moms, VAT-nummer och beskrivning — och allt annat som kan vara relevant, som fakturanummer, momsrader per sats, betalsätt och kvittots artiklar. Dessutom en ordagrann avskrift av allt som står.', finns: 'Körs av sig själv när ett underlag kommer med mejl. Går att köra (om) när man följer ett underlag här.' },
   { id: 'komplettera', klar: true, namn: 'Komplettera med kundhistorik', typ: 'ai', rad: 5, kol: 5, beskrivning: 'Varje transaktion kompletteras med hur kunden bokfört liknande saker tidigare, hur andra kunder bokfört liknande, kundens verksamhetsbeskrivning och det mejlen säger om just den. Koden letar fram liknande verifikationer, AI:n väljer ut de som verkligen liknar och läser mejlen. Allt följer med till konteringen.', finns: 'Kundens verifikationer (SIE och bokförda), andra kunders verifikationer, Kundkontext och mejlarkivet. Körs när man följer ett underlag här.' },
@@ -371,8 +371,7 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
   }
   ga('definiera', 'val-typ');
 
-  // Flyttad till Övriga filer gäller alltid. Annars avgör definitionen, och utan den vad som lästs in.
-  const kategori = u.sortering === 'ovrigt' ? 'ovrigt' : d?.kategori ?? (u.sie ? 'verifikationer' : 'transaktioner');
+  const kategori = vagFor(u);
 
   if (kategori === 'ovrigt') {
     satt('val-typ', 'klar', 'Övrigt');
@@ -384,9 +383,10 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
   if (kategori === 'verifikationer') {
     satt('val-typ', 'klar', 'Redan konterad historik');
     ga('val-typ', 'plocka-verif');
+    if (!u.sie && u.utlasning?.fel) { satt('plocka-verif', 'fel', u.utlasning.fel); return { steg, pilar }; }
     if (!u.sie) { satt('plocka-verif', 'har', 'Verifikationerna har inte lästs in än'); return { steg, pilar }; }
     if (u.sie.fel) { satt('plocka-verif', 'fel', u.sie.fel); return { steg, pilar }; }
-    satt('plocka-verif', 'klar', `${u.sie.antal} verifikationer inlagda${u.sie.dubbletter ? `, ${u.sie.dubbletter} dubbletter` : ''}`);
+    satt('plocka-verif', 'klar', `${u.sie.antal} verifikationer inlagda${u.sie.dubbletter ? `, ${u.sie.dubbletter} fanns redan hos kunden` : ''}`);
     ga('plocka-verif', 'huvudbok');
     satt('huvudbok', 'klar', `${u.verifikationer} verifikationer i huvudboken`);
     return { steg, pilar };
@@ -599,9 +599,11 @@ export default function FlodesschemaPage() {
       if (stegId === 'konteras') { await kontera(); return; }
       if (stegId !== 'alla') { await ett(stegId, val ? { val } : {}); return; }
       // Från början så långt flödet är byggt. Vägen tar slut för övriga
-      // filer och verifikationer, och vid fel.
+      // filer, efter inläsningen för verifikationer, och vid fel.
       const def = await ett('definiera');
-      if (!def || def.kategori !== 'transaktioner') return;
+      if (!def) return;
+      if (def.kategori === 'verifikationer') { await ett('plocka-verif'); return; }
+      if (def.kategori !== 'transaktioner') return;
       const ut = await ett('plocka-trans');
       if (!ut || ut.typ !== 'transaktioner') return;
       // Det som saknas frågas i dygnsmejlet kl 18; resten konteras ändå
@@ -934,13 +936,25 @@ export default function FlodesschemaPage() {
   );
 }
 
-/** Underlaget som följs: vad det är, var det står och dess transaktioner. */
+/**
+ * Vägen underlaget går. Flyttad till Övriga filer gäller alltid, sedan det som
+ * faktiskt lästes ut och sist vad Definiera sa — avläsningen kan komma fram
+ * till något annat, och då är det den som gäller.
+ */
+function vagFor(u: FlodesUnderlag): 'ovrigt' | 'verifikationer' | 'transaktioner' {
+  if (u.sortering === 'ovrigt') return 'ovrigt';
+  if (u.sie) return 'verifikationer';
+  if (u.utlasning && !u.utlasning.fel) return 'transaktioner';
+  const k = u.definition?.kategori;
+  return k === 'ovrigt' || k === 'verifikationer' ? k : 'transaktioner';
+}
+
 /** AI-stegen som går att köra på underlaget härifrån. */
-type KorSteg = 'alla' | 'definiera' | 'plocka-trans' | 'komplettera' | 'dublett' | 'tillrackligt' | 'skriv-mejl' | 'konteras' | 'skapa-verif';
+type KorSteg = 'alla' | 'definiera' | 'plocka-trans' | 'plocka-verif' | 'komplettera' | 'dublett' | 'tillrackligt' | 'skriv-mejl' | 'konteras' | 'skapa-verif';
 
 /** Var i schemat varje körbart steg står. */
 const STEG_I_SCHEMAT: Record<Exclude<KorSteg, 'alla'>, string> = {
-  definiera: 'definiera', 'plocka-trans': 'plocka-trans', komplettera: 'komplettera',
+  definiera: 'definiera', 'plocka-trans': 'plocka-trans', 'plocka-verif': 'plocka-verif', komplettera: 'komplettera',
   dublett: 'val-dublett', tillrackligt: 'val-tillrackligt', 'skriv-mejl': 'skriv-mejl', konteras: 'konteras', 'skapa-verif': 'skapa-verif',
 };
 
@@ -949,8 +963,7 @@ function Sparpanel({ u, spar, steg, onVal, onKor, kor, korText }: {
   onKor: (s: KorSteg, val?: { transaktionId: string; konto: string; momssats: number }) => void; kor: KorSteg | null; korText: string;
 }) {
   const [oppenTrans, setOppenTrans] = useState<string | null>(null);
-  // Övriga filer och verifikationer går inte till avläsningen i schemat
-  const vag = u.definition?.kategori ?? (u.sortering === 'ovrigt' ? 'ovrigt' : 'transaktioner');
+  const vag = vagFor(u);
   const ordning = STEG.filter((s) => spar.steg[s.id]).sort((a, b) => a.kol - b.kol || a.rad - b.rad);
   const belopp = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const KONTERING = {
@@ -1024,6 +1037,26 @@ function Sparpanel({ u, spar, steg, onVal, onKor, kor, korText }: {
           {kor === 'definiera' ? 'AI:n läser…' : u.definition ? 'Definiera igen' : 'Definiera med AI'}
         </button>
       </div>
+
+      {vag === 'verifikationer' && (
+        <div className="mb-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700 mb-1">Plocka ut verifikationer</div>
+          <p className="text-xs text-slate-700 mb-2">
+            {u.sie
+              ? u.sie.fel
+                ? `Gick inte: ${u.sie.fel}`
+                : `${u.sie.antal} verifikationer inlagda${u.sie.dubbletter ? `, ${u.sie.dubbletter} fanns redan hos kunden` : ''}. Körs den igen ersätts de.`
+              : u.utlasning?.fel ? `Gick inte: ${u.utlasning.fel}` : 'Inte inläst än.'}
+          </p>
+          <button
+            onClick={() => onKor('plocka-verif')}
+            disabled={kor !== null}
+            className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md"
+          >
+            {kor === 'plocka-verif' ? 'Läser in…' : u.sie ? 'Läs in igen' : 'Läs in verifikationer'}
+          </button>
+        </div>
+      )}
 
       {vag === 'transaktioner' && (
         <div className="mb-3 p-3 rounded-lg bg-violet-50 border border-violet-200">

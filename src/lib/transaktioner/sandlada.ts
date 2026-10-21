@@ -1,4 +1,7 @@
-import { BESKRIVNINGSREGEL, DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, OVRIGTREGEL, UPPGIFTSREGEL, tolkaSvar, type TolkatSvar } from './normalisera';
+import {
+  BESKRIVNINGSREGEL, DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, OVRIGTREGEL, UPPGIFTSREGEL, definitionsDel, tolkaSvar,
+  type TolkatSvar, type Underlagstyp,
+} from './normalisera';
 
 /**
  * Läser ett kalkylblad eller en textlista genom att låta modellen köra Python
@@ -105,6 +108,7 @@ export async function lasMedSandlada(file: {
   mimeType: string | null;
   lagradSom?: string;
   mejl?: string;
+  definition?: { kategori: Underlagstyp; dokumenttyp: string } | null;
 }): Promise<SandladaResultat> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
@@ -128,9 +132,11 @@ export async function lasMedSandlada(file: {
       body: JSON.stringify({
         model: MODELL,
         tools: [{ type: 'code_interpreter', container: { type: 'auto', file_ids: [fileId] } }],
-        input: file.mejl
-          ? `${INSTRUKTION}\n\nFilen är lagrad som ${file.lagradSom ?? '(okänt)'}.\n\n${file.mejl}`
-          : INSTRUKTION,
+        input: [
+          INSTRUKTION,
+          definitionsDel(file.definition),
+          file.mejl ? `Filen är lagrad som ${file.lagradSom ?? '(okänt)'}.\n\n${file.mejl}` : '',
+        ].filter(Boolean).join('\n\n'),
       }),
     });
     if (!res.ok) throw new Error(`AI-tjänsten svarade inte: ${await felText(res)}`);
