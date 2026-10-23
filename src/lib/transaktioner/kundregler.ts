@@ -7,6 +7,10 @@
  * kontot mot de valda reglernas instruktioner. Valet sparas i
  * `konteringar.regler`.
  *
+ * Reglerna här gäller alla kunder. Byrån kan lägga till fler, för en kund
+ * eller alla, från flödesschemat — de ligger i `flodes_instruktioner` och
+ * läggs till listan av `reglerFor` i instruktioner.ts.
+ *
  * Kryssrutor på kunden (t.ex. Periodisk sammanfattning) styr inte reglerna —
  * de är till för kalendern och påminnelserna.
  */
@@ -31,14 +35,14 @@ export const KUNDREGLER: Kundregel[] = [
 
 export const REGEL_IDN = KUNDREGLER.map((r) => r.id);
 
-/** Hela listan till konteringens första pass. */
-export function reglerAttValja(): string {
-  return KUNDREGLER.map((r) => `- ${r.id} (${r.namn})\n  Gäller när: ${r.galler}\n  Gör så här: ${r.instruktion}`).join('\n');
+/** Hela listan till konteringens första pass. Byråns tillagda regler (se instruktioner.ts) skickas med i `regler`. */
+export function reglerAttValja(regler: Kundregel[] = KUNDREGLER): string {
+  return regler.map((r) => `- ${r.id} (${r.namn})\n  Gäller när: ${r.galler}\n  Gör så här: ${r.instruktion}`).join('\n');
 }
 
 /** Instruktionerna för de valda reglerna, till granskningen. Tom när ingen gäller. */
-export function regelText(ids: string[]): string {
-  const regler = ids.map((id) => KUNDREGLER.find((r) => r.id === id)).filter((r): r is Kundregel => !!r);
+export function regelText(ids: string[], alla: Kundregel[] = KUNDREGLER): string {
+  const regler = ids.map((id) => alla.find((r) => r.id === id)).filter((r): r is Kundregel => !!r);
   if (!regler.length) return '';
   return `KUNDREGLER SOM GÄLLER (byråns instruktion):\n${regler.map((r) => `- ${r.namn}: ${r.instruktion}`).join('\n')}`;
 }

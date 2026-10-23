@@ -2,8 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { FlodesKund, FlodesUnderlag } from '@/lib/admin-types';
-import { regelNamn } from '@/lib/transaktioner/kundregler';
+import type { FlodesInstruktion, FlodesKund, FlodesUnderlag } from '@/lib/admin-types';
 
 /**
  * Flödesschemat: hela processen från att kunden skickar underlag till
@@ -112,7 +111,7 @@ const STEG: Steg[] = [
   { id: 'bank-till-bokslut', namn: 'Spara till årsbokslutet', typ: 'system', rad: 2, kol: 11, beskrivning: 'Bankrader utan underlag vid momsdeadline sparas och tas upp igen inför årsbokslutet.' },
   { id: 'hopp-ut-b', namn: 'B', typ: 'hopp', rad: 2, kol: 12, hopp: 'hopp-in-b', etikett: 'till Inför årsbokslut', beskrivning: 'Fortsätter vid Inför årsbokslut.' },
   { id: 'hopp-in-b', namn: 'B', typ: 'hopp', rad: 6, kol: 13, beskrivning: 'Bankrader utan underlag kommer in i bokslutet här.' },
-  { id: 'konteras', klar: true, namn: 'Konteras', typ: 'ai', rad: 5, kol: 8, beskrivning: 'Två AI-modeller (GPT-5.5 och Claude Opus) konterar var för sig enligt K1, i två pass: först väljs konto, sedan prövas det mot kontots regler. Grönt när båda är säkra och överens om konto och moms. Kontot väljs bara ur byråns egen K1-dokumentation — kundhistoriken är en ledtråd om vad affären är, inte om kontot. Modellerna väljer också vilka kundspecifika regler som gäller transaktionen, t.ex. periodisk sammanställning vid försäljning till företag i andra EU-länder (3108/3308), och följer dem — transaktionen styr, inte kryssrutorna på kunden. Dubbletter och transaktioner som saknar uppgifter konteras inte.', finns: 'Fliken Kontering i personvyn. Reglerna finns i src/lib/transaktioner/kundregler.ts. Körs när man följer ett underlag här, utan att bokföra — det är nästa steg.' },
+  { id: 'konteras', klar: true, namn: 'Konteras', typ: 'ai', rad: 5, kol: 8, beskrivning: 'Två AI-modeller (GPT-5.5 och Claude Opus) konterar var för sig enligt K1, i två pass: först väljs konto, sedan prövas det mot kontots regler. Grönt när båda är säkra och överens om konto och moms. Kontot väljs bara ur byråns egen K1-dokumentation — kundhistoriken är en ledtråd om vad affären är, inte om kontot. Modellerna väljer också vilka kundspecifika regler som gäller transaktionen, t.ex. periodisk sammanställning vid försäljning till företag i andra EU-länder (3108/3308), och följer dem — transaktionen styr, inte kryssrutorna på kunden. Dubbletter och transaktioner som saknar uppgifter konteras inte.', finns: 'Fliken Kontering i personvyn. Reglerna finns i src/lib/transaktioner/kundregler.ts. Körs när man följer ett underlag här. Gröna bokförs direkt, resten går till Granska.' },
   { id: 'val-resultat', namn: 'Grönt?', typ: 'val', rad: 5, kol: 9 },
   { id: 'granska', namn: 'Granska', typ: 'manuell', rad: 7, kol: 9, beskrivning: 'Det AI:n inte är överens om eller osäker på granskar vi själva.', finns: 'Rätta kontering i fliken Kontering' },
   { id: 'skapa-verif', klar: true, namn: 'Skapa verifikationer / lägg in i databas', typ: 'system', rad: 5, kol: 10, beskrivning: 'Varje godkänd transaktion blir en verifikation i databasen: kostnads- eller intäktskontot, momsen och betalkontot (1930 företagskonto, 2013/2017 privat) enligt Kundkontext. Gröna bokförs med kontot båda modellerna valt, signerade AI. Granskade bokförs på kontot man väljer, signerade Erik.', finns: 'Verifikationer i serie AI, kopplade till transaktionen och underlaget. Bokförs när man följer ett underlag här eller i fliken Kontering.' },
@@ -575,13 +574,13 @@ export default function FlodesschemaPage() {
   const [kor, setKor] = useState<KorSteg | null>(null);
   // Vad som körs just nu, för knappen: "Konterar (3 kvar)"
   const [korText, setKorText] = useState('');
-  const korSteg = async (stegId: KorSteg, val?: { transaktionId: string; konto: string; momssats: number }) => {
+  const korSteg = async (stegId: KorSteg, val?: { transaktionId: string; konto: string; momssats: number }, fran?: Omkorning) => {
     if (!foljer) return;
     const id = foljer.id;
     setKor(stegId);
     setSparFel('');
     /** Ett steg på servern. Null när det gick fel — felet visas då. */
-    const ett = async (steg: Exclude<KorSteg, 'alla'>, extra: Record<string, unknown> = {}) => {
+    const ett = async (steg: Exclude<KorSteg, 'alla' | 'omkorning'>, extra: Record<string, unknown> = {}) => {
       setKorText(STEG.find((s) => s.id === STEG_I_SCHEMAT[steg])?.namn ?? steg);
       const d = await fetch('/api/admin/flodesschema/underlag', {
         method: 'POST',
@@ -605,7 +604,26 @@ export default function FlodesschemaPage() {
     };
     try {
       if (stegId === 'konteras') { await kontera(); return; }
-      if (stegId !== 'alla') { await ett(stegId, val ? { val } : {}); return; }
+      if (stegId === 'omkorning') {
+        // Efter en ny instruktion: alla AI-steg från början. Konteringen
+        // bokför de gröna direkt; resten väntar på Granska.
+        // Definiera och Plocka ut körs inte om — de tar inga instruktioner, och
+        // en ny utläsning ersätter transaktionerna (och med dem instruktionerna
+        // på en transaktion). Frågemejlet skrivs om bara när ett oskickat
+        // utkast finns, eller när instruktionen skrevs på Skriv mail —
+        // annars tar dygnsmejlet kl 18 det.
+        const utkast = foljer.mejl?.status === 'draft';
+        for (const steg of OMKORNING) {
+          if (steg === 'konteras') { await kontera(); return; }
+          if (steg === 'skriv-mejl') {
+            if (fran === 'skriv-mejl' || utkast) await ett('skriv-mejl', { omkorning: true });
+            continue;
+          }
+          if (!(await ett(steg))) return;
+        }
+        return;
+      }
+      if (stegId !== 'alla') { await ett(stegId as Exclude<KorSteg, 'alla' | 'omkorning'>, val ? { val } : {}); return; }
       // Från början så långt flödet är byggt. Vägen tar slut för övriga
       // filer, efter inläsningen för verifikationer, och vid fel.
       const def = await ett('definiera');
@@ -624,6 +642,28 @@ export default function FlodesschemaPage() {
   };
 
   const spar = useMemo(() => (foljer ? foljUnderlag(foljer) : null), [foljer]);
+
+  // Granska öppnas som popup när man följer ett underlag med något att granska
+  const [granskar, setGranskar] = useState(false);
+  const stangGranska = useCallback(() => setGranskar(false), []);
+  const valj = (id: string | null) => {
+    setVald(id);
+    if (id === 'granska' && foljer?.transaktioner.some(attGranska)) setGranskar(true);
+  };
+  /** Kommentaren blir byråns kontext på transaktionen, och underlaget körs om från början. */
+  const kommenteraGranskning = async (transaktionId: string, text: string): Promise<string | null> => {
+    if (!foljer) return 'Inget underlag valt';
+    const d = await fetch('/api/admin/flodesschema/instruktioner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ underlag: foljer.id, steg: 'konteras', typ: 'kontext', omfang: 'transaktion', transaktion: transaktionId, text }),
+    }).then((r) => r.json()).catch(() => ({ error: 'Kunde inte nå servern' }));
+    if (d.error) return d.error;
+    const i = d.instruktion;
+    setFoljer((f) => (f ? { ...f, instruktioner: [...f.instruktioner, { id: i.id, typ: i.typ, omfang: i.omfang, steg: i.steg, transaktionId: i.transaktion_id, namn: i.namn, galler: i.galler, text: i.text, at: i.created_at }] } : f));
+    void korSteg('omkorning', undefined, 'konteras');
+    return null;
+  };
   const kund = kunder?.find((k) => k.key === kundKey) ?? null;
 
   const nara = useMemo(() => {
@@ -805,7 +845,7 @@ export default function FlodesschemaPage() {
             const pl = platser[s.id];
             const t = TYPER[s.typ];
             const arVald = vald === s.id;
-            const klick = (e: React.MouseEvent) => { e.stopPropagation(); if (!harDragit()) setVald(arVald ? null : s.id); };
+            const klick = (e: React.MouseEvent) => { e.stopPropagation(); if (!harDragit()) valj(arVald ? null : s.id); };
             const op = tonad(s.id) ? (spar ? 0.2 : 0.3) : 1;
 
             if (s.typ === 'hopp') {
@@ -908,9 +948,42 @@ export default function FlodesschemaPage() {
           Scrolla för att zooma · dra för att flytta
         </div>
 
-        {foljer && spar && <Sparpanel u={foljer} spar={spar} steg={steg} onVal={setVald} onKor={korSteg} kor={kor} korText={korText} />}
-        {valt && <Detaljer key={valt.id} valt={valt} steg={steg} spar={spar?.steg[valt.id]} onVal={setVald} onSpara={spara} />}
+        {foljer && spar && <Sparpanel u={foljer} spar={spar} steg={steg} onVal={valj} onKor={korSteg} kor={kor} korText={korText} />}
+        {valt && (
+          <Detaljer key={valt.id} valt={valt} steg={steg} spar={spar?.steg[valt.id]} onVal={valj} onSpara={spara}>
+            {foljer && valt.id === 'granska' && foljer.transaktioner.some(attGranska) && (
+              <button
+                onClick={() => setGranskar(true)}
+                className="w-full mb-3 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-lg"
+              >
+                Granska {foljer.transaktioner.filter(attGranska).length} transaktioner
+              </button>
+            )}
+            {foljer && INSTRUKTION_I_SCHEMAT[valt.id] && (
+              <Instruktioner
+                u={foljer}
+                steg={INSTRUKTION_I_SCHEMAT[valt.id]}
+                kor={kor}
+                korText={korText}
+                onSparad={(i) => setFoljer((f) => (f ? { ...f, instruktioner: [...f.instruktioner, i] } : f))}
+                onBorttagen={(id) => setFoljer((f) => (f ? { ...f, instruktioner: f.instruktioner.filter((x) => x.id !== id) } : f))}
+                onKorOm={(fran) => korSteg('omkorning', undefined, fran)}
+              />
+            )}
+          </Detaljer>
+        )}
       </div>
+
+      {granskar && foljer && (
+        <GranskaPopup
+          u={foljer}
+          kor={kor}
+          korText={korText}
+          onBokfor={(transaktionId, konto, momssats) => korSteg('skapa-verif', { transaktionId, konto, momssats })}
+          onKommentar={kommenteraGranskning}
+          onStang={stangGranska}
+        />
+      )}
 
       <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-4 mt-6 items-start">
         {FASER.map((f) => {
@@ -923,7 +996,7 @@ export default function FlodesschemaPage() {
                 {iFasen.map((s) => (
                   <li
                     key={s.id}
-                    onClick={() => setVald(s.id)}
+                    onClick={() => valj(s.id)}
                     className={`px-4 py-2 cursor-pointer text-sm ${vald === s.id ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
                   >
                     <div className="flex items-center gap-2 mb-0.5">
@@ -958,10 +1031,20 @@ function vagFor(u: FlodesUnderlag): 'ovrigt' | 'verifikationer' | 'transaktioner
 }
 
 /** AI-stegen som går att köra på underlaget härifrån. */
-type KorSteg = 'alla' | 'definiera' | 'plocka-trans' | 'plocka-verif' | 'komplettera' | 'dublett' | 'tillrackligt' | 'skriv-mejl' | 'konteras' | 'skapa-verif';
+type KorSteg = 'alla' | 'omkorning' | 'definiera' | 'plocka-trans' | 'plocka-verif' | 'komplettera' | 'dublett' | 'tillrackligt' | 'skriv-mejl' | 'konteras' | 'skapa-verif';
+
+/** Stegen som tar byråns kontext och regler, i ordning — alla körs om när en instruktion läggs till. */
+const OMKORNING = ['komplettera', 'dublett', 'tillrackligt', 'skriv-mejl', 'konteras'] as const;
+type Omkorning = typeof OMKORNING[number];
+
+/** Rutorna i schemat där man kan skriva en instruktion, och vilket steg den hör till. */
+const INSTRUKTION_I_SCHEMAT: Record<string, Omkorning> = {
+  komplettera: 'komplettera', 'val-dublett': 'dublett', 'val-tillrackligt': 'tillrackligt',
+  'skriv-mejl': 'skriv-mejl', konteras: 'konteras', 'val-resultat': 'konteras', granska: 'konteras',
+};
 
 /** Var i schemat varje körbart steg står. */
-const STEG_I_SCHEMAT: Record<Exclude<KorSteg, 'alla'>, string> = {
+const STEG_I_SCHEMAT: Record<Exclude<KorSteg, 'alla' | 'omkorning'>, string> = {
   definiera: 'definiera', 'plocka-trans': 'plocka-trans', 'plocka-verif': 'plocka-verif', komplettera: 'komplettera',
   dublett: 'val-dublett', tillrackligt: 'val-tillrackligt', 'skriv-mejl': 'skriv-mejl', konteras: 'konteras', 'skapa-verif': 'skapa-verif',
 };
@@ -1366,6 +1449,178 @@ function TransaktionDetaljer({ t, format, onBokfor, bokfor }: {
   );
 }
 
+type FlodesTransaktion = FlodesUnderlag['transaktioner'][number];
+/** Konterad men inte grön, och inte bokförd än — väntar på granskning. */
+const attGranska = (t: FlodesTransaktion) => t.kontering === 'granska' && !t.bokford && !t.dublettAv;
+const MODELL: Record<string, string> = { 'gpt-5.5': 'GPT-5.5', 'claude-opus-5-5': 'Claude Opus 5.5' };
+const PRICK: Record<string, string> = { gron: 'bg-emerald-400', gul: 'bg-amber-400', rod: 'bg-red-500' };
+
+/**
+ * Steget Granska: båda modellernas förslag för en transaktion i taget, som i
+ * fliken Kontering. Är de överens — eller ska transaktionen enligt reglerna
+ * granskas för hand — räcker Okej; har de valt olika konton väljer man ett.
+ * Valet bokförs (Skapa verifikationer, signerad Erik). En kommentar sparas
+ * som byråns kontext på transaktionen, och underlaget körs om från början.
+ */
+function GranskaPopup({ u, kor, korText, onBokfor, onKommentar, onStang }: {
+  u: FlodesUnderlag; kor: KorSteg | null; korText: string;
+  onBokfor: (transaktionId: string, konto: string, momssats: number) => void;
+  /** Svarar med ett fel, eller null när kommentaren sparats och omkörningen startat. */
+  onKommentar: (transaktionId: string, text: string) => Promise<string | null>;
+  onStang: () => void;
+}) {
+  const kvar = u.transaktioner.filter(attGranska);
+  const [index, setIndex] = useState(0);
+  const [kommentar, setKommentar] = useState('');
+  const [fel, setFel] = useState('');
+  const [sparar, setSparar] = useState(false);
+  // En bokförd transaktion försvinner ur listan, och nästa tar dess plats
+  const i = Math.min(index, Math.max(kvar.length - 1, 0));
+  const t = kvar[i];
+  const upptagen = kor !== null || sparar;
+  const kr = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onStang(); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onStang]);
+
+  const forslag = t?.forslag.filter((f) => f.konto) ?? [];
+  const overens = forslag.length > 0 && forslag.every((f) => f.konto === forslag[0].konto && f.momssats === forslag[0].momssats);
+  const kontexter = t ? u.instruktioner.filter((x) => x.typ === 'kontext' && x.transaktionId === t.id) : [];
+
+  const korOm = async () => {
+    if (!t) return;
+    setSparar(true);
+    setFel('');
+    const f = await onKommentar(t.id, kommentar.trim());
+    setSparar(false);
+    if (f) setFel(f);
+    else setKommentar('');
+  };
+
+  const knapp = 'px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onStang}>
+      <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white rounded-xl shadow-xl p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mb-3">
+          <h2 className="text-base font-semibold text-slate-900">Granska konteringen</h2>
+          {kvar.length > 1 && (
+            <span className="flex items-center gap-1 text-xs text-slate-500">
+              <button onClick={() => setIndex(Math.max(i - 1, 0))} disabled={i === 0} className="px-1.5 hover:text-slate-900 disabled:opacity-30">‹</button>
+              {i + 1} av {kvar.length}
+              <button onClick={() => setIndex(Math.min(i + 1, kvar.length - 1))} disabled={i === kvar.length - 1} className="px-1.5 hover:text-slate-900 disabled:opacity-30">›</button>
+            </span>
+          )}
+          <button onClick={onStang} className="ml-auto text-slate-400 hover:text-slate-700 text-lg leading-none" title="Stäng">×</button>
+        </div>
+
+        {!t ? (
+          <p className="text-sm text-slate-700">
+            {kor ? `${korText || 'Kör'}…` : 'Inget kvar att granska i underlaget.'}
+          </p>
+        ) : (
+          <>
+            <div className="mb-3 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+              <div className="text-sm text-slate-900 font-medium">{t.motpart || t.beskrivning || 'Utan beskrivning'}</div>
+              <div className="text-slate-600">
+                {t.datum ?? 'Inget datum'} · {t.riktning === 'in' ? 'pengar in' : 'pengar ut'} · {kr.format(t.belopp)} {t.valuta}
+                {t.moms ? ` · moms ${kr.format(t.moms)}` : ''}{t.vatNummer ? ` · VAT ${t.vatNummer}` : ''}
+              </div>
+              {t.motpart && t.beskrivning && <div className="text-slate-600">{t.beskrivning}</div>}
+              {t.anteckning && <p className="mt-1 text-slate-600 whitespace-pre-wrap"><span className="text-slate-500">Anteckning:</span> {t.anteckning}</p>}
+              {kontexter.map((x) => <p key={x.id} className="mt-1 text-amber-800"><span className="text-amber-700">Byråns kontext:</span> {x.text}</p>)}
+              {t.detaljer && (
+                <details className="mt-1">
+                  <summary className="text-slate-500 cursor-pointer">Avskrift av underlaget</summary>
+                  <p className="mt-1 text-slate-600 whitespace-pre-wrap">{t.detaljer}</p>
+                </details>
+              )}
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-3 mb-3">
+              {t.forslag.map((f) => {
+                const g = f.granskning;
+                const byttFran = g?.forstaKonto && g.forstaKonto !== f.konto ? g.forstaKonto : null;
+                const flaggor = f.flaggor.filter((x) => x.typ !== 'granskning');
+                return (
+                  <div key={f.modell} className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${PRICK[f.omdome] ?? 'bg-slate-300'}`} />
+                      <span className="text-slate-600 text-xs font-semibold">{MODELL[f.modell] ?? f.modell}</span>
+                    </div>
+                    <p className="text-slate-900 text-sm">
+                      <span className="tabular-nums font-semibold">{f.konto ?? '—'}</span> {f.kontonamn}
+                      <span className="text-slate-500"> · moms {f.momssats} %</span>
+                      {byttFran && <span className="text-slate-400 text-xs"> (bytt från {byttFran} i granskningen)</span>}
+                    </p>
+                    {f.regler.length > 0 && <p className="text-violet-700 text-xs">Kundregel: {f.regler.join(', ')}</p>}
+                    <p className="text-slate-600 text-xs leading-relaxed">{f.motivering}</p>
+                    {g?.motivering && <p className="text-slate-500 text-xs leading-relaxed"><span className="text-slate-600">Granskning:</span> {g.motivering}</p>}
+                    {flaggor.length > 0 && (
+                      <ul className="space-y-0.5">
+                        {flaggor.map((x, n) => (
+                          <li key={n} className={`text-xs ${x.allvar === 'stopp' ? 'text-red-600' : 'text-amber-700'}`}>• {x.text}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {!overens && f.konto && (
+                      <button onClick={() => onBokfor(t.id, f.konto!, f.momssats)} disabled={upptagen} className={knapp}>
+                        Välj {f.konto} ({f.momssats} %)
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {overens && (
+              <div className="flex items-center gap-3 mb-4">
+                <button onClick={() => onBokfor(t.id, forslag[0].konto!, forslag[0].momssats)} disabled={upptagen} className={knapp}>
+                  {kor === 'skapa-verif' ? 'Bokför…' : `Okej — bokför på ${forslag[0].konto} (${forslag[0].momssats} %)`}
+                </button>
+                <span className="text-xs text-slate-500">Båda modellerna valde samma konto.</span>
+              </div>
+            )}
+            {!overens && forslag.length > 1 && (
+              <p className="mb-4 text-xs text-slate-500">Modellerna valde olika konton — välj det som stämmer, så bokförs det.</p>
+            )}
+
+            <div className="pt-3 border-t border-slate-200">
+              <label className="block text-xs text-slate-500">
+                Kommentar till AI:n
+                <textarea
+                  value={kommentar}
+                  onChange={(e) => setKommentar(e.target.value)}
+                  disabled={upptagen}
+                  rows={2}
+                  placeholder="t.ex. Beloppet är 3 235,43 kr. Eller: Det här är representation, inte material."
+                  className="block mt-1 w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                />
+              </label>
+              <div className="flex items-center gap-3 mt-2">
+                <button
+                  onClick={korOm}
+                  disabled={upptagen || !kommentar.trim()}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg"
+                >
+                  {sparar ? 'Sparar…' : kor === 'omkorning' ? 'Kör om…' : 'Spara och kör om'}
+                </button>
+                <span className="text-xs text-slate-500">
+                  {kor && korText ? `${korText}…` : 'Sparas som kontext på transaktionen, och underlaget körs om från början. Blir den grön bokförs den direkt.'}
+                </span>
+              </div>
+              {fel && <p className="mt-1 text-xs text-red-600">{fel}</p>}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Modellernas konteringar för en transaktion som inte är bokförd. Grönt
  * bokförs med knappen i panelen; här väljer man konto för hand — ett av
@@ -1387,7 +1642,7 @@ function Bokforingsval({ t, onBokfor, bokfor }: {
           <li key={i}>
             <span className="text-slate-500">{f.modell.startsWith('claude') ? 'Claude' : 'GPT'}: </span>
             <span className="font-mono">{f.konto ?? '—'}</span> {f.kontonamn} · {f.momssats} % <span className={OMDOME[f.omdome] ?? ''}>({f.omdome})</span>
-            {f.regler.length > 0 && <span className="block text-violet-700">Kundregel: {f.regler.map(regelNamn).join(', ')}</span>}
+            {f.regler.length > 0 && <span className="block text-violet-700">Kundregel: {f.regler.join(', ')}</span>}
             {f.motivering && <span className="block text-slate-500">{f.motivering}</span>}
           </li>
         ))}
@@ -1458,9 +1713,9 @@ function KompletteringVy({ k }: { k: NonNullable<FlodesUnderlag['transaktioner']
   );
 }
 
-function Detaljer({ valt, steg, spar, onVal, onSpara }: {
+function Detaljer({ valt, steg, spar, onVal, onSpara, children }: {
   valt: Steg; steg: Record<string, Steg>; spar?: { lage: Lage; text: string };
-  onVal: (id: string | null) => void; onSpara: (id: string, t: Texter) => Promise<void>;
+  onVal: (id: string | null) => void; onSpara: (id: string, t: Texter) => Promise<void>; children?: React.ReactNode;
 }) {
   const [utkast, setUtkast] = useState<Texter | null>(null);
   const [sparar, setSparar] = useState(false);
@@ -1510,6 +1765,8 @@ function Detaljer({ valt, steg, spar, onVal, onSpara }: {
           <div className="text-slate-800">{spar.text}</div>
         </div>
       )}
+
+      {children}
 
       {utkast ? (
         <div className="mb-4">
@@ -1571,6 +1828,184 @@ function Detaljer({ valt, steg, spar, onVal, onSpara }: {
       )}
       <Grannar id={valt.id} steg={steg} onVal={onVal} />
     </aside>
+  );
+}
+
+type Omfang = FlodesInstruktion['omfang'];
+const OMFANG_NAMN: Record<Omfang, string> = {
+  transaktion: 'En transaktion', underlag: 'Hela underlaget', kund: 'Kunden framöver', alla: 'Alla kunder',
+};
+const OMKORNING_NAMN: Record<Omkorning, string> = {
+  komplettera: 'Komplettera', dublett: 'Dublettcheck', tillrackligt: 'Tillräckligt?', 'skriv-mejl': 'Skriv mail', konteras: 'Konteras',
+};
+
+/**
+ * Byråns kontext och regler på ett steg, när man följer ett underlag. Det man
+ * skriver följer med till alla AI-steg, före och efter, och sparas man
+ * med "kör om" körs underlagets AI-steg om från början — fram till bokföringen.
+ */
+function Instruktioner({ u, steg, kor, korText, onSparad, onBorttagen, onKorOm }: {
+  u: FlodesUnderlag; steg: Omkorning; kor: KorSteg | null; korText: string;
+  onSparad: (i: FlodesInstruktion) => void; onBorttagen: (id: string) => void; onKorOm: (fran: Omkorning) => void;
+}) {
+  // Transaktionerna som stannat på steget kommer först
+  const stannat = (t: FlodesUnderlag['transaktioner'][number]) => {
+    if (steg === 'tillrackligt' || steg === 'skriv-mejl') return t.tillrackligt?.status === 'saknar';
+    if (steg === 'dublett') return !!t.dublettAv || t.dublettkoll?.status === 'tveksam';
+    if (steg === 'konteras') return t.kontering === 'granska' && !t.bokford;
+    return false;
+  };
+  const transaktioner = [...u.transaktioner].sort((a, b) => Number(stannat(b)) - Number(stannat(a)));
+  const galler = u.instruktioner;
+
+  const [typ, setTyp] = useState<'kontext' | 'regel'>('kontext');
+  const [omfang, setOmfang] = useState<Omfang>(transaktioner.length ? 'transaktion' : 'underlag');
+  const [transId, setTransId] = useState(transaktioner[0]?.id ?? '');
+  const [text, setText] = useState('');
+  const [namn, setNamn] = useState('');
+  const [villkor, setVillkor] = useState('');
+  const [sparar, setSparar] = useState(false);
+  const [fel, setFel] = useState('');
+  const [raderar, setRaderar] = useState<string | null>(null);
+
+  const vald = transaktioner.find((t) => t.id === transId);
+  const kr = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const etikett = (t: FlodesUnderlag['transaktioner'][number]) =>
+    `${t.datum ?? 'Inget datum'} · ${t.motpart || t.beskrivning || 'Utan beskrivning'} · ${t.riktning === 'in' ? '+' : '−'}${kr.format(t.belopp)} ${t.valuta}`;
+
+  const valjTyp = (ny: 'kontext' | 'regel') => {
+    setTyp(ny);
+    // Regler gäller bara kunden eller alla kunder
+    if (ny === 'regel' && (omfang === 'transaktion' || omfang === 'underlag')) setOmfang('kund');
+  };
+
+  const spara = async (korOm: boolean) => {
+    setSparar(true);
+    setFel('');
+    const d = await fetch('/api/admin/flodesschema/instruktioner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ underlag: u.id, steg, typ, omfang, transaktion: omfang === 'transaktion' ? transId : null, text, namn, galler: villkor }),
+    }).then((r) => r.json()).catch(() => ({ error: 'Kunde inte nå servern' }));
+    setSparar(false);
+    if (d.error) { setFel(d.error); return; }
+    const i = d.instruktion;
+    onSparad({ id: i.id, typ: i.typ, omfang: i.omfang, steg: i.steg, transaktionId: i.transaktion_id, namn: i.namn, galler: i.galler, text: i.text, at: i.created_at });
+    setText('');
+    setNamn('');
+    setVillkor('');
+    if (korOm) onKorOm(steg);
+  };
+
+  const taBort = async (id: string) => {
+    const d = await fetch('/api/admin/flodesschema/instruktioner', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+    }).then((r) => r.json()).catch(() => ({ error: 'Kunde inte nå servern' }));
+    setRaderar(null);
+    if (d.error) setFel(d.error);
+    else onBorttagen(id);
+  };
+
+  const falt = 'w-full mb-2 px-2.5 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const flik = (aktiv: boolean) => `flex-1 py-1 text-xs font-semibold rounded-md ${aktiv ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`;
+  const upptagen = kor !== null || sparar;
+
+  return (
+    <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-800 mb-1">Instruktion till AI:n</div>
+      <p className="text-xs text-slate-600 mb-2">
+        Följer med till alla AI-steg, före och efter det här. Spara och kör om kör underlaget från början fram till bokföringen.
+      </p>
+
+      {galler.length > 0 && (
+        <ul className="mb-3 space-y-1.5">
+          {galler.map((i) => {
+            const t = i.transaktionId ? u.transaktioner.find((x) => x.id === i.transaktionId) : null;
+            return (
+              <li key={i.id} className="p-2 rounded-md bg-white border border-amber-100 text-xs">
+                <div className="flex items-start gap-2 mb-0.5">
+                  <span className={`px-1.5 rounded ${i.typ === 'regel' ? 'bg-violet-100 text-violet-800' : 'bg-sky-100 text-sky-800'}`}>{i.typ === 'regel' ? 'Regel' : 'Kontext'}</span>
+                  <span className="text-slate-500 min-w-0">
+                    {i.omfang === 'transaktion' && t ? etikett(t) : OMFANG_NAMN[i.omfang]} · skriven på {OMKORNING_NAMN[i.steg as Omkorning] ?? i.steg}
+                  </span>
+                  {raderar === i.id ? (
+                    <span className="ml-auto flex gap-2 whitespace-nowrap">
+                      <button onClick={() => taBort(i.id)} className="text-red-600 font-semibold hover:underline">Ta bort</button>
+                      <button onClick={() => setRaderar(null)} className="text-slate-500 hover:underline">Avbryt</button>
+                    </span>
+                  ) : (
+                    <button onClick={() => setRaderar(i.id)} className="ml-auto text-slate-400 hover:text-red-600" title="Ta bort">×</button>
+                  )}
+                </div>
+                {i.typ === 'regel' && <div className="font-semibold text-slate-800">{i.namn || 'Byråns regel'}</div>}
+                {i.galler && <div className="text-slate-600">Gäller när: {i.galler}</div>}
+                <div className="text-slate-800 whitespace-pre-line">{i.typ === 'regel' ? `Gör så här: ${i.text}` : i.text}</div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <div className="flex gap-1 p-0.5 mb-2 bg-amber-100 rounded-lg">
+        <button onClick={() => valjTyp('kontext')} className={flik(typ === 'kontext')}>Kontext</button>
+        <button onClick={() => valjTyp('regel')} className={flik(typ === 'regel')}>Regel</button>
+      </div>
+      <p className="text-[11px] text-slate-500 mb-2">
+        {typ === 'kontext'
+          ? 'Fakta eller besked som AI:n ska utgå från, t.ex. "Köparen är ett tyskt företag med VAT DE123456789".'
+          : 'Ett villkor och vad AI:n ska göra då. Konteringen avgör själv om regeln passar en transaktion.'}
+      </p>
+
+      <label className="block text-xs font-medium text-slate-700 mb-1">Gäller</label>
+      <select value={omfang} onChange={(e) => setOmfang(e.target.value as Omfang)} className={falt}>
+        {(typ === 'regel' ? ['kund', 'alla'] as const : ['transaktion', 'underlag', 'kund', 'alla'] as const)
+          .filter((o) => o !== 'transaktion' || transaktioner.length > 0)
+          .map((o) => <option key={o} value={o}>{OMFANG_NAMN[o]}</option>)}
+      </select>
+      {omfang === 'transaktion' && (
+        <>
+          <select value={transId} onChange={(e) => setTransId(e.target.value)} className={falt}>
+            {transaktioner.map((t) => <option key={t.id} value={t.id}>{stannat(t) ? '● ' : ''}{etikett(t)}</option>)}
+          </select>
+          {vald?.tillrackligt?.status === 'saknar' && (
+            <p className="text-[11px] text-amber-800 -mt-1 mb-2">Saknar: {vald.tillrackligt.saknas.map((s) => s.vad).join(', ')}</p>
+          )}
+        </>
+      )}
+
+      {typ === 'regel' && (
+        <>
+          <input value={namn} onChange={(e) => setNamn(e.target.value)} placeholder="Namn, t.ex. Swish-insättningar" className={falt} />
+          <textarea rows={2} value={villkor} onChange={(e) => setVillkor(e.target.value)} placeholder="Gäller när …" className={falt} />
+        </>
+      )}
+      <textarea
+        rows={3}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={typ === 'regel' ? 'Gör så här …' : 'Skriv kontexten …'}
+        className={falt}
+      />
+      {fel && <p className="text-xs text-red-600 mb-2">{fel}</p>}
+      <div className="flex flex-wrap gap-2 items-center">
+        <button
+          onClick={() => spara(true)}
+          disabled={upptagen || !text.trim()}
+          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg"
+        >
+          {sparar ? 'Sparar…' : 'Spara och kör om'}
+        </button>
+        <button onClick={() => spara(false)} disabled={upptagen || !text.trim()} className="px-2 py-1.5 text-xs text-slate-700 hover:bg-amber-100 disabled:opacity-50 rounded-lg">
+          Bara spara
+        </button>
+        {galler.length > 0 && (
+          <button onClick={() => onKorOm(steg)} disabled={upptagen} className="px-2 py-1.5 text-xs text-slate-700 hover:bg-amber-100 disabled:opacity-50 rounded-lg">
+            Kör om från början
+          </button>
+        )}
+      </div>
+      {kor === 'omkorning' && <p className="text-xs text-amber-800 mt-2">Kör om: {korText || 'startar'}…</p>}
+    </div>
   );
 }
 

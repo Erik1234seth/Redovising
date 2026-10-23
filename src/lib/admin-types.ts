@@ -595,10 +595,25 @@ export interface FlodesUnderlag {
     kontering: 'ingen' | 'gron' | 'granska';
     bokford: boolean;
     /** Modellernas konteringar — förslagen när transaktionen ska granskas. */
-    forslag: { modell: string; konto: string | null; kontonamn: string | null; momssats: number; omdome: string; motivering: string; /** Kundreglerna modellen valde. */ regler: string[] }[];
+    forslag: { modell: string; konto: string | null; kontonamn: string | null; momssats: number; omdome: string; motivering: string; granskning: AdminKontering['granskning']; flaggor: AdminKontering['flaggor']; /** Namnen på kundreglerna modellen valde. */ regler: string[] }[];
     /** Verifikationen transaktionen blev, med sina rader. */
     verifikation: { id: string; datum: string | null; signatur: string; rader: { konto: string; kontonamn: string | null; belopp: number }[] } | null;
   }[];
   /** Verifikationer som pekar på underlaget. */
   verifikationer: number;
+  /** Byråns kontext och regler som gäller underlaget, skrivna på ett steg i schemat. */
+  instruktioner: FlodesInstruktion[];
+}
+
+export interface FlodesInstruktion {
+  id: string;
+  typ: 'kontext' | 'regel';
+  omfang: 'transaktion' | 'underlag' | 'kund' | 'alla';
+  /** Steget den skrevs på: komplettera, dublett, tillrackligt, skriv-mejl eller konteras. */
+  steg: string;
+  transaktionId: string | null;
+  namn: string | null;
+  galler: string | null;
+  text: string;
+  at: string;
 }

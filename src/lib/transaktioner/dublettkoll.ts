@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { hamtaInstruktioner, kontextFor } from './instruktioner';
 
 /**
  * Steget "Dublettcheck" i flödesschemat: finns samma affär redan i ett annat
@@ -131,6 +132,7 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
     && (!r.underlag_id || (filer.get(r.underlag_id)?.at ?? '') < u.created_at));
 
   const nya = (egna as Rad[]).map((t) => ({ t, kandidater: kandidaterFor(t, tidigare) }));
+  const instruktioner = await hamtaInstruktioner(supabase, { userId: u.user_id, underlagIds: [underlagId] });
 
   const resultat = new Map<string, Dublettkoll>();
   const attFraga = nya.filter((n) => n.kandidater.length > 0);
@@ -145,9 +147,10 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
       const user = grupp.map((n, j) => [
         `NY TRANSAKTION ${j + 1}`,
         radText(n.t),
+        kontextFor(instruktioner, { id: n.t.id, underlag_id: underlagId, user_id: u.user_id }),
         'KANDIDATER:',
         ...n.kandidater.map((k, m) => `[${j + 1}${String.fromCharCode(65 + m)}] ur ${k.underlag_id ? `"${filer.get(k.underlag_id)?.namn ?? 'okänd fil'}", inkommen ${(filer.get(k.underlag_id)?.at ?? '').slice(0, 10)}` : 'en källa utan fil'}\n${radText(k)}`),
-      ].join('\n')).join('\n\n');
+      ].filter(Boolean).join('\n')).join('\n\n');
 
       const svar = await fraga(user);
       grupp.forEach((n, j) => {

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkontext';
 import { byggMejlkontext } from '@/lib/mejlkontext';
+import { hamtaInstruktioner, kontextFor } from './instruktioner';
 
 /**
  * Steget "Komplettera med kundhistorik" i flödesschemat.
@@ -60,6 +61,8 @@ interface Transaktion {
   valuta: string | null;
   riktning: string;
   detaljer: string | null;
+  /** Byråns kontext från flödesschemat, satt innan AI:n frågas. */
+  kontext?: string;
 }
 
 interface Kandidat {
@@ -128,7 +131,9 @@ async function komplettera(supabase: SupabaseClient, underlagId: string): Promis
   await indexeraVerifikationstexter(supabase);
 
   const grupper: Transaktion[][] = [];
-  for (let i = 0; i < trans.length; i += PER_ANROP) grupper.push(trans.slice(i, i + PER_ANROP) as Transaktion[]);
+  const instruktioner = await hamtaInstruktioner(supabase, { userId: u.user_id, underlagIds: [underlagId] });
+  const medKontext: Transaktion[] = (trans as Transaktion[]).map((t) => ({ ...t, kontext: kontextFor(instruktioner, { id: t.id, underlag_id: underlagId, user_id: u.user_id }) }));
+  for (let i = 0; i < medKontext.length; i += PER_ANROP) grupper.push(medKontext.slice(i, i + PER_ANROP));
 
   const nu = new Date().toISOString();
   for (let i = 0; i < grupper.length; i += SAMTIDIGA) {
@@ -163,6 +168,7 @@ async function kompletteraGrupp(
     `Motpart: ${t.motpart || '—'}`,
     `Beskrivning: ${t.beskrivning || '—'}`,
     t.detaljer ? `På underlaget: ${t.detaljer.slice(0, 600)}` : '',
+    t.kontext ?? '',
     `KUNDENS:\n${kandidater[i].kundens.map(kandidatText).join('\n') || '(inga)'}`,
     `ANDRA:\n${kandidater[i].andra.map(kandidatText).join('\n') || '(inga)'}`,
   ].filter(Boolean).join('\n')).join('\n\n');

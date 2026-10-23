@@ -3,7 +3,8 @@ import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkon
 import { svenskDag } from '@/lib/dagskassa';
 import { byggMejlkontext } from '@/lib/mejlkontext';
 import { kompletteringText, type Komplettering } from '@/lib/transaktioner/komplettera';
-import { REGEL_IDN, regelText, reglerAttValja } from '@/lib/transaktioner/kundregler';
+import { regelText, reglerAttValja, type Kundregel } from '@/lib/transaktioner/kundregler';
+import { hamtaInstruktioner, kontextFor, reglerFor } from '@/lib/transaktioner/instruktioner';
 import { tolkaBetalsatt, type Betalsatt } from './betalsatt';
 import { MODELLER, fraga, type Modell, type System } from './modeller';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
@@ -99,7 +100,8 @@ export interface Utfall {
 
 // ---------- prompter ----------
 
-const PASS1_SCHEMA = {
+/** Reglerna att välja bland skiljer mellan kunder, så schemat byggs per kund. */
+const pass1Schema = (regelIdn: string[]) => ({
   type: 'object',
   additionalProperties: false,
   required: ['konto', 'momssats', 'momshantering', 'sakerhet', 'motivering', 'regler'],
@@ -109,9 +111,9 @@ const PASS1_SCHEMA = {
     momshantering: { type: 'string', enum: ['svensk', 'ingen', 'omvand'] },
     sakerhet: { type: 'string', enum: ['hog', 'medel', 'lag'] },
     motivering: { type: 'string' },
-    regler: { type: 'array', items: { type: 'string', enum: REGEL_IDN }, description: 'Id på kundreglerna som gäller transaktionen' },
+    regler: { type: 'array', items: { type: 'string', enum: regelIdn }, description: 'Id på kundreglerna som gäller transaktionen' },
   },
-};
+});
 
 const PASS2_SCHEMA = {
   type: 'object',
@@ -138,10 +140,8 @@ Regler:
 - motivering: en eller två meningar om varför, på svenska.
 - Använd kundens verksamhet för att avgöra vad ett köp är till för. Har kunden i ett mejl förklarat vad ett köp eller en inbetalning avser, väger det tyngre än en gissning — säg det i motiveringen.
 - Står det en instruktion från byrån i anteckningen följer du den. Den väger tyngst av allt.
-- regler: id på de kundregler nedan som gäller transaktionen. Ta bara med en regel när underlaget, uppgifterna eller mejlen visar att den gäller — tom lista annars. En regel du tar med följer du: dess instruktion är byråns och väger lika tungt som anteckningen. Nämn regeln i motiveringen.
-
-KUNDREGLER:
-${reglerAttValja()}
+- Står det BYRÅNS KONTEXT vid transaktionen följer du den på samma sätt som anteckningen.
+- regler: id på de KUNDREGLER (sist i instruktionen) som gäller transaktionen. Ta bara med en regel när underlaget, uppgifterna, mejlen eller byråns kontext visar att den gäller — tom lista annars. En regel du tar med följer du: dess instruktion är byråns och väger lika tungt som anteckningen. Nämn regeln i motiveringen.
 - Kontot väljs bara utifrån K1-kontoplanen och kontobeskrivningarna nedan — byråns egen dokumentation. Använd ingen annan källa. Hur kunden eller andra kunder bokfört liknande saker tidigare är en ledtråd om vad affären är, inte om vilket konto som är rätt: tidigare bokföringar kan vara gjorda i ett annat program, med BAS-underkonton eller fel. Stämmer historiken inte med kontobeskrivningarna gäller beskrivningarna.
 
 K1-KONTOPLAN (konto namn — beskrivning [sökord]):
@@ -161,7 +161,7 @@ Gränsprövningarna är uträknade i kod. Godta siffrorna.
 
 Transaktionen konteras direkt från underlaget, inte från en tidigare bokföring. Punkter som handlar om vilket BAS-konto en post tidigare bokförts på stämmer därför aldrig — bortse från dem.
 
-Står det en instruktion från byrån i anteckningen och kontot följer den, är kontot rätt om inte reglerna uttryckligen förbjuder det. Detsamma gäller KUNDREGLER SOM GÄLLER.`;
+Står det en instruktion från byrån i anteckningen och kontot följer den, är kontot rätt om inte reglerna uttryckligen förbjuder det. Detsamma gäller KUNDREGLER SOM GÄLLER och BYRÅNS KONTEXT.`;
 
 const RATTELSE_SCHEMA = {
   type: 'object',
@@ -271,24 +271,29 @@ async function konteraMedModell(
   t: Transaktion,
   betalsatt: Betalsatt,
   kund: string,
+  { allaRegler, kontext }: Byran,
 ): Promise<Kontering> {
-  const user = transaktionText(t, betalsatt);
+  const user = [transaktionText(t, betalsatt), kontext].filter(Boolean).join('\n\n');
   const flaggor: Flagga[] = [];
+  const regelIdn = allaRegler.map((r) => r.id);
+  // Reglerna skiljer mellan kunder och ligger därför i kunddelen, efter den cachade
+  const system: System = { fast: PASS1_FAST, kund: [kund, `KUNDREGLER:\n${reglerAttValja(allaRegler)}`].filter(Boolean).join('\n\n') };
+  const schema = pass1Schema(regelIdn);
 
   // Pass 1, och ett nytt försök om kontot inte finns i K1
-  let svar = await fraga<Pass1>(modell, { system: { fast: PASS1_FAST, kund }, user, namn: 'kontering', schema: PASS1_SCHEMA });
+  let svar = await fraga<Pass1>(modell, { system, user, namn: 'kontering', schema });
   if (!slaUppKonto(svar.data.konto)) {
     svar = await fraga<Pass1>(modell, {
-      system: { fast: PASS1_FAST, kund },
+      system,
       user: `${user}\n\nDitt förra svar var konto ${svar.data.konto}, som inte finns i K1-kontoplanen. Välj ett konto ur listan.`,
       namn: 'kontering',
-      schema: PASS1_SCHEMA,
+      schema,
     });
   }
   const p1 = svar.data;
   const svarade = new Set([svar.modell]);
   // Bara regler som finns, en gång var
-  const regler = [...new Set((Array.isArray(p1.regler) ? p1.regler : []).filter((id) => REGEL_IDN.includes(id)))];
+  const regler = [...new Set((Array.isArray(p1.regler) ? p1.regler : []).filter((id) => regelIdn.includes(id)))];
 
   const { moms, flaggor: momsflaggor } = raknaMoms(t, p1);
   flaggor.push(...momsflaggor);
@@ -307,7 +312,7 @@ async function konteraMedModell(
       user: [
         `TRANSAKTIONEN:\n${user}`,
         `VALT KONTO: ${p1.konto} ${forsta.rad.namn}, momssats ${p1.momssats} %\nMotivering: ${p1.motivering}`,
-        regelText(regler),
+        regelText(regler, allaRegler),
         `KONTOTS REGLER:\n${kontoBlock(forsta)}`,
       ].filter(Boolean).join('\n\n'),
       namn: 'granskning',
@@ -396,11 +401,61 @@ export async function konteraTransaktioner(
   const klara = new Set((bokforda ?? []).map((v) => v.transaktion_id as string));
   const kvar = (rader as Transaktion[]).filter((t) => !klara.has(t.id) && Number(t.belopp) > 0);
 
+  // Byråns kontext och regler från flödesschemat
+  const instruktioner = await hamtaInstruktioner(supabase, {
+    userId, underlagIds: [...new Set(kvar.map((t) => t.underlag_id).filter((x): x is string => !!x))],
+  });
+  const allaRegler = reglerFor(instruktioner, userId);
+
   const utfall: Utfall[] = [];
   for (let i = 0; i < kvar.length; i += SAMTIDIGA) {
-    utfall.push(...await Promise.all(kvar.slice(i, i + SAMTIDIGA).map((t) => konteraEn(supabase, t, betalsatt, kund, torrkorning, bokforGrona))));
+    utfall.push(...await Promise.all(kvar.slice(i, i + SAMTIDIGA).map(async (t) => {
+      const kontext = kontextFor(instruktioner, t);
+      try {
+        if (kontext && !torrkorning) t = await rattaEfterKontext(supabase, t, betalsatt, kontext);
+      } catch (err) {
+        return { transaktionId: t.id, konteringar: [], bokford: false, fel: err instanceof Error ? err.message : String(err) };
+      }
+      return konteraEn(supabase, t, betalsatt, kund, { allaRegler, kontext }, torrkorning, bokforGrona);
+    })));
   }
   return utfall;
+}
+
+/**
+ * Byråns kontext kan rätta transaktionens uppgifter — "beloppet är 3 235,43
+ * kr" på en rad i EUR. Konteringen läser kontexten ändå, men beloppet,
+ * valutaflaggan och bokföringen tar uppgifterna från transaktionen, så de
+ * rättas här först. Står inget nytt i kontexten ändras ingenting.
+ */
+async function rattaEfterKontext(supabase: SupabaseClient, t: Transaktion, betalsatt: Betalsatt, kontext: string): Promise<Transaktion> {
+  const { data: r } = await fraga<{
+    datum: string | null; belopp: number | null; moms: number | null;
+    valuta: string | null; riktning: 'in' | 'ut' | null; kommentar: string;
+  }>('gpt-5.5', {
+    system: { fast: RATTELSE_FAST, kund: '' },
+    user: `TRANSAKTIONEN:\n${transaktionText(t, betalsatt)}\n\nBYRÅNS INSTRUKTION:\n${kontext}`,
+    namn: 'rattelse',
+    schema: RATTELSE_SCHEMA,
+  });
+  const fore: Record<string, unknown> = { ...t, valuta: t.valuta || 'SEK' };
+  const andringar: Andringar = Object.fromEntries(
+    (['datum', 'belopp', 'moms', 'valuta', 'riktning'] as const)
+      // Belopp kommer som "300.00" ur databasen
+      .filter((k) => r[k] !== null && r[k] !== undefined && (typeof r[k] === 'number'
+        ? Number(r[k]) !== Number(fore[k] ?? NaN)
+        : String(r[k]) !== String(fore[k] ?? '')))
+      .map((k) => [k, r[k]]),
+  );
+  if (!Object.keys(andringar).length) return t;
+  await sparaAndringar(supabase, t, andringar, `Rättat efter byråns kontext: ${r.kommentar}`);
+  return { ...t, ...andringar } as Transaktion;
+}
+
+/** Det byrån lagt till i flödesschemat: alla regler kunden har, och kontexten för transaktionen. */
+interface Byran {
+  allaRegler: Kundregel[];
+  kontext: string;
 }
 
 /** En torrkörning konterar men sparar ingenting — för att prova prompter och modeller. */
@@ -409,12 +464,13 @@ async function konteraEn(
   t: Transaktion,
   betalsatt: Betalsatt,
   kund: string,
+  byran: Byran,
   torrkorning: boolean,
   bokforGrona = true,
 ): Promise<Utfall> {
   let konteringar: Kontering[];
   try {
-    konteringar = await Promise.all(MODELLER.map((m) => konteraMedModell(m, t, betalsatt, kund)));
+    konteringar = await Promise.all(MODELLER.map((m) => konteraMedModell(m, t, betalsatt, kund, byran)));
   } catch (err) {
     return { transaktionId: t.id, konteringar: [], bokford: false, fel: err instanceof Error ? err.message : String(err) };
   }

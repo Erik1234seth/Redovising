@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { handleGeneralQuestion } from '@/lib/inmail/handlers/general-question';
 import { smsKontextForMejl } from '@/lib/inkorg/kontext';
 import type { Tillrackligt } from './tillrackligt';
+import { hamtaInstruktioner, kontextFor, reglerText } from './instruktioner';
 
 /**
  * Steget "Skriv mail" i flödesschemat: frågemejlet till kunden om det som
@@ -83,6 +84,7 @@ export async function skrivFragemejl(supabase: SupabaseClient, userId: string, r
   if (uFel) throw new Error(uFel.message);
   if (!profil) throw new Error('Kunden finns inte');
   const filer = new Map((underlag ?? []).map((u) => [u.id, u]));
+  const instruktioner = await hamtaInstruktioner(supabase, { userId, underlagIds });
 
   // Kom allt i samma mejl blir det ett svar i den tråden, annars ett nytt mejl
   const mejlIds = [...new Set((underlag ?? []).map((u) => u.gmail_message_id))];
@@ -107,13 +109,16 @@ export async function skrivFragemejl(supabase: SupabaseClient, userId: string, r
       const vem = [t.motpart, t.beskrivning].filter(Boolean).join(', ') || 'okänd transaktion';
       const belopp = `${kr.format(Number(t.belopp))} ${t.valuta && t.valuta !== 'SEK' ? t.valuta : 'kr'}`;
       const vad = t.tillrackligt!.saknas.map((s) => `${s.vad} (${s.varfor})`).join('; ');
-      return `    • ${t.datum ?? 'okänt datum'}, ${vem}, ${belopp}${t.riktning === 'in' ? ' in' : ''}: ${vad}`;
+      const kontext = kontextFor(instruktioner, t);
+      return `    • ${t.datum ?? 'okänt datum'}, ${vem}, ${belopp}${t.riktning === 'in' ? ' in' : ''}: ${vad}${kontext ? `\n      ${kontext.replace(/\n/g, '\n      ')}` : ''}`;
     }).join('\n')}`;
   });
   const underlagKontext = `TRANSAKTIONER SOM SAKNAR UPPGIFTER (${fragor.length} st):\n${block.join('\n\n')}\n\n`
     + 'Skriv ETT mejl till kunden och fråga efter just det som saknas ovan, för alla transaktionerna. Gå igenom dem en och en, '
     + 'med datum, motpart och belopp så att kunden ser vilken det gäller. Förklara kort och begripligt varför vi behöver det — '
-    + 'utan facktermer där det går. Be kunden svara på mejlet. Fråga inte om något annat, och aldrig om sådant kunden redan svarat på i mejlhistoriken.';
+    + 'utan facktermer där det går. Be kunden svara på mejlet. Fråga inte om något annat, och aldrig om sådant kunden redan svarat på i mejlhistoriken. '
+    + 'Står det BYRÅNS KONTEXT eller BYRÅNS REGLER följer du dem — fråga inte om sådant de redan besvarar.'
+    + (reglerText(instruktioner, userId) ? `\n\n${reglerText(instruktioner, userId)}` : '');
 
   const svar = await handleGeneralQuestion({
     supabase, profile: profil, subject: amne,

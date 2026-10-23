@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkontext';
 import { kompletteringText, type Komplettering } from './komplettera';
+import { hamtaInstruktioner, kontextFor, reglerText } from './instruktioner';
 
 /**
  * Steget "Tillräckligt?" i flödesschemat: räcker det vi samlat om varje
@@ -14,7 +15,8 @@ import { kompletteringText, type Komplettering } from './komplettera';
  * omvänd byggmoms — ska det också finnas.
  *
  * Det som saknas sparas per transaktion, så att nästa steg kan fråga kunden
- * om just det. Dubbletter bedöms inte — de bokförs inte.
+ * om just det. Dubbletter bedöms inte — de bokförs inte. Byråns kontext och
+ * regler från flödesschemat följer med (instruktioner.ts).
  */
 
 const MODELL = 'gpt-5.5';
@@ -83,6 +85,7 @@ interface Rad {
   uppgifter: Record<string, unknown> | null;
   komplettering: Komplettering | null;
   dublett_av: string | null;
+  fraga_utkast_id: string | null;
 }
 
 /** Kontrollerar underlagets transaktioner och sparar resultatet. Kastar vid fel, efter att felet skrivits på underlaget. */
@@ -104,7 +107,7 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
   if (!u) throw new Error('Underlaget finns inte');
 
   const { data: rader, error: tFel } = await supabase.from('transaktioner')
-    .select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, vat_nummer, anteckning, detaljer, uppgifter, komplettering, dublett_av')
+    .select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, vat_nummer, anteckning, detaljer, uppgifter, komplettering, dublett_av, fraga_utkast_id')
     .eq('underlag_id', underlagId).order('radnr');
   if (tFel) throw new Error(`Kunde inte läsa transaktionerna: ${tFel.message}`);
   if (!rader?.length) throw new Error('Underlaget har inga transaktioner att kontrollera — plocka ut dem först');
@@ -113,6 +116,8 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
     ? await supabase.from('profiles').select(KUND_KOLUMNER).eq('id', u.user_id).maybeSingle()
     : { data: null };
   const kund = byggKundkontext(profil as unknown as Kund | null);
+  const instruktioner = await hamtaInstruktioner(supabase, { userId: u.user_id, underlagIds: [underlagId] });
+  const regler = reglerText(instruktioner, u.user_id);
 
   const att = (rader as Rad[]).filter((t) => !t.dublett_av);
   // Mejlen följer med per transaktion i kompletteringen. Utan den har steget
@@ -130,7 +135,8 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
       const user = [
         kund || 'Inga uppgifter om kunden.',
         okompletterade ? 'OBS: transaktionerna har inte kompletterats med historik och mejl.' : '',
-        ...grupp.map((t, j) => `TRANSAKTION ${j + 1}\n${radText(t)}`),
+        regler,
+        ...grupp.map((t, j) => [`TRANSAKTION ${j + 1}\n${radText(t)}`, kontextFor(instruktioner, { ...t, underlag_id: underlagId, user_id: u.user_id })].filter(Boolean).join('\n')),
       ].filter(Boolean).join('\n\n');
       const svar = await fraga(user);
       grupp.forEach((t, j) => {
@@ -153,16 +159,41 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
     }));
   }
 
+  // Oskickade frågemejl: räcker en transaktion nu ska den inte frågas om
+  const utkastIds = [...new Set((rader as Rad[]).map((t) => t.fraga_utkast_id).filter((x): x is string => !!x))];
+  const { data: utkast } = utkastIds.length
+    ? await supabase.from('mejl_utkast').select('id').in('id', utkastIds).eq('status', 'draft')
+    : { data: [] };
+  const oskickade = new Set((utkast ?? []).map((x) => x.id as string));
+
   let tillrackliga = 0;
   let saknar = 0;
   for (const t of rader as Rad[]) {
     const r = resultat.get(t.id) ?? null;
     if (r?.status === 'tillrackligt') tillrackliga++;
     if (r?.status === 'saknar') saknar++;
-    const { error: sFel } = await supabase.from('transaktioner').update({ tillrackligt: r }).eq('id', t.id);
+    const slapp = r?.status !== 'saknar' && t.fraga_utkast_id && oskickade.has(t.fraga_utkast_id);
+    const { error: sFel } = await supabase.from('transaktioner')
+      .update(slapp ? { tillrackligt: r, fraga_utkast_id: null } : { tillrackligt: r }).eq('id', t.id);
     if (sFel) throw new Error(`Kunde inte spara kontrollen: ${sFel.message}`);
   }
+  await slangTommaUtkast(supabase, [...oskickade]);
   return { tillrackliga, saknar };
+}
+
+/**
+ * Oskickade frågemejl som inte längre frågar om någon transaktion slängs.
+ * Frågar ett utkast fortfarande om några skrivs det om i Skriv mail.
+ */
+async function slangTommaUtkast(supabase: SupabaseClient, ids: string[]) {
+  if (!ids.length) return;
+  const { data: kvar } = await supabase.from('transaktioner').select('fraga_utkast_id').in('fraga_utkast_id', ids);
+  const anvanda = new Set((kvar ?? []).map((x) => x.fraga_utkast_id));
+  const tomma = ids.filter((id) => !anvanda.has(id));
+  if (tomma.length) {
+    await supabase.from('mejl_utkast').update({ status: 'discarded', updated_at: new Date().toISOString() })
+      .in('id', tomma).eq('status', 'draft');
+  }
 }
 
 function radText(t: Rad): string {
