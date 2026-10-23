@@ -64,6 +64,8 @@ function CodeGate({ onUnlock }: { onUnlock: () => void }) {
 
     const data = await post({});
     if (!data) { setCode(''); return; }
+    // Lokalt räcker lösenordet
+    if (data.ok) { onUnlock(); return; }
     setPeople(data.people);
     // Finns bara en person finns inget att välja — skicka koden direkt
     if (data.people.length === 1) await sendSms(0);

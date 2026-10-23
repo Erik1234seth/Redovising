@@ -26,7 +26,24 @@ import { sendSms } from '@/lib/sms/twilio';
  *   { code }                    → vilka personer som kan få en sms-kod
  *   { code, person }            → skickar sms-koden till den personen
  *   { code, person, smsCode }   → kontrollerar sms-koden och loggar in
+ *
+ * Lokalt (app.localhost m.fl.) räcker lösenordet: steg 1 loggar in direkt
+ * och svarar { ok: true }. Då behövs inte heller ADMIN_PHONES.
  */
+
+/**
+ * Utan sms-kod bara när utvecklingsservern körs och adressen är localhost.
+ * Host-huvudet går att förfalska, så det räcker inte ensamt — men i
+ * produktion är NODE_ENV alltid "production".
+ */
+function arLokal(request: NextRequest): boolean {
+  if (process.env.NODE_ENV !== 'development') return false;
+  const host = request.nextUrl.hostname;
+  return host === 'localhost' || host.endsWith('.localhost') || host === '127.0.0.1';
+}
+
+/** Lokalt räcker lösenordet, annars krävs även sms-mottagarna. */
+const klar = (request: NextRequest) => (arLokal(request) ? !!process.env.ADMIN_PASSWORD?.trim() : isConfigured());
 
 /**
  * Bromskloss mot att någon sitter och gissar koden. Räknaren lever i minnet på
@@ -71,7 +88,7 @@ function sessionCookie(response: NextResponse, value: string, maxAge: number, na
 
 /** Panelen frågar den här vid start för att veta om den ska visa kodrutan. */
 export async function GET(request: NextRequest) {
-  if (!isConfigured()) {
+  if (!klar(request)) {
     return NextResponse.json(
       { ok: false, error: 'ADMIN_PASSWORD eller ADMIN_PHONES saknas i miljövariablerna' },
       { status: 500 },
@@ -82,7 +99,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isConfigured()) {
+  if (!klar(request)) {
     return NextResponse.json(
       {
         error:
@@ -104,6 +121,13 @@ export async function POST(request: NextRequest) {
   if (!passwordMatches(code)) {
     noteFailure(ip);
     return NextResponse.json({ error: 'Fel kod' }, { status: 401 });
+  }
+
+  if (arLokal(request)) {
+    attempts.delete(ip);
+    const token = await createSession();
+    if (!token) return NextResponse.json({ error: 'Kunde inte skapa sessionen' }, { status: 500 });
+    return sessionCookie(NextResponse.json({ ok: true }), token, SESSION_MAX_AGE_SECONDS);
   }
 
   const people = adminPeople();
