@@ -47,7 +47,7 @@ GRUNDKRAV — av det vi har ska det gå att avgöra:
 4. En tydlig uppfattning om vad transaktionen gäller: vad som köpts eller sålts och att det hör till verksamheten. Räcker motpartens namn, kundens verksamhet eller historiken för att förstå det, är det nog.
 
 EXTRA KRAV — när transaktionen pekar på det. Exempel, inte en fullständig lista; tänk som en redovisare:
-- Försäljning av varor eller tjänster till ett företag i ett annat EU-land utan svensk moms: köparens VAT-nummer, och att fakturan anger omvänd skattskyldighet / reverse charge.
+- Försäljning av varor eller tjänster till ett företag i ett annat EU-land utan svensk moms: köparens VAT-nummer. Står köparens VAT-nummer på underlaget, finns köparen utomlands och är beloppet fakturerat utan något momsbelopp utskrivet, utgå från att det är omvänd betalningsskyldighet eller momsfri unionsintern varuförsäljning — fråga inte efter momsen eller efter texten "omvänd skattskyldighet" / "reverse charge", och skriv antagandet i "antaganden".
 - Köp av tjänster från ett företag i ett annat land (omvänd moms): att säljaren finns utomlands — land eller VAT-nummer.
 - Byggtjänster åt eller från en byggfirma (omvänd byggmoms): att fakturan anger omvänd skattskyldighet och båda parters momsregistreringsnummer.
 - ROT- eller RUT-arbete: köparens personnummer och fastighetsbeteckning eller bostadsrättsförening, och arbetskostnaden för sig.

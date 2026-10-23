@@ -6030,7 +6030,9 @@
     "Beloppet är vinst vid avyttring av anläggningstillgång; använd 3970",
     "Beloppet är ränta eller annan finansiell intäkt",
     "Momsbehandlingen är bara oklar eller kunden finns utomlands utan att beskattningslandet har utretts",
-    "Beloppet är kundförskott över 5 000 kronor för en prestation som inte påbörjats"
+    "Beloppet är kundförskott över 5 000 kronor för en prestation som inte påbörjats",
+    "Försäljning av varor till ett företag i ett annat EU-land; använd 3108",
+    "Försäljning av tjänster till ett företag i ett annat EU-land; använd 3308"
    ],
    "beslutsregler": [
     "Identifiera den exakta grunden för att ingen svensk utgående moms ska redovisas",
@@ -6076,6 +6078,109 @@
    "trosklar": [
     "customer_advance_over_5000"
    ],
+   "endastManuellt": false
+  },
+  {
+   "konto": "3108",
+   "namn": "Försäljning varor till annat EU-land, momsfri",
+   "beskrivning": "Intäktskonto för försäljning av varor till en momsregistrerad köpare i ett annat EU-land, där varan transporteras dit och köparen redovisar momsen. Ingen svensk utgående moms. Redovisas i momsdeklarationens ruta 35 och i den periodiska sammanställningen.",
+   "anvandNar": [
+    "Företaget säljer varor till ett företag i ett annat EU-land",
+    "Köparen har ett giltigt VAT-nummer från ett annat EU-land",
+    "Varan transporteras från Sverige till ett annat EU-land",
+    "Ingen svensk utgående moms har debiterats"
+   ],
+   "anvandInteNar": [
+    "Köparen är en privatperson",
+    "Köparen är ett svenskt företag; använd 3000",
+    "Försäljningen avser tjänster; använd 3308",
+    "Varan säljs till ett land utanför EU",
+    "Köparens VAT-nummer saknas"
+   ],
+   "beslutsregler": [
+    "Kontrollera att köparens VAT-nummer från ett annat EU-land finns på fakturan",
+    "Kontrollera att fakturan anger omvänd skattskyldighet eller unionsintern leverans",
+    "Bokför hela beloppet utan svensk utgående moms",
+    "Försäljningen ska redovisas i ruta 35 och i den periodiska sammanställningen med köparens VAT-nummer",
+    "Skilj varor från tjänster; tjänster bokförs på 3308",
+    "Godkänn 3108 för dokumenterad varuförsäljning till momsregistrerad köpare i annat EU-land"
+   ],
+   "exempel": [
+    "En webbshop säljer produkter till ett företag i Tyskland med tyskt VAT-nummer; fakturan anger reverse charge och beloppet bokförs på 3108 utan moms"
+   ],
+   "varningar": [
+    "Försäljning till privatpersoner i andra EU-länder är inte momsfri på det här sättet",
+    "Utan köparens VAT-nummer gäller inte undantaget",
+    "Försäljningen ska med i den periodiska sammanställningen"
+   ],
+   "nyckelord": [
+    "EU-försäljning varor",
+    "unionsintern försäljning",
+    "reverse charge",
+    "omvänd skattskyldighet",
+    "periodisk sammanställning",
+    "ruta 35",
+    "VAT-nummer"
+   ],
+   "granskningNar": [
+    "Köparens VAT-nummer saknas eller är svenskt",
+    "Det är oklart om köparen är ett företag",
+    "Det är oklart om det är varor eller tjänster",
+    "Varan har inte lämnat Sverige"
+   ],
+   "trosklar": [],
+   "endastManuellt": false
+  },
+  {
+   "konto": "3308",
+   "namn": "Försäljning tjänster till annat EU-land",
+   "beskrivning": "Intäktskonto för försäljning av tjänster till en momsregistrerad köpare i ett annat EU-land enligt huvudregeln, där köparen redovisar momsen. Ingen svensk utgående moms. Redovisas i momsdeklarationens ruta 39 och i den periodiska sammanställningen.",
+   "anvandNar": [
+    "Företaget säljer tjänster till ett företag i ett annat EU-land",
+    "Köparen har ett giltigt VAT-nummer från ett annat EU-land",
+    "Fakturan anger omvänd skattskyldighet eller reverse charge",
+    "Ingen svensk utgående moms har debiterats"
+   ],
+   "anvandInteNar": [
+    "Köparen är en privatperson",
+    "Köparen är ett svenskt företag; använd 3000",
+    "Försäljningen avser varor; använd 3108",
+    "Köparen finns utanför EU",
+    "Tjänsten är knuten till fastighet i Sverige, persontransport, tillträde till evenemang eller restaurang, där andra regler gäller",
+    "Köparens VAT-nummer saknas"
+   ],
+   "beslutsregler": [
+    "Kontrollera att köparens VAT-nummer från ett annat EU-land finns på fakturan",
+    "Kontrollera att fakturan anger omvänd skattskyldighet eller reverse charge",
+    "Bokför hela beloppet utan svensk utgående moms",
+    "Försäljningen ska redovisas i ruta 39 och i den periodiska sammanställningen med köparens VAT-nummer",
+    "Skilj tjänster från varor; varor bokförs på 3108",
+    "Godkänn 3308 för dokumenterad tjänsteförsäljning till momsregistrerad köpare i annat EU-land"
+   ],
+   "exempel": [
+    "En konsult fakturerar ett företag i Danmark med danskt VAT-nummer för ett uppdrag; fakturan anger reverse charge och beloppet bokförs på 3308 utan moms"
+   ],
+   "varningar": [
+    "Försäljning till privatpersoner i andra EU-länder beskattas normalt i Sverige",
+    "Vissa tjänster har särskilda regler för omsättningsland",
+    "Försäljningen ska med i den periodiska sammanställningen"
+   ],
+   "nyckelord": [
+    "EU-försäljning tjänster",
+    "reverse charge",
+    "omvänd skattskyldighet",
+    "periodisk sammanställning",
+    "ruta 39",
+    "VAT-nummer",
+    "konsulttjänst EU"
+   ],
+   "granskningNar": [
+    "Köparens VAT-nummer saknas eller är svenskt",
+    "Det är oklart om köparen är ett företag",
+    "Det är oklart om det är varor eller tjänster",
+    "Tjänsten kan omfattas av ett undantag från huvudregeln"
+   ],
+   "trosklar": [],
    "endastManuellt": false
   },
   {

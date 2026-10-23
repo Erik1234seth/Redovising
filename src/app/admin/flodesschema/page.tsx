@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { FlodesKund, FlodesUnderlag } from '@/lib/admin-types';
+import { regelNamn } from '@/lib/transaktioner/kundregler';
 
 /**
  * Flödesschemat: hela processen från att kunden skickar underlag till
@@ -111,7 +112,7 @@ const STEG: Steg[] = [
   { id: 'bank-till-bokslut', namn: 'Spara till årsbokslutet', typ: 'system', rad: 2, kol: 11, beskrivning: 'Bankrader utan underlag vid momsdeadline sparas och tas upp igen inför årsbokslutet.' },
   { id: 'hopp-ut-b', namn: 'B', typ: 'hopp', rad: 2, kol: 12, hopp: 'hopp-in-b', etikett: 'till Inför årsbokslut', beskrivning: 'Fortsätter vid Inför årsbokslut.' },
   { id: 'hopp-in-b', namn: 'B', typ: 'hopp', rad: 6, kol: 13, beskrivning: 'Bankrader utan underlag kommer in i bokslutet här.' },
-  { id: 'konteras', klar: true, namn: 'Konteras', typ: 'ai', rad: 5, kol: 8, beskrivning: 'Två AI-modeller (GPT-5.5 och Claude Opus) konterar var för sig enligt K1, i två pass: först väljs konto, sedan prövas det mot kontots regler. Grönt när båda är säkra och överens om konto och moms. Kontot väljs bara ur byråns egen K1-dokumentation — kundhistoriken är en ledtråd om vad affären är, inte om kontot. Dubbletter och transaktioner som saknar uppgifter konteras inte.', finns: 'Fliken Kontering i personvyn. Körs när man följer ett underlag här, utan att bokföra — det är nästa steg.' },
+  { id: 'konteras', klar: true, namn: 'Konteras', typ: 'ai', rad: 5, kol: 8, beskrivning: 'Två AI-modeller (GPT-5.5 och Claude Opus) konterar var för sig enligt K1, i två pass: först väljs konto, sedan prövas det mot kontots regler. Grönt när båda är säkra och överens om konto och moms. Kontot väljs bara ur byråns egen K1-dokumentation — kundhistoriken är en ledtråd om vad affären är, inte om kontot. Modellerna väljer också vilka kundspecifika regler som gäller transaktionen, t.ex. periodisk sammanställning vid försäljning till företag i andra EU-länder (3108/3308), och följer dem — transaktionen styr, inte kryssrutorna på kunden. Dubbletter och transaktioner som saknar uppgifter konteras inte.', finns: 'Fliken Kontering i personvyn. Reglerna finns i src/lib/transaktioner/kundregler.ts. Körs när man följer ett underlag här, utan att bokföra — det är nästa steg.' },
   { id: 'val-resultat', namn: 'Grönt?', typ: 'val', rad: 5, kol: 9 },
   { id: 'granska', namn: 'Granska', typ: 'manuell', rad: 7, kol: 9, beskrivning: 'Det AI:n inte är överens om eller osäker på granskar vi själva.', finns: 'Rätta kontering i fliken Kontering' },
   { id: 'skapa-verif', klar: true, namn: 'Skapa verifikationer / lägg in i databas', typ: 'system', rad: 5, kol: 10, beskrivning: 'Varje godkänd transaktion blir en verifikation i databasen: kostnads- eller intäktskontot, momsen och betalkontot (1930 företagskonto, 2013/2017 privat) enligt Kundkontext. Gröna bokförs med kontot båda modellerna valt, signerade AI. Granskade bokförs på kontot man väljer, signerade Erik.', finns: 'Verifikationer i serie AI, kopplade till transaktionen och underlaget. Bokförs när man följer ett underlag här eller i fliken Kontering.' },
@@ -1386,6 +1387,7 @@ function Bokforingsval({ t, onBokfor, bokfor }: {
           <li key={i}>
             <span className="text-slate-500">{f.modell.startsWith('claude') ? 'Claude' : 'GPT'}: </span>
             <span className="font-mono">{f.konto ?? '—'}</span> {f.kontonamn} · {f.momssats} % <span className={OMDOME[f.omdome] ?? ''}>({f.omdome})</span>
+            {f.regler.length > 0 && <span className="block text-violet-700">Kundregel: {f.regler.map(regelNamn).join(', ')}</span>}
             {f.motivering && <span className="block text-slate-500">{f.motivering}</span>}
           </li>
         ))}

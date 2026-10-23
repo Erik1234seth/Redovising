@@ -249,7 +249,7 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
 
   const transIds = (trans.data ?? []).map((t) => t.id);
   const { data: konteringar, error: kFel } = transIds.length
-    ? await supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, omdome, motivering').in('transaktion_id', transIds)
+    ? await supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, omdome, motivering, regler').in('transaktion_id', transIds)
     : { data: [], error: null };
   if (kFel) throw new Error(kFel.message);
 
@@ -313,7 +313,7 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
         tillrackligt: t.tillrackligt ?? null,
         kontering: k.length === 0 ? 'ingen' : gron ? 'gron' : 'granska',
         bokford: bokforda.has(t.id),
-        forslag: k.map((x) => ({ modell: x.modell, konto: x.konto, kontonamn: x.konto ? slaUppKonto(x.konto)?.namn ?? null : null, momssats: Number(x.momssats ?? 0), omdome: x.omdome, motivering: x.motivering ?? '' })),
+        forslag: k.map((x) => ({ modell: x.modell, konto: x.konto, kontonamn: x.konto ? slaUppKonto(x.konto)?.namn ?? null : null, momssats: Number(x.momssats ?? 0), omdome: x.omdome, motivering: x.motivering ?? '', regler: Array.isArray(x.regler) ? x.regler as string[] : [] })),
         verifikation: (() => {
           const v = (verif.data ?? []).find((x) => x.transaktion_id === t.id);
           if (!v) return null;

@@ -3,6 +3,7 @@ import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkon
 import { svenskDag } from '@/lib/dagskassa';
 import { byggMejlkontext } from '@/lib/mejlkontext';
 import { kompletteringText, type Komplettering } from '@/lib/transaktioner/komplettera';
+import { REGEL_IDN, regelText, reglerAttValja } from '@/lib/transaktioner/kundregler';
 import { tolkaBetalsatt, type Betalsatt } from './betalsatt';
 import { MODELLER, fraga, type Modell, type System } from './modeller';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
@@ -13,7 +14,8 @@ import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './
  * Varje transaktion konteras av båda modellerna, var för sig och med samma
  * prompter:
  *
- *   Pass 1     Modellen väljer konto ur K1-kontoplanen och momssats.
+ *   Pass 1     Modellen väljer konto ur K1-kontoplanen och momssats, och vilka
+ *              kundregler (`@/lib/transaktioner/kundregler`) som gäller.
  *   Kod        Kontot prövas: finns det i K1, får det väljas automatiskt,
  *              håller beloppsgränserna. Ett konto utanför K1 ger modellen
  *              ett nytt försök, en gång.
@@ -63,6 +65,7 @@ interface Pass1 {
   momshantering: Momshantering;
   sakerhet: 'hog' | 'medel' | 'lag';
   motivering: string;
+  regler: string[];
 }
 
 interface Pass2 {
@@ -80,6 +83,8 @@ export interface Kontering {
   konto: string | null;
   momssats: number | null;
   motivering: string;
+  /** Kundreglerna modellen valde. */
+  regler: string[];
   granskning: (Pass2 & { forstaKonto: string }) | null;
   flaggor: Flagga[];
   omdome: Omdome;
@@ -97,13 +102,14 @@ export interface Utfall {
 const PASS1_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['konto', 'momssats', 'momshantering', 'sakerhet', 'motivering'],
+  required: ['konto', 'momssats', 'momshantering', 'sakerhet', 'motivering', 'regler'],
   properties: {
     konto: { type: 'string', description: 'Fyrsiffrigt konto ur K1-kontoplanen' },
     momssats: { type: 'integer', enum: [0, 6, 12, 25] },
     momshantering: { type: 'string', enum: ['svensk', 'ingen', 'omvand'] },
     sakerhet: { type: 'string', enum: ['hog', 'medel', 'lag'] },
     motivering: { type: 'string' },
+    regler: { type: 'array', items: { type: 'string', enum: REGEL_IDN }, description: 'Id på kundreglerna som gäller transaktionen' },
   },
 };
 
@@ -132,6 +138,10 @@ Regler:
 - motivering: en eller två meningar om varför, på svenska.
 - Använd kundens verksamhet för att avgöra vad ett köp är till för. Har kunden i ett mejl förklarat vad ett köp eller en inbetalning avser, väger det tyngre än en gissning — säg det i motiveringen.
 - Står det en instruktion från byrån i anteckningen följer du den. Den väger tyngst av allt.
+- regler: id på de kundregler nedan som gäller transaktionen. Ta bara med en regel när underlaget, uppgifterna eller mejlen visar att den gäller — tom lista annars. En regel du tar med följer du: dess instruktion är byråns och väger lika tungt som anteckningen. Nämn regeln i motiveringen.
+
+KUNDREGLER:
+${reglerAttValja()}
 - Kontot väljs bara utifrån K1-kontoplanen och kontobeskrivningarna nedan — byråns egen dokumentation. Använd ingen annan källa. Hur kunden eller andra kunder bokfört liknande saker tidigare är en ledtråd om vad affären är, inte om vilket konto som är rätt: tidigare bokföringar kan vara gjorda i ett annat program, med BAS-underkonton eller fel. Stämmer historiken inte med kontobeskrivningarna gäller beskrivningarna.
 
 K1-KONTOPLAN (konto namn — beskrivning [sökord]):
@@ -151,7 +161,7 @@ Gränsprövningarna är uträknade i kod. Godta siffrorna.
 
 Transaktionen konteras direkt från underlaget, inte från en tidigare bokföring. Punkter som handlar om vilket BAS-konto en post tidigare bokförts på stämmer därför aldrig — bortse från dem.
 
-Står det en instruktion från byrån i anteckningen och kontot följer den, är kontot rätt om inte reglerna uttryckligen förbjuder det.`;
+Står det en instruktion från byrån i anteckningen och kontot följer den, är kontot rätt om inte reglerna uttryckligen förbjuder det. Detsamma gäller KUNDREGLER SOM GÄLLER.`;
 
 const RATTELSE_SCHEMA = {
   type: 'object',
@@ -277,6 +287,8 @@ async function konteraMedModell(
   }
   const p1 = svar.data;
   const svarade = new Set([svar.modell]);
+  // Bara regler som finns, en gång var
+  const regler = [...new Set((Array.isArray(p1.regler) ? p1.regler : []).filter((id) => REGEL_IDN.includes(id)))];
 
   const { moms, flaggor: momsflaggor } = raknaMoms(t, p1);
   flaggor.push(...momsflaggor);
@@ -292,7 +304,12 @@ async function konteraMedModell(
     const sys: System = { fast: PASS2_FAST, kund };
     const g = await fraga<Pass2>(modell, {
       system: sys,
-      user: `TRANSAKTIONEN:\n${user}\n\nVALT KONTO: ${p1.konto} ${forsta.rad.namn}, momssats ${p1.momssats} %\nMotivering: ${p1.motivering}\n\nKONTOTS REGLER:\n${kontoBlock(forsta)}`,
+      user: [
+        `TRANSAKTIONEN:\n${user}`,
+        `VALT KONTO: ${p1.konto} ${forsta.rad.namn}, momssats ${p1.momssats} %\nMotivering: ${p1.motivering}`,
+        regelText(regler),
+        `KONTOTS REGLER:\n${kontoBlock(forsta)}`,
+      ].filter(Boolean).join('\n\n'),
       namn: 'granskning',
       schema: PASS2_SCHEMA,
     });
@@ -333,6 +350,7 @@ async function konteraMedModell(
     konto,
     momssats: p1.momshantering === 'svensk' ? p1.momssats : 0,
     motivering: p1.motivering,
+    regler,
     granskning,
     flaggor,
     omdome,
@@ -410,6 +428,7 @@ async function konteraEn(
       konto: k.konto,
       momssats: k.momssats,
       motivering: k.motivering,
+      regler: k.regler,
       granskning: k.granskning ? { ...k.granskning, svarade: k.svarade } : { svarade: k.svarade },
       flaggor: k.flaggor,
       omdome: k.omdome,
@@ -591,7 +610,7 @@ export async function bokfor(
   if (!t.datum) throw new Error('Transaktionen saknar datum');
 
   const sats = momssats as Pass1['momssats'];
-  const { moms } = raknaMoms(t, { konto, momssats: sats, momshantering: sats ? 'svensk' : 'ingen', sakerhet: 'hog', motivering: '' });
+  const { moms } = raknaMoms(t, { konto, momssats: sats, momshantering: sats ? 'svensk' : 'ingen', sakerhet: 'hog', motivering: '', regler: [] });
   const rader = byggRader(t, konto, sats, moms, motkonto);
 
   const id = crypto.randomUUID();
