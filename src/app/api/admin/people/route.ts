@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizePhone } from '@/lib/sms/phone';
-import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, BokslutData, MomsPeriod, Redovisningsmetod } from '@/lib/admin-types';
+import type { Abonnemang, AdminMailMessage, AdminTransaktion, AdminVerifikation, BokslutData, MomsPeriod, Redovisningsmetod } from '@/lib/admin-types';
 import { importPendingSie } from '@/lib/sie/import';
 import { sieIngaendeBalans } from '@/lib/sie/ingaende-balans';
 import { build, getSupabase, locate, otherContacts, summary, toIso, type Built } from '@/lib/personer';
@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
       underlag: match.files,
       mail: await mailFor(match),
       bokslut: await bokslutFor(match, owner),
+      abonnemang: await abonnemangFor(owner),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internt fel';
@@ -57,6 +58,35 @@ export async function GET(request: NextRequest) {
 }
 
 type Owner = { userIds: string[]; emails: string[] };
+
+/**
+ * Personens senaste abonnemang och priset hen har låst. Årskunder faktureras
+ * med det här beloppet, inte med dagens pris.
+ */
+async function abonnemangFor(owner: Owner): Promise<Abonnemang | null> {
+  const filters = [
+    ...(owner.userIds.length ? [`stripe_subscription_id.in.(${owner.userIds.map((id) => `yearly_${id}`).join(',')})`] : []),
+    ...(owner.emails.length ? [`email.in.(${owner.emails.map((e) => `"${e}"`).join(',')})`] : []),
+  ];
+  if (!filters.length) return null;
+
+  const { data } = await getSupabase()
+    .from('subscriptions')
+    .select('status, billing_period, pris_kr, created_at')
+    .or(filters.join(','))
+    .order('created_at', { ascending: false });
+
+  // En aktiv rad går före en avslutad, även om den avslutade är nyare
+  const rows = data ?? [];
+  const row = rows.find((r) => ['active', 'trialing', 'past_due', 'invoice'].includes(r.status)) ?? rows[0];
+  if (!row) return null;
+  return {
+    status: row.status,
+    billingPeriod: row.billing_period === 'yearly' ? 'yearly' : 'monthly',
+    prisKr: row.pris_kr,
+    sedan: row.created_at,
+  };
+}
 
 /** Kontona och adresserna personens verifikationer kan ligga på. */
 function ownerOf(p: Built): Owner {

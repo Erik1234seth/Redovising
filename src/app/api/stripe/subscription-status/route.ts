@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
   const { data } = await supabase
     .from('subscriptions')
-    .select('status, billing_period, current_period_end, price_id')
+    .select('status, billing_period, current_period_end, price_id, pris_kr')
     .eq('email', email)
     .order('created_at', { ascending: false })
     .limit(1)

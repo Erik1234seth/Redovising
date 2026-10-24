@@ -4,8 +4,8 @@ export const packages: PackageInfo[] = [
   {
     id: 'komplett',
     name: 'Komplett Tjänst',
-    price: 299,
-    yearlyPrice: 3999,
+    price: 399,
+    yearlyPrice: 4788,
     period: '/mån',
     description: 'Allt inkluderat. Löpande abonnemang utan bindningstid.',
     features: [

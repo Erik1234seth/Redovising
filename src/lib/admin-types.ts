@@ -55,6 +55,15 @@ export type Redovisningsmetod = 'faktureringsmetoden' | 'kontantmetoden';
 /** Hur ofta kunden redovisar moms (`profiles.moms_period`). "helår" betyder årsvis. */
 export type MomsPeriod = 'månadsvis' | 'kvartalsvis' | 'helår' | 'ingen-moms';
 
+/** Personens abonnemang (`subscriptions`), med priset som låstes när hen skrev upp sig. */
+export interface Abonnemang {
+  status: string;
+  billingPeriod: 'monthly' | 'yearly';
+  /** Kr exkl. moms per månad eller år. Null på rader från före prislåsningen. */
+  prisKr: number | null;
+  sedan: string;
+}
+
 export interface Person {
   key: string;
   name: string | null;

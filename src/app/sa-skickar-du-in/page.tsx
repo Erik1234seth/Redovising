@@ -277,7 +277,7 @@ export default function SaSkickarDuInPage() {
               </svg>
             </div>
             <div>
-              <h3 className="text-base font-bold text-white mb-2">Därför kan vi hålla priset på 299 kr/mån</h3>
+              <h3 className="text-base font-bold text-white mb-2">Därför kan vi hålla priset på 399 kr/mån</h3>
               <p className="text-white/60 text-sm leading-relaxed mb-4">
                 Många redovisningsbyråer tar betalt per timme delvis för att de lägger tid på att tolka röriga underlag. Hos oss är strukturen given från start — du fyller i mallen vi ger dig, och vi kan jobba effektivt. Den besparingen delar vi med dig.
               </p>

@@ -67,15 +67,17 @@ Vid frågor om redovisning, skatt eller moms ska information i tillgängliga reg
 
 Alla priser anges exklusive moms.
 
-Månadsabonnemang: 299 kr per månad. Betalning sker löpande med kort. Abonnemanget måste vara betalt för att kunden ska ha tillgång till tjänsten.
+Priserna nedan gäller nya kunder. Kunder som anslöt innan priset höjdes behåller sitt pris. Står kundens eget pris i kunduppgifterna i Del 2 är det det priset som gäller för kunden.
+
+Månadsabonnemang: 399 kr per månad. Betalning sker löpande med kort. Abonnemanget måste vara betalt för att kunden ska ha tillgång till tjänsten.
 
 När en kund ansluter under ett pågående kalenderår och Enkla Bokslut tar ansvar för hela årets redovisning debiteras även de tidigare månaderna.
 
 Exempel: Om kunden blir kund i september och Enkla Bokslut tar hand om redovisningen från januari, debiteras kunden även för januari–augusti. Avgiften för tidigare månader faktureras i samband med att bokslutet, NE-bilagan och firmans deklarationsuppgifter lämnas in.
 
-Årsbetalning: 3 999 kr per kalenderår. Kunden betalar inget i förskott. Fakturering sker efter att Enkla Bokslut har lämnat in kundens årsbokslut, NE-bilaga och de deklarationsuppgifter som hör till den enskilda firman. Kunden får tillgång till tjänsten direkt.
+Årsbetalning: 4 788 kr per kalenderår. Kunden betalar inget i förskott. Fakturering sker efter att Enkla Bokslut har lämnat in kundens årsbokslut, NE-bilaga och de deklarationsuppgifter som hör till den enskilda firman. Kunden får tillgång till tjänsten direkt.
 
-Om Enkla Bokslut gör bokslut, NE-bilaga och de delar av inkomstdeklarationen som hör till den enskilda firman för ett tidigare, ännu inte inlämnat år är priset 3 999 kr exklusive moms per år. Fakturering sker efter inlämning.
+Om Enkla Bokslut gör bokslut, NE-bilaga och de delar av inkomstdeklarationen som hör till den enskilda firman för ett tidigare, ännu inte inlämnat år är priset 4 788 kr exklusive moms per år. Fakturering sker efter inlämning.
 
 Generella prisvillkor:
 - Inga tillval

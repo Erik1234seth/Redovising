@@ -6,6 +6,7 @@ import { PROMPT_INTRO, SERVICE_INFO, KNOWLEDGE_RULES, EXAMPLE_RULES } from '../i
 import type { Sender } from './identify';
 import { byggMejlkontext } from '../mejlkontext';
 import { anteckningarForPrompt } from '../inkorg/anteckningar';
+import { hamtaKundpris, kundprisRad } from '../kundpris';
 
 /** Hur många tidigare SMS i konversationen som skickas med som kontext. */
 const HISTORY_LIMIT = 10;
@@ -105,11 +106,14 @@ async function buildCustomerContext(
   userId: string,
 ): Promise<string> {
   try {
-    const { data: p } = await supabase
-      .from('profiles')
-      .select('full_name, email, company_name, org_nr, momsnr, verksamhet, ort, moms_period, redovisningsmetod, start_ar, forsta_deklarationsar, subscription_status, ombud_klart_at')
-      .eq('id', userId)
-      .single();
+    const [{ data: p }, kundpris] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('full_name, email, company_name, org_nr, momsnr, verksamhet, ort, moms_period, redovisningsmetod, start_ar, forsta_deklarationsar, subscription_status, ombud_klart_at')
+        .eq('id', userId)
+        .single(),
+      hamtaKundpris(supabase, userId).catch(() => null),
+    ]);
 
     if (!p) return '';
 
@@ -127,6 +131,8 @@ async function buildCustomerContext(
     if (p.start_ar) lines.push(`- Startår: ${p.start_ar}`);
     if (p.forsta_deklarationsar === true) lines.push('- Första deklarationsåret för firman — ingen tidigare bokföring');
     if (p.forsta_deklarationsar === false) lines.push('- Kunden har deklarerat för firman tidigare år');
+    const prisRad = kundprisRad(kundpris);
+    if (prisRad) lines.push(prisRad);
 
     return `
 

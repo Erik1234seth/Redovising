@@ -30,7 +30,7 @@ const DESKTOP_MIN_H = 'sm:min-h-[600px]';
 
 // Varje annonsvariant har en egen "nästa bildruta". De flesta delar copy och
 // byter bara bild; en variant kan skriva över rubrik, pris och fotnot när
-// annonsen lovar något annat än 299 i månaden.
+// annonsen lovar något annat än 399 i månaden.
 type Variant = {
   image: string;
   /**
@@ -64,7 +64,7 @@ const DEFAULT_VARIANT: Variant = {
   imagePosition: 'object-[62%_26%]',
   headline: 'Slipp bokföringen. Vi gör allt åt dig.',
   headlineClass: 'text-2xl sm:text-3xl',
-  price: '299',
+  price: '399',
   priceUnit: 'kr/mån',
   priceNote: 'Allt ingår - inga överraskningar',
   hideSourcePill: false,
@@ -80,7 +80,7 @@ const RESERVATION: Partial<Variant> = {
   // Rubriken är dubbelt så lång som standardvariantens, så den får ett snäpp
   // mindre grad för att fortfarande rymmas på tre rader i mobil.
   headlineClass: 'text-[22px] sm:text-[28px]',
-  price: '3999',
+  price: '4788',
   priceUnit: 'kr',
   hideSourcePill: true,
   notBinding: true,
@@ -99,7 +99,7 @@ const VARIANTS: Record<string, Partial<Variant>> = {
   // Liggande bild, ansiktet högt upp — remsan måste börja nära överkanten för
   // att håret ska få plats.
   'fb-f': { ...RESERVATION, image: '/popup4.png', imagePosition: 'object-[50%_5%]' },
-  // Standardpopupen rakt av — 299 i månaden och vinkbilden. Samma innehåll som
+  // Standardpopupen rakt av — 399 i månaden och vinkbilden. Samma innehåll som
   // fb-pris, men en egen kod så annonsen den ligger på kan mätas för sig.
   'fb-g': { image: '/vinkafacebook.png' },
 };

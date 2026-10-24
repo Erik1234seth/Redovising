@@ -291,7 +291,7 @@ export default function Home() {
   // Bas-pixeln (init + PageView) laddas statiskt i layout.tsx.
   useEffect(() => {
     window.fbq?.('track', 'ViewContent', {
-      value: 3999,
+      value: 4788,
       currency: 'SEK',
       content_ids: '1',
     });
@@ -463,7 +463,7 @@ export default function Home() {
             "name": "Enkla Bokslut",
             "description": "Professionell årsredovisning och bokslut för enskilda firmor.",
             "url": "https://enklabokslut.se",
-            "priceRange": "299 kr/mån",
+            "priceRange": "399 kr/mån",
             "areaServed": { "@type": "Country", "name": "Sverige" },
           })
         }}
@@ -519,7 +519,7 @@ export default function Home() {
               {/* Mini trust signals */}
               <div className="flex items-center gap-5 lg:gap-7 mt-8 justify-center lg:justify-start">
                 {[
-                  { value: '299 kr/mån', label: 'allt inkluderat' },
+                  { value: '399 kr/mån', label: 'allt inkluderat' },
                   { value: 'Trygg och säker', label: 'bokföring' },
                   { value: '100%', label: 'fokus på enskilda firmor' },
                 ].map(({ value, label }) => (

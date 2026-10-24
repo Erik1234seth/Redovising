@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendWelcomeEmails } from '@/lib/welcome-email';
+import { packages } from '@/data/packages';
+import { formateraPris } from '@/lib/kundpris';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,6 +38,15 @@ export async function POST(req: NextRequest) {
     .update({ subscription_status: 'invoice' })
     .eq('id', userId);
 
+  // Kundens årspris låses första gången. Går en befintlig årskund igenom
+  // flödet igen ska hen inte hamna på ett höjt pris.
+  const { data: befintlig } = await supabase
+    .from('subscriptions')
+    .select('pris_kr')
+    .eq('stripe_subscription_id', `yearly_${userId}`)
+    .maybeSingle();
+  const prisKr: number = befintlig?.pris_kr ?? packages[0].yearlyPrice;
+
   // Registrera årsabonnemanget så det syns på konto-sidan (idempotent via syntetiskt id)
   await supabase.from('subscriptions').upsert(
     {
@@ -43,6 +54,7 @@ export async function POST(req: NextRequest) {
       email,
       status: 'invoice',
       billing_period: 'yearly',
+      pris_kr: prisKr,
       current_period_end: null,
       metadata: { userId, name: name ?? '', plan: 'yearly_invoice' },
     },
@@ -56,7 +68,7 @@ export async function POST(req: NextRequest) {
         email,
         name,
         contactMethod,
-        planLabel: '3 999 kr/år (exkl. moms) – faktureras när ditt årsbokslut lämnats in',
+        planLabel: `${formateraPris(prisKr, 'yearly')} (exkl. moms) – faktureras när ditt årsbokslut lämnats in`,
       });
     } catch (err) {
       console.error('[yearly-signup] välkomstmejl misslyckades:', err);

@@ -4,6 +4,7 @@ import { retrieveKnowledge, retrieveExamples, embedQuery } from '../retrieve';
 import { buildGeneralQuestionPrompt } from '../general-question-prompt';
 import { anteckningarForPrompt } from '../../inkorg/anteckningar';
 import { byggMejlkontext } from '../../mejlkontext';
+import { hamtaKundpris, kundprisRad } from '../../kundpris';
 
 /** Hur mycket av mejlet som besvaras som skickas till AI:n. */
 const MEJL_MAX_TECKEN = 20000;
@@ -30,7 +31,7 @@ async function buildSenderContext(
   userId: string,
 ): Promise<{ customerInfo: string; customerBookkeeping: string }> {
   try {
-    const [{ data: p }, { data: txs }, { count }] = await Promise.all([
+    const [{ data: p }, { data: txs }, { count }, kundpris] = await Promise.all([
       supabase
         .from('profiles')
         .select('full_name, email, company_name, org_nr, momsnr, verksamhet, ort, moms_period, start_ar, bokforing_metod, forsta_deklarationsar')
@@ -46,6 +47,7 @@ async function buildSenderContext(
         .from('bokforing_transaktioner')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId),
+      hamtaKundpris(supabase, userId).catch(() => null),
     ]);
 
     const lines: string[] = [];
@@ -61,6 +63,8 @@ async function buildSenderContext(
     if (p?.start_ar) lines.push(`- Startår: ${p.start_ar}`);
     if (p?.forsta_deklarationsar === true) lines.push('- Första deklarationsåret för firman — ingen tidigare bokföring');
     if (p?.forsta_deklarationsar === false) lines.push('- Kunden har deklarerat för firman tidigare år');
+    const prisRad = kundprisRad(kundpris);
+    if (prisRad) lines.push(prisRad);
 
     let txBlock = 'Kunden har inga bokförda transaktioner ännu.';
     if (txs?.length) {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { formateraPris, kundensPris } from '@/lib/kundpris';
 
 const NAV_BG = '#173b57';
 const ACCENT = '#d04a52';
@@ -276,6 +277,7 @@ type Subscription = {
   billing_period: string;
   current_period_end: string | null;
   price_id: string;
+  pris_kr: number | null;
 };
 
 function PrenumerationTab({ email }: { email: string }) {
@@ -366,7 +368,7 @@ function PrenumerationTab({ email }: { email: string }) {
           <div className="flex justify-between items-center py-3 border-b" style={{ borderBottomColor: '#F1F5F9' }}>
             <span className="text-sm text-slate-500">Plan</span>
             <span className="text-sm font-semibold text-slate-800">
-              Enkla Bokslut — {subscription.billing_period === 'yearly' ? '3 999 kr/år' : '299 kr/mån'}
+              Enkla Bokslut — {formateraPris(kundensPris(subscription), subscription.billing_period)}
             </span>
           </div>
 

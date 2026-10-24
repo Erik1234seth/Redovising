@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import type { AdminMailMessage, AdminTransaktion, AdminVerifikation, BokslutData, MomsPeriod, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
+import type { Abonnemang, AdminMailMessage, AdminTransaktion, AdminVerifikation, BokslutData, MomsPeriod, Person, PersonUnderlag, Redovisningsmetod, TimelineEvent } from '@/lib/admin-types';
 import { EVENT_STYLE, REDOVISNINGSMETODER, MOMSPERIODER, fullDate } from '../../_pipeline';
 import SmsComposer from '../../_sms-composer';
 import { formatPhone } from '@/lib/sms/phone';
@@ -18,6 +18,7 @@ import { KonteringsVy } from '../../_kontering';
 import { MomsFil } from '../../_momsfil';
 import { Varningar } from '../../_varningar';
 import { NeBilaga } from '../../_ne';
+import { formateraPris, kundensPris } from '@/lib/kundpris';
 
 /**
  * Flikarna i personkortet — en per fråga man kommer hit med.
@@ -70,6 +71,7 @@ export default function PersonPage() {
   const [laser, setLaser] = useState<string | null>(null);
   const [mail, setMail] = useState<AdminMailMessage[]>([]);
   const [bokslut, setBokslut] = useState<BokslutData | null>(null);
+  const [abonnemang, setAbonnemang] = useState<Abonnemang | null>(null);
   // Perioden som valts i momsfilen — verifikationslistan under visar samma
   const [verPeriod, setVerPeriod] = useState<{ fran: string; tom: string } | undefined>();
   const [loading, setLoading] = useState(true);
@@ -108,6 +110,7 @@ export default function PersonPage() {
           setUnderlag(data.underlag ?? []);
           setMail(data.mail ?? []);
           setBokslut(data.bokslut ?? null);
+          setAbonnemang(data.abonnemang ?? null);
           setVerifikationerCount(data.verifikationerCount ?? 0);
           setTransaktionerCount(data.transaktionerCount ?? 0);
         }
@@ -697,6 +700,18 @@ export default function PersonPage() {
               }`}>
                 {person.isCustomer ? 'Kund' : 'Prospekt'}
               </span>
+              {abonnemang && (
+                <span
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                    abonnemang.status === 'canceled' ? 'bg-slate-500/15 text-slate-500 line-through' : 'bg-blue-500/15 text-blue-700'
+                  }`}
+                  title={`${abonnemang.status === 'invoice' ? 'Faktureras efter inlämnat årsbokslut' : `Stripe-status: ${abonnemang.status}`} · sedan ${fullDate(abonnemang.sedan)}`}
+                >
+                  {abonnemang.billingPeriod === 'yearly' ? 'Årsvis' : 'Månadsvis'}
+                  {' · '}
+                  {formateraPris(kundensPris({ pris_kr: abonnemang.prisKr, billing_period: abonnemang.billingPeriod }), abonnemang.billingPeriod)}
+                </span>
+              )}
               {person.optedOut && (
                 <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-red-500/20 text-red-600">
                   Avregistrerad från SMS

@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { createClient } from '@supabase/supabase-js';
 import { sendWelcomeEmails } from '@/lib/welcome-email';
+import { formateraPris } from '@/lib/kundpris';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,6 +38,8 @@ export async function POST(req: NextRequest) {
         status: subscription.status,
         price_id: price.id,
         billing_period: billingPeriod,
+        // Låser kundens pris. Höjer vi priset senare ligger kunden kvar här.
+        pris_kr: price.unit_amount != null ? price.unit_amount / 100 : null,
         current_period_end: subscription.current_period_end
           ? new Date(subscription.current_period_end * 1000).toISOString()
           : null,
@@ -61,7 +64,7 @@ export async function POST(req: NextRequest) {
     const email = session.customer_email;
     const name = session.metadata?.name || '';
     const contactMethod = session.metadata?.contactMethod || 'email';
-    const planLabel = billingPeriod === 'yearly' ? '3 999 kr/år' : '299 kr/mån';
+    const planLabel = formateraPris(price.unit_amount / 100, billingPeriod);
 
     if (email) {
       await sendWelcomeEmails({ email, name, contactMethod, planLabel });

@@ -60,7 +60,7 @@ const PARAGRAPHS = [
 
   'När året är slut gör vi klart bokslutet, momsdeklarationen och '
     + 'inkomstdeklarationen och lämnar in det som ska lämnas in till Skatteverket. '
-    + 'Alla delar ingår i priset (299 per månad eller 3999 per år) och vi har inga '
+    + 'Alla delar ingår i priset (399 per månad eller 4788 per år) och vi har inga '
     + '"tillval" som kostar extra.',
 
   'Har du någon annan fundering?',

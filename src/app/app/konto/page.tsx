@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
 import { PAYMENTS_ENABLED } from '@/lib/config';
+import { formateraPris, kundensPris } from '@/lib/kundpris';
 
 const NAV_BG = '#173b57';
 const CORAL = '#E95C63';
@@ -44,7 +45,7 @@ export default function KontoPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [subscription, setSubscription] = useState<{ status: string; billing_period: string; current_period_end: string | null } | null>(null);
+  const [subscription, setSubscription] = useState<{ status: string; billing_period: string; current_period_end: string | null; pris_kr: number | null } | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState<'monthly' | 'yearly' | null>(null);
 
@@ -487,7 +488,7 @@ export default function KontoPage() {
               <div className="flex items-center justify-between py-2 border-b border-slate-100">
                 <span className="text-sm text-slate-500">Plan</span>
                 <span className="text-sm font-semibold text-slate-700">
-                  {subscription.billing_period === 'yearly' ? '3 999 kr/år' : '299 kr/mån'}
+                  {formateraPris(kundensPris(subscription), subscription.billing_period)}
                 </span>
               </div>
               {subscription.current_period_end && (
@@ -502,7 +503,7 @@ export default function KontoPage() {
               )}
               {subscription.billing_period === 'yearly' ? (
                 <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  Du betalar inget löpande. Vi skickar en faktura på 3 999 kr (exkl. moms) när vi lämnat in ditt årsbokslut.
+                  Du betalar inget löpande. Vi skickar en faktura på {kundensPris(subscription).toLocaleString('sv-SE')} kr (exkl. moms) när vi lämnat in ditt årsbokslut.
                 </p>
               ) : (
                 <button
@@ -530,7 +531,7 @@ export default function KontoPage() {
                   <p className="text-xs text-slate-400">Ingen bindningstid</p>
                 </div>
                 <span className="text-sm font-extrabold" style={{ color: CORAL }}>
-                  {checkoutLoading === 'monthly' ? '...' : '299 kr/mån'}
+                  {checkoutLoading === 'monthly' ? '...' : '399 kr/mån'}
                 </span>
               </button>
               <button
@@ -545,7 +546,7 @@ export default function KontoPage() {
                   <p className="text-xs text-slate-400">Betala inget nu — faktureras efter inlämnat bokslut</p>
                 </div>
                 <span className="text-sm font-extrabold" style={{ color: NAV_BG }}>
-                  {checkoutLoading === 'yearly' ? '...' : '3 999 kr/år'}
+                  {checkoutLoading === 'yearly' ? '...' : '4 788 kr/år'}
                 </span>
               </button>
             </div>
