@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendWelcomeEmails } from '@/lib/welcome-email';
 import { packages } from '@/data/packages';
 import { formateraPris } from '@/lib/kundpris';
+import { TIDIGARE_PRIS } from '@/lib/tidigare-pris';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
   // Verifiera att användaren finns och inte redan har en aktiv prenumeration
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, subscription_status')
+    .select('id, subscription_status, tidigare_pris')
     .eq('id', userId)
     .single();
 
@@ -45,7 +46,8 @@ export async function POST(req: NextRequest) {
     .select('pris_kr')
     .eq('stripe_subscription_id', `yearly_${userId}`)
     .maybeSingle();
-  const prisKr: number = befintlig?.pris_kr ?? packages[0].yearlyPrice;
+  const prisKr: number = befintlig?.pris_kr
+    ?? (profile.tidigare_pris ? TIDIGARE_PRIS.yearlyPrice : packages[0].yearlyPrice);
 
   // Registrera årsabonnemanget så det syns på konto-sidan (idempotent via syntetiskt id)
   await supabase.from('subscriptions').upsert(

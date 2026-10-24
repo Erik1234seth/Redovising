@@ -4,6 +4,7 @@ import { ENKLA_BOKSLUT_CONTEXT } from '../service-context';
 import { REPLY_RULES } from '../reply-rules';
 import { anteckningarForPrompt } from '../../inkorg/anteckningar';
 import { byggMejlkontext } from '../../mejlkontext';
+import { tidigarePrisRegel } from '../../tidigare-pris';
 
 // Förut 1000 tecken av mejlet och de sista 3000 av tråden. Ett långt frågemejl
 // från ett lead blev då början (hälsningen) plus slutet (sista frågorna, som
@@ -27,9 +28,13 @@ async function generateInitialReply(
   history?: string,
   attachmentNames: string[] = [],
   anteckningar = '',
+  prisRegel = '',
 ): Promise<InitialReply> {
   const systemPrompt = `${ENKLA_BOKSLUT_CONTEXT}
-
+${prisRegel ? `
+OM AVSÄNDAREN:
+${prisRegel}
+` : ''}
 Du jobbar på Enkla Bokslut och svarar en potentiell kund. Håll det kort. Ingen säljig ton, inga tomma fraser. Svara rakt på frågan, var hjälpsam och professionell men avslappnad.
 
 Lägg bara med registreringslänken (${registrationLink}) om de tydligt vill komma igång eller skapa konto, och sätt då includeLink till true. Annars svarar du bara på frågan. Andra länkar får du bara använda om de står i länkregistret och passar frågan.
@@ -101,7 +106,8 @@ export async function handleUnknownUser(params: {
   let reply: InitialReply;
   try {
     reply = await generateInitialReply(body, subject, registrationLink, emailHistory, attachmentNames,
-      await anteckningarForPrompt(supabase, { email: senderEmail }));
+      await anteckningarForPrompt(supabase, { email: senderEmail }),
+      await tidigarePrisRegel(supabase, [senderEmail]));
   } catch (err) {
     // Inget standardsvar här. Tidigare gick ett hårdkodat "registrera dig"-mejl ut
     // så fort AI:n fallerade — även till avsändare som aldrig frågat efter det, som

@@ -6,6 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { packages } from '@/data/packages';
 import FlowCheckpoints from '@/components/FlowCheckpoints';
 import { useMainSiteUrl } from '@/lib/useMainSiteUrl';
+import { createClient } from '@/lib/supabase';
+import { TIDIGARE_PRIS, TIDIGARE_PRIS_STORAGE } from '@/lib/tidigare-pris';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
@@ -22,7 +24,27 @@ export default function BetalningPage() {
   const router = useRouter();
   const { user, profile, loading, refreshProfile } = useAuth();
   const mainSiteUrl = useMainSiteUrl();
-  const pkg = packages[0];
+
+  // Kom kunden via länken med det tidigare priset ligger koden i localStorage
+  // sedan signup. Den sparas på profilen här, och det är profilen checkouten
+  // och yearly-signup läser.
+  const [tidigareKod, setTidigareKod] = useState<string | null>(null);
+  useEffect(() => {
+    try { setTidigareKod(localStorage.getItem(TIDIGARE_PRIS_STORAGE)); } catch {}
+  }, []);
+  const tidigarePris = !!profile?.tidigare_pris || !!tidigareKod;
+  const pkg = tidigarePris ? { ...packages[0], ...TIDIGARE_PRIS } : packages[0];
+
+  const sparaTidigarePris = async () => {
+    if (!tidigareKod || profile?.tidigare_pris) return;
+    const { data } = await createClient().auth.getSession();
+    const res = await fetch('/api/tidigare-pris', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` },
+      body: JSON.stringify({ kod: tidigareKod }),
+    }).catch(() => null);
+    if (!res?.ok) throw new Error('Kunde inte spara det tidigare priset');
+  };
 
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
   const [preselected, setPreselected] = useState(false);
@@ -59,6 +81,15 @@ export default function BetalningPage() {
     if (!user) { router.push('/auth/login'); return; }
     setSubmitting(true);
     setError('');
+
+    // Måste vara sparat innan priset sätts, annars får kunden dagens pris
+    try {
+      await sparaTidigarePris();
+    } catch {
+      setError('Något gick fel, försök igen.');
+      setSubmitting(false);
+      return;
+    }
 
     // Årsvis: ingen kortbetalning i förskott — ge åtkomst direkt, fakturera senare.
     if (billing === 'yearly') {

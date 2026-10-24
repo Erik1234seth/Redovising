@@ -1,15 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
+import { createClient } from '@supabase/supabase-js';
 
 const PRICE_IDS = {
   monthly: process.env.STRIPE_MONTHLY_PRICE_ID!,
   yearly: process.env.STRIPE_YEARLY_PRICE_ID!,
 };
 
+/** Det tidigare månadspriset, 299 kr. Gäller den som kom in via länken (profiles.tidigare_pris). */
+const TIDIGARE_MONTHLY_PRICE_ID = process.env.STRIPE_MONTHLY_PRICE_ID_TIDIGARE;
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 export async function POST(req: NextRequest) {
   const { billingPeriod, email, metadata } = await req.json();
 
-  const priceId = PRICE_IDS[billingPeriod as 'monthly' | 'yearly'];
+  let priceId = PRICE_IDS[billingPeriod as 'monthly' | 'yearly'];
+  if (billingPeriod === 'monthly' && metadata?.userId && TIDIGARE_MONTHLY_PRICE_ID) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tidigare_pris')
+      .eq('id', metadata.userId)
+      .maybeSingle();
+    if (profile?.tidigare_pris) priceId = TIDIGARE_MONTHLY_PRICE_ID;
+  }
   if (!priceId) {
     return NextResponse.json({ error: 'Ogiltig betalningsperiod' }, { status: 400 });
   }

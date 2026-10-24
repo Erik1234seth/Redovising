@@ -35,6 +35,8 @@ export interface Profile {
   skicka_in_metod: 'maila-fil' | 'ladda-upp' | null;
   onboarding_done: boolean;
   subscription_status: string | null;
+  /** Kom in via länken med det tidigare priset (299/3 999). Sätts av /api/tidigare-pris. */
+  tidigare_pris?: boolean;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
 }

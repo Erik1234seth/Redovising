@@ -67,7 +67,7 @@ Vid frågor om redovisning, skatt eller moms ska information i tillgängliga reg
 
 Alla priser anges exklusive moms.
 
-Priserna nedan gäller nya kunder. Kunder som anslöt innan priset höjdes behåller sitt pris. Står kundens eget pris i kunduppgifterna i Del 2 är det det priset som gäller för kunden.
+Priserna nedan gäller nya kunder. Kunder som anslöt innan priset höjdes behåller sitt pris. Står kundens eget pris i kunduppgifterna i Del 2 är det det priset som gäller för kunden. Står det att tidigare pris gäller för personen följer du den instruktionen. Annars nämner du aldrig något tidigare pris, någon rabatt eller någon annan registreringslänk, inte ens om personen frågar.
 
 Månadsabonnemang: 399 kr per månad. Betalning sker löpande med kort. Abonnemanget måste vara betalt för att kunden ska ha tillgång till tjänsten.
 

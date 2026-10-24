@@ -5,6 +5,7 @@ import { buildGeneralQuestionPrompt } from '../general-question-prompt';
 import { anteckningarForPrompt } from '../../inkorg/anteckningar';
 import { byggMejlkontext } from '../../mejlkontext';
 import { hamtaKundpris, kundprisRad } from '../../kundpris';
+import { tidigarePrisRegel } from '../../tidigare-pris';
 
 /** Hur mycket av mejlet som besvaras som skickas till AI:n. */
 const MEJL_MAX_TECKEN = 20000;
@@ -63,7 +64,9 @@ async function buildSenderContext(
     if (p?.start_ar) lines.push(`- Startår: ${p.start_ar}`);
     if (p?.forsta_deklarationsar === true) lines.push('- Första deklarationsåret för firman — ingen tidigare bokföring');
     if (p?.forsta_deklarationsar === false) lines.push('- Kunden har deklarerat för firman tidigare år');
-    const prisRad = kundprisRad(kundpris);
+    // Kunden har ett låst pris. Saknas det kan personen ha rätt till det
+    // tidigare priset, om vi hade kontakt innan priset höjdes.
+    const prisRad = kundprisRad(kundpris) ?? (await tidigarePrisRegel(supabase, [p?.email].filter(Boolean) as string[]));
     if (prisRad) lines.push(prisRad);
 
     let txBlock = 'Kunden har inga bokförda transaktioner ännu.';

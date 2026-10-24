@@ -58,3 +58,5 @@ public/image.png
 
 # Nedladdade API-nycklar
 client-credentials.json
+
+.env*

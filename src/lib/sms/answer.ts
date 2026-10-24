@@ -7,6 +7,7 @@ import type { Sender } from './identify';
 import { byggMejlkontext } from '../mejlkontext';
 import { anteckningarForPrompt } from '../inkorg/anteckningar';
 import { hamtaKundpris, kundprisRad } from '../kundpris';
+import { tidigarePrisRegel } from '../tidigare-pris';
 
 /** Hur många tidigare SMS i konversationen som skickas med som kontext. */
 const HISTORY_LIMIT = 10;
@@ -131,7 +132,7 @@ async function buildCustomerContext(
     if (p.start_ar) lines.push(`- Startår: ${p.start_ar}`);
     if (p.forsta_deklarationsar === true) lines.push('- Första deklarationsåret för firman — ingen tidigare bokföring');
     if (p.forsta_deklarationsar === false) lines.push('- Kunden har deklarerat för firman tidigare år');
-    const prisRad = kundprisRad(kundpris);
+    const prisRad = kundprisRad(kundpris) ?? (await tidigarePrisRegel(supabase, [p.email].filter(Boolean) as string[]));
     if (prisRad) lines.push(prisRad);
 
     return `
@@ -181,6 +182,8 @@ export async function generateSmsReply(params: {
     buildHistory(supabase, phone),
   ]);
   const mejlkontext = await byggMejlkontext(supabase, { userId: sender.userId, emails: [sender.email] }).catch(() => '');
+  // Har avsändaren konto står prisregeln redan i kundkontexten
+  const prisRegel = !sender.userId && sender.email ? await tidigarePrisRegel(supabase, [sender.email]) : '';
 
   const senderNote =
     sender.kind === 'customer'
@@ -205,7 +208,7 @@ ${SERVICE_INFO}
 
 DEL 2 – OM AVSÄNDAREN
 
-${senderNote}
+${senderNote}${prisRegel ? `\n${prisRegel}` : ''}
 ${accountStatus}${customerContext}
 
 ${KNOWLEDGE_RULES}

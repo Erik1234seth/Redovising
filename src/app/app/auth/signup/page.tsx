@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import FlowCheckpoints from '@/components/FlowCheckpoints';
 import { useMainSiteUrl } from '@/lib/useMainSiteUrl';
 import { parsePlan } from '@/lib/signupUrl';
+import { TIDIGARE_PRIS, TIDIGARE_PRIS_KOD, TIDIGARE_PRIS_STORAGE } from '@/lib/tidigare-pris';
 
 const CORAL = '#E95C63';
 const NAV_BG = '#173b57';
@@ -31,6 +32,19 @@ function SignupForm() {
     const plan = parsePlan(searchParams.get('plan'));
     if (plan) {
       try { sessionStorage.setItem('billingPeriod', plan); } catch {}
+    }
+  }, [searchParams]);
+
+  // Länken med det tidigare priset (?p=). localStorage och inte sessionStorage,
+  // så att den överlever att kunden bekräftar mejlen i en ny flik. Betalningen
+  // sparar den sedan på profilen, och det är bara där priset avgörs.
+  const [tidigarePris, setTidigarePris] = useState(false);
+  useEffect(() => {
+    try {
+      if (searchParams.get('p') === TIDIGARE_PRIS_KOD) localStorage.setItem(TIDIGARE_PRIS_STORAGE, TIDIGARE_PRIS_KOD);
+      setTidigarePris(localStorage.getItem(TIDIGARE_PRIS_STORAGE) === TIDIGARE_PRIS_KOD);
+    } catch {
+      setTidigarePris(searchParams.get('p') === TIDIGARE_PRIS_KOD);
     }
   }, [searchParams]);
 
@@ -69,6 +83,14 @@ function SignupForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {tidigarePris && (
+        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl text-sm">
+          Ditt pris: <strong>{TIDIGARE_PRIS.price} kr/mån</strong> eller{' '}
+          <strong>{TIDIGARE_PRIS.yearlyPrice.toLocaleString('sv-SE')} kr/år</strong> exkl. moms.
+          Du hade kontakt med oss innan vi höjde priset, så det tidigare priset gäller för dig.
+        </div>
+      )}
+
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
           {error}
