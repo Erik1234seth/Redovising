@@ -22,8 +22,9 @@ import { cleanBody } from '@/lib/inmail/clean-body';
  *    ALLA kundens transaktioner och verifikationer — kvitton, kontoutdrag och
  *    kassarapporter — så att den kan hitta dubbletter. Status sätts bara på
  *    de filer mejlet gäller; det är bara om dem vi frågar kunden. Sist skrivs
- *    ett utkast i inkorgen: vad som saknas, eller att allt är klart. Svarar
- *    kunden körs samma sak igen, tills underlaget är komplett.
+ *    ett utkast i inkorgen om vad som saknas. Är allt komplett och kunden inte
+ *    frågar något skrivs inget utkast. Svarar kunden körs samma sak igen,
+ *    tills underlaget är komplett.
  *
  * Kunden behöver inte visa kvitto eller faktura för en rad på kontoutdraget —
  * det kunden säger att den gäller räcker. Filer vi själva skickat (till
@@ -34,6 +35,8 @@ const MODELL = 'gpt-5.5';
 /** Så många underlag som läses ut samtidigt. Varje avläsning är ett tungt AI-anrop. */
 const SAMTIDIGA = 3;
 const PAGE = 1000;
+/** AI:ns svar när underlaget är komplett och kunden inte frågar något. Då skrivs inget utkast. */
+const INGET_SVAR = 'INGET_SVAR';
 
 interface Profil { id: string; full_name: string; email: string }
 
@@ -403,8 +406,9 @@ async function iOmgangar<T>(lista: T[], n: number, fn: (x: T) => Promise<unknown
 
 /**
  * Hela slingan för ett underlagsmejl. Körs i bakgrunden efter att Apps Script
- * fått sitt svar — avläsningen kan ta minuter. Slutar alltid med ett utkast i
- * inkorgen, även när något gick fel på vägen.
+ * fått sitt svar — avläsningen kan ta minuter. Slutar med ett utkast i
+ * inkorgen, även när något gick fel på vägen. Undantaget är när allt underlag
+ * är komplett och kunden inte frågar något: då behövs inget svar.
  */
 export async function korUnderlagsflode(opts: {
   supabase: SupabaseClient;
@@ -486,14 +490,26 @@ export async function korUnderlagsflode(opts: {
       ? `\n\nÖVRIGA FILER: ${ovriga.join(', ')} är inga underlag för bokföringen (till exempel en NE-bilaga, ett avtal eller ett brev). De är sparade hos oss som övriga filer och behöver inte kontrolleras. Bekräfta kort att vi fått dem.`
       : '';
 
+    // Är allt komplett behöver kunden inget svar, om hen inte också frågar
+    // något. Då skrivs inget utkast alls. När Erik själv bett om ett utkast
+    // skrivs det ändå.
+    const allaKompletta = kontroll.length > 0 && kontroll.every((k) => k.status === 'komplett');
+    const inget = allaKompletta && opts.kalla !== 'manuell'
+      ? `\n\nINGET SVAR BEHÖVS om kunden bara skickar in underlag: allt är komplett, och kunden behöver ingen bekräftelse. Svara då med exakt ${INGET_SVAR} och ingenting annat. Skriv ett vanligt svar bara om kunden i mejlet ställer en fråga eller ber om något som behöver ett svar, och svara då bara på det.`
+      : '';
+
     const svar = await handleGeneralQuestion({
       supabase, profile: profil, subject: opts.amne, body: opts.text, messageId: opts.messageId,
-      emailHistory: opts.historik, smsKontext: await smsKontextForMejl(supabase, email), underlagKontext: underlagKontext + ovrigtKontext,
+      emailHistory: opts.historik, smsKontext: await smsKontextForMejl(supabase, email), underlagKontext: underlagKontext + ovrigtKontext + inget,
       attachmentNames: nya.map((f) => f.file_name),
     });
 
     const text = svar.replyBody?.trim();
     if (!text) throw new Error('AI:n skrev inget svar');
+    if (inget && text.includes(INGET_SVAR)) {
+      console.log(`[underlag-kontroll] ${email}: ${kontroll.length} underlag kompletta, inget att svara på — inget utkast`);
+      return;
+    }
     const { error } = await supabase.from('mejl_utkast').insert({
       till_email: email, amne: opts.amne || null, text,
       gmail_thread_id: opts.threadId, svar_pa_message_id: opts.messageId, kalla: opts.kalla ?? 'ai',

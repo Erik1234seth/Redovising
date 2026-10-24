@@ -287,6 +287,7 @@ Regler:
 - Börja med en naturlig hälsning med kundens förnamn, exempelvis "Hej Anna,". Om förnamn saknas, skriv "Hej,".
 - Om kunden vill bli kund, beställa eller komma igång, använd länken för att bli kund som anges i informationen om Enkla Bokslut. Använd inte möteslänken om kunden inte uttryckligen vill boka ett möte.
 - Ställ bara en följdfråga om svaret behövs för att kunna besvara kundens fråga korrekt.
+- Driv inte samtalet vidare. När frågan är besvarad är mejlet klart: be inte om uppgifter eller underlag som inte behövs, föreslå inga nästa steg och ta inte upp nya ämnen som kunden inte tagit upp. En kort öppen avslutning som "Har du fler frågor är det bara att skriva" går bra.
 ${attachmentNames.length ? `
 Om kunden har bifogat filer:
 

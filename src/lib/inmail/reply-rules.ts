@@ -21,7 +21,14 @@
 export const REPLY_RULES = `
 Regel för längden. Håll svaret kort:
 - Svara på det kunden frågar om och inget mer. Ingen onödig bakgrund och inga upprepningar.
-- Hellre några få korta meningar än långa stycken.
+- Hellre några få korta meningar än långa stycken. Ett enkelt besked eller en bekräftelse är en eller två meningar.
+- Skriv längre bara när frågan faktiskt kräver en förklaring för att kunden ska förstå.
+
+Regel för att inte driva samtalet vidare:
+- När kundens fråga är besvarad är svaret klart.
+- Be inte om uppgifter, underlag eller förtydliganden som inte behövs för att hjälpa kunden med det hen skrev om. Ställ ingen följdfråga och föreslå inget nästa steg bara för att hålla samtalet igång.
+- Ta inte upp nya ämnen, tjänster eller möten som kunden inte har frågat om.
+- En kort öppen avslutning som "Har du fler frågor är det bara att skriva" går bra, men den ska inte kräva något av kunden.
 
 Regler för tecken. Mejlet skickas som ren text, så använd BARA vanliga tecken:
 - Inga emojis och inga symboltecken
