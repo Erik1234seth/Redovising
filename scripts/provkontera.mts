@@ -14,7 +14,10 @@ for (const u of utfall) {
   for (const k of u.konteringar) {
     console.log(`  ${k.modell.padEnd(16)} ${k.omdome.padEnd(5)} konto ${k.konto} moms ${k.momsdelar ? JSON.stringify(k.momsdelar) : k.momssats + '%'}  (${k.svarade})`);
     console.log(`     pass1: ${k.motivering}`);
-    if (k.granskning) console.log(`     pass2: stämmer=${k.granskning.stammer} bättre=${k.granskning.battre_konto} kräver=${k.granskning.granskning_kravs} — ${k.granskning.motivering}`);
+    for (const g of k.granskning?.konton ?? []) {
+      const byte = g.forstaKonto !== g.konto ? ` (${g.forstaKonto} → ${g.konto})` : '';
+      console.log(`     pass2 ${g.konto}${byte}: stämmer=${g.stammer} bättre=${g.battre_konto} kräver=${g.granskning_kravs} — ${g.motivering}`);
+    }
     for (const f of k.flaggor) console.log(`     [${f.allvar}] ${f.text}`);
   }
 }

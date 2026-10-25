@@ -21,7 +21,7 @@ import { hamtaInstruktioner, kontextFor } from './instruktioner';
  * `komplettering` och skickas med till konteringen.
  */
 
-const MODELL = 'gpt-5.5';
+const MODELL = 'gpt-6.1-sol';
 /** Transaktioner per AI-anrop, och anrop samtidigt. Ett kontoutdrag kan ha hundratals rader. */
 const PER_ANROP = 10;
 const SAMTIDIGA = 3;
@@ -275,6 +275,7 @@ async function fraga(user: string): Promise<{ nr?: unknown; kundens?: { ref?: un
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: MODELL,
+      reasoning_effort: 'low',
       response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: user }],
       max_completion_tokens: 32000,

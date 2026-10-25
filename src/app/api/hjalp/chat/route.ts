@@ -303,7 +303,8 @@ export async function POST(req: NextRequest) {
   system += buildUserContext(userContext);
 
   const stream = await openai.chat.completions.create({
-    model: 'gpt-5.5',
+    model: 'gpt-6.1-sol',
+    reasoning_effort: 'low',
     messages: [{ role: 'system', content: system }, ...messages],
     stream: true,
     max_completion_tokens: 800,

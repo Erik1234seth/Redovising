@@ -18,7 +18,7 @@ import {
  * gjorde, som sparas på underlaget och syns i panelen.
  */
 
-const MODELL = 'gpt-5.5';
+const MODELL = 'gpt-6.1-sol';
 const UTFIL = 'resultat.json';
 
 const INSTRUKTION = `Du läser underlag åt en svensk bokföringsbyrå. Den bifogade filen är ett kalkylblad, en textlista eller en PDF ur ett bokförings- eller kassasystem.
@@ -131,6 +131,7 @@ export async function lasMedSandlada(file: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: MODELL,
+        reasoning: { effort: 'medium' },
         tools: [{ type: 'code_interpreter', container: { type: 'auto', file_ids: [fileId] } }],
         input: [
           INSTRUKTION,

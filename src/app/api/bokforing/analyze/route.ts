@@ -80,14 +80,14 @@ Avgör om det är en vara eller tjänst baserat på beskrivningen. Ange rätt BA
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-6.1-sol',
+        reasoning_effort: 'medium',
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        temperature: 0.2,
-        max_tokens: 800,
+        max_completion_tokens: 16000,
       }),
     });
 

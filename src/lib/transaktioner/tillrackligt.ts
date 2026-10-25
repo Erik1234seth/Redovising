@@ -19,7 +19,7 @@ import { hamtaInstruktioner, kontextFor, reglerText } from './instruktioner';
  * regler från flödesschemat följer med (instruktioner.ts).
  */
 
-const MODELL = 'gpt-5.5';
+const MODELL = 'gpt-6.1-sol';
 const PER_ANROP = 8;
 const SAMTIDIGA = 3;
 
@@ -219,6 +219,7 @@ async function fraga(user: string): Promise<{ nr?: unknown; status?: unknown; sa
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: MODELL,
+      reasoning_effort: 'high',
       response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: user }],
       max_completion_tokens: 32000,

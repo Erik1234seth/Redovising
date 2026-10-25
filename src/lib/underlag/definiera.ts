@@ -56,7 +56,7 @@ export interface Definition {
   antalSidor?: number | null;
 }
 
-const MODELL = 'gpt-5.5';
+const MODELL = 'gpt-6.1-sol';
 // Bara ett litet JSON-svar, men modellens tänkande ryms i samma budget
 const MAX_TOKENS = 16000;
 const BUCKET = 'bokforing-underlag';
@@ -181,6 +181,7 @@ async function fragaAi(supabase: SupabaseClient, row: UnderlagRad): Promise<Defi
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: MODELL,
+      reasoning_effort: 'low',
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },

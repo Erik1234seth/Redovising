@@ -35,9 +35,9 @@ export type { ExtraheradTransaktion, ExtraheradVerifikation };
  * SIE-filer går ingen av vägarna. De tolkas med kod i `@/lib/sie/parse`.
  */
 
-const MODELL = 'gpt-5.5';
+const MODELL = 'gpt-6.1-sol';
 
-// Taket för ett svar hos gpt-5.5. Filen delas inte upp, så hela avskriften
+// Taket för ett svar hos gpt-6.1-sol. Filen delas inte upp, så hela avskriften
 // ska få plats i ett svar — och modellens eget tänkande ryms i samma budget.
 const MAX_TOKENS = 100000;
 
@@ -131,6 +131,7 @@ async function las(content: unknown, apiKey: string, fileName: string): Promise<
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: MODELL,
+      reasoning_effort: 'high',
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },

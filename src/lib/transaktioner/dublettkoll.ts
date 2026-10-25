@@ -26,7 +26,7 @@ import { hamtaInstruktioner, kontextFor } from './instruktioner';
  * egen koll (se `dubbletter.ts`) och är inte med här.
  */
 
-const MODELL = 'gpt-5.5';
+const MODELL = 'gpt-6.1-sol';
 const PER_ANROP = 10;
 const SAMTIDIGA = 3;
 const KANDIDATER = 6;
@@ -239,6 +239,7 @@ async function fraga(user: string): Promise<{ nr?: unknown; status?: unknown; re
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: MODELL,
+      reasoning_effort: 'medium',
       response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: user }],
       max_completion_tokens: 32000,

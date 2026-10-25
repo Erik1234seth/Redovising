@@ -74,13 +74,13 @@ Ange rätt BAS-konton för debet och kredit. Debetera kostnadskontot och kredite
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-6.1-sol',
+        reasoning_effort: 'medium',
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        temperature: 0.2,
       }),
     });
 

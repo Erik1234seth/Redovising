@@ -95,7 +95,8 @@ Om du är osäker på vad som ska ändras: sätt edits: [] och förklara i reply
     : `Ändringsbegäran:\n${body}`;
 
   const raw = await callOpenAI({
-    model: 'o3',
+    model: 'gpt-6.1-sol',
+    effort: 'medium',
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },

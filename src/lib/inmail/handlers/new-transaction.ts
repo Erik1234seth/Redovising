@@ -75,13 +75,14 @@ async function analyzeReceipt(fileBase64: string, mimeType: string): Promise<Rec
   }
 
   const raw = await callOpenAI({
-    model: 'gpt-4o',
+    model: 'gpt-6.1-sol',
+    effort: 'medium',
     messages: [
       { role: 'system', content: RECEIPT_SYSTEM_PROMPT },
       { role: 'user', content: userContent },
     ],
     responseFormat: { type: 'json_object' },
-    maxTokens: 1000,
+    maxTokens: 8000,
   });
 
   return parseJSON<ReceiptAnalysis>(raw);

@@ -270,7 +270,8 @@ SMS klarar bara enkla tecken.
   const anteckningar = await anteckningarForPrompt(supabase, { email: sender.email, phone });
 
   const answer = await callOpenAI({
-    model: 'o3',
+    model: 'gpt-6.1-sol',
+    effort: 'low',
     messages: [
       { role: 'system', content: systemPrompt + anteckningar },
       { role: 'user', content: userContent },

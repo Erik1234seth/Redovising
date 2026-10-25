@@ -11,7 +11,7 @@ import { callOpenAI, parseJSON } from '@/lib/inmail/openai-client';
  * och sväljs.
  */
 
-const MODELL = 'gpt-5.5';
+const MODELL = 'gpt-6.1-sol';
 
 interface Forslag { titel: string; beskrivning?: string; datum?: string | null }
 
@@ -59,6 +59,7 @@ export async function skapaArendenFranMeddelande(opts: {
 
     const raw = await callOpenAI({
       model: MODELL,
+      effort: 'low',
       messages: [
         { role: 'system', content: PROMPT(idag) },
         { role: 'user', content: delar },

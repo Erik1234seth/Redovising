@@ -19,7 +19,7 @@ import { build, locate, type Built } from '@/lib/personer';
  * Fel loggas och sväljs per person, så en trasig person stoppar inte resten.
  */
 
-const MODELL = 'gpt-5.5';
+const MODELL = 'gpt-6.1-sol';
 
 /** Per meddelande och totalt i det AI:n får läsa om en person. */
 const MEDDELANDE_MAX_TECKEN = 1500;
@@ -209,6 +209,7 @@ async function kollaPerson(supabase: SupabaseClient, p: Built, arenden: Rad[], s
 
   const svar = parseJSON<Svar>(await callOpenAI({
     model: MODELL,
+    effort: 'low',
     messages: [{ role: 'system', content: PROMPT(idag) }, { role: 'user', content: fraga }],
     responseFormat: { type: 'json_object' },
     maxTokens: 8000,

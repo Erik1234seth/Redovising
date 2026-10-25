@@ -73,7 +73,8 @@ Returnera JSON:
 Om du är osäker: sätt transaction_indices: [] och förklara i replyMessage.`;
 
   const raw = await callOpenAI({
-    model: 'o3',
+    model: 'gpt-6.1-sol',
+    effort: 'medium',
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: body },

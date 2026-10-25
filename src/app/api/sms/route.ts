@@ -8,7 +8,7 @@ import { notifyIncomingSms } from '@/lib/sms/notify';
 import { skapaArendenFranMeddelande } from '@/lib/arenden/fran-meddelande';
 import { kollaArenden } from '@/lib/arenden/ai-koll';
 
-// o3 plus två vektorsökningar tar längre tid än Twilios webhook-timeout på 15 s.
+// AI-svaret plus två vektorsökningar tar längre tid än Twilios webhook-timeout på 15 s.
 // Därför kvitteras webhooken direkt och svaret genereras efteråt, via Twilios
 // REST-API istället för TwiML.
 //
@@ -32,7 +32,7 @@ const START_WORDS = ['start', 'starta', 'ja tack'];
  *
  * Räknar även utkast, inklusive slängda. Sedan svaren blev utkast kan inget gå
  * i loop av sig självt längre — det taket skyddar numera mot att någon som
- * spammar oss kostar oss ett o3-anrop per SMS.
+ * spammar oss kostar oss ett AI-anrop per SMS.
  */
 const MAX_OUT_PER_HOUR = 10;
 

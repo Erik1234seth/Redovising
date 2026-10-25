@@ -60,7 +60,8 @@ ${body.slice(0, MEJL_MAX_TECKEN)}`;
 
   try {
     const raw = await callOpenAI({
-      model: 'o3',
+      model: 'gpt-6.1-sol',
+      effort: 'low',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMsg },

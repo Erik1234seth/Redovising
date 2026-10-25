@@ -151,7 +151,8 @@ export async function handleGeneralQuestion(params: {
   const userContent = [smsKontext, mejl, underlagKontext].filter(Boolean).join('\n\n');
 
   const answer = await callOpenAI({
-    model: 'o3',
+    model: 'gpt-6.1-sol',
+    effort: 'medium',
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },

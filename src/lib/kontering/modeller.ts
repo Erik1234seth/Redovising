@@ -11,7 +11,7 @@ import Anthropic from '@anthropic-ai/sdk';
  * minuter, och den måste hinna klart inom Vercels fem minuter.
  */
 
-export const MODELLER = ['gpt-5.5', 'claude-opus-5-5'] as const;
+export const MODELLER = ['gpt-6-astra', 'claude-opus-5-5'] as const;
 export type Modell = (typeof MODELLER)[number];
 
 export interface Svar<T> {
@@ -45,7 +45,7 @@ async function fragaGpt<T>(system: System, user: string, namn: string, schema: o
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: 'gpt-5.5',
+      model: 'gpt-6-astra',
       reasoning_effort: 'high',
       response_format: { type: 'json_schema', json_schema: { name: namn, strict: true, schema } },
       messages: [
@@ -55,13 +55,13 @@ async function fragaGpt<T>(system: System, user: string, namn: string, schema: o
       max_completion_tokens: 32000,
     }),
   });
-  if (!res.ok) throw new Error(`gpt-5.5 svarade ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) throw new Error(`gpt-6-astra svarade ${res.status}: ${(await res.text()).slice(0, 300)}`);
 
   const json = await res.json();
   const choice = json.choices?.[0];
-  if (choice?.message?.refusal) throw new Error(`gpt-5.5 vägrade: ${choice.message.refusal}`);
-  if (choice?.finish_reason === 'length') throw new Error('gpt-5.5 hann inte svara klart');
-  return { data: JSON.parse(choice?.message?.content ?? '') as T, modell: json.model ?? 'gpt-5.5' };
+  if (choice?.message?.refusal) throw new Error(`gpt-6-astra vägrade: ${choice.message.refusal}`);
+  if (choice?.finish_reason === 'length') throw new Error('gpt-6-astra hann inte svara klart');
+  return { data: JSON.parse(choice?.message?.content ?? '') as T, modell: json.model ?? 'gpt-6-astra' };
 }
 
 async function fragaClaude<T>(system: System, user: string, schema: object): Promise<Svar<T>> {
@@ -91,7 +91,7 @@ async function fragaClaude<T>(system: System, user: string, schema: object): Pro
 }
 
 export function fraga<T>(modell: Modell, o: { system: System; user: string; namn: string; schema: object }): Promise<Svar<T>> {
-  return modell === 'gpt-5.5'
+  return modell === 'gpt-6-astra'
     ? fragaGpt<T>(o.system, o.user, o.namn, o.schema)
     : fragaClaude<T>(o.system, o.user, o.schema);
 }

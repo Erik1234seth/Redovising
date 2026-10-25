@@ -6673,7 +6673,7 @@
     "Ta inte med varor som ska aktiveras som anläggningstillgång",
     "Inventera och värdera varor som finns kvar på balansdagen på 1400",
     "Bokför lagerförändringen separat på 4900 så att R5 avser årets varukostnad",
-    "Bokför erhållna rabatter och bonusar på 4700 enligt kontoplanen",
+    "Bokför erhållna efterhandsrabatter och bonusar på 4700. Rabatter som redan är avdragna på fakturan eller kvittot ingår i inköpet på 4000",
     "Stäm av 4000 mot leverantörsreskontra, bank, 1700, 2440, 1400 och 4900",
     "Använd för varor och material som säljs vidare eller direkt ingår i kundens leverans",
     "Klassificera efter inköpets användning",

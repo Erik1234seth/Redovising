@@ -32,7 +32,7 @@ import { cleanBody } from '@/lib/inmail/clean-body';
  * exempel en Excel-fil att markera privata rader i) är bara kontext.
  */
 
-const MODELL = 'gpt-5.5';
+const MODELL = 'gpt-6.1-sol';
 /** Så många underlag som läses ut samtidigt. Varje avläsning är ett tungt AI-anrop. */
 const SAMTIDIGA = 3;
 const PAGE = 1000;
@@ -123,6 +123,7 @@ export async function arUnderlagsmejl(opts: {
 
     const raw = await callOpenAI({
       model: MODELL,
+      effort: 'low',
       responseFormat: { type: 'json_object' },
       maxTokens: 4000,
       messages: [
@@ -330,6 +331,7 @@ async function kontrollera(
 
   const raw = await callOpenAI({
     model: MODELL,
+    effort: 'medium',
     responseFormat: { type: 'json_object' },
     maxTokens: 30000,
     messages: [

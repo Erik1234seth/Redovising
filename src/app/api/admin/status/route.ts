@@ -120,9 +120,10 @@ async function checkOpenAI(): Promise<StatusCheck> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-6.1-sol',
+        reasoning_effort: 'low',
         messages: [{ role: 'user', content: 'ping' }],
-        max_completion_tokens: 1,
+        max_completion_tokens: 50,
       }),
       signal: AbortSignal.timeout(PING_TIMEOUT_MS),
     });
@@ -142,7 +143,7 @@ async function checkOpenAI(): Promise<StatusCheck> {
     // Kontot kanske inte når just den här modellen. Att vi över huvud taget
     // fick ett modellfel betyder att nyckeln godtogs.
     if (/model/i.test(body)) {
-      return { ...base, level: 'unknown', detail: 'Nyckeln godtas, men testmodellen gpt-4o-mini är inte tillgänglig.' };
+      return { ...base, level: 'unknown', detail: 'Nyckeln godtas, men testmodellen gpt-6.1-sol är inte tillgänglig.' };
     }
     return { ...base, level: 'fail', detail: trim(`${res.status}: ${body}`) };
   } catch (err) {
