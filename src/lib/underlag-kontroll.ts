@@ -17,8 +17,9 @@ import { cleanBody } from '@/lib/inmail/clean-body';
  *    mejlhistoriken och kundens filer som inte är klara, och pekar ut vilka av
  *    dem mejlet gäller. Ett svar handlar ofta om en fil som kom i en annan
  *    tråd veckor tidigare.
- * 2. `korUnderlagsflode` läser ut mejlets bilagor och läser om de utpekade
- *    filerna (med kundens nya svar i mejlhistoriken). Kontrollen ser sedan
+ * 2. `startaUnderlagsflode` läser ut mejlets bilagor och läser om de utpekade
+ *    filerna (med kundens nya svar i mejlhistoriken), några i taget, i
+ *    omgångar som var och en är ett eget anrop. Kontrollen ser sedan
  *    ALLA kundens transaktioner och verifikationer — kvitton, kontoutdrag och
  *    kassarapporter — så att den kan hitta dubbletter. Status sätts bara på
  *    de filer mejlet gäller; det är bara om dem vi frågar kunden. Sist skrivs
@@ -399,23 +400,24 @@ async function kontrollera(
   return { filer: kontroll, flaggor, anteckningar };
 }
 
-/** Kör `fn` på varje värde, högst `n` åt gången. */
-async function iOmgangar<T>(lista: T[], n: number, fn: (x: T) => Promise<unknown>) {
-  for (let i = 0; i < lista.length; i += n) await Promise.all(lista.slice(i, i + n).map(fn));
-}
+/** Säkerhetsspärr: så många avläsningsomgångar får ett mejl ta innan kontrollen körs ändå. */
+const MAX_OMGANGAR = 40;
 
 /**
- * Hela slingan för ett underlagsmejl. Körs i bakgrunden efter att Apps Script
- * fått sitt svar — avläsningen kan ta minuter. Slutar med ett utkast i
- * inkorgen, även när något gick fel på vägen. Undantaget är när allt underlag
- * är komplett och kunden inte frågar något: då behövs inget svar.
+ * Ett underlagsmejl på väg genom flödet. Skickas mellan omgångarna, så allt
+ * måste gå att göra JSON av.
  */
-export async function korUnderlagsflode(opts: {
-  supabase: SupabaseClient;
-  profil: Profil;
+export interface UnderlagsJobb {
+  profilId: string;
   avsandare: string;
   messageId: string;
   threadId: string;
+  /**
+   * Alla kundens nya mejl i tråden som flödet gäller, inte bara det senaste
+   * (messageId). Skickar kunden fem mejl i rad i samma tråd ska filerna i
+   * alla fem läsas ut.
+   */
+  meddelanden?: string[];
   amne: string;
   text: string;
   historik?: string;
@@ -426,110 +428,196 @@ export async function korUnderlagsflode(opts: {
    * får finnas per mejl, och det första finns redan.
    */
   kalla?: 'ai' | 'manuell';
-}): Promise<void> {
-  const { supabase, profil } = opts;
-  const email = opts.avsandare.trim().toLowerCase();
+  /** Utkastet som skrivs om. Kastas när det nya är skrivet, så att det gamla ligger kvar under tiden. */
+  ersatterUtkast?: string;
+  /** Var flödet är. Utelämnat = första omgången. */
+  steg?: 'las' | 'kontroll';
+  /** Underlag som redan lästs ut (eller försökts läsas ut) i det här flödet. */
+  lasta?: string[];
+  omgang?: number;
+}
+
+/**
+ * Hela slingan för ett underlagsmejl, uppdelad i omgångar. Varje omgång är
+ * ett eget anrop till /api/inmail/flode med egna 300 sekunder, så att ett
+ * stort kontoutdrag eller ett mejl med femtio kvitton inte slår i taket:
+ *
+ *   las       högst SAMTIDIGA underlag läses ut, sedan nästa omgång
+ *   kontroll  när allt är utläst: kontrollen och utkastet, i ett eget anrop
+ *
+ * Slutar med ett utkast i inkorgen, även när något gick fel på vägen.
+ * Undantaget är när allt underlag är komplett och kunden inte frågar något:
+ * då behövs inget svar.
+ *
+ * `bas` är adressen till appen själv, där nästa omgång postas.
+ */
+export async function startaUnderlagsflode(bas: string, jobb: UnderlagsJobb): Promise<void> {
+  const res = await fetch(`${bas}/api/inmail/flode`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-inmail-secret': process.env.INMAIL_SECRET ?? '' },
+    body: JSON.stringify(jobb),
+  });
+  if (!res.ok) throw new Error(`Nästa omgång kunde inte startas: ${res.status} ${(await res.text()).slice(0, 200)}`);
+}
+
+/** Mejlen flödet gäller: det senaste plus de andra nya i samma tråd. */
+const mejlen = (jobb: UnderlagsJobb) => new Set([jobb.messageId, ...(jobb.meddelanden ?? [])]);
+
+/** En omgång av flödet. Anropas av /api/inmail/flode. */
+export async function korUnderlagsomgang(supabase: SupabaseClient, bas: string, jobb: UnderlagsJobb): Promise<void> {
+  const { data: profil, error } = await supabase.from('profiles')
+    .select('id, full_name, email').eq('id', jobb.profilId).maybeSingle<Profil>();
+  if (error || !profil) {
+    console.error(`[underlag-kontroll] hittade inte profilen ${jobb.profilId}:`, error?.message);
+    return;
+  }
 
   try {
+    if ((jobb.steg ?? 'las') === 'las') await lasOmgang(supabase, bas, profil, jobb);
+    else await kontrolleraOchSvara(supabase, profil, jobb);
+  } catch (err) {
+    await reservutkast(supabase, profil, jobb, err);
+  }
+}
+
+async function lasOmgang(supabase: SupabaseClient, bas: string, profil: Profil, jobb: UnderlagsJobb) {
+  const omgang = jobb.omgang ?? 0;
+  const email = jobb.avsandare.trim().toLowerCase();
+
+  if (omgang === 0) {
     // Mejlet måste finnas i mejlarkivet innan något läses — det är där
     // avläsningen och kontrollen hämtar kundens svar
-    const raw = opts.text.replace(/\r/g, '').slice(0, 50_000);
+    const raw = jobb.text.replace(/\r/g, '').slice(0, 50_000);
     await supabase.from('mail_messages').upsert({
-      gmail_message_id: opts.messageId, gmail_thread_id: opts.threadId, direction: 'in',
-      from_email: email, to_emails: [], customer_email: email, subject: opts.amne || null,
+      gmail_message_id: jobb.messageId, gmail_thread_id: jobb.threadId, direction: 'in',
+      from_email: email, to_emails: [], customer_email: email, subject: jobb.amne || null,
       body: cleanBody(raw), body_raw: raw, attachment_names: [], sent_at: new Date().toISOString(),
     }, { onConflict: 'gmail_message_id', ignoreDuplicates: true });
-
-    const filer = await kundensFiler(supabase, profil.id);
-    const valda = new Set(opts.filer ?? []);
-    const nya = filer.filter((f) => f.gmail_message_id === opts.messageId);
-    let alla = filer.filter((f) => f.gmail_message_id === opts.messageId || valda.has(f.id));
-
-    // Läs ut (eller läs om, med kundens nya svar) — SIE läggs in av sig själv
-    // och behöver det inte, och ett bokfört underlag läses inte om
-    const attLasa = alla.filter((f) => kanLasasAvAi(f.file_name, f.mime_type) && !isSieFile(f.file_name)
-      && !(arBokford(f) && f.gmail_message_id !== opts.messageId));
-    await iOmgangar(attLasa, SAMTIDIGA, (f) => lasUtTransaktioner(supabase, f.id).catch((err) => {
-      console.error(`[underlag-kontroll] kunde inte läsa ${f.file_name}:`, err instanceof Error ? err.message : err);
-    }));
-    // Avläsningen sorterar: det som visade sig vara övriga filer kontrolleras inte
-    const kvar = new Set((await kundensFiler(supabase, profil.id)).map((f) => f.id));
-    alla = alla.filter((f) => kvar.has(f.id));
-
-    const [mejlkontext, varaFiler] = await Promise.all([
-      byggMejlkontext(supabase, { userId: profil.id, emails: [email, profil.email] }),
-      varaFilerSomText(supabase, profil.id),
-    ]);
-    const resultat = await kontrollera(supabase, profil.id, alla.map((f) => f.id), [mejlkontext, varaFiler].filter(Boolean).join('\n\n'));
-    const kontroll = resultat.filer;
-
-    const nu = new Date().toISOString();
-    await Promise.all([
-      ...kontroll.map((k) => supabase.from('bokforing_underlag')
-        .update({ kontroll_status: k.status, kontroll_saknas: k.saknas.length ? k.saknas : null, kontroll_at: nu })
-        .eq('id', k.id)),
-      ...[...resultat.flaggor].map(([id, f]) => supabase.from('transaktioner').update(f).eq('id', id)),
-      ...[...resultat.anteckningar].map(([id, text]) => supabase.from('transaktioner').update({ anteckning: text }).eq('id', id)),
-    ]);
-    if (resultat.flaggor.size) console.log(`[underlag-kontroll] ${email}: ${resultat.flaggor.size} dubblettflaggor ändrade`);
-
-    const namn = new Map(alla.map((f) => [f.id, f.file_name]));
-    const underlagKontext = kontroll.length
-      ? `UNDERLAGSKONTROLL (gjord nyss, efter kundens senaste mejl):\n${kontroll.map((k) => {
-        const rubrik = `- ${namn.get(k.id)}: ${k.status === 'komplett' ? 'komplett, allt vi behöver finns' : k.status === 'fel' ? 'gick inte att läsa' : 'saknar uppgifter'}`;
-        // En rad per transaktion, med allt som saknas på den — annars ser
-        // två saker som fattas på samma rad ut som två rader
-        const perRad = new Map<string, string[]>();
-        for (const s of k.saknas) perRad.set(s.rad, [...(perRad.get(s.rad) ?? []), s.vad]);
-        return perRad.size ? `${rubrik}\n${[...perRad].map(([rad, vad]) => `    • ${rad}: ${vad.join(', ')}`).join('\n')}` : rubrik;
-      }).join('\n')}\n\nSvara kunden. Saknas något: förklara konkret, transaktion för transaktion, vilka uppgifter vi behöver och be kunden svara på mejlet. Fråga bara om det som står ovan, och aldrig om sådant kunden redan har svarat på. Gick en fil inte att läsa: be om en tydligare bild eller en annan fil. Är allt komplett: tacka kort och bekräfta att vi har det vi behöver. Ställer kunden också en annan fråga i mejlet: svara på den i samma mejl.`
-      : 'UNDERLAGSKONTROLL: mejlet handlar om underlag, men vi hittade inga filer att kontrollera — varken bifogade nu eller tidigare inskickade som mejlet gäller. Svara på det kunden skriver, och be om underlaget om det behövs.';
-    // Bilagor som sorterades bort är inte borttappade — kunden ska inte bli ombedd att skicka dem igen
-    const ovriga = nya.filter((f) => !alla.some((x) => x.id === f.id)).map((f) => f.file_name);
-    const ovrigtKontext = ovriga.length
-      ? `\n\nÖVRIGA FILER: ${ovriga.join(', ')} är inga underlag för bokföringen (till exempel en NE-bilaga, ett avtal eller ett brev). De är sparade hos oss som övriga filer och behöver inte kontrolleras. Bekräfta kort att vi fått dem.`
-      : '';
-
-    // Är allt komplett behöver kunden inget svar, om hen inte också frågar
-    // något. Då skrivs inget utkast alls. När Erik själv bett om ett utkast
-    // skrivs det ändå.
-    const allaKompletta = kontroll.length > 0 && kontroll.every((k) => k.status === 'komplett');
-    const inget = allaKompletta && opts.kalla !== 'manuell'
-      ? `\n\nINGET SVAR BEHÖVS om kunden bara skickar in underlag: allt är komplett, och kunden behöver ingen bekräftelse. Svara då med exakt ${INGET_SVAR} och ingenting annat. Skriv ett vanligt svar bara om kunden i mejlet ställer en fråga eller ber om något som behöver ett svar, och svara då bara på det.`
-      : '';
-
-    const svar = await handleGeneralQuestion({
-      supabase, profile: profil, subject: opts.amne, body: opts.text, messageId: opts.messageId,
-      emailHistory: opts.historik, smsKontext: await smsKontextForMejl(supabase, email), underlagKontext: underlagKontext + ovrigtKontext + inget,
-      attachmentNames: nya.map((f) => f.file_name),
-    });
-
-    const text = svar.replyBody?.trim();
-    if (!text) throw new Error('AI:n skrev inget svar');
-    if (inget && text.includes(INGET_SVAR)) {
-      console.log(`[underlag-kontroll] ${email}: ${kontroll.length} underlag kompletta, inget att svara på — inget utkast`);
-      return;
-    }
-    const { error } = await supabase.from('mejl_utkast').insert({
-      till_email: email, amne: opts.amne || null, text,
-      gmail_thread_id: opts.threadId, svar_pa_message_id: opts.messageId, kalla: opts.kalla ?? 'ai',
-    });
-    if (error && error.code !== '23505') throw new Error(error.message);
-    console.log(`[underlag-kontroll] ${email}: ${kontroll.length} underlag kontrollerade (${kontroll.filter((k) => k.status === 'komplett').length} kompletta), utkast skrivet`);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[underlag-kontroll] flödet misslyckades:', message);
-    // Kunden får inte bli utan svar för att kontrollen fallerade. Ett vanligt
-    // svar skrivs i stället, och felet står vid utkastet så att det syns att
-    // underlaget inte är kontrollerat.
-    const fel = `Underlagskontrollen misslyckades (${message}) — titta på underlaget i personkortet innan du skickar.`;
-    const reserv = await handleGeneralQuestion({
-      supabase, profile: profil, subject: opts.amne, body: opts.text, emailHistory: opts.historik, messageId: opts.messageId,
-    }).catch(() => null);
-    await supabase.from('mejl_utkast').insert({
-      till_email: email, amne: opts.amne || null,
-      text: reserv?.replyBody?.trim() || 'Hej!\n\nTack för ditt mejl. Vi tittar på underlaget och återkommer.',
-      gmail_thread_id: opts.threadId, svar_pa_message_id: opts.messageId, kalla: opts.kalla ?? 'ai', fel,
-    }).then(() => {}, () => {});
   }
+
+  const filer = await kundensFiler(supabase, profil.id);
+  const valda = new Set(jobb.filer ?? []);
+  const lasta = new Set(jobb.lasta ?? []);
+  const egna = mejlen(jobb);
+
+  // Läs ut (eller läs om, med kundens nya svar) — SIE läggs in av sig själv
+  // och behöver det inte, och ett bokfört underlag läses inte om
+  const attLasa = filer.filter((f) => (egna.has(f.gmail_message_id ?? '') || valda.has(f.id))
+    && kanLasasAvAi(f.file_name, f.mime_type) && !isSieFile(f.file_name)
+    && !(arBokford(f) && !egna.has(f.gmail_message_id ?? ''))
+    && !lasta.has(f.id));
+  const nu = attLasa.slice(0, SAMTIDIGA);
+  await Promise.all(nu.map((f) => lasUtTransaktioner(supabase, f.id).catch((err) => {
+    console.error(`[underlag-kontroll] kunde inte läsa ${f.file_name}:`, err instanceof Error ? err.message : err);
+  })));
+
+  const merKvar = attLasa.length > nu.length;
+  if (merKvar && omgang + 1 >= MAX_OMGANGAR) {
+    console.error(`[underlag-kontroll] ${email}: ${attLasa.length - nu.length} underlag olästa efter ${MAX_OMGANGAR} omgångar — kontrollerar ändå`);
+  }
+  await startaUnderlagsflode(bas, {
+    ...jobb,
+    steg: merKvar && omgang + 1 < MAX_OMGANGAR ? 'las' : 'kontroll',
+    lasta: [...lasta, ...nu.map((f) => f.id)],
+    omgang: omgang + 1,
+  });
+}
+
+async function kontrolleraOchSvara(supabase: SupabaseClient, profil: Profil, opts: UnderlagsJobb) {
+  const email = opts.avsandare.trim().toLowerCase();
+  // Avläsningen sorterar: det som visade sig vara övriga filer kontrolleras inte
+  const filer = await kundensFiler(supabase, profil.id);
+  const valda = new Set(opts.filer ?? []);
+  const egna = mejlen(opts);
+  const nya = filer.filter((f) => egna.has(f.gmail_message_id ?? ''));
+  const alla = filer.filter((f) => egna.has(f.gmail_message_id ?? '') || valda.has(f.id));
+
+  const [mejlkontext, varaFiler] = await Promise.all([
+    byggMejlkontext(supabase, { userId: profil.id, emails: [email, profil.email] }),
+    varaFilerSomText(supabase, profil.id),
+  ]);
+  const resultat = await kontrollera(supabase, profil.id, alla.map((f) => f.id), [mejlkontext, varaFiler].filter(Boolean).join('\n\n'));
+  const kontroll = resultat.filer;
+
+  const nu = new Date().toISOString();
+  await Promise.all([
+    ...kontroll.map((k) => supabase.from('bokforing_underlag')
+      .update({ kontroll_status: k.status, kontroll_saknas: k.saknas.length ? k.saknas : null, kontroll_at: nu })
+      .eq('id', k.id)),
+    ...[...resultat.flaggor].map(([id, f]) => supabase.from('transaktioner').update(f).eq('id', id)),
+    ...[...resultat.anteckningar].map(([id, text]) => supabase.from('transaktioner').update({ anteckning: text }).eq('id', id)),
+  ]);
+  if (resultat.flaggor.size) console.log(`[underlag-kontroll] ${email}: ${resultat.flaggor.size} dubblettflaggor ändrade`);
+
+  const namn = new Map(alla.map((f) => [f.id, f.file_name]));
+  const underlagKontext = kontroll.length
+    ? `UNDERLAGSKONTROLL (gjord nyss, efter kundens senaste mejl):\n${kontroll.map((k) => {
+      const rubrik = `- ${namn.get(k.id)}: ${k.status === 'komplett' ? 'komplett, allt vi behöver finns' : k.status === 'fel' ? 'gick inte att läsa' : 'saknar uppgifter'}`;
+      // En rad per transaktion, med allt som saknas på den — annars ser
+      // två saker som fattas på samma rad ut som två rader
+      const perRad = new Map<string, string[]>();
+      for (const s of k.saknas) perRad.set(s.rad, [...(perRad.get(s.rad) ?? []), s.vad]);
+      return perRad.size ? `${rubrik}\n${[...perRad].map(([rad, vad]) => `    • ${rad}: ${vad.join(', ')}`).join('\n')}` : rubrik;
+    }).join('\n')}\n\nSvara kunden. Saknas något: förklara konkret, transaktion för transaktion, vilka uppgifter vi behöver och be kunden svara på mejlet. Fråga bara om det som står ovan, och aldrig om sådant kunden redan har svarat på. Gick en fil inte att läsa: be om en tydligare bild eller en annan fil. Är allt komplett: tacka kort och bekräfta att vi har det vi behöver. Ställer kunden också en annan fråga i mejlet: svara på den i samma mejl.`
+    : 'UNDERLAGSKONTROLL: mejlet handlar om underlag, men vi hittade inga filer att kontrollera — varken bifogade nu eller tidigare inskickade som mejlet gäller. Svara på det kunden skriver, och be om underlaget om det behövs.';
+  // Bilagor som sorterades bort är inte borttappade — kunden ska inte bli ombedd att skicka dem igen
+  const ovriga = nya.filter((f) => !alla.some((x) => x.id === f.id)).map((f) => f.file_name);
+  const ovrigtKontext = ovriga.length
+    ? `\n\nÖVRIGA FILER: ${ovriga.join(', ')} är inga underlag för bokföringen (till exempel en NE-bilaga, ett avtal eller ett brev). De är sparade hos oss som övriga filer och behöver inte kontrolleras. Bekräfta kort att vi fått dem.`
+    : '';
+
+  // Är allt komplett behöver kunden inget svar, om hen inte också frågar
+  // något. Då skrivs inget utkast alls. När Erik själv bett om ett utkast
+  // skrivs det ändå.
+  const allaKompletta = kontroll.length > 0 && kontroll.every((k) => k.status === 'komplett');
+  const inget = allaKompletta && opts.kalla !== 'manuell'
+    ? `\n\nINGET SVAR BEHÖVS om kunden bara skickar in underlag: allt är komplett, och kunden behöver ingen bekräftelse. Svara då med exakt ${INGET_SVAR} och ingenting annat. Skriv ett vanligt svar bara om kunden i mejlet ställer en fråga eller ber om något som behöver ett svar, och svara då bara på det.`
+    : '';
+
+  const svar = await handleGeneralQuestion({
+    supabase, profile: profil, subject: opts.amne, body: opts.text, messageId: opts.messageId,
+    emailHistory: opts.historik, smsKontext: await smsKontextForMejl(supabase, email), underlagKontext: underlagKontext + ovrigtKontext + inget,
+    attachmentNames: nya.map((f) => f.file_name),
+  });
+
+  const text = svar.replyBody?.trim();
+  if (!text) throw new Error('AI:n skrev inget svar');
+  if (inget && text.includes(INGET_SVAR)) {
+    console.log(`[underlag-kontroll] ${email}: ${kontroll.length} underlag kompletta, inget att svara på — inget utkast`);
+    return;
+  }
+  const { error } = await supabase.from('mejl_utkast').insert({
+    till_email: email, amne: opts.amne || null, text,
+    gmail_thread_id: opts.threadId, svar_pa_message_id: opts.messageId, kalla: opts.kalla ?? 'ai',
+  });
+  if (error && error.code !== '23505') throw new Error(error.message);
+  await kastaErsatt(supabase, opts);
+  console.log(`[underlag-kontroll] ${email}: ${kontroll.length} underlag kontrollerade (${kontroll.filter((k) => k.status === 'komplett').length} kompletta), utkast skrivet`);
+}
+
+/**
+ * Kunden får inte bli utan svar för att kontrollen fallerade. Ett vanligt
+ * svar skrivs i stället, och felet står vid utkastet så att det syns att
+ * underlaget inte är kontrollerat.
+ */
+async function reservutkast(supabase: SupabaseClient, profil: Profil, opts: UnderlagsJobb, err: unknown) {
+  const email = opts.avsandare.trim().toLowerCase();
+  const message = err instanceof Error ? err.message : String(err);
+  console.error('[underlag-kontroll] flödet misslyckades:', message);
+  const fel = `Underlagskontrollen misslyckades (${message}) — titta på underlaget i personkortet innan du skickar.`;
+  const reserv = await handleGeneralQuestion({
+    supabase, profile: profil, subject: opts.amne, body: opts.text, emailHistory: opts.historik, messageId: opts.messageId,
+  }).catch(() => null);
+  await supabase.from('mejl_utkast').insert({
+    till_email: email, amne: opts.amne || null,
+    text: reserv?.replyBody?.trim() || 'Hej!\n\nTack för ditt mejl. Vi tittar på underlaget och återkommer.',
+    gmail_thread_id: opts.threadId, svar_pa_message_id: opts.messageId, kalla: opts.kalla ?? 'ai', fel,
+  }).then(() => kastaErsatt(supabase, opts), () => {});
+}
+
+/** Det gamla utkastet när Erik bett om ett nytt, och bara om det fortfarande är ett utkast. */
+async function kastaErsatt(supabase: SupabaseClient, opts: UnderlagsJobb) {
+  if (!opts.ersatterUtkast) return;
+  await supabase.from('mejl_utkast').update({ status: 'discarded', updated_at: new Date().toISOString() })
+    .eq('id', opts.ersatterUtkast).eq('status', 'draft');
 }

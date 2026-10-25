@@ -119,7 +119,7 @@ function cleanTechnical(raw: string | null | undefined): string | undefined {
  * 404 och timeout från Apps Script är lömska: scriptet kan ha hunnit skicka
  * mejlet innan svaret gick förlorat. Då är "kom inte fram" fel påstående.
  */
-function explainError(channel: 'mejl' | 'sms', raw: string | null | undefined): string {
+export function explainError(channel: 'mejl' | 'sms', raw: string | null | undefined): string {
   const error = raw?.trim() ?? '';
   if (channel === 'mejl') {
     // Nyare fel är redan skrivna på svenska av send-via-gmail — de står sig själva

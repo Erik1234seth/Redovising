@@ -137,14 +137,17 @@ function handleThread(config, thread, messages, unprocessed) {
   const messageId = target.getId();
   const subject = target.getSubject() || '';
   const emailBody = target.getPlainBody() || '';
-  // Bara namn och typ — filerna är redan sparade och tolkas inte här
-  const attachments = getAttachmentInfo(target);
+  // Bara namn och typ — filerna är redan sparade och tolkas inte här. Från
+  // alla nya mejl i tråden: skickar kunden fem mejl i rad ska alla läsas ut.
+  const attachments = [];
+  unprocessed.forEach(function (m) { attachments.push.apply(attachments, getAttachmentInfo(m)); });
+  const messageIds = unprocessed.map(function (m) { return m.getId(); });
   const isReply = messages.length > 1;
 
   if (isReply) {
-    handleReply(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments);
+    handleReply(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments, messageIds);
   } else {
-    handleNewMail(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments);
+    handleNewMail(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments, messageIds);
   }
 
   markProcessed(config, unprocessed);
@@ -245,7 +248,7 @@ function withSignatureHtml(replyBody) {
 
 // ─── Nytt mail ────────────────────────────────────────────────────────────────
 
-function handleNewMail(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments) {
+function handleNewMail(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments, messageIds) {
   const payload = {
     senderEmail: senderEmail,
     gmailThreadId: threadId,
@@ -253,6 +256,7 @@ function handleNewMail(config, thread, senderEmail, threadId, messageId, subject
     subject: subject,
     emailBody: emailBody,
     attachments: attachments,
+    messageIds: messageIds,
   };
 
   const response = callApi(config, '/api/inmail', payload);
@@ -269,7 +273,7 @@ function handleNewMail(config, thread, senderEmail, threadId, messageId, subject
 
 // ─── Svar i befintlig tråd ────────────────────────────────────────────────────
 
-function handleReply(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments) {
+function handleReply(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments, messageIds) {
   const messages = thread.getMessages();
   const history = messages.map(function(m) {
     return 'From: ' + m.getFrom() + '\nDate: ' + m.getDate() + '\n\n' + m.getPlainBody();
@@ -283,6 +287,7 @@ function handleReply(config, thread, senderEmail, threadId, messageId, subject, 
     emailBody: emailBody,
     emailHistory: history,
     attachments: attachments,
+    messageIds: messageIds,
   };
 
   const response = callApi(config, '/api/inmail/reply', payload);

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { AdminMote, Arende, InkorgKonversation, InlamningKund, Person } from '@/lib/admin-types';
+import { Varningspanel } from './_varningspanel';
 
 /**
  * Översikten: det som kräver handling idag, på en sida.
@@ -108,6 +109,8 @@ export default function OversiktPage() {
         <Link href="/admin/personer" className="text-sm text-slate-600 hover:text-blue-700">Alla personer</Link>
         <Link href="/admin/status" className="text-sm text-slate-600 hover:text-blue-700">Systemstatus</Link>
       </div>
+
+      <Varningspanel />
 
       {!s ? <p className="text-slate-500 text-sm">Hämtar…</p> : (
         <>

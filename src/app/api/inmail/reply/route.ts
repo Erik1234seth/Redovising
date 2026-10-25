@@ -1,5 +1,5 @@
 import { NextResponse, after } from 'next/server';
-import { arUnderlagsmejl, korUnderlagsflode } from '@/lib/underlag-kontroll';
+import { arUnderlagsmejl, startaUnderlagsflode, korUnderlagsomgang, type UnderlagsJobb } from '@/lib/underlag-kontroll';
 import { createClient } from '@supabase/supabase-js';
 import { classifyIntent } from '@/lib/inmail/classify';
 import { isNoReplyAddress } from '@/lib/inmail/no-reply';
@@ -48,6 +48,8 @@ async function handlePost(request: Request) {
       senderEmail: string;
       gmailThreadId: string;
       messageId: string;
+      /** Alla kundens nya mejl i tråden (messageId är det senaste). Äldre scriptversioner skickar det inte. */
+      messageIds?: string[];
       subject?: string;
       emailBody?: string;
       emailHistory: string;
@@ -138,9 +140,16 @@ async function handlePost(request: Request) {
       harBilagor: savedUnderlag > 0 || attachments.length > 0,
     });
     if (sortering.underlag) {
-      after(() => korUnderlagsflode({
-        supabase: getSupabase(), profil: profile, avsandare: senderEmail, messageId,
+      const jobb: UnderlagsJobb = {
+        profilId: profile.id, avsandare: senderEmail, messageId, meddelanden: body.messageIds,
         threadId: gmailThreadId, amne: subject, text: emailBody, historik: emailHistory, filer: sortering.filer,
+      };
+      // Flödet går i omgångar, var och en ett eget anrop. Går det inte att
+      // starta så körs första omgången här, och den startar nästa.
+      const bas = new URL(request.url).origin;
+      after(() => startaUnderlagsflode(bas, jobb).catch((err) => {
+        console.error('[inmail] underlagsflödet startade inte, kör första omgången här:', err instanceof Error ? err.message : err);
+        return korUnderlagsomgang(getSupabase(), bas, jobb);
       }));
       return NextResponse.json({ action: 'underlag_kontroll' });
     }

@@ -626,3 +626,18 @@ export interface FlodesInstruktion {
   text: string;
   at: string;
 }
+
+/** Något som gått fel, för översiktens varningar (/api/admin/varningar). */
+export interface AdminVarning {
+  id: string;
+  allvar: 'fel' | 'varning';
+  kategori: string;
+  titel: string;
+  detalj?: string;
+  at: string;
+  /** Vem det gäller: e-post eller profil-id, för länken till personkortet. */
+  person?: string;
+  personNamn?: string;
+  /** Misslyckade utskick kan markeras som hanterade. */
+  utskick?: { channel: 'mejl' | 'sms'; id: string };
+}

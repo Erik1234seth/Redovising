@@ -12,7 +12,7 @@ import { handleGeneralQuestion } from '@/lib/inmail/handlers/general-question';
 import { handleUnknownUser } from '@/lib/inmail/handlers/unknown-user';
 import { smsKontextForMejl } from '@/lib/inkorg/kontext';
 import { normalizePhone } from '@/lib/sms/phone';
-import { arUnderlagsmejl, korUnderlagsflode } from '@/lib/underlag-kontroll';
+import { arUnderlagsmejl, startaUnderlagsflode } from '@/lib/underlag-kontroll';
 
 /**
  * Inkorgen: mejl och SMS per person, med utkasten som väntar.
@@ -348,14 +348,17 @@ export async function POST(request: NextRequest) {
       }
 
       case 'ai-utkast':
-        return aiUtkast(supabase, String(body.key ?? ''), body.kanal === 'sms' ? 'sms' : 'mejl');
+        return aiUtkast(supabase, request.nextUrl.origin, String(body.key ?? ''), body.kanal === 'sms' ? 'sms' : 'mejl');
 
       case 'skriv-om': {
         // Nytt utkast först. Går det inte ligger det gamla kvar.
         if (!body.id) return fel('id krävs');
         const kanal = body.kanal === 'sms' ? 'sms' : 'mejl';
-        const svar = await aiUtkast(supabase, String(body.key ?? ''), kanal);
+        const svar = await aiUtkast(supabase, request.nextUrl.origin, String(body.key ?? ''), kanal, String(body.id));
         if (!svar.ok) return svar;
+        // Underlagsflödet skriver det nya utkastet om några minuter och kastar
+        // det gamla då själv
+        if ((await svar.clone().json()).pagar) return svar;
         await (kanal === 'sms'
           ? supabase.from('sms_messages').update({ status: 'discarded' }).eq('id', body.id).eq('status', 'draft')
           : supabase.from('mejl_utkast').update({ status: 'discarded', updated_at: new Date().toISOString() }).eq('id', body.id).eq('status', 'draft'));
@@ -395,7 +398,7 @@ export async function POST(request: NextRequest) {
  * Ett nytt AI-utkast på begäran, med samma AI och prompt som när ett meddelande
  * kommer in. Svarar på det senaste personen skickat i den kanalen.
  */
-async function aiUtkast(supabase: Supabase, key: string, kanal: 'mejl' | 'sms') {
+async function aiUtkast(supabase: Supabase, bas: string, key: string, kanal: 'mejl' | 'sms', ersatterUtkast?: string) {
   const people = await build();
   const p = locate(people, key);
   if (!p) return fel('Hittade ingen sådan person', 404);
@@ -439,11 +442,13 @@ async function aiUtkast(supabase: Supabase, key: string, kanal: 'mejl' | 'sms') 
         harBilagor: !!senaste.bilagor?.length,
       });
       if (sortering.underlag) {
-        await korUnderlagsflode({
-          supabase, profil: profil!, avsandare: email, messageId: senaste.gmailMessageId, threadId: senaste.gmailThreadId,
-          amne, text: senaste.text, filer: sortering.filer, kalla: 'manuell',
+        // Flödet går i omgångar i bakgrunden (avläsningen kan ta minuter),
+        // så utkastet dyker upp i inkorgen när det är klart
+        await startaUnderlagsflode(bas, {
+          profilId: profil!.id, avsandare: email, messageId: senaste.gmailMessageId, threadId: senaste.gmailThreadId,
+          amne, text: senaste.text, filer: sortering.filer, kalla: 'manuell', ersatterUtkast,
         });
-        return NextResponse.json({ ok: true });
+        return NextResponse.json({ ok: true, pagar: true });
       }
     }
 
