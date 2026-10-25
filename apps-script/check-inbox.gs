@@ -13,49 +13,170 @@ function getConfig() {
 }
 
 // ─── Huvud-trigger ────────────────────────────────────────────────────────────
+// Vilka mejl som är nya avgör servern (/api/inmail/behandlade), inte läst/oläst
+// i Gmail. Förr hoppades ett mejl över för alltid om någon öppnat det innan
+// skriptet hann köra, och då sparades inte heller bilagorna.
+//
+// Varje körning tar kundens mejl från de senaste INBOX_WINDOW_DAYS dygnen och
+// frågar servern vilka som inte är behandlade. Fönstret är marginalen om
+// skriptet stått still en stund; allt äldre än så räknas som klart.
+//
+// Innan första körningen måste seedInboxProcessed() köras en gång, annars tas
+// alla mejl i fönstret om. checkInbox vägrar köra tills det är gjort.
+
+var INBOX_WINDOW_DAYS = 2;
+var INBOX_SEARCH_FILTER = '-from:me -category:promotions -category:social';
+var INBOX_THREADS_PER_PAGE = 50;
+var INBOX_MAX_THREADS = 300;
+var INBOX_SEEDED_PROPERTY = 'INBOX_PROCESSED_SEEDED';
 
 function checkInbox() {
-  const config = getConfig();
-  // Obs: 'has:attachment' borttaget — vi hanterar nu även vanliga textmejl
-  const threads = GmailApp.search('is:unread -from:me', 0, 20);
-
-  for (const thread of threads) {
-    const messages = thread.getMessages();
-    const lastMsg = messages[messages.length - 1];
-
-    if (!lastMsg.isUnread()) continue;
-
-    const senderEmail = extractEmail(lastMsg.getFrom());
-
-    // Systemutskick och studsar hoppas över helt, innan bilagorna läses in.
-    // Markeras som lästa så att de inte ligger kvar och äter av de 20 trådar
-    // sökningen hämtar.
-    if (isNoReplyAddress(senderEmail)) {
-      console.log('Hoppar över no-reply-avsändare: ' + senderEmail);
-      lastMsg.markRead();
-      continue;
-    }
-
-    // Bilagorna sparas som underlag innan något annat händer (save-attachments.gs).
-    // Går det inte lämnas mejlet oläst och tas om vid nästa körning.
-    if (!saveThreadAttachments(config, messages)) continue;
-
-    const threadId = thread.getId();
-    const messageId = lastMsg.getId();
-    const subject = lastMsg.getSubject() || '';
-    const emailBody = lastMsg.getPlainBody() || '';
-    // Bara namn och typ — filerna är redan sparade och tolkas inte här
-    const attachments = getAttachmentInfo(lastMsg);
-    const isReply = messages.length > 1;
-
-    if (isReply) {
-      handleReply(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments);
-    } else {
-      handleNewMail(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments);
-    }
-
-    lastMsg.markRead();
+  if (PropertiesService.getScriptProperties().getProperty(INBOX_SEEDED_PROPERTY) !== 'ja') {
+    console.error('checkInbox: kör seedInboxProcessed() en gång först.');
+    return;
   }
+  runInbox('newer_than:' + INBOX_WINDOW_DAYS + 'd', INBOX_WINDOW_DAYS);
+}
+
+/**
+ * Engångskörning för hand: tar mejl som missats längre bakåt, när de lästes i
+ * Gmail innan den här versionen fanns. Allt som redan är behandlat hoppas över.
+ */
+function checkInboxBackfill() {
+  runInbox('newer_than:14d', 14);
+}
+
+function runInbox(query, windowDays) {
+  // Två körningar samtidigt skulle köra flödet två gånger på samma mejl
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) {
+    console.log('checkInbox: en körning pågår redan.');
+    return;
+  }
+
+  try {
+    const config = getConfig();
+    const owners = getMailSyncOwners();
+    const since = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+    const threads = searchInboxThreads(query + ' ' + INBOX_SEARCH_FILTER);
+
+    // Kundens meddelanden per tråd, i fönstret
+    const candidates = [];
+    for (const thread of threads) {
+      const messages = thread.getMessages();
+      const fromCustomer = messages.filter(function (m) {
+        return !m.isDraft() && m.getDate().getTime() >= since && owners.indexOf(extractEmail(m.getFrom())) === -1;
+      });
+      if (fromCustomer.length) candidates.push({ thread: thread, messages: messages, fromCustomer: fromCustomer });
+    }
+
+    const ids = [];
+    candidates.forEach(function (c) { c.fromCustomer.forEach(function (m) { ids.push(m.getId()); }); });
+    const nya = fetchUnprocessed(config, ids);
+    if (!nya) return;
+
+    for (const c of candidates) {
+      const unprocessed = c.fromCustomer.filter(function (m) { return nya.indexOf(m.getId()) !== -1; });
+      if (!unprocessed.length) continue;
+      handleThread(config, c.thread, c.messages, unprocessed);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function searchInboxThreads(query) {
+  const threads = [];
+  while (threads.length < INBOX_MAX_THREADS) {
+    const page = GmailApp.search(query, threads.length, INBOX_THREADS_PER_PAGE);
+    threads.push.apply(threads, page);
+    if (page.length < INBOX_THREADS_PER_PAGE) break;
+  }
+  return threads;
+}
+
+/** De id:n servern inte har som behandlade, eller null om frågan inte gick fram. */
+function fetchUnprocessed(config, ids) {
+  if (!ids.length) return [];
+  const nya = [];
+  for (let i = 0; i < ids.length; i += 500) {
+    const res = callApi(config, '/api/inmail/behandlade', { action: 'check', messageIds: ids.slice(i, i + 500) });
+    if (!res) return null;
+    nya.push.apply(nya, res.nya || []);
+  }
+  return nya;
+}
+
+function markProcessed(config, messages) {
+  const ids = messages.map(function (m) { return m.getId(); });
+  if (!callApi(config, '/api/inmail/behandlade', { action: 'mark', messageIds: ids })) {
+    console.error('Kunde inte markera ' + ids.join(', ') + ' som behandlade — de tas om nästa körning.');
+  }
+}
+
+/**
+ * Kör mejlflödet på tråden. Flödet går på kundens senaste obehandlade mejl;
+ * bilagorna sparas från alla obehandlade.
+ */
+function handleThread(config, thread, messages, unprocessed) {
+  const target = unprocessed[unprocessed.length - 1];
+  const senderEmail = extractEmail(target.getFrom());
+
+  // Systemutskick och studsar hoppas över helt, innan bilagorna läses in
+  if (isNoReplyAddress(senderEmail)) {
+    console.log('Hoppar över no-reply-avsändare: ' + senderEmail);
+    markProcessed(config, unprocessed);
+    return;
+  }
+
+  // Bilagorna sparas som underlag innan något annat händer (save-attachments.gs).
+  // Går det inte lämnas mejlet obehandlat och tas om vid nästa körning.
+  if (!saveThreadAttachments(config, unprocessed)) return;
+
+  const threadId = thread.getId();
+  const messageId = target.getId();
+  const subject = target.getSubject() || '';
+  const emailBody = target.getPlainBody() || '';
+  // Bara namn och typ — filerna är redan sparade och tolkas inte här
+  const attachments = getAttachmentInfo(target);
+  const isReply = messages.length > 1;
+
+  if (isReply) {
+    handleReply(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments);
+  } else {
+    handleNewMail(config, thread, senderEmail, threadId, messageId, subject, emailBody, attachments);
+  }
+
+  markProcessed(config, unprocessed);
+  unprocessed.forEach(function (m) { if (m.isUnread()) m.markRead(); });
+}
+
+/**
+ * Körs en gång för hand innan den nya checkInbox slås på. Allt som redan är
+ * läst räknas som behandlat — det har den gamla versionen tagit hand om (eller
+ * så fångas det av checkInboxBackfill, se README). Olästa mejl lämnas, så tar
+ * checkInbox dem som vanligt.
+ */
+function seedInboxProcessed() {
+  const config = getConfig();
+  const owners = getMailSyncOwners();
+  const threads = searchInboxThreads('newer_than:30d ' + INBOX_SEARCH_FILTER);
+  const ids = [];
+  for (const thread of threads) {
+    for (const m of thread.getMessages()) {
+      if (m.isDraft() || m.isUnread()) continue;
+      if (owners.indexOf(extractEmail(m.getFrom())) !== -1) continue;
+      ids.push(m.getId());
+    }
+  }
+  for (let i = 0; i < ids.length; i += 500) {
+    if (!callApi(config, '/api/inmail/behandlade', { action: 'mark', messageIds: ids.slice(i, i + 500) })) {
+      console.error('seedInboxProcessed: avbröt, kör igen.');
+      return;
+    }
+  }
+  PropertiesService.getScriptProperties().setProperty(INBOX_SEEDED_PROPERTY, 'ja');
+  console.log('seedInboxProcessed: ' + ids.length + ' lästa mejl i ' + threads.length + ' trådar markerade som behandlade.');
 }
 
 // ─── Signatur ─────────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@
 //   2. PUT  signedUrl  (filens bytes)
 //   3. POST /api/inmail/underlag  { action: 'confirm', ... }
 //
-// Går något snett lämnar checkInbox mejlet oläst och tar om det vid nästa
+// Går något snett lämnar checkInbox mejlet obehandlat och tar om det vid nästa
 // körning. Servern stoppar dubbletter, så en omkörning sparar bara det som
 // saknas. Efter UNDERLAG_MAX_ATTEMPTS försök ges det upp, så att ett trasigt
 // mejl inte blockerar inkorgen för evigt.
@@ -39,20 +39,16 @@ function getAttachmentInfo(message) {
 }
 
 /**
- * Sparar bilagorna i alla olästa meddelanden i tråden som inte är från oss.
+ * Sparar bilagorna i kundens obehandlade meddelanden (checkInbox väljer ut dem).
  * Returnerar true när allt är sparat (eller försöken är slut), false när
- * mejlet ska lämnas oläst och tas om.
+ * mejlet ska lämnas obehandlat och tas om.
  */
 function saveThreadAttachments(config, messages) {
-  var owner = Session.getEffectiveUser().getEmail().toLowerCase();
   var ok = true;
 
   for (var m = 0; m < messages.length; m++) {
     var message = messages[m];
-    if (!message.isUnread()) continue;
-    var sender = extractEmail(message.getFrom());
-    if (sender === owner) continue;
-    if (!saveMessageAttachments(config, message, sender)) ok = false;
+    if (!saveMessageAttachments(config, message, extractEmail(message.getFrom()))) ok = false;
   }
 
   return ok;

@@ -5,7 +5,7 @@ erik@enklabokslut.se. Projektet äger både Gmail-inkorgen och utskicken.
 
 | Fil | Riktning | Vad den gör |
 | --- | --- | --- |
-| `check-inbox.gs` | Gmail → oss | Tidsstyrd trigger läser olästa mejl och postar till `/api/inmail` respektive `/api/inmail/reply`. Sedan 2026-10-10 blir AI-svaret ett utkast i adminpanelens inkorg, inte i Gmail. Utlösaren ställs in för hand under Utlösare (rekommenderat: var 5:e minut). Äger `doGet`. |
+| `check-inbox.gs` | Gmail → oss | Tidsstyrd trigger läser kundens mejl från senaste två dygnen som servern inte har som behandlade (`/api/inmail/behandlade`, tabellen `inmail_behandlade`), lästa som olästa, och postar till `/api/inmail` respektive `/api/inmail/reply`. Sedan 2026-10-10 blir AI-svaret ett utkast i adminpanelens inkorg, inte i Gmail. Utlösaren ställs in för hand under Utlösare (rekommenderat: var 5:e minut). Äger `doGet`. |
 | `send-mail.gs` | oss → Gmail | Webbapp som tar emot `doPost`: välkomstmejlet till nya leads, och svar (`action: reply`) och nya mejl (`action: compose`) från inkorgen i adminpanelen, med bilagor som scriptet hämtar via korta länkar till lagringen (`mejlbilagor/`). Äger `doPost`. |
 | `save-attachments.gs` | Gmail → oss | Anropas från `checkInbox` innan mail-AI:n. Laddar upp varje bilaga direkt till lagringen (via `/api/inmail/underlag`) och sparar den som underlag på avsändarens adress. Alla filtyper, ingen tolkning. Varken `doGet` eller `doPost`. |
 | `sync-mail.gs` | Gmail → oss | Tidsstyrd trigger varje timme speglar alla konversationer, åt båda hållen, till `/api/inmail/messages/import` (tabellen `mail_messages`). Syns under fliken Mejl på personsidan. Varken `doGet` eller `doPost`. |
@@ -80,3 +80,24 @@ lookup loggas utskicket som "okänt om mejlet gick iväg".
 Distribuera → Hantera distributioner → pennan → Version: **Ny version** →
 Distribuera. Samma URL fortsätter gälla. Redigerad kod som inte distribuerats om
 påverkar bara triggern, inte webbappen.
+
+## Behandlade mejl (från 2026-10-25)
+
+`check-inbox.gs` bryr sig inte längre om läst/oläst i Gmail. Förr hoppades ett
+mejl över för alltid om någon öppnat det innan skriptet hann köra, och då
+sparades inte heller bilagorna. Nu tar skriptet kundens mejl från de senaste
+två dygnen och frågar `/api/inmail/behandlade` vilka som inte är behandlade
+(tabellen `inmail_behandlade`). Flödet körs på kundens senaste obehandlade mejl
+i tråden, och bilagorna sparas från alla obehandlade. Därefter markeras de som
+behandlade (och som lästa i Gmail, som förut).
+
+**Övergången, i den här ordningen:**
+
+1. Klistra in nya `check-inbox.gs` och `save-attachments.gs`.
+2. Kör `seedInboxProcessed()` en gång. Den markerar alla redan lästa mejl från
+   de senaste 30 dygnen som behandlade, så att de inte tas om. `checkInbox`
+   vägrar köra tills det är gjort (Script Property `INBOX_PROCESSED_SEEDED`).
+3. Ta bort de mejl ur `inmail_behandlade` som missats och ska tas om, och kör
+   `checkInboxBackfill()` en gång. Den tittar 14 dygn bakåt.
+
+`doGet` kör `checkInbox` som förut, så ingen ny distribution behövs för det.
