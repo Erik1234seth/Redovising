@@ -12,11 +12,24 @@ import type { AdminVarning } from '@/lib/admin-types';
  */
 
 const DAG = new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+/** Om rutan är utfälld. Hopfälld syns fortfarande antalet per kategori. */
+const OPPEN_KEY = 'admin_varningar_oppen';
 
 export function Varningspanel() {
   const [varningar, setVarningar] = useState<AdminVarning[] | null>(null);
   const [fel, setFel] = useState('');
   const [upptagen, setUpptagen] = useState(false);
+  const [oppen, setOppen] = useState(false);
+
+  useEffect(() => {
+    try { setOppen(localStorage.getItem(OPPEN_KEY) === 'ja'); } catch { /* utan lagring börjar den hopfälld */ }
+  }, []);
+
+  const vaxla = () => {
+    const ny = !oppen;
+    setOppen(ny);
+    try { localStorage.setItem(OPPEN_KEY, ny ? 'ja' : 'nej'); } catch { /* bara en bekvämlighet */ }
+  };
 
   const ladda = useCallback(() => {
     fetch('/api/admin/varningar')
@@ -73,16 +86,27 @@ export function Varningspanel() {
 
   return (
     <section className={`rounded-xl p-4 mb-6 border-2 ${antalFel ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'}`}>
-      <div className="flex items-center gap-3 mb-3">
-        <h2 className={`text-sm font-semibold ${antalFel ? 'text-red-800' : 'text-amber-800'}`}>
-          {antalFel ? `${antalFel} fel` : ''}{antalFel && varningar.length > antalFel ? ' och ' : ''}
-          {varningar.length > antalFel ? `${varningar.length - antalFel} ${varningar.length - antalFel === 1 ? 'varning' : 'varningar'}` : ''}
-        </h2>
+      <div className="flex items-center gap-3">
+        <button onClick={vaxla} aria-expanded={oppen} className="flex items-center gap-2 text-left min-w-0">
+          <svg className={`w-4 h-4 shrink-0 transition-transform ${oppen ? 'rotate-90' : ''} ${antalFel ? 'text-red-700' : 'text-amber-700'}`}
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+          <h2 className={`text-sm font-semibold ${antalFel ? 'text-red-800' : 'text-amber-800'}`}>
+            {antalFel ? `${antalFel} fel` : ''}{antalFel && varningar.length > antalFel ? ' och ' : ''}
+            {varningar.length > antalFel ? `${varningar.length - antalFel} ${varningar.length - antalFel === 1 ? 'varning' : 'varningar'}` : ''}
+          </h2>
+          {!oppen && (
+            <span className="text-xs text-slate-600 truncate">
+              {kategorier.map((k) => `${k} ${varningar.filter((v) => v.kategori === k).length}`).join(' · ')}
+            </span>
+          )}
+        </button>
         {fel && <span className="text-xs text-red-700">{fel}</span>}
-        <button onClick={ladda} className="ml-auto text-xs text-slate-600 hover:text-blue-700">Uppdatera</button>
+        <button onClick={ladda} className="ml-auto text-xs text-slate-600 hover:text-blue-700 shrink-0">Uppdatera</button>
       </div>
 
-      <div className="space-y-4">
+      {oppen && <div className="space-y-4 mt-3">
         {kategorier.map((k) => {
           const rader = varningar.filter((v) => v.kategori === k);
           const utskick = rader.filter((v) => v.utskick);
@@ -128,7 +152,7 @@ export function Varningspanel() {
             </div>
           );
         })}
-      </div>
+      </div>}
     </section>
   );
 }
