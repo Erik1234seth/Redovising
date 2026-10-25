@@ -431,9 +431,11 @@ export interface UnderlagsJobb {
   /** Utkastet som skrivs om. Kastas när det nya är skrivet, så att det gamla ligger kvar under tiden. */
   ersatterUtkast?: string;
   /** Var flödet är. Utelämnat = första omgången. */
-  steg?: 'las' | 'kontroll';
+  steg?: 'las' | 'kontroll' | 'svar';
   /** Underlag som redan lästs ut (eller försökts läsas ut) i det här flödet. */
   lasta?: string[];
+  /** Underlag som redan kontrollerats i det här flödet. */
+  kontrollerade?: string[];
   omgang?: number;
 }
 
@@ -443,7 +445,8 @@ export interface UnderlagsJobb {
  * stort kontoutdrag eller ett mejl med femtio kvitton inte slår i taket:
  *
  *   las       högst SAMTIDIGA underlag läses ut, sedan nästa omgång
- *   kontroll  när allt är utläst: kontrollen och utkastet, i ett eget anrop
+ *   kontroll  högst KONTROLL_PER_OMGANG underlag kontrolleras, sedan nästa
+ *   svar      utkastet, utifrån det kontrollomgångarna kom fram till
  *
  * Slutar med ett utkast i inkorgen, även när något gick fel på vägen.
  * Undantaget är när allt underlag är komplett och kunden inte frågar något:
@@ -468,13 +471,23 @@ export async function korUnderlagsomgang(supabase: SupabaseClient, bas: string, 
   const { data: profil, error } = await supabase.from('profiles')
     .select('id, full_name, email').eq('id', jobb.profilId).maybeSingle<Profil>();
   if (error || !profil) {
-    console.error(`[underlag-kontroll] hittade inte profilen ${jobb.profilId}:`, error?.message);
+    // Utan profil går det inte att skriva ett riktigt svar, men mejlet får
+    // inte försvinna: ett utkast med felet hamnar i inkorgen och på översikten
+    const fel = `Underlagsflödet hittade inte kundens profil (${error?.message ?? jobb.profilId}) — titta på underlaget i personkortet.`;
+    console.error('[underlag-kontroll]', fel);
+    await supabase.from('mejl_utkast').insert({
+      till_email: jobb.avsandare.trim().toLowerCase(), amne: jobb.amne || null,
+      text: 'Hej!\n\nTack för ditt mejl. Vi tittar på underlaget och återkommer.',
+      gmail_thread_id: jobb.threadId, svar_pa_message_id: jobb.messageId, kalla: jobb.kalla ?? 'ai', fel,
+    }).then(() => {}, () => {});
     return;
   }
 
   try {
-    if ((jobb.steg ?? 'las') === 'las') await lasOmgang(supabase, bas, profil, jobb);
-    else await kontrolleraOchSvara(supabase, profil, jobb);
+    const steg = jobb.steg ?? 'las';
+    if (steg === 'las') await lasOmgang(supabase, bas, profil, jobb);
+    else if (steg === 'kontroll') await kontrollOmgang(supabase, bas, profil, jobb);
+    else await svara(supabase, profil, jobb);
   } catch (err) {
     await reservutkast(supabase, profil, jobb, err);
   }
@@ -517,37 +530,79 @@ async function lasOmgang(supabase: SupabaseClient, bas: string, profil: Profil, 
   }
   await startaUnderlagsflode(bas, {
     ...jobb,
-    steg: merKvar && omgang + 1 < MAX_OMGANGAR ? 'las' : 'kontroll',
+    ...(merKvar && omgang + 1 < MAX_OMGANGAR
+      ? { steg: 'las' as const, omgang: omgang + 1 }
+      : { steg: 'kontroll' as const, omgang: 0 }),
     lasta: [...lasta, ...nu.map((f) => f.id)],
-    omgang: omgang + 1,
   });
 }
 
-async function kontrolleraOchSvara(supabase: SupabaseClient, profil: Profil, opts: UnderlagsJobb) {
-  const email = opts.avsandare.trim().toLowerCase();
+/** Filerna flödet gäller: mejlens egna bilagor och de tidigare filer sorteringen pekade ut. */
+async function flodetsFiler(supabase: SupabaseClient, profil: Profil, opts: UnderlagsJobb) {
   // Avläsningen sorterar: det som visade sig vara övriga filer kontrolleras inte
   const filer = await kundensFiler(supabase, profil.id);
   const valda = new Set(opts.filer ?? []);
   const egna = mejlen(opts);
-  const nya = filer.filter((f) => egna.has(f.gmail_message_id ?? ''));
-  const alla = filer.filter((f) => egna.has(f.gmail_message_id ?? '') || valda.has(f.id));
+  return {
+    nya: filer.filter((f) => egna.has(f.gmail_message_id ?? '')),
+    alla: filer.filter((f) => egna.has(f.gmail_message_id ?? '') || valda.has(f.id)),
+  };
+}
 
-  const [mejlkontext, varaFiler] = await Promise.all([
-    byggMejlkontext(supabase, { userId: profil.id, emails: [email, profil.email] }),
-    varaFilerSomText(supabase, profil.id),
-  ]);
-  const resultat = await kontrollera(supabase, profil.id, alla.map((f) => f.id), [mejlkontext, varaFiler].filter(Boolean).join('\n\n'));
-  const kontroll = resultat.filer;
+/**
+ * Kontrollen skriver ett utlåtande per fil och tar ungefär en halv minut per
+ * fil. Så många kontrolleras per anrop; varje omgång ser ändå alla kundens
+ * transaktioner, så dubbletter mellan omgångarna hittas.
+ */
+const KONTROLL_PER_OMGANG = 4;
 
-  const nu = new Date().toISOString();
-  await Promise.all([
-    ...kontroll.map((k) => supabase.from('bokforing_underlag')
-      .update({ kontroll_status: k.status, kontroll_saknas: k.saknas.length ? k.saknas : null, kontroll_at: nu })
-      .eq('id', k.id)),
-    ...[...resultat.flaggor].map(([id, f]) => supabase.from('transaktioner').update(f).eq('id', id)),
-    ...[...resultat.anteckningar].map(([id, text]) => supabase.from('transaktioner').update({ anteckning: text }).eq('id', id)),
-  ]);
-  if (resultat.flaggor.size) console.log(`[underlag-kontroll] ${email}: ${resultat.flaggor.size} dubblettflaggor ändrade`);
+async function kontrollOmgang(supabase: SupabaseClient, bas: string, profil: Profil, opts: UnderlagsJobb) {
+  const email = opts.avsandare.trim().toLowerCase();
+  const omgang = opts.omgang ?? 0;
+  const { alla } = await flodetsFiler(supabase, profil, opts);
+  const klara = new Set(opts.kontrollerade ?? []);
+  const kvar = alla.filter((f) => !klara.has(f.id));
+  const nu = kvar.slice(0, KONTROLL_PER_OMGANG);
+
+  if (nu.length) {
+    const [mejlkontext, varaFiler] = await Promise.all([
+      byggMejlkontext(supabase, { userId: profil.id, emails: [email, profil.email] }),
+      varaFilerSomText(supabase, profil.id),
+    ]);
+    const resultat = await kontrollera(supabase, profil.id, nu.map((f) => f.id), [mejlkontext, varaFiler].filter(Boolean).join('\n\n'));
+    const tid = new Date().toISOString();
+    await Promise.all([
+      ...resultat.filer.map((k) => supabase.from('bokforing_underlag')
+        .update({ kontroll_status: k.status, kontroll_saknas: k.saknas.length ? k.saknas : null, kontroll_at: tid })
+        .eq('id', k.id)),
+      ...[...resultat.flaggor].map(([id, f]) => supabase.from('transaktioner').update(f).eq('id', id)),
+      ...[...resultat.anteckningar].map(([id, text]) => supabase.from('transaktioner').update({ anteckning: text }).eq('id', id)),
+    ]);
+    if (resultat.flaggor.size) console.log(`[underlag-kontroll] ${email}: ${resultat.flaggor.size} dubblettflaggor ändrade`);
+  }
+
+  const merKvar = kvar.length > nu.length;
+  if (merKvar && omgang + 1 >= MAX_OMGANGAR) {
+    console.error(`[underlag-kontroll] ${email}: ${kvar.length - nu.length} underlag okontrollerade efter ${MAX_OMGANGAR} omgångar — svarar ändå`);
+  }
+  await startaUnderlagsflode(bas, {
+    ...opts,
+    steg: merKvar && omgang + 1 < MAX_OMGANGAR ? 'kontroll' : 'svar',
+    kontrollerade: [...klara, ...nu.map((f) => f.id)],
+    omgang: omgang + 1,
+  });
+}
+
+async function svara(supabase: SupabaseClient, profil: Profil, opts: UnderlagsJobb) {
+  const email = opts.avsandare.trim().toLowerCase();
+  const { nya, alla } = await flodetsFiler(supabase, profil, opts);
+  // Utlåtandena som kontrollomgångarna sparade, för filerna de kontrollerade nu
+  const klara = new Set(opts.kontrollerade ?? []);
+  const kontroll: Kontroll[] = alla.filter((f) => klara.has(f.id) && f.kontroll_status).map((f) => ({
+    id: f.id,
+    status: f.kontroll_status as Kontroll['status'],
+    saknas: Array.isArray(f.kontroll_saknas) ? (f.kontroll_saknas as Saknas[]) : [],
+  }));
 
   const namn = new Map(alla.map((f) => [f.id, f.file_name]));
   const underlagKontext = kontroll.length
