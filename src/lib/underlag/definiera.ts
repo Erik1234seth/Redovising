@@ -4,6 +4,7 @@ import { arBildEllerPdf, arTabellfil } from './filtyp';
 import { FLYTTAD_FOR_HAND, sorteraEfterRegler } from './sortering';
 import { OVRIGTREGEL } from '@/lib/transaktioner/normalisera';
 import { isSieFile } from '@/lib/sie/parse';
+import { samlaSidor } from './sidor';
 
 /**
  * Definiera underlaget — första steget efter att ett underlag tagits emot.
@@ -13,6 +14,9 @@ import { isSieFile } from '@/lib/sie/parse';
  * - vad det är (kvitto, leverantörsfaktura, kontoutdrag, verifikationslista …)
  * - vilket år det hör till
  * - vilken väg det ska gå: transaktioner, verifikationer eller övrigt
+ *
+ * Står det på underlaget plockar den också ut dokumentnummer, org.nr, datum
+ * och sidnummer, så att sidor som skannats var för sig kan läsas ihop.
  *
  * Året styr inte vägen. Det sparas i `underlag_ar` och hanteras i huvudboken.
  * Vägen skrivs till `sortering`, så att övriga filer hamnar under Övriga filer
@@ -39,6 +43,17 @@ export interface Definition {
   motivering: string;
   /** Modellen, eller "regel" när ingen AI behövdes. */
   modell: string;
+  /**
+   * Det som känner igen dokumentet när det kommer i flera sidor. Fylls i bara
+   * när det står på underlaget — alla underlag har det inte. Se `./sidor`.
+   */
+  dokumentnummer?: string | null;
+  orgnr?: string | null;
+  motpart?: string | null;
+  datum?: string | null;
+  /** "Sida 1 (2)" ger sida 1 och antalSidor 2. */
+  sida?: number | null;
+  antalSidor?: number | null;
 }
 
 const MODELL = 'gpt-5.5';
@@ -63,13 +78,26 @@ ${OVRIGTREGEL}
 
 3. "ar" — vilket år underlaget hör till, som ett heltal (t.ex. 2025). Utgå från datumen i underlaget: kvittodatum, fakturadatum, perioden på ett kontoutdrag. Spänner underlaget över flera år väljer du året där det mesta ligger. Framgår inget år sätter du null — gissa aldrig.
 
+4. Det som känner igen dokumentet, ifall det består av flera sidor som skickats var för sig. Skriv bara av det som står på underlaget — null när det inte står där, gissa aldrig:
+- "dokumentnummer": kvitto-, köpnota-, faktura- eller ordernumret, exakt som det står.
+- "orgnr": säljarens eller avsändarens organisationsnummer.
+- "motpart": säljarens eller avsändarens namn.
+- "datum": dokumentets datum, YYYY-MM-DD.
+- "sida" och "antal_sidor": när underlaget säger vilken sida det är, t.ex. "Sida: 1 (2)", "Sida 2 av 3" eller "1/2". Null när det inte står.
+
 Returnera BARA ett JSON-objekt:
 {
   "kategori": "transaktioner", "verifikationer" eller "ovrigt",
   "dokumenttyp": "…",
   "beskrivning": "en kort mening om vad underlaget gäller, t.ex. \\"Kvitto från Biltema på verktyg\\"",
   "ar": 2025 eller null,
-  "motivering": "en kort mening om varför du valde kategori och år"
+  "motivering": "en kort mening om varför du valde kategori och år",
+  "dokumentnummer": "…" eller null,
+  "orgnr": "…" eller null,
+  "motpart": "…" eller null,
+  "datum": "YYYY-MM-DD" eller null,
+  "sida": 1 eller null,
+  "antal_sidor": 2 eller null
 }`;
 
 interface UnderlagRad {
@@ -96,6 +124,8 @@ export async function definieraUnderlag(supabase: SupabaseClient, underlagId: st
   try {
     const definition = avgorMedRegler(row) ?? await fragaAi(supabase, row);
     await spara(supabase, row, definition);
+    // En sida i ett dokument med flera sidor kopplas ihop med de andra
+    await samlaSidor(supabase, row.id);
     return definition;
   } catch (err) {
     const fel = err instanceof Error ? err.message : 'Okänt fel';
@@ -177,7 +207,19 @@ async function fragaAi(supabase: SupabaseClient, row: UnderlagRad): Promise<Defi
 
   const kategori: Kategori = svar.kategori === 'verifikationer' || svar.kategori === 'ovrigt' ? svar.kategori : 'transaktioner';
   const ar = Number(svar.ar);
+  const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
+  const sida = Number(svar.sida);
+  const antalSidor = Number(svar.antal_sidor);
+  // Sidnumren gäller bara när båda finns och går ihop
+  const sidor = Number.isInteger(sida) && Number.isInteger(antalSidor) && antalSidor >= 2 && antalSidor <= 50 && sida >= 1 && sida <= antalSidor;
+  const datum = text(svar.datum, 10);
   return {
+    dokumentnummer: text(svar.dokumentnummer, 60),
+    orgnr: text(svar.orgnr, 20),
+    motpart: text(svar.motpart, 120),
+    datum: datum && /^\d{4}-\d{2}-\d{2}$/.test(datum) ? datum : null,
+    sida: sidor ? sida : null,
+    antalSidor: sidor ? antalSidor : null,
     kategori,
     dokumenttyp: String(svar.dokumenttyp ?? '').trim().slice(0, 60) || 'Okänt',
     beskrivning: String(svar.beskrivning ?? '').trim().slice(0, 300),

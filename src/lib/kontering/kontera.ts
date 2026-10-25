@@ -7,6 +7,7 @@ import { regelText, reglerAttValja, type Kundregel } from '@/lib/transaktioner/k
 import { hamtaInstruktioner, kontextFor, reglerFor } from '@/lib/transaktioner/instruktioner';
 import { tolkaBetalsatt, type Betalsatt } from './betalsatt';
 import { MODELLER, fraga, type Modell, type System } from './modeller';
+import { momsText, rensaMomsdelar, sammaMoms, type Momsdel } from './momsdelar';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
 
 /**
@@ -15,8 +16,9 @@ import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './
  * Varje transaktion konteras av båda modellerna, var för sig och med samma
  * prompter:
  *
- *   Pass 1     Modellen väljer konto ur K1-kontoplanen och momssats, och vilka
- *              kundregler (`@/lib/transaktioner/kundregler`) som gäller.
+ *   Pass 1     Modellen väljer konto ur K1-kontoplanen och momssats — eller
+ *              flera satser med belopp per sats när kvittot blandar, t.ex.
+ *              livsmedel 6 % och förpackningar 25 % — och vilka kundregler (`@/lib/transaktioner/kundregler`) som gäller.
  *   Kod        Kontot prövas: finns det i K1, får det väljas automatiskt,
  *              håller beloppsgränserna. Ett konto utanför K1 ger modellen
  *              ett nytt försök, en gång.
@@ -30,9 +32,9 @@ import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './
  * Kontantmetoden: verifikationen får transaktionens datum, inga kund- eller
  * leverantörsskulder.
  *
- * Bara när båda modellerna är gröna och har valt samma konto och momssats
- * bokförs transaktionen direkt. Annars blir konteringarna förslag som Erik
- * väljer mellan.
+ * Inget bokförs här. Konteringen är preliminär och blir verifikation 14 dagar
+ * efter att den senast ändrades, när båda modellerna är gröna och har valt
+ * samma konto och moms — eller när Erik valt konto själv. Se ./preliminar.
  */
 
 export type Omdome = 'gron' | 'gul' | 'rod';
@@ -63,6 +65,8 @@ interface Transaktion {
 interface Pass1 {
   konto: string;
   momssats: 0 | 6 | 12 | 25;
+  /** Flera momssatser på samma underlag. Tom när hela beloppet har momssats. */
+  momsdelar: Momsdel[];
   momshantering: Momshantering;
   sakerhet: 'hog' | 'medel' | 'lag';
   motivering: string;
@@ -83,6 +87,8 @@ export interface Kontering {
   svarade: string;
   konto: string | null;
   momssats: number | null;
+  /** Satserna och beloppen när underlaget har flera momssatser, annars null. */
+  momsdelar: Momsdel[] | null;
   motivering: string;
   /** Kundreglerna modellen valde. */
   regler: string[];
@@ -94,7 +100,6 @@ export interface Kontering {
 export interface Utfall {
   transaktionId: string;
   konteringar: Kontering[];
-  bokford: boolean;
   fel?: string;
 }
 
@@ -104,10 +109,24 @@ export interface Utfall {
 const pass1Schema = (regelIdn: string[]) => ({
   type: 'object',
   additionalProperties: false,
-  required: ['konto', 'momssats', 'momshantering', 'sakerhet', 'motivering', 'regler'],
+  required: ['konto', 'momssats', 'momsdelar', 'momshantering', 'sakerhet', 'motivering', 'regler'],
   properties: {
     konto: { type: 'string', description: 'Fyrsiffrigt konto ur K1-kontoplanen' },
     momssats: { type: 'integer', enum: [0, 6, 12, 25] },
+    momsdelar: {
+      type: 'array',
+      description: 'En rad per momssats när underlaget har flera satser, annars tom lista',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['momssats', 'belopp', 'moms'],
+        properties: {
+          momssats: { type: 'integer', enum: [0, 6, 12, 25] },
+          belopp: { type: 'number', description: 'Beloppet med den här satsen, inklusive moms' },
+          moms: { type: ['number', 'null'], description: 'Momsen för satsen enligt underlaget, null om den inte står där' },
+        },
+      },
+    },
     momshantering: { type: 'string', enum: ['svensk', 'ingen', 'omvand'] },
     sakerhet: { type: 'string', enum: ['hog', 'medel', 'lag'] },
     motivering: { type: 'string' },
@@ -135,6 +154,7 @@ Du får EN transaktion. Välj kontot för vad transaktionen avser: kostnad, int�
 Regler:
 - Välj bara konton ur K1-kontoplanen nedan. Inga andra konton, inte heller BAS-underkonton som 3001 eller 5410.
 - momssats: svensk moms som ingår i beloppet (25, 12, 6 eller 0). 0 när ingen avdragsgill eller utgående moms finns.
+- momsdelar: tom lista när hela beloppet har samma momssats. Har underlaget flera momssatser — t.ex. ett kvitto med livsmedel på 6 % och förpackningar på 25 % — en rad per sats med beloppet inklusive moms och momsen som står på underlaget (null om den inte står där). Ta beloppen ur underlagets momsspecifikation när den finns. En del kan vara negativ, t.ex. returnerad pant på 0 %. Beloppen ska tillsammans bli transaktionens belopp. momssats är då satsen med störst belopp. Hela beloppet konteras på ett konto.
 - momshantering: "svensk" vid vanlig svensk moms, "ingen" när momsen inte hanteras (momsfritt, privat, lån, överföringar, skatter), "omvand" vid omvänd skattskyldighet, EU-förvärv eller import.
 - sakerhet: "hog" bara när underlaget tydligt visar vad det är. "lag" när du gissar.
 - motivering: en eller två meningar om varför, på svenska.
@@ -160,6 +180,8 @@ Du får en transaktion, kontot som valts och kontots regler ur K1-kontobeskrivni
 Gränsprövningarna är uträknade i kod. Godta siffrorna.
 
 Transaktionen konteras direkt från underlaget, inte från en tidigare bokföring. Punkter som handlar om vilket BAS-konto en post tidigare bokförts på stämmer därför aldrig — bortse från dem.
+
+Bokslutsjusteringar — t.ex. lagerinventering, periodiseringar och avskrivningar — görs i bokslutet, inte när en transaktion konteras. Punkter som tydligt gäller bokslutsjusteringar är därför irrelevanta här: de bryter inga regler och kräver ingen manuell granskning.
 
 Står det en instruktion från byrån i anteckningen och kontot följer den, är kontot rätt om inte reglerna uttryckligen förbjuder det. Detsamma gäller KUNDREGLER SOM GÄLLER och BYRÅNS KONTEXT.`;
 
@@ -219,47 +241,85 @@ function betalkonto(betalsatt: Betalsatt, riktning: 'in' | 'ut'): string | null 
 
 const ore = (n: number) => Math.round(n * 100) / 100;
 
+/** Momsen för en sats. */
+interface Satsmoms { sats: number; moms: number }
+
 /**
  * Momsen tas från underlaget när den står där. Annars räknas den fram ur
  * satsen — men då är den en gissning, och raden kan inte bli grön.
+ *
+ * Med flera momssatser räknas varje del för sig, och delarna ska tillsammans
+ * bli transaktionens belopp och moms.
  */
-function raknaMoms(t: Transaktion, p: Pass1): { moms: number; flaggor: Flagga[] } {
+function raknaMoms(t: Transaktion, p: Pass1): { moms: number; satser: Satsmoms[]; flaggor: Flagga[] } {
   const flaggor: Flagga[] = [];
   if (p.momshantering === 'omvand') {
     flaggor.push({ typ: 'omvand-moms', allvar: 'granskning', text: 'Omvänd skattskyldighet eller import — momsen bokförs för hand.' });
-    return { moms: 0, flaggor };
+    return { moms: 0, satser: [], flaggor };
   }
-  const sats = p.momshantering === 'ingen' ? 0 : p.momssats;
   const underlag = Number(t.moms) || 0;
+  const delar = p.momshantering === 'svensk' ? rensaMomsdelar(p.momsdelar) : null;
+  if (delar) {
+    const summa = ore(delar.reduce((s, d) => s + d.belopp, 0));
+    if (Math.abs(summa - t.belopp) > 1) {
+      flaggor.push({ typ: 'moms', allvar: 'granskning', text: `Momsdelarna (${momsText(null, delar)}) blir ${summa} kr, men transaktionen är ${t.belopp} kr.` });
+    }
+    const satser = delar.map((d) => {
+      const raknad = ore((d.belopp * d.momssats) / (100 + d.momssats));
+      if (d.moms === null) {
+        if (d.momssats > 0) flaggor.push({ typ: 'moms', allvar: 'granskning', text: `Momsen för ${d.momssats} % framgår inte av underlaget — ${raknad} kr är uträknat.` });
+        return { sats: d.momssats, moms: raknad };
+      }
+      if (Math.abs(d.moms - raknad) > 1) {
+        flaggor.push({ typ: 'moms', allvar: 'granskning', text: `Momsen för ${d.momssats} % (${d.moms} kr) stämmer inte med beloppet ${d.belopp} kr (${raknad} kr).` });
+      }
+      return { sats: d.momssats, moms: ore(d.moms) };
+    }).filter((x) => x.moms);
+    const moms = ore(satser.reduce((s, x) => s + x.moms, 0));
+    if (underlag > 0 && Math.abs(underlag - moms) > 1) {
+      flaggor.push({ typ: 'moms', allvar: 'granskning', text: `Momsen på underlaget (${underlag} kr) stämmer inte med delarna (${moms} kr).` });
+    }
+    return { moms, satser, flaggor };
+  }
+
+  const sats = p.momshantering === 'ingen' ? 0 : p.momssats;
   const raknad = ore((t.belopp * sats) / (100 + sats));
 
   if (underlag > 0) {
     if (sats === 0) {
       flaggor.push({ typ: 'moms', allvar: 'granskning', text: `Underlaget visar ${underlag} kr i moms men kontot bokförs utan moms.` });
-      return { moms: 0, flaggor };
+      return { moms: 0, satser: [], flaggor };
     }
     if (Math.abs(underlag - raknad) > 1) {
       flaggor.push({ typ: 'moms', allvar: 'granskning', text: `Momsen på underlaget (${underlag} kr) stämmer inte med ${sats} % (${raknad} kr) — blandade momssatser?` });
     }
-    return { moms: underlag, flaggor };
+    return { moms: underlag, satser: [{ sats, moms: underlag }], flaggor };
   }
   if (sats > 0) {
     flaggor.push({ typ: 'moms', allvar: 'granskning', text: `Momsen framgår inte av underlaget — ${raknad} kr är uträknat ur ${sats} %.` });
   }
-  return { moms: sats > 0 ? raknad : 0, flaggor };
+  return { moms: sats > 0 ? raknad : 0, satser: sats > 0 ? [{ sats, moms: raknad }] : [], flaggor };
 }
 
 const MOMSKONTO_UT: Record<number, string> = { 25: '2611', 12: '2621', 6: '2631' };
 
-/** Raderna i verifikationen, debet positivt. Balanserar alltid: netto + moms = brutto. */
-export function byggRader(t: Transaktion, konto: string, sats: number, moms: number, motkonto: string) {
+/**
+ * Raderna i verifikationen, debet positivt. Balanserar alltid: netto + moms =
+ * brutto. Ingående moms samlas på 2641; utgående får ett konto per sats.
+ */
+function byggRader(t: Transaktion, konto: string, satser: Satsmoms[], motkonto: string) {
   const brutto = ore(t.belopp);
-  const netto = ore(brutto - moms);
+  const netto = ore(brutto - satser.reduce((s, x) => s + x.moms, 0));
   const ut = t.riktning === 'ut';
   const rader: { konto: string; belopp: number }[] = [
     { konto, belopp: ut ? netto : -netto },
   ];
-  if (moms) rader.push({ konto: ut ? '2641' : MOMSKONTO_UT[sats] ?? '2611', belopp: ut ? moms : -moms });
+  const momskonton = new Map<string, number>();
+  for (const x of satser) {
+    const k = ut ? '2641' : MOMSKONTO_UT[x.sats] ?? '2611';
+    momskonton.set(k, ore((momskonton.get(k) ?? 0) + x.moms));
+  }
+  for (const [k, m] of momskonton) if (m) rader.push({ konto: k, belopp: ut ? m : -m });
   rader.push({ konto: motkonto, belopp: ut ? -brutto : brutto });
   return rader;
 }
@@ -295,6 +355,7 @@ async function konteraMedModell(
   // Bara regler som finns, en gång var
   const regler = [...new Set((Array.isArray(p1.regler) ? p1.regler : []).filter((id) => regelIdn.includes(id)))];
 
+  const momsdelar = p1.momshantering === 'svensk' ? rensaMomsdelar(p1.momsdelar) : null;
   const { moms, flaggor: momsflaggor } = raknaMoms(t, p1);
   flaggor.push(...momsflaggor);
   const prova = (konto: string) => provaKonto({ konto, netto: t.belopp - moms, brutto: t.belopp, datum: t.datum });
@@ -311,7 +372,7 @@ async function konteraMedModell(
       system: sys,
       user: [
         `TRANSAKTIONEN:\n${user}`,
-        `VALT KONTO: ${p1.konto} ${forsta.rad.namn}, momssats ${p1.momssats} %\nMotivering: ${p1.motivering}`,
+        `VALT KONTO: ${p1.konto} ${forsta.rad.namn}, momssats ${momsText(p1.momssats, momsdelar)}\nMotivering: ${p1.motivering}`,
         regelText(regler, allaRegler),
         `KONTOTS REGLER:\n${kontoBlock(forsta)}`,
       ].filter(Boolean).join('\n\n'),
@@ -354,6 +415,7 @@ async function konteraMedModell(
     svarade: [...svarade].join(', '),
     konto,
     momssats: p1.momshantering === 'svensk' ? p1.momssats : 0,
+    momsdelar,
     motivering: p1.motivering,
     regler,
     granskning,
@@ -371,7 +433,7 @@ export async function konteraTransaktioner(
   supabase: SupabaseClient,
   userId: string,
   transaktionIds: string[],
-  { torrkorning = false, bokforGrona = true }: { torrkorning?: boolean; /** false = spara konteringarna men bokför inte, även när de är gröna. */ bokforGrona?: boolean } = {},
+  { torrkorning = false }: { torrkorning?: boolean } = {},
 ): Promise<Utfall[]> {
   const { data: profil, error: profilFel } = await supabase
     .from('profiles').select(KUND_KOLUMNER).eq('id', userId).maybeSingle();
@@ -414,9 +476,9 @@ export async function konteraTransaktioner(
       try {
         if (kontext && !torrkorning) t = await rattaEfterKontext(supabase, t, betalsatt, kontext);
       } catch (err) {
-        return { transaktionId: t.id, konteringar: [], bokford: false, fel: err instanceof Error ? err.message : String(err) };
+        return { transaktionId: t.id, konteringar: [], fel: err instanceof Error ? err.message : String(err) };
       }
-      return konteraEn(supabase, t, betalsatt, kund, { allaRegler, kontext }, torrkorning, bokforGrona);
+      return konteraEn(supabase, t, betalsatt, kund, { allaRegler, kontext }, torrkorning);
     })));
   }
   return utfall;
@@ -466,15 +528,14 @@ async function konteraEn(
   kund: string,
   byran: Byran,
   torrkorning: boolean,
-  bokforGrona = true,
 ): Promise<Utfall> {
   let konteringar: Kontering[];
   try {
     konteringar = await Promise.all(MODELLER.map((m) => konteraMedModell(m, t, betalsatt, kund, byran)));
   } catch (err) {
-    return { transaktionId: t.id, konteringar: [], bokford: false, fel: err instanceof Error ? err.message : String(err) };
+    return { transaktionId: t.id, konteringar: [], fel: err instanceof Error ? err.message : String(err) };
   }
-  if (torrkorning) return { transaktionId: t.id, konteringar, bokford: false };
+  if (torrkorning) return { transaktionId: t.id, konteringar };
 
   const { error } = await supabase.from('konteringar').upsert(
     konteringar.map((k) => ({
@@ -483,6 +544,7 @@ async function konteraEn(
       modell: k.modell,
       konto: k.konto,
       momssats: k.momssats,
+      momsdelar: k.momsdelar,
       motivering: k.motivering,
       regler: k.regler,
       granskning: k.granskning ? { ...k.granskning, svarade: k.svarade } : { svarade: k.svarade },
@@ -493,18 +555,14 @@ async function konteraEn(
     })),
     { onConflict: 'transaktion_id,modell' },
   );
-  if (error) return { transaktionId: t.id, konteringar, bokford: false, fel: `Kunde inte spara konteringen: ${error.message}` };
+  if (error) return { transaktionId: t.id, konteringar, fel: `Kunde inte spara konteringen: ${error.message}` };
 
-  const [a, b] = konteringar;
-  const overens = a.omdome === 'gron' && b.omdome === 'gron' && a.konto === b.konto && a.momssats === b.momssats;
-  if (!overens || !bokforGrona) return { transaktionId: t.id, konteringar, bokford: false };
-
-  try {
-    await bokfor(supabase, t, a.konto!, a.momssats ?? 0, betalsatt, 'AI');
-    return { transaktionId: t.id, konteringar, bokford: true };
-  } catch (err) {
-    return { transaktionId: t.id, konteringar, bokford: false, fel: err instanceof Error ? err.message : String(err) };
-  }
+  // En ny kontering ersätter ett konto byrån valt förut, och de 14 dagarna
+  // till verifikation börjar om (se ./preliminar)
+  const { error: tFel } = await supabase.from('transaktioner')
+    .update({ vald_kontering: null, preliminar_at: new Date().toISOString() }).eq('id', t.id);
+  if (tFel) return { transaktionId: t.id, konteringar, fel: `Kunde inte spara konteringen: ${tFel.message}` };
+  return { transaktionId: t.id, konteringar };
 }
 
 export const TRANSAKTION_KOLUMNER =
@@ -514,14 +572,19 @@ export const TRANSAKTION_KOLUMNER =
  * Erik väljer konto för hand — ett av modellernas förslag eller ett eget.
  * Betalkontot följer kunden, utom när kunden betalar från båda hållen; då
  * skickas det med.
+ *
+ * Valet är preliminärt som allt annat: det sparas på transaktionen och blir
+ * verifikation 14 dagar senare (./preliminar). Till dess går det att ändra.
  */
-export async function bokforManuellt(
+export async function valjKonto(
   supabase: SupabaseClient,
   userId: string,
   transaktionId: string,
   konto: string,
   momssats: number,
   motkonto?: string,
+  /** Från ett förslag med flera momssatser. */
+  momsdelar?: Momsdel[] | null,
 ) {
   const { data: t, error } = await supabase
     .from('transaktioner').select(TRANSAKTION_KOLUMNER).eq('id', transaktionId).eq('user_id', userId).maybeSingle();
@@ -535,7 +598,22 @@ export async function bokforManuellt(
     .from('verifikationer').select('id', { count: 'exact', head: true }).eq('transaktion_id', transaktionId);
   if (count) throw new Error('Transaktionen är redan bokförd — ångra först');
   if (![0, 6, 12, 25].includes(momssats)) throw new Error('Momssatsen måste vara 0, 6, 12 eller 25');
-  await bokfor(supabase, t as Transaktion, konto, momssats, betalsatt, 'Erik', motkonto);
+  if (!slaUppKonto(konto)) throw new Error(`${konto} finns inte bland K1-kontona`);
+  if (!motkonto && !betalkonto(betalsatt, (t as Transaktion).riktning)) throw new Error('Kunden betalar från båda hållen — välj betalkonto');
+  const nu = new Date().toISOString();
+  const vald: ValdKontering = { konto, momssats, momsdelar: rensaMomsdelar(momsdelar), motkonto: motkonto ?? null, at: nu };
+  const { error: uFel } = await supabase.from('transaktioner').update({ vald_kontering: vald, preliminar_at: nu }).eq('id', transaktionId);
+  if (uFel) throw new Error(`Kunde inte spara valet: ${uFel.message}`);
+}
+
+/** Kontot byrån valt för hand, i `transaktioner.vald_kontering`. */
+export interface ValdKontering {
+  konto: string;
+  momssats: number;
+  momsdelar: Momsdel[] | null;
+  /** Betalkontot, bara när kunden betalar från båda hållen. */
+  motkonto: string | null;
+  at: string;
 }
 
 // ---------- rätta transaktionen ----------
@@ -592,6 +670,8 @@ async function sparaAndringar(supabase: SupabaseClient, t: Transaktion, andringa
   const { error } = await supabase.from('transaktioner').update({
     ...Object.fromEntries(Object.entries(ny).filter(([, v]) => v !== undefined)),
     anteckning: [t.anteckning, rad].filter(Boolean).join('\n'),
+    // En ändring startar om de 14 dagarna till verifikation
+    preliminar_at: new Date().toISOString(),
   }).eq('id', t.id);
   if (error) throw new Error(`Kunde inte spara ändringen: ${error.message}`);
 }
@@ -658,6 +738,7 @@ export async function bokfor(
   betalsatt: Betalsatt,
   signatur: string,
   motkontoOverride?: string,
+  momsdelar?: Momsdel[] | null,
 ) {
   const k1 = slaUppKonto(konto);
   if (!k1) throw new Error(`${konto} finns inte bland K1-kontona`);
@@ -666,8 +747,12 @@ export async function bokfor(
   if (!t.datum) throw new Error('Transaktionen saknar datum');
 
   const sats = momssats as Pass1['momssats'];
-  const { moms } = raknaMoms(t, { konto, momssats: sats, momshantering: sats ? 'svensk' : 'ingen', sakerhet: 'hog', motivering: '', regler: [] });
-  const rader = byggRader(t, konto, sats, moms, motkonto);
+  const delar = rensaMomsdelar(momsdelar);
+  const { satser } = raknaMoms(t, {
+    konto, momssats: sats, momsdelar: delar ?? [], momshantering: sats || delar ? 'svensk' : 'ingen',
+    sakerhet: 'hog', motivering: '', regler: [],
+  });
+  const rader = byggRader(t, konto, satser, motkonto);
 
   const id = crypto.randomUUID();
   const { error } = await supabase.from('verifikationer').insert({

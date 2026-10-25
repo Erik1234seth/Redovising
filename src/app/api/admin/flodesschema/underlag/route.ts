@@ -9,8 +9,9 @@ import { kompletteraUnderlag } from '@/lib/transaktioner/komplettera';
 import { kollaDubbletter } from '@/lib/transaktioner/dublettkoll';
 import { kollaTillrackligt } from '@/lib/transaktioner/tillrackligt';
 import { skrivFragemejl } from '@/lib/transaktioner/fragemejl';
-import { TRANSAKTION_KOLUMNER, bokfor, bokforManuellt, konteraTransaktioner } from '@/lib/kontering/kontera';
-import { tolkaBetalsatt } from '@/lib/kontering/betalsatt';
+import { konteraTransaktioner, valjKonto, type ValdKontering } from '@/lib/kontering/kontera';
+import { rensaMomsdelar } from '@/lib/kontering/momsdelar';
+import { bokforForfallna, slutligKontering, verifikationFran } from '@/lib/kontering/preliminar';
 import { slaUppKonto } from '@/lib/kontering/regelverk';
 import { hamtaInstruktioner, reglerFor } from '@/lib/transaktioner/instruktioner';
 
@@ -24,7 +25,7 @@ export const maxDuration = 300;
  * POST { id, steg } → kör ett steg på underlaget och svarar { underlag, ... } som GET ?id=
  *            steg: definiera | plocka-trans | plocka-verif | komplettera | dublett | tillrackligt | konteras | skapa-verif
  *            | skriv-mejl (kundens samlade frågemejl nu, i stället för kl 18; med omkorning: true är det inget fel om inget finns att fråga om)
- *            (skapa-verif med val: { transaktionId, konto, momssats } bokför en granskad för hand)
+ *            (skapa-verif med val: { transaktionId, konto, momssats, momsdelar? } bokför en granskad för hand)
  *
  * Varje steg är ett eget anrop, så att vart och ett har hela tidsgränsen på
  * sig. "Skicka in i flödet" på sidan kör dem efter varandra. Konteringen tar
@@ -111,8 +112,8 @@ async function fragemejl(underlagId: string, omkorning = false) {
 
 /**
  * Konterar nästa omgång av underlagets transaktioner med båda modellerna och
- * sparar konteringarna. Gröna — båda modellerna säkra och överens om konto
- * och moms — bokförs direkt, signerade AI; resten väntar på Granska.
+ * sparar konteringarna — preliminärt. Gröna, båda modellerna säkra och överens
+ * om konto och moms, blir verifikationer om 14 dagar; resten väntar på Granska.
  * Dubbletter och de som saknar uppgifter konteras inte. Svarar med hur många
  * som är kvar.
  */
@@ -148,12 +149,13 @@ async function kontera(underlagId: string, fran: string): Promise<number> {
 }
 
 /**
- * Steget "Skapa verifikationer": konteringarna blir verifikationer.
+ * Steget "Skapa verifikationer".
  *
- * Utan val bokförs varje grön transaktion — båda modellerna gröna och överens
- * — på kontot de valt, signerad AI. Med val bokförs en granskad transaktion
- * på det konto och den moms Erik valt, signerad Erik. Det som redan är bokfört
- * rörs inte, och dubbletter bokförs aldrig. Svarar med hur många som bokfördes.
+ * Med val sparas kontot och momsen Erik valt för en granskad transaktion —
+ * preliminärt, som modellernas konteringar. Utan val blir underlagets klara
+ * konteringar verifikationer direkt, i stället för om 14 dagar (se
+ * `@/lib/kontering/preliminar`). Det som redan är bokfört rörs inte, och
+ * dubbletter bokförs aldrig. Svarar med hur många som bokfördes.
  */
 async function skapaVerifikationer(underlagId: string, val: unknown): Promise<number> {
   const supabase = createServerClient();
@@ -161,54 +163,27 @@ async function skapaVerifikationer(underlagId: string, val: unknown): Promise<nu
   if (!u?.user_id) throw new Error('Underlaget hör inte till ett kundkonto — det går inte att bokföra');
 
   if (val && typeof val === 'object') {
-    const v = val as { transaktionId?: unknown; konto?: unknown; momssats?: unknown };
+    const v = val as { transaktionId?: unknown; konto?: unknown; momssats?: unknown; momsdelar?: unknown };
     if (typeof v.transaktionId !== 'string' || typeof v.konto !== 'string') throw new Error('Välj transaktion och konto');
     const { data: t } = await supabase.from('transaktioner').select('underlag_id, dublett_av').eq('id', v.transaktionId).maybeSingle();
     if (t?.underlag_id !== underlagId) throw new Error('Transaktionen hör inte till underlaget');
     if (t.dublett_av) throw new Error('Transaktionen är markerad som dublett och bokförs inte');
-    await bokforManuellt(supabase, u.user_id, v.transaktionId, v.konto.trim(), Number(v.momssats ?? 0));
-    return 1;
+    // Valet är preliminärt och blir verifikation om 14 dagar, som allt annat
+    await valjKonto(supabase, u.user_id, v.transaktionId, v.konto.trim(), Number(v.momssats ?? 0), undefined, rensaMomsdelar(v.momsdelar));
+    return 0;
   }
 
-  const { data: profil } = await supabase.from('profiles').select('har_foretagskonto').eq('id', u.user_id).maybeSingle();
-  const betalsatt = tolkaBetalsatt(profil?.har_foretagskonto ?? null);
-  if (!betalsatt) throw new Error('Välj först om kunden betalar via företagskonto eller privatkonto (Kundkontext)');
-
-  const { data: trans, error } = await supabase.from('transaktioner').select(TRANSAKTION_KOLUMNER)
-    .eq('underlag_id', underlagId).is('dublett_av', null).is('dublett_orsak', null);
-  if (error) throw new Error(error.message);
-  const ids = (trans ?? []).map((t) => t.id as string);
-  if (!ids.length) return 0;
-  const [{ data: k }, { data: v }] = await Promise.all([
-    supabase.from('konteringar').select('transaktion_id, konto, momssats, omdome').in('transaktion_id', ids),
-    supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', ids),
-  ]);
-  const bokforda = new Set((v ?? []).map((x) => x.transaktion_id));
-
-  let antal = 0;
-  const fel: string[] = [];
-  for (const t of (trans ?? []) as unknown as Parameters<typeof bokfor>[1][]) {
-    if (bokforda.has(t.id)) continue;
-    const kk = (k ?? []).filter((x) => x.transaktion_id === t.id);
-    // Samma regel som konteringen: båda gröna och överens om konto och moms
-    const gron = kk.length >= 2 && kk.every((x) => x.omdome === 'gron' && x.konto === kk[0].konto && Number(x.momssats) === Number(kk[0].momssats));
-    if (!gron) continue;
-    try {
-      await bokfor(supabase, t, kk[0].konto, Number(kk[0].momssats ?? 0), betalsatt, 'AI');
-      antal++;
-    } catch (e) {
-      fel.push(`${t.motpart || t.beskrivning || t.id}: ${e instanceof Error ? e.message : 'okänt fel'}`);
-    }
-  }
-  if (fel.length) throw new Error(`${antal} bokförda, ${fel.length} gick inte: ${fel.join('; ')}`);
-  return antal;
+  // Knappen: allt som är klart blir verifikation nu, utan att vänta 14 dagar
+  const { bokforda, fel } = await bokforForfallna(supabase, { underlagId, nu: true });
+  if (fel.length) throw new Error(`${bokforda} bokförda, ${fel.length} gick inte: ${fel.join('; ')}`);
+  return bokforda;
 }
 
 async function allaKunder(): Promise<FlodesKund[]> {
   const supabase = createServerClient();
   const { data: rader, error } = await supabase
     .from('bokforing_underlag')
-    .select('id, user_id, sender_email, file_name, created_at, source, sortering')
+    .select('id, user_id, sender_email, file_name, created_at, source, sortering, del_av, sidor_saknas, sida:definition->sida, antal_sidor:definition->antalSidor')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
@@ -227,7 +202,13 @@ async function allaKunder(): Promise<FlodesKund[]> {
       const namn = profil?.full_name?.trim() || profil?.company_name?.trim() || epost || 'Okänd avsändare';
       kunder.set(key, { key, namn, underlag: [] });
     }
-    kunder.get(key)!.underlag.push({ id: r.id, fileName: r.file_name, at: r.created_at, source: r.source ?? 'app', sortering: r.sortering ?? null });
+    // Sidor i ett dokument märks, så att det syns vilka som hör ihop
+    const sidor = r.antal_sidor
+      ? r.sidor_saknas?.length
+        ? `sida ${r.sida}/${r.antal_sidor}, väntar på sida ${r.sidor_saknas.join(', ')}`
+        : `sida ${r.sida}/${r.antal_sidor}${r.del_av ? ', läses med första sidan' : ''}`
+      : null;
+    kunder.get(key)!.underlag.push({ id: r.id, fileName: r.file_name, at: r.created_at, source: r.source ?? 'app', sortering: r.sortering ?? null, sidor });
   }
   return [...kunder.values()].sort((a, b) => a.namn.localeCompare(b.namn, 'sv'));
 }
@@ -236,14 +217,14 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
   const supabase = createServerClient();
   const { data: u, error } = await supabase
     .from('bokforing_underlag')
-    .select('id, user_id, sender_email, file_name, created_at, source, sortering, sortering_orsak, definition, definierad_at, definition_fel, kontroll_status, kontroll_saknas, kontroll_at, transaktioner_utlasta_at, transaktioner_antal, transaktioner_fel, kompletterad_at, komplettering_fel, dublettkollad_at, dublettkoll_fel, tillrackligt_at, tillrackligt_fel, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel')
+    .select('id, user_id, sender_email, file_name, created_at, source, sortering, sortering_orsak, definition, definierad_at, definition_fel, del_av, sidor_saknas,kontroll_status, kontroll_saknas, kontroll_at, transaktioner_utlasta_at, transaktioner_antal, transaktioner_fel, kompletterad_at, komplettering_fel, dublettkollad_at, dublettkoll_fel, tillrackligt_at, tillrackligt_fel, verifikationer_inlagda_at, verifikationer_antal, verifikationer_dubbletter, verifikationer_fel')
     .eq('id', id)
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!u) throw new Error('Underlaget finns inte');
 
   const [trans, verif, profil] = await Promise.all([
-    supabase.from('transaktioner').select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, vat_nummer, anteckning, detaljer, uppgifter, komplettering, dublettkoll, dublett_av, tillrackligt, fraga_utkast_id').eq('underlag_id', id).order('radnr'),
+    supabase.from('transaktioner').select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, vat_nummer, anteckning, detaljer, uppgifter, komplettering, dublettkoll, dublett_av, tillrackligt, fraga_utkast_id, vald_kontering, preliminar_at').eq('underlag_id', id).order('radnr'),
     supabase.from('verifikationer').select('id, transaktion_id, serie, nummer, datum, signatur, verifikation_rader(radnr, konto, kontonamn, belopp, borttagen)').eq('underlag_id', id),
     u.user_id ? supabase.from('profiles').select('email').eq('id', u.user_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
   ]);
@@ -252,7 +233,7 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
 
   const transIds = (trans.data ?? []).map((t) => t.id);
   const { data: konteringar, error: kFel } = transIds.length
-    ? await supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, omdome, motivering, regler, granskning, flaggor').in('transaktion_id', transIds)
+    ? await supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, momsdelar, omdome, motivering, regler, granskning, flaggor').in('transaktion_id', transIds)
     : { data: [], error: null };
   if (kFel) throw new Error(kFel.message);
 
@@ -269,8 +250,30 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
     .filter((i) => i.omfang === 'alla' || i.omfang === 'kund' || i.underlag_id === id || (i.transaktion_id && transIdSet.has(i.transaktion_id)));
   const regelnamn = new Map(reglerFor(instruktioner, u.user_id).map((r) => [r.id, r.namn]));
 
+  // Ett dokument i flera sidor: huvudunderlaget och de andra sidorna
+  const { data: dokument } = u.definition?.antalSidor
+    ? await supabase.from('bokforing_underlag').select('id, file_name, created_at, definition, sidor_fraga_utkast_id')
+      .or(`id.eq.${u.del_av ?? u.id},del_av.eq.${u.del_av ?? u.id}`)
+    : { data: null };
+  const huvudRad = (dokument ?? []).find((d) => d.id === (u.del_av ?? u.id));
+  const { data: fraga } = huvudRad?.sidor_fraga_utkast_id
+    ? await supabase.from('mejl_utkast').select('created_at').eq('id', huvudRad.sidor_fraga_utkast_id).maybeSingle()
+    : { data: null };
+  const sidor: FlodesUnderlag['sidor'] = u.definition?.antalSidor ? {
+    sida: u.definition.sida ?? null,
+    antal: u.definition.antalSidor,
+    saknas: u.sidor_saknas ?? [],
+    huvud: u.del_av ? huvudRad?.file_name ?? null : null,
+    huvudId: u.del_av ?? null,
+    delar: (dokument ?? []).map((d) => ({
+      id: d.id, fileName: d.file_name, at: d.created_at, sida: d.definition?.sida ?? null,
+      dokumentnummer: d.definition?.dokumentnummer ?? null, datum: d.definition?.datum ?? null, motpart: d.definition?.motpart ?? null,
+    })).sort((a, b) => (a.sida ?? 0) - (b.sida ?? 0)),
+    fragadAt: fraga?.created_at ?? null,
+  } : null;
+
   const bokforda = new Set((verif.data ?? []).map((v) => v.transaktion_id).filter(Boolean));
-  const epost = (profil.data?.email?.trim() || u.sender_email?.trim() || '').toLowerCase();
+  const epost =(profil.data?.email?.trim() || u.sender_email?.trim() || '').toLowerCase();
 
   return {
     id: u.id,
@@ -283,6 +286,7 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
     definition: u.definition ?? null,
     definieradAt: u.definierad_at ?? null,
     definitionFel: u.definition_fel ?? null,
+    sidor,
     kontroll: u.kontroll_status ? { status: u.kontroll_status, saknas: u.kontroll_saknas ?? [], at: u.kontroll_at } : null,
     utlasning: u.transaktioner_utlasta_at ? { at: u.transaktioner_utlasta_at, antal: u.transaktioner_antal ?? 0, fel: u.transaktioner_fel } : null,
     komplettering: u.kompletterad_at ? { at: u.kompletterad_at, fel: u.komplettering_fel } : null,
@@ -301,9 +305,13 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
     } : null,
     transaktioner: (trans.data ?? []).map((t) => {
       const k = (konteringar ?? []).filter((x) => x.transaktion_id === t.id);
-      // Samma regel som konteringen: grönt när båda modellerna är gröna och överens
-      const gron = k.length >= 2 && k.every((x) => x.omdome === 'gron' && x.konto === k[0].konto && x.momssats === k[0].momssats);
+      // Samma regel som när den blir verifikation: byråns val, eller båda modellerna gröna och överens
+      const vald = t.vald_kontering as ValdKontering | null;
+      const slutlig = slutligKontering(vald, k);
+      const gron = !!slutlig;
       return {
+        vald: vald ? { konto: vald.konto, momssats: Number(vald.momssats) || 0, momsdelar: rensaMomsdelar(vald.momsdelar) } : null,
+        verifikationFran: slutlig && !bokforda.has(t.id) ? verifikationFran(t.preliminar_at) : null,
         id: t.id,
         datum: t.datum,
         beskrivning: t.beskrivning ?? '',
@@ -320,9 +328,9 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
         dublettkoll: t.dublettkoll ?? null,
         dublettAv: t.dublett_av ?? null,
         tillrackligt: t.tillrackligt ?? null,
-        kontering: k.length === 0 ? 'ingen' : gron ? 'gron' : 'granska',
+        kontering: gron ? 'gron' : k.length === 0 ? 'ingen' : 'granska',
         bokford: bokforda.has(t.id),
-        forslag: k.map((x) => ({ modell: x.modell, konto: x.konto, kontonamn: x.konto ? slaUppKonto(x.konto)?.namn ?? null : null, momssats: Number(x.momssats ?? 0), omdome: x.omdome, motivering: x.motivering ?? '', granskning: x.granskning ?? null, flaggor: x.flaggor ?? [], regler: (Array.isArray(x.regler) ? x.regler as string[] : []).map((r) => regelnamn.get(r) ?? 'Borttagen regel') })),
+        forslag: k.map((x) => ({ modell: x.modell, konto: x.konto, kontonamn: x.konto ? slaUppKonto(x.konto)?.namn ?? null : null, momssats: Number(x.momssats ?? 0), momsdelar: rensaMomsdelar(x.momsdelar), omdome: x.omdome, motivering: x.motivering ?? '', granskning: x.granskning ?? null, flaggor: x.flaggor ?? [], regler: (Array.isArray(x.regler) ? x.regler as string[] : []).map((r) => regelnamn.get(r) ?? 'Borttagen regel') })),
         verifikation: (() => {
           const v = (verif.data ?? []).find((x) => x.transaktion_id === t.id);
           if (!v) return null;

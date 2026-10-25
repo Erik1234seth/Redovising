@@ -2,14 +2,17 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { AdminKontering, AdminKonteringRad, Betalsatt } from '@/lib/admin-types';
+import { momsText, type Momsdel } from '@/lib/kontering/momsdelar';
 import { kr } from './_verifikationer';
 
 /**
  * Konteringen av kundens transaktioner enligt K1.
  *
  * Båda modellerna (gpt-5.5 och Claude Opus 5.5) konterar varje transaktion.
- * När båda är gröna och har valt samma konto och momssats bokförs den direkt;
- * annars blir det förslag, och här väljer Erik ett av dem eller ett eget konto.
+ * När båda är gröna och har valt samma konto och moms är den klar; annars blir
+ * det förslag, och här väljer Erik ett av dem eller ett eget konto. Allt är
+ * preliminärt och blir verifikation 14 dagar efter senaste ändringen (se
+ * `@/lib/kontering/preliminar`) — till dess går det att ändra fritt.
  *
  * En transaktion konteras per anrop — två modeller med två pass var tar upp
  * till ett par minuter, och ett anrop får ta högst fem. Fliken kör några
@@ -19,7 +22,8 @@ import { kr } from './_verifikationer';
 const SAMTIDIGA = 3;
 const PAGE = 100;
 
-type Status = 'okonterad' | 'forslag' | 'bokford';
+/** preliminar = klar (grön och överens, eller vald för hand) men inte verifikation än. */
+type Status = 'okonterad' | 'forslag' | 'preliminar' | 'bokford';
 type Filter = Status | 'alla';
 
 const MODELLNAMN: Record<string, string> = {
@@ -35,8 +39,12 @@ const OMDOME: Record<AdminKontering['omdome'], { prick: string; text: string }> 
 
 function status(r: AdminKonteringRad): Status {
   if (r.verifikation) return 'bokford';
+  if (r.verifikationFran) return 'preliminar';
   return r.konteringar.length ? 'forslag' : 'okonterad';
 }
+
+const DATUM = new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'short' });
+const dag = (iso: string) => DATUM.format(new Date(iso));
 
 function matches(r: AdminKonteringRad, q: string): boolean {
   if (!q) return true;
@@ -75,7 +83,7 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
     setRader((list) => list && (rad ? list.map((r) => (r.id === id ? rad : r)) : list.filter((r) => r.id !== id)));
 
   const antal = useMemo(() => {
-    const a = { okonterad: 0, forslag: 0, bokford: 0 };
+    const a = { okonterad: 0, forslag: 0, preliminar: 0, bokford: 0 };
     for (const r of rader ?? []) a[status(r)]++;
     return a;
   }, [rader]);
@@ -175,14 +183,16 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
     { id: 'alla', label: 'Alla', n: rader.length },
     { id: 'okonterad', label: 'Okonterade', n: antal.okonterad },
     { id: 'forslag', label: 'Förslag', n: antal.forslag },
+    { id: 'preliminar', label: 'Preliminära', n: antal.preliminar },
     { id: 'bokford', label: 'Bokförda', n: antal.bokford },
   ];
 
   return (
     <div className="space-y-5">
       <p className="text-slate-500 text-xs">
-        Båda modellerna konterar varje rad enligt K1. Bokförs direkt när båda är gröna och överens om konto och
-        moms — annars blir det förslag. Betalkonto:{' '}
+        Båda modellerna konterar varje rad enligt K1. Klar när båda är gröna och överens om konto och moms, eller
+        när du valt konto — annars blir det förslag. Allt är preliminärt och blir verifikation 14 dagar efter
+        senaste ändringen. Betalkonto:{' '}
         <span className="text-slate-700">
           {betalsatt === 'foretagskonto' ? '1930 Företagskonto' : betalsatt === 'privatkonto' ? '2017 Egna insättningar / 2013 Egna uttag' : 'väljs per rad'}
         </span>
@@ -414,6 +424,18 @@ function KonteringsStatus({ rad: r, status: s, kor, fel }: { rad: AdminKontering
       </span>
     );
   }
+  if (s === 'preliminar') {
+    const k = r.vald ?? r.konteringar[0];
+    return (
+      <span className="text-xs" title="Preliminär — går att ändra tills den blir verifikation">
+        <span className="px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-700 font-semibold mr-2">Preliminär</span>
+        <span className="text-slate-700 tabular-nums">{k?.konto}</span>
+        <span className="text-slate-400"> {momsText(k?.momssats ?? 0, k?.momsdelar)}</span>
+        {r.vald && <span className="text-slate-500"> · vald för hand</span>}
+        <span className="text-slate-400"> · verifikation {dag(r.verifikationFran!)}</span>
+      </span>
+    );
+  }
   if (s === 'forslag') {
     return (
       <span className="flex flex-col gap-0.5 text-xs">
@@ -423,7 +445,7 @@ function KonteringsStatus({ rad: r, status: s, kor, fel }: { rad: AdminKontering
             <span className="text-slate-400 w-12">{k.modell.startsWith('gpt') ? 'GPT' : 'Claude'}</span>
             <span className="text-slate-800 tabular-nums">{k.konto ?? '—'}</span>
             <span className="text-slate-500 truncate max-w-[14rem]">{k.kontonamn}</span>
-            {k.momssats ? <span className="text-slate-400">{k.momssats} %</span> : null}
+            {k.momssats || k.momsdelar ? <span className="text-slate-400">{momsText(k.momssats, k.momsdelar)}</span> : null}
           </span>
         ))}
       </span>
@@ -490,12 +512,13 @@ function Detalj({
     </button>
   );
 
-  const bokfor = (k: string, m: number | string) =>
+  const bokfor = (k: string, m: number | string, momsdelar?: Momsdel[] | null) =>
     anropa('PUT', {
       userId,
       transaktionId: r.id,
       konto: k,
       momssats: Number(m) || 0,
+      momsdelar: momsdelar ?? undefined,
       motkonto: betalsatt === 'bada' ? motkonto : undefined,
     });
 
@@ -534,7 +557,7 @@ function Detalj({
         </table>
         <div className="flex items-center gap-3">
           <span className="text-slate-400 text-xs">
-            {v.signatur === 'AI' ? 'Bokförd direkt — båda modellerna var överens.' : `Bokförd av ${v.signatur ?? 'okänd'}.`}
+            {v.signatur === 'AI' ? 'Bokförd — båda modellerna var överens.' : `Bokförd på kontot ${v.signatur ?? 'okänd'} valt.`}
           </span>
           {r.konteringar.length > 0 && (
             <button
@@ -564,13 +587,21 @@ function Detalj({
   return (
     <div className="space-y-4">
       {detaljer}
+      {r.verifikationFran && (
+        <p className="text-xs text-sky-800 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
+          {r.vald
+            ? `Du har valt ${r.vald.konto} (${momsText(r.vald.momssats, r.vald.momsdelar)}${r.vald.motkonto ? `, betalt via ${r.vald.motkonto}` : ''}).`
+            : 'Båda modellerna är gröna och överens.'}
+          {' '}Preliminärt — blir verifikation {dag(r.verifikationFran)} om inget ändras. Väljer du ett annat konto börjar de 14 dagarna om.
+        </p>
+      )}
       {r.konteringar.length > 0 ? (
         <div className="grid md:grid-cols-2 gap-3">
           {r.konteringar.map((k) => (
             <Forslag
               key={k.modell}
               k={k}
-              onBokfor={k.konto && k.omdome !== 'rod' ? () => bokfor(k.konto!, k.momssats ?? 0) : undefined}
+              onBokfor={k.konto && k.omdome !== 'rod' ? () => bokfor(k.konto!, k.momssats ?? 0, k.momsdelar) : undefined}
               arbetar={arbetar}
             />
           ))}
@@ -621,7 +652,7 @@ function Detalj({
           disabled={arbetar || konto.length !== 4}
           className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold rounded-lg text-xs transition disabled:opacity-50"
         >
-          {arbetar ? 'Bokför…' : 'Bokför'}
+          {arbetar ? 'Sparar…' : 'Välj'}
         </button>
         {fel && <span className="text-red-600 text-xs">{fel}</span>}
       </div>
@@ -784,7 +815,7 @@ function Forslag({ k, onBokfor, arbetar }: { k: AdminKontering; onBokfor?: () =>
       </div>
       <p className="text-slate-900 text-sm">
         <span className="tabular-nums font-semibold">{k.konto ?? '—'}</span> {k.kontonamn}
-        <span className="text-slate-500"> · moms {k.momssats ?? 0} %</span>
+        <span className="text-slate-500"> · moms {momsText(k.momssats, k.momsdelar)}</span>
         {byttFran && <span className="text-slate-400 text-xs"> (bytt från {byttFran} i granskningen)</span>}
       </p>
       <p className="text-slate-600 text-xs leading-relaxed">{k.motivering}</p>
@@ -806,7 +837,7 @@ function Forslag({ k, onBokfor, arbetar }: { k: AdminKontering; onBokfor?: () =>
           disabled={arbetar}
           className="mt-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition disabled:opacity-50"
         >
-          Bokför {k.konto}
+          Välj {k.konto}
         </button>
       )}
     </div>

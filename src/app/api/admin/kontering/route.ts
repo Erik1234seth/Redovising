@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { AdminKontering, AdminKonteringRad } from '@/lib/admin-types';
-import { andraTransaktion, bokforManuellt, konteraMedInstruktion, konteraTransaktioner, type Andringar } from '@/lib/kontering/kontera';
+import { andraTransaktion, konteraMedInstruktion, konteraTransaktioner, valjKonto, type Andringar, type ValdKontering } from '@/lib/kontering/kontera';
 import { slaUppKonto } from '@/lib/kontering/regelverk';
+import { rensaMomsdelar } from '@/lib/kontering/momsdelar';
+import { slutligKontering, verifikationFran } from '@/lib/kontering/preliminar';
 
 /**
  * Konteringsfliken i personkortet. Bara adminpanelen når hit — /api/admin
@@ -12,7 +14,8 @@ import { slaUppKonto } from '@/lib/kontering/regelverk';
  *   POST    kontera EN transaktion med båda modellerna (en per anrop, så att
  *           anropet hinner klart inom fem minuter — fliken kör flera parallellt).
  *           Med en instruktion rättas transaktionen först och konteras om.
- *   PUT     bokför ett förslag eller ett eget konto för hand
+ *   PUT     välj ett förslag eller ett eget konto för hand — preliminärt, det
+ *           blir verifikation om 14 dagar (se `@/lib/kontering/preliminar`)
  *   PATCH   rätta transaktionens datum, belopp, moms, valuta eller riktning
  *   DELETE  radera bokföringen, eller hela konteringen (förslag och bokföring),
  *           för en eller flera transaktioner — de kan då konteras om
@@ -45,7 +48,7 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string[]):
   for (let from = 0; ; from += 1000) {
     let q = supabase
       .from('transaktioner')
-      .select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, kalla, detaljer, anteckning, bokforing_underlag(file_name)')
+      .select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, kalla, detaljer, anteckning, vald_kontering, preliminar_at, bokforing_underlag(file_name)')
       .eq('user_id', userId)
       .is('dublett_av', null)
       .is('dublett_orsak', null)
@@ -69,7 +72,7 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string[]):
     const del = ids.slice(i, i + CHUNK);
     const [k, v] = await Promise.all([
       supabase.from('konteringar')
-        .select('transaktion_id, modell, konto, momssats, motivering, granskning, flaggor, omdome')
+        .select('transaktion_id, modell, konto, momssats, momsdelar, motivering, granskning, flaggor, omdome')
         .in('transaktion_id', del),
       supabase.from('verifikationer')
         .select('id, transaktion_id, signatur, verifikation_rader(konto, kontonamn, belopp, radnr)')
@@ -85,6 +88,7 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string[]):
         konto: r.konto,
         kontonamn: r.konto ? slaUppKonto(r.konto)?.namn ?? null : null,
         momssats: r.momssats === null ? null : Number(r.momssats),
+        momsdelar: rensaMomsdelar(r.momsdelar),
         motivering: r.motivering ?? '',
         granskning: r.granskning,
         flaggor: r.flaggor ?? [],
@@ -104,7 +108,12 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string[]):
 
   return transaktioner.map((t) => {
     const underlag = t.bokforing_underlag as { file_name?: string } | null;
+    const vald = t.vald_kontering as ValdKontering | null;
+    const forslag = konteringar.get(t.id as string) ?? [];
+    const klar = !!slutligKontering(vald, forslag);
     return {
+      vald: vald ? { konto: vald.konto, momssats: Number(vald.momssats) || 0, momsdelar: rensaMomsdelar(vald.momsdelar), motkonto: vald.motkonto } : null,
+      verifikationFran: klar && !verifikationer.has(t.id as string) ? verifikationFran(t.preliminar_at as string | null) : null,
       id: t.id as string,
       datum: (t.datum as string) ?? '',
       beskrivning: (t.beskrivning as string) ?? '',
@@ -152,13 +161,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const { userId, transaktionId, konto, momssats, motkonto } = await request.json().catch(() => ({}));
+  const { userId, transaktionId, konto, momssats, motkonto, momsdelar } = await request.json().catch(() => ({}));
   if (!userId || !transaktionId || !konto) {
     return NextResponse.json({ error: 'userId, transaktionId och konto behövs' }, { status: 400 });
   }
   try {
     const supabase = getSupabase();
-    await bokforManuellt(supabase, userId, transaktionId, String(konto).trim(), Number(momssats) || 0, motkonto || undefined);
+    await valjKonto(supabase, userId, transaktionId, String(konto).trim(), Number(momssats) || 0, motkonto || undefined, rensaMomsdelar(momsdelar));
     const [rad] = await rader(supabase, userId, [transaktionId]);
     return NextResponse.json({ rad: rad ?? null });
   } catch (err) {
@@ -206,6 +215,12 @@ export async function DELETE(request: NextRequest) {
         const { error: kFel } = await supabase.from('konteringar').delete().in('transaktion_id', del).eq('user_id', userId);
         if (kFel) throw new Error(`Kunde inte ta bort konteringarna: ${kFel.message}`);
       }
+      // Ångrad bokföring blir preliminär igen och väntar 14 nya dagar; raderad
+      // kontering tar också bort kontot byrån valt
+      const { error: tFel } = await supabase.from('transaktioner').update(bara === 'bokforing'
+        ? { preliminar_at: new Date().toISOString() }
+        : { preliminar_at: null, vald_kontering: null }).in('id', del).eq('user_id', userId);
+      if (tFel) throw new Error(`Kunde inte spara ändringen: ${tFel.message}`);
     }
     return NextResponse.json({ rader: await rader(supabase, userId, transaktionIds) });
   } catch (err) {

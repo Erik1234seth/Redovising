@@ -7,6 +7,8 @@ import { arVarAdress } from '@/lib/underlag/var-fil';
 import { extraheraTransaktioner, kanLasasAvAi, type ExtraheradTransaktion, type ExtraheradVerifikation } from './extract';
 import type { Underlagstyp } from './normalisera';
 import { FLYTTAD_FOR_HAND } from '@/lib/underlag/sortering';
+import { definieraUnderlag } from '@/lib/underlag/definiera';
+import { dokumentetsSidor } from '@/lib/underlag/sidor';
 
 /**
  * Kör AI-avläsningen på ett underlag och sparar resultatet hos kunden.
@@ -51,20 +53,33 @@ interface UnderlagRad {
   mime_type: string | null;
   sortering: string | null;
   sortering_orsak: string | null;
-  definition: { kategori?: string; dokumenttyp?: string } | null;
+  definition: { kategori?: string; dokumenttyp?: string; sida?: number | null; antalSidor?: number | null } | null;
+  /** Sida i ett dokument som läses ut med huvudunderlaget, se `@/lib/underlag/sidor`. */
+  del_av: string | null;
+  sidor_saknas: number[] | null;
 }
+
+const UNDERLAG_KOLUMNER = 'id, user_id, sender_email, file_name, file_path, mime_type, sortering, sortering_orsak, definition, del_av, sidor_saknas';
 
 export async function lasUtTransaktioner(
   supabase: SupabaseClient,
   underlagId: string,
 ): Promise<TransaktionResultat> {
-  const { data: row, error } = await supabase
-    .from('bokforing_underlag')
-    .select('id, user_id, sender_email, file_name, file_path, mime_type, sortering, sortering_orsak, definition')
-    .eq('id', underlagId)
-    .maybeSingle<UnderlagRad>();
+  const hamta = () => supabase.from('bokforing_underlag').select(UNDERLAG_KOLUMNER).eq('id', underlagId).maybeSingle<UnderlagRad>();
+  let { data: hamtad, error } = await hamta();
   if (error) throw new Error(`Kunde inte läsa underlaget: ${error.message}`);
-  if (!row) throw new Error('Underlaget finns inte');
+  if (!hamtad) throw new Error('Underlaget finns inte');
+
+  // Definiera känner igen sidor som hör ihop. Har den inte hunnit köras görs
+  // det först, annars läses en ensam sida ut som ett eget kvitto.
+  if (!hamtad.definition) {
+    const namn = hamtad.file_name;
+    await definieraUnderlag(supabase, underlagId).catch((err) =>
+      console.error(`[transaktioner] kunde inte definiera ${namn}:`, err instanceof Error ? err.message : err));
+    ({ data: hamtad, error } = await hamta());
+    if (error || !hamtad) throw new Error(`Kunde inte läsa underlaget: ${error?.message ?? 'det finns inte'}`);
+  }
+  const row = hamtad;
 
   // Våra egna filer är kopior av kundens underlag — utlästa skulle de bokföras två gånger
   if (arVarAdress(row.sender_email)) {
@@ -170,7 +185,27 @@ export async function lasUtTransaktioner(
   return result;
 }
 
+/** Tar bort det som lästes ut förra gången, av båda sorterna. */
+async function rensa(supabase: SupabaseClient, row: UnderlagRad) {
+  const { error: deleteError } = await supabase.from('transaktioner').delete().eq('underlag_id', row.id);
+  if (deleteError) throw new Error(`Kunde inte rensa tidigare transaktioner: ${deleteError.message}`);
+  const { error: deleteVerError } = await supabase.from('verifikationer').delete().eq('underlag_id', row.id).eq('kalla', 'ai');
+  if (deleteVerError) throw new Error(`Kunde inte rensa tidigare verifikationer: ${deleteVerError.message}`);
+}
+
 async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<TransaktionResultat> {
+  // En sida i ett dokument läses ut med huvudunderlaget, och ett dokument där
+  // en sida saknas väntar tills den kommit — se `@/lib/underlag/sidor`
+  if (row.del_av) {
+    await rensa(supabase, row);
+    const { data: huvud } = await supabase.from('bokforing_underlag').select('file_name').eq('id', row.del_av).maybeSingle();
+    return { typ: 'transaktioner', antal: 0, notering: `Sida ${row.definition?.sida ?? '?'} av ${row.definition?.antalSidor ?? '?'} — läses ut tillsammans med ${huvud?.file_name ?? 'dokumentets första sida'}` };
+  }
+  if (row.sidor_saknas?.length) {
+    await rensa(supabase, row);
+    return { typ: 'transaktioner', antal: 0, notering: `Väntar på sida ${row.sidor_saknas.join(', ')} av ${row.definition?.antalSidor ?? '?'} innan underlaget läses ut` };
+  }
+
   const { data: file, error: downloadError } = await supabase.storage.from(BUCKET).download(row.file_path);
   if (downloadError || !file) {
     throw new Error(`Filen saknas i lagringen: ${downloadError?.message ?? 'okänt fel'}`);
@@ -187,6 +222,13 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
   }
   const mejl = await byggMejlkontext(supabase, { userId: row.user_id, emails: [email, kontoEmail] });
 
+  // Dokumentets andra sidor läses med i samma avläsning
+  const sidor = await Promise.all((await dokumentetsSidor(supabase, row.id)).map(async (s) => {
+    const { data, error: fel } = await supabase.storage.from(BUCKET).download(s.file_path);
+    if (fel || !data) throw new Error(`Sidan ${s.file_name} saknas i lagringen: ${fel?.message ?? 'okänt fel'}`);
+    return { buffer: Buffer.from(await data.arrayBuffer()), fileName: s.file_name, mimeType: s.mime_type };
+  }));
+
   const svar = await extraheraTransaktioner({
     buffer: Buffer.from(await file.arrayBuffer()),
     fileName: row.file_name,
@@ -194,6 +236,7 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
     lagradSom: row.file_path.split('/').pop(),
     mejl: mejl || undefined,
     definition: definitionen(row.definition),
+    sidor,
   });
   // Samma ägarskap som SIE-verifikationerna: kontot när det finns, adressen
   // när filen bara hör ihop med en mejladress
@@ -202,10 +245,7 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
   // Det som lästes ut förra gången ersätts — annars dubbleras raderna vid en
   // omkörning, och det är just omkörningen man vill göra när avskriften blev
   // fel. Båda sorterna rensas, ifall filen lästes som den andra sorten då.
-  const { error: deleteError } = await supabase.from('transaktioner').delete().eq('underlag_id', row.id);
-  if (deleteError) throw new Error(`Kunde inte rensa tidigare transaktioner: ${deleteError.message}`);
-  const { error: deleteVerError } = await supabase.from('verifikationer').delete().eq('underlag_id', row.id).eq('kalla', 'ai');
-  if (deleteVerError) throw new Error(`Kunde inte rensa tidigare verifikationer: ${deleteVerError.message}`);
+  await rensa(supabase, row);
 
   if (svar.typ === 'ovrigt') return { typ: 'ovrigt', antal: 0, vad: svar.vad, notering: svar.notering };
 

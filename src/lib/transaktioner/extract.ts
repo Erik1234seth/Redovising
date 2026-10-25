@@ -188,6 +188,8 @@ export async function extraheraTransaktioner(file: {
   mejl?: string;
   /** Vad steget Definiera kom fram till, när det körts. */
   definition?: { kategori: Underlagstyp; dokumenttyp: string } | null;
+  /** Dokumentets andra sidor, när det skannats sida för sida (se `@/lib/underlag/sidor`). */
+  sidor?: { buffer: Buffer; fileName: string; mimeType: string | null }[];
 }): Promise<ExtraktionsResultat> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
@@ -201,9 +203,18 @@ export async function extraheraTransaktioner(file: {
   }
 
   const arPdf = file.fileName.toLowerCase().endsWith('.pdf') || file.mimeType === 'application/pdf';
-  const del = arPdf
-    ? pdfDel(file.buffer, file.fileName)
-    : buildImageParts(file.buffer, file.mimeType ?? '', file.fileName)[0] as unknown[];
+  const delAv = (f: { buffer: Buffer; fileName: string; mimeType: string | null }) =>
+    f.fileName.toLowerCase().endsWith('.pdf') || f.mimeType === 'application/pdf'
+      ? pdfDel(f.buffer, f.fileName)
+      : buildImageParts(f.buffer, f.mimeType ?? '', f.fileName)[0] as unknown[];
+  const sidor = (file.sidor ?? []).filter((s) => arBildEllerPdf(s.fileName, s.mimeType));
+  // Flera filer som är sidor i samma dokument läses som ett underlag
+  const del = sidor.length
+    ? [
+      { type: 'text', text: `Underlaget består av ${sidor.length + 1} filer som är sidor i SAMMA dokument, i ordning. Läs dem tillsammans som ett underlag. En summa som förs över till nästa sida ("Transport", "Att överföra") är ingen egen transaktion — summan, betalningen och momsen står ofta på sista sidan.` },
+      ...[file, ...sidor].flatMap((f, i) => [{ type: 'text', text: `Sida ${i + 1}: ${f.fileName}` }, ...delAv(f)]),
+    ]
+    : delAv(file);
 
   // Är PDF:en redan definierad som verifikationer går den direkt till
   // sandlådan, se nedan. Synen behövs bara om sandlådan inte klarar den.

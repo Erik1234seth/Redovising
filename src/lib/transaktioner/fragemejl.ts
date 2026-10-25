@@ -3,6 +3,7 @@ import { handleGeneralQuestion } from '@/lib/inmail/handlers/general-question';
 import { smsKontextForMejl } from '@/lib/inkorg/kontext';
 import type { Tillrackligt } from './tillrackligt';
 import { hamtaInstruktioner, kontextFor, reglerText } from './instruktioner';
+import { svenskDag } from '@/lib/dagskassa';
 
 /**
  * Steget "Skriv mail" i flödesschemat: frågemejlet till kunden om det som
@@ -20,7 +21,22 @@ import { hamtaInstruktioner, kontextFor, reglerText } from './instruktioner';
  * Vilket mejl en transaktion frågats om i står i `fraga_utkast_id`. Den
  * frågas om igen bara om utkastet aldrig skickades: ett kvarliggande utkast
  * från igår slängs och dess frågor kommer med i dagens.
+ *
+ * Samma mejl ber om sidor som saknas i ett dokument som skannats sida för
+ * sida (`bokforing_underlag.sidor_saknas`, se `@/lib/underlag/sidor`). Där
+ * väntar vi ett dygn — sidan kommer ofta strax efter — så ett underlag som
+ * kom in i dag frågas om först kl 18 i morgon.
  */
+
+interface Sidfraga {
+  id: string;
+  user_id: string;
+  file_name: string;
+  created_at: string;
+  definition: { dokumenttyp?: string; dokumentnummer?: string | null; motpart?: string | null; datum?: string | null; antalSidor?: number | null } | null;
+  sidor_saknas: number[];
+  sidor_fraga_utkast_id: string | null;
+}
 
 interface Rad {
   id: string;
@@ -66,15 +82,42 @@ async function fragorAttStalla(supabase: SupabaseClient, userId?: string): Promi
   return rader;
 }
 
+/** Dokument där sidor saknas, inkomna före i dag och inte frågade om än. */
+async function sidorAttFraga(supabase: SupabaseClient, userId?: string): Promise<Sidfraga[]> {
+  let q = supabase.from('bokforing_underlag')
+    .select('id, user_id, file_name, created_at, definition, sidor_saknas, sidor_fraga_utkast_id')
+    .not('sidor_saknas', 'is', null).is('del_av', null).not('user_id', 'is', null).limit(500);
+  if (userId) q = q.eq('user_id', userId);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  const idag = svenskDag(new Date());
+  let rader = ((data ?? []) as Sidfraga[]).filter((u) => u.sidor_saknas?.length && svenskDag(new Date(u.created_at)) < idag);
+
+  const utkastIds = [...new Set(rader.map((u) => u.sidor_fraga_utkast_id).filter(Boolean))] as string[];
+  if (utkastIds.length) {
+    const { data: utkast, error: uFel } = await supabase.from('mejl_utkast').select('id, status').in('id', utkastIds);
+    if (uFel) throw new Error(uFel.message);
+    const stalld = new Set((utkast ?? []).filter((u) => !EJ_SKICKAD.includes(u.status)).map((u) => u.id));
+    rader = rader.filter((u) => !(u.sidor_fraga_utkast_id && stalld.has(u.sidor_fraga_utkast_id)));
+  }
+  return rader;
+}
+
 /**
  * Skriver kundens frågemejl som ett utkast i inkorgen. Null när det inte
  * finns något att fråga om.
  */
-export async function skrivFragemejl(supabase: SupabaseClient, userId: string, rader?: Rad[]): Promise<{ utkastId: string; antal: number } | null> {
+export async function skrivFragemejl(
+  supabase: SupabaseClient,
+  userId: string,
+  rader?: Rad[],
+  sidfragor?: Sidfraga[],
+): Promise<{ utkastId: string; antal: number } | null> {
   const fragor = rader ?? await fragorAttStalla(supabase, userId);
-  if (!fragor.length) return null;
+  const sidor = sidfragor ?? await sidorAttFraga(supabase, userId);
+  if (!fragor.length && !sidor.length) return null;
 
-  const underlagIds = [...new Set(fragor.map((t) => t.underlag_id).filter(Boolean))] as string[];
+  const underlagIds = [...new Set([...fragor.map((t) => t.underlag_id), ...sidor.map((u) => u.id)].filter(Boolean))] as string[];
   const [{ data: profil }, { data: underlag, error: uFel }] = await Promise.all([
     supabase.from('profiles').select('id, full_name, email').eq('id', userId).maybeSingle(),
     underlagIds.length
@@ -113,8 +156,15 @@ export async function skrivFragemejl(supabase: SupabaseClient, userId: string, r
       return `    • ${t.datum ?? 'okänt datum'}, ${vem}, ${belopp}${t.riktning === 'in' ? ' in' : ''}: ${vad}${kontext ? `\n      ${kontext.replace(/\n/g, '\n      ')}` : ''}`;
     }).join('\n')}`;
   });
-  const underlagKontext = `TRANSAKTIONER SOM SAKNAR UPPGIFTER (${fragor.length} st):\n${block.join('\n\n')}\n\n`
-    + 'Skriv ETT mejl till kunden och fråga efter just det som saknas ovan, för alla transaktionerna. Gå igenom dem en och en, '
+  const sidblock = sidor.map((u) => {
+    const d = u.definition;
+    const vad = [d?.dokumenttyp || 'Underlag', d?.dokumentnummer ? `nr ${d.dokumentnummer}` : '', d?.motpart ? `från ${d.motpart}` : '', d?.datum ? `daterat ${d.datum}` : '']
+      .filter(Boolean).join(' ');
+    return `    • ${vad} (${u.file_name}, inskickat ${String(u.created_at).slice(0, 10)}): vi har inte fått sida ${u.sidor_saknas.join(', ')} av ${d?.antalSidor ?? '?'}`;
+  });
+  const underlagKontext = (fragor.length ? `TRANSAKTIONER SOM SAKNAR UPPGIFTER (${fragor.length} st):\n${block.join('\n\n')}\n\n` : '')
+    + (sidor.length ? `UNDERLAG DÄR SIDOR SAKNAS (${sidor.length} st) — be kunden skicka de saknade sidorna, gärna som foto:\n${sidblock.join('\n')}\n\n` : '')
+    + 'Skriv ETT mejl till kunden och fråga efter just det som saknas ovan, för alla transaktionerna och underlagen. Gå igenom dem en och en, '
     + 'med datum, motpart och belopp så att kunden ser vilken det gäller. Förklara kort och begripligt varför vi behöver det — '
     + 'utan facktermer där det går. Be kunden svara på mejlet. Fråga inte om något annat, och aldrig om sådant kunden redan svarat på i mejlhistoriken. '
     + 'Står det BYRÅNS KONTEXT eller BYRÅNS REGLER följer du dem — fråga inte om sådant de redan besvarar.'
@@ -131,7 +181,7 @@ export async function skrivFragemejl(supabase: SupabaseClient, userId: string, r
   if (!text) throw new Error('AI:n skrev inget');
 
   // Gamla utkast som aldrig skickades ersätts av det här
-  const gamla = [...new Set(fragor.map((t) => t.fraga_utkast_id).filter(Boolean))] as string[];
+  const gamla = [...new Set([...fragor.map((t) => t.fraga_utkast_id), ...sidor.map((u) => u.sidor_fraga_utkast_id)].filter(Boolean))] as string[];
   if (gamla.length) {
     await supabase.from('mejl_utkast').update({ status: 'discarded', updated_at: new Date().toISOString() })
       .in('id', gamla).eq('status', 'draft');
@@ -143,21 +193,29 @@ export async function skrivFragemejl(supabase: SupabaseClient, userId: string, r
   }).select('id').single();
   if (error) throw new Error(error.message);
 
-  const { error: tFel } = await supabase.from('transaktioner').update({ fraga_utkast_id: utkast.id }).in('id', fragor.map((t) => t.id));
-  if (tFel) throw new Error(tFel.message);
-  return { utkastId: utkast.id, antal: fragor.length };
+  if (fragor.length) {
+    const { error: tFel } = await supabase.from('transaktioner').update({ fraga_utkast_id: utkast.id }).in('id', fragor.map((t) => t.id));
+    if (tFel) throw new Error(tFel.message);
+  }
+  if (sidor.length) {
+    const { error: sFel } = await supabase.from('bokforing_underlag').update({ sidor_fraga_utkast_id: utkast.id }).in('id', sidor.map((u) => u.id));
+    if (sFel) throw new Error(sFel.message);
+  }
+  return { utkastId: utkast.id, antal: fragor.length + sidor.length };
 }
 
 /** Dygnets körning: ett frågemejl per kund som har något att fråga om. */
 export async function skrivAllaFragemejl(supabase: SupabaseClient): Promise<{ kunder: number; transaktioner: number; fel: string[] }> {
-  const alla = await fragorAttStalla(supabase);
-  const perKund = new Map<string, Rad[]>();
-  for (const t of alla) perKund.set(t.user_id, [...(perKund.get(t.user_id) ?? []), t]);
+  const [alla, allaSidor] = await Promise.all([fragorAttStalla(supabase), sidorAttFraga(supabase)]);
+  const perKund = new Map<string, { rader: Rad[]; sidor: Sidfraga[] }>();
+  const kund = (id: string) => perKund.get(id) ?? perKund.set(id, { rader: [], sidor: [] }).get(id)!;
+  for (const t of alla) kund(t.user_id).rader.push(t);
+  for (const u of allaSidor) kund(u.user_id).sidor.push(u);
 
   const res = { kunder: 0, transaktioner: 0, fel: [] as string[] };
-  for (const [userId, rader] of perKund) {
+  for (const [userId, { rader, sidor }] of perKund) {
     try {
-      const r = await skrivFragemejl(supabase, userId, rader);
+      const r = await skrivFragemejl(supabase, userId, rader, sidor);
       if (r) { res.kunder++; res.transaktioner += r.antal; }
     } catch (e) {
       res.fel.push(`${userId}: ${e instanceof Error ? e.message : String(e)}`);

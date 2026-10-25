@@ -55,9 +55,12 @@ interface FilRad {
   verifikationer_fel: string | null;
   transaktioner_fel: string | null;
   sortering: string | null;
+  /** Sida i ett dokument som läses och kontrolleras med huvudunderlaget (`@/lib/underlag/sidor`). */
+  del_av: string | null;
+  sidor_saknas: number[] | null;
 }
 
-const FIL_KOLUMNER = 'id, file_name, mime_type, sender_email, gmail_message_id, created_at, kontroll_status, kontroll_saknas, verifikationer_inlagda_at, verifikationer_antal, verifikationer_fel, transaktioner_fel, sortering';
+const FIL_KOLUMNER = 'id, file_name, mime_type, sender_email, gmail_message_id, created_at, kontroll_status, kontroll_saknas, verifikationer_inlagda_at, verifikationer_antal, verifikationer_fel, transaktioner_fel, sortering, del_av, sidor_saknas';
 
 /** Ett redan bokfört underlag (kassarapport, SIE) har allt — det finns inget att fråga om. */
 const arBokford = (f: FilRad) => !!f.verifikationer_inlagda_at && !f.verifikationer_fel && (f.verifikationer_antal ?? 0) > 0;
@@ -76,7 +79,9 @@ async function kundensFiler(supabase: SupabaseClient, userId: string): Promise<F
 /** Filer som inte är klara: aldrig kontrollerade, eller kontrollerade med något som saknas. */
 function oppna(filer: FilRad[]): FilRad[] {
   return filer.filter((f) => f.kontroll_status !== 'komplett' && !arBokford(f)
-    && kanLasasAvAi(f.file_name, f.mime_type) && !isSieFile(f.file_name));
+    && kanLasasAvAi(f.file_name, f.mime_type) && !isSieFile(f.file_name)
+    // Sidor som läses med en annan, och dokument som väntar på en sida, frågas om för sig
+    && !f.del_av && !f.sidor_saknas?.length);
 }
 
 /** Ämnet på mejlet varje fil kom med, så att AI:n ser vilket mejl som handlar om vilken fil. */
@@ -543,9 +548,15 @@ async function flodetsFiler(supabase: SupabaseClient, profil: Profil, opts: Unde
   const filer = await kundensFiler(supabase, profil.id);
   const valda = new Set(opts.filer ?? []);
   const egna = mejlen(opts);
+  const iFlodet = filer.filter((f) => egna.has(f.gmail_message_id ?? '') || valda.has(f.id));
+  // En sida som läses med en annan kontrolleras med den, och ett dokument som
+  // väntar på en sida kontrolleras när sidan kommit — frågemejlet ber om den
+  // dagen efter om den inte gjort det
+  const sida = (f: FilRad) => !!f.del_av || !!f.sidor_saknas?.length;
   return {
-    nya: filer.filter((f) => egna.has(f.gmail_message_id ?? '')),
-    alla: filer.filter((f) => egna.has(f.gmail_message_id ?? '') || valda.has(f.id)),
+    nya: filer.filter((f) => egna.has(f.gmail_message_id ?? '') && !sida(f)),
+    alla: iFlodet.filter((f) => !sida(f)),
+    sidor: iFlodet.filter(sida),
   };
 }
 
@@ -595,7 +606,7 @@ async function kontrollOmgang(supabase: SupabaseClient, bas: string, profil: Pro
 
 async function svara(supabase: SupabaseClient, profil: Profil, opts: UnderlagsJobb) {
   const email = opts.avsandare.trim().toLowerCase();
-  const { nya, alla } = await flodetsFiler(supabase, profil, opts);
+  const { nya, alla, sidor } = await flodetsFiler(supabase, profil, opts);
   // Utlåtandena som kontrollomgångarna sparade, för filerna de kontrollerade nu
   const klara = new Set(opts.kontrollerade ?? []);
   const kontroll: Kontroll[] = alla.filter((f) => klara.has(f.id) && f.kontroll_status).map((f) => ({
@@ -617,9 +628,14 @@ async function svara(supabase: SupabaseClient, profil: Profil, opts: UnderlagsJo
     : 'UNDERLAGSKONTROLL: mejlet handlar om underlag, men vi hittade inga filer att kontrollera — varken bifogade nu eller tidigare inskickade som mejlet gäller. Svara på det kunden skriver, och be om underlaget om det behövs.';
   // Bilagor som sorterades bort är inte borttappade — kunden ska inte bli ombedd att skicka dem igen
   const ovriga = nya.filter((f) => !alla.some((x) => x.id === f.id)).map((f) => f.file_name);
-  const ovrigtKontext = ovriga.length
+  const ovrigtKontext = (ovriga.length
     ? `\n\nÖVRIGA FILER: ${ovriga.join(', ')} är inga underlag för bokföringen (till exempel en NE-bilaga, ett avtal eller ett brev). De är sparade hos oss som övriga filer och behöver inte kontrolleras. Bekräfta kort att vi fått dem.`
-    : '';
+    : '')
+    + (sidor.length
+      ? `\n\nSIDOR: ${sidor.map((f) => f.del_av
+        ? `${f.file_name} är en sida i samma dokument som ${namn.get(f.del_av) ?? 'en annan fil'} och kontrolleras tillsammans med den`
+        : `${f.file_name} är en del av ett dokument där sida ${f.sidor_saknas!.join(', ')} inte kommit in än`).join('; ')}. Fråga INTE efter saknade sidor nu — de kommer ofta strax efter, och annars frågar vi i ett eget mejl dagen efter.`
+      : '');
 
   // Är allt komplett behöver kunden inget svar, om hen inte också frågar
   // något. Då skrivs inget utkast alls. När Erik själv bett om ett utkast

@@ -5,6 +5,8 @@ import { isSieFile } from '@/lib/sie/parse';
 import { arVarAdress } from '@/lib/underlag/var-fil';
 import { explainError } from '@/lib/personer';
 import type { AdminVarning } from '@/lib/admin-types';
+import { PRELIMINAR_DAGAR, slutligKontering } from '@/lib/kontering/preliminar';
+import type { ValdKontering } from '@/lib/kontering/kontera';
 
 /**
  * Allt som gått fel, för översikten. Inget sållas bort: varje steg som
@@ -47,7 +49,7 @@ export async function GET() {
       .select('id, user_id, sender_email, file_name, created_at, kontroll_status, kontroll_at, varningar, definition_fel, transaktioner_fel, verifikationer_fel, komplettering_fel, dublettkoll_fel, tillrackligt_fel, transaktioner_utlasta_at, verifikationer_inlagda_at')
       .or('definition_fel.not.is.null,transaktioner_fel.not.is.null,verifikationer_fel.not.is.null,komplettering_fel.not.is.null,dublettkoll_fel.not.is.null,tillrackligt_fel.not.is.null,kontroll_status.eq.fel,varningar.not.is.null'),
     supabase.from('bokforing_underlag')
-      .select('id, user_id, sender_email, file_name, mime_type, gmail_message_id, created_at, sortering, transaktioner_utlasta_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_fel')
+      .select('id, user_id, sender_email, file_name, mime_type, gmail_message_id, created_at, sortering, transaktioner_utlasta_at, verifikationer_inlagda_at, verifikationer_antal, verifikationer_fel, del_av, sidor_saknas')
       .eq('source', 'mejl').not('user_id', 'is', null).is('kontroll_at', null).gte('created_at', KONTROLL_SEDAN),
     supabase.from('mail_messages').select('gmail_message_id, from_email, subject, sent_at, attachment_names')
       .eq('direction', 'in').gte('sent_at', BILAGOR_SEDAN),
@@ -117,6 +119,8 @@ export async function GET() {
   const fastnade = new Map<string, Varning & { filer: string[] }>();
   for (const u of ejKontrollerade.data ?? []) {
     if (!gammal(u.created_at) || u.sortering === 'ovrigt' || arVarAdress(u.sender_email)) continue;
+    // Sidor kontrolleras med sitt dokument, och ett dokument som väntar på en sida varnas för nedan
+    if (u.del_av || u.sidor_saknas?.length) continue;
     if (!kanLasasAvAi(u.file_name, u.mime_type) || isSieFile(u.file_name)) continue;
     // Ett bokfört underlag (kassarapport, SIE) kontrolleras inte — det har allt
     if (u.verifikationer_inlagda_at && !u.verifikationer_fel && (u.verifikationer_antal ?? 0) > 0) continue;
@@ -135,6 +139,60 @@ export async function GET() {
     fastnade.set(nyckel, rad);
   }
   for (const { filer: _filer, ...v } of fastnade.values()) varningar.push(v);
+
+  // ── Dokument i flera sidor där en sida inte kommit ──
+  {
+    const { data, error } = await supabase.from('bokforing_underlag')
+      .select('id, user_id, sender_email, file_name, created_at, definition, sidor_saknas, sidor_fraga_utkast_id')
+      .not('sidor_saknas', 'is', null).is('del_av', null);
+    if (error) varningar.push({ id: 'tabell:sidor', allvar: 'fel', kategori: 'Varningarna', titel: 'Kunde inte läsa dokument som väntar på sidor', detalj: error.message, at: new Date().toISOString() });
+    for (const u of data ?? []) {
+      const d = u.definition as { antalSidor?: number; dokumentnummer?: string | null; motpart?: string | null } | null;
+      varningar.push({
+        id: `sidor:${u.id}`, allvar: 'varning', kategori: 'Underlag',
+        titel: `Väntar på sida ${(u.sidor_saknas as number[]).join(', ')} av ${d?.antalSidor ?? '?'}: ${u.file_name}`,
+        detalj: [d?.motpart, d?.dokumentnummer && `nr ${d.dokumentnummer}`].filter(Boolean).join(', ')
+          + (u.sidor_fraga_utkast_id ? ' — kunden har fått en fråga om sidan i frågemejlet.' : ' — läses inte ut förrän sidan kommit. Frågemejlet kl 18 dagen efter ber kunden om den.'),
+        at: u.created_at, ...vem(u.user_id, u.sender_email),
+      });
+    }
+  }
+
+  // ── Preliminära konteringar som borde ha blivit verifikationer ──
+  // Cron-jobbet gör dem till verifikationer efter 14 dagar; ligger en klar
+  // kontering kvar längre än så har något gått fel
+  {
+    const grans = new Date(nu - (PRELIMINAR_DAGAR + 1) * 86_400_000).toISOString();
+    const { data, error } = await supabase.from('transaktioner')
+      .select('id, user_id, customer_email, motpart, beskrivning, belopp, vald_kontering, preliminar_at')
+      .lte('preliminar_at', grans).not('user_id', 'is', null).is('dublett_av', null).is('dublett_orsak', null).gt('belopp', 0).limit(2000);
+    if (error) varningar.push({ id: 'tabell:preliminara', allvar: 'fel', kategori: 'Varningarna', titel: 'Kunde inte läsa preliminära konteringar', detalj: error.message, at: new Date().toISOString() });
+    const ids = (data ?? []).map((t) => t.id);
+    const kvar: typeof data = [];
+    for (let i = 0; i < ids.length; i += 200) {
+      const del = ids.slice(i, i + 200);
+      const [k, v] = await Promise.all([
+        supabase.from('konteringar').select('transaktion_id, konto, momssats, momsdelar, omdome').in('transaktion_id', del),
+        supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', del),
+      ]);
+      const bokforda = new Set((v.data ?? []).map((x) => x.transaktion_id));
+      for (const t of (data ?? []).filter((x) => del.includes(x.id))) {
+        if (bokforda.has(t.id)) continue;
+        if (slutligKontering(t.vald_kontering as ValdKontering | null, (k.data ?? []).filter((x) => x.transaktion_id === t.id))) kvar.push(t);
+      }
+    }
+    const perKund = new Map<string, NonNullable<typeof data>>();
+    for (const t of kvar ?? []) perKund.set(t.user_id, [...(perKund.get(t.user_id) ?? []), t]);
+    for (const [userId, rader] of perKund) {
+      varningar.push({
+        id: `preliminar:${userId}`, allvar: 'fel', kategori: 'Kontering',
+        titel: `${rader.length} preliminära konteringar har inte blivit verifikationer`,
+        detalj: `De är klara sedan mer än ${PRELIMINAR_DAGAR} dagar, men cron-jobbet /api/cron/verifikationer har inte bokfört dem: `
+          + rader.slice(0, 10).map((t) => [t.motpart, t.beskrivning].filter(Boolean).join(', ') || t.id).join('; ') + (rader.length > 10 ? ' …' : ''),
+        at: rader.map((t) => t.preliminar_at as string).sort()[0], ...vem(userId, rader[0].customer_email),
+      });
+    }
+  }
 
   // ── Mejl med bilagor där filerna inte finns bland underlagen ──
   // Matchar på mejlets id, och på avsändare + filnamn för filer som lagts in

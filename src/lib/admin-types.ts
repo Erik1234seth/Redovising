@@ -4,6 +4,7 @@ import type { Deadlineperiod } from '@/lib/deadlines';
 import type { Komplettering } from '@/lib/transaktioner/komplettera';
 import type { Dublettkoll } from '@/lib/transaktioner/dublettkoll';
 import type { Tillrackligt } from '@/lib/transaktioner/tillrackligt';
+import type { Momsdel } from '@/lib/kontering/momsdelar';
 /**
  * Formen på det adminpanelen visar.
  *
@@ -376,6 +377,8 @@ export interface AdminKontering {
   konto: string | null;
   kontonamn: string | null;
   momssats: number | null;
+  /** Flera momssatser på samma underlag, annars null. */
+  momsdelar: Momsdel[] | null;
   motivering: string;
   /** Granskningens svar, när kontot fanns att pröva. */
   granskning: { stammer?: boolean; battre_konto?: string | null; granskning_kravs?: boolean; motivering?: string; forstaKonto?: string; svarade?: string } | null;
@@ -400,6 +403,10 @@ export interface AdminKonteringRad {
   /** Osäkerheter från avläsningen, svar från kunden och byråns ändringar och instruktioner. */
   anteckning: string;
   konteringar: AdminKontering[];
+  /** Kontot byrån valt för hand. Preliminärt tills det blir verifikation. */
+  vald: { konto: string; momssats: number; momsdelar: Momsdel[] | null; motkonto: string | null } | null;
+  /** Dagen konteringen blir verifikation, när den är klar men inte bokförd. */
+  verifikationFran: string | null;
   verifikation: {
     id: string;
     signatur: string | null;
@@ -540,7 +547,11 @@ export interface FlodesKund {
   /** Nyckel till personvyn, e:<adress>. */
   key: string;
   namn: string;
-  underlag: { id: string; fileName: string; at: string; source: string; sortering: 'underlag' | 'ovrigt' | null }[];
+  underlag: {
+    id: string; fileName: string; at: string; source: string; sortering: 'underlag' | 'ovrigt' | null;
+    /** "sida 2/2", "väntar på sida 2" — när Definiera sett att det är en sida av flera. */
+    sidor: string | null;
+  }[];
 }
 
 /** Allt som hänt med ett underlag, för att följa det genom flödesschemat. */
@@ -561,9 +572,34 @@ export interface FlodesUnderlag {
     ar: number | null;
     motivering: string;
     modell: string;
+    dokumentnummer?: string | null;
+    orgnr?: string | null;
+    motpart?: string | null;
+    datum?: string | null;
+    sida?: number | null;
+    antalSidor?: number | null;
   } | null;
   definieradAt: string | null;
   definitionFel: string | null;
+  /**
+   * När underlaget är en sida i ett dokument som skannats sida för sida (se
+   * `@/lib/underlag/sidor`). huvud är filen sidan läses ut med, null när
+   * underlaget själv är huvudunderlaget.
+   */
+  sidor: {
+    sida: number | null;
+    antal: number;
+    saknas: number[];
+    huvud: string | null;
+    huvudId: string | null;
+    /** Alla dokumentets sidor, med det Definiera såg på var och en. */
+    delar: {
+      id: string; fileName: string; at: string; sida: number | null;
+      dokumentnummer: string | null; datum: string | null; motpart: string | null;
+    }[];
+    /** Frågemejlet om de saknade sidorna, när det skrivits. */
+    fragadAt: string | null;
+  } | null;
   kontroll: { status: 'komplett' | 'saknar' | 'fel'; saknas: { rad: string; vad: string }[]; at: string } | null;
   /** AI-avläsningen till transaktioner. */
   utlasning: { at: string; antal: number; fel: string | null } | null;
@@ -600,11 +636,15 @@ export interface FlodesUnderlag {
     /** Satt när transaktionen är en dubblett och inte ska bokföras — av dublettkollen eller bankens koll. */
     dublettAv: string | null;
     tillrackligt: Tillrackligt | null;
-    /** ingen = inte konterad, gron = båda modellerna gröna och överens, granska = allt annat. */
+    /** ingen = inte konterad, gron = båda modellerna gröna och överens eller konto valt av byrån, granska = allt annat. */
     kontering: 'ingen' | 'gron' | 'granska';
     bokford: boolean;
+    /** Kontot byrån valt för hand. Preliminärt, som modellernas konteringar. */
+    vald: { konto: string; momssats: number; momsdelar: Momsdel[] | null } | null;
+    /** Dagen den preliminära konteringen blir verifikation, när den är klar men inte bokförd. */
+    verifikationFran: string | null;
     /** Modellernas konteringar — förslagen när transaktionen ska granskas. */
-    forslag: { modell: string; konto: string | null; kontonamn: string | null; momssats: number; omdome: string; motivering: string; granskning: AdminKontering['granskning']; flaggor: AdminKontering['flaggor']; /** Namnen på kundreglerna modellen valde. */ regler: string[] }[];
+    forslag: { modell: string; konto: string | null; kontonamn: string | null; momssats: number; momsdelar: Momsdel[] | null; omdome: string; motivering: string; granskning: AdminKontering['granskning']; flaggor: AdminKontering['flaggor']; /** Namnen på kundreglerna modellen valde. */ regler: string[] }[];
     /** Verifikationen transaktionen blev, med sina rader. */
     verifikation: { id: string; datum: string | null; signatur: string; rader: { konto: string; kontonamn: string | null; belopp: number }[] } | null;
   }[];
