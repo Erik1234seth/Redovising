@@ -339,6 +339,22 @@ export async function POST(request: NextRequest) {
         // Ett mejl vi skriver själva. Svarar i tråden om `svarPa` är satt.
         const till = String(body.till ?? '').trim().toLowerCase();
         if (!till.includes('@') || !text) return fel('Mottagare och text krävs');
+        // Från "Nytt mejl": en person vi kanske inte känner sedan förut. Utan en
+        // rad någonstans syns konversationen aldrig i inkorgen, och utan numret
+        // där mejl-notisen letar (mail-notice.ts) går inget SMS efter mejlet.
+        if ('namn' in body || 'telefon' in body) {
+          const telefon = String(body.telefon ?? '').trim();
+          if (telefon && !normalizePhone(telefon)) return fel('Telefonnumret ser inte rätt ut');
+          const p = locate(await build(), till);
+          const nyttNummer = !!telefon && !p?.aliases.includes(phoneKey(telefon) ?? '');
+          if (!p || nyttNummer) {
+            const { error: leadFel } = await supabase.from('contact_requests').insert({
+              email: till, name: String(body.namn ?? '').trim() || null, phone: telefon || null,
+              package_type: 'komplett', ref: 'manuell',
+            });
+            if (leadFel) return fel(leadFel.message, 500);
+          }
+        }
         const { data, error } = await supabase.from('mejl_utkast').insert({
           till_email: till, amne: String(body.amne ?? '').trim() || null, text,
           svar_pa_message_id: body.svarPa || null, kalla: 'manuell', bilagor: lasBilagor(body.bilagor),

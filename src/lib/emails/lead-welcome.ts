@@ -71,3 +71,17 @@ export function leadWelcomeEmail(): { subject: string; html: string } {
 
   return { subject: 'Lite kort om hur EnklaBokslut funkar', html };
 }
+
+/**
+ * Samma mejl till dem på ringlistan som sagt ja i telefon. De har pratat med
+ * oss men inte sett sajten, så här får hemsidan vara med som länk.
+ */
+export function ringlistaInfoEmail(): { subject: string; html: string } {
+  const html = [
+    ...PARAGRAPHS.slice(0, -1),
+    'Kolla gärna in hemsidan <a href="https://www.enklabokslut.se/">www.enklabokslut.se</a> '
+      + 'och har du någon annan fundering så är det bara att maila.',
+  ].map((p) => `<p>${p}</p>`).join('\n') + '\n' + SIGNATURE_HTML;
+
+  return { subject: 'Lite kort om hur EnklaBokslut funkar', html };
+}

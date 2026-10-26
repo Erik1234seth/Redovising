@@ -29,4 +29,4 @@ export const LEAD_REMINDER_SMS =
   'sedan om bokföring för enskild firma. Är det fortfarande aktuellt? Svara ' +
   'på mejlet eller på det här SMS:et så hör jag av mig. Är det inte aktuellt ' +
   'är det bara att säga till.\n\n' +
-  'Hälsningar\nErik på EnklaBokslut';
+  'Hälsningar\nOss på EnklaBokslut';

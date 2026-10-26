@@ -22,7 +22,7 @@ export function meetingReminderSms(date: string, time: string): string {
   return (
     `Hej! Påminnelse från EnklaBokslut: vi ringer upp dig i dag kl. ${time} ` +
     `från ${CALLING_NUMBER}. Passar det inte, svara på det här SMS:et så bokar vi om.\n\n` +
-    'Hälsningar\nErik på EnklaBokslut'
+    'Hälsningar\nOss på EnklaBokslut'
   );
 }
 

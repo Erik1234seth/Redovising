@@ -59,6 +59,10 @@ export interface IncomingLead {
   /** Vald dag och tid, i svensk tid, när formuläret innehöll ett tidsval. */
   meetingDate?: string | null;
   meetingTime?: string | null;
+  /** Anteckning till contact_requests.notes, i stället för formulärnamnet. */
+  notes?: string | null;
+  /** Ett annat välkomstmejl än standardmallen, t.ex. ringlistans. */
+  welcomeEmail?: { subject: string; html: string };
 }
 
 export type LeadOutcome =
@@ -84,7 +88,7 @@ export interface LeadResult {
 export const WELCOME_SMS =
   'Hej! Erik på EnklaBokslut här. Vi har precis skickat ett mejl till dig. ' +
   'Kika gärna i inkorgen och även skräpposten om du inte hittar det.\n\n' +
-  'Hälsningar\nErik på EnklaBokslut';
+  'Hälsningar\nOss på EnklaBokslut';
 
 /**
  * Har personen bokat en tid i snabbformuläret är "vi har skickat ett mejl"
@@ -96,7 +100,7 @@ export function bookingSms(date: string, time: string): string {
   return (
     `Hej! Erik på EnklaBokslut här. Din tid är bokad: ${formatMeetingDate(date)} kl. ${time}. ` +
     'Jag ringer upp dig då. Bekräftelsen har gått till din mejl.\n\n' +
-    'Hälsningar\nErik på EnklaBokslut'
+    'Hälsningar\nOss på EnklaBokslut'
   );
 }
 
@@ -170,7 +174,7 @@ export async function handleNewLead(
       name: lead.name || null,
       email: lead.email,
       phone: lead.phone || null,
-      notes: lead.formName ? `Facebook-formulär: ${lead.formName}` : null,
+      notes: lead.notes ?? (lead.formName ? `Facebook-formulär: ${lead.formName}` : null),
       contact_method: lead.contactChoice ?? null,
       package_type: 'komplett',
       ref,
@@ -239,7 +243,7 @@ export async function handleNewLead(
           date: booking.date,
           time: booking.time,
         })
-      : leadWelcomeEmail();
+      : lead.welcomeEmail ?? leadWelcomeEmail();
     emailed = await sendViaGmail({
       to: lead.email,
       subject,

@@ -17,7 +17,7 @@ export const MAIL_NOTICE_SMS_KIND = 'mejl_notis';
 export const MAIL_NOTICE_SMS =
   'Hej! Jag skickade precis ett mail till dig, ' +
   'kika i inkorgen (eller skräpposten om du inte hittar det).\n\n' +
-  'Hälsningar\nErik på EnklaBokslut';
+  'Hälsningar\nOss på EnklaBokslut';
 
 /**
  * Bara mejl som skickats nyligen. Synken tar med två dygns marginal och en
