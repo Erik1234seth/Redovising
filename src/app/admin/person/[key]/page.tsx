@@ -18,6 +18,7 @@ import { KonteringsVy } from '../../_kontering';
 import { MomsFil } from '../../_momsfil';
 import { Varningar } from '../../_varningar';
 import { NeBilaga } from '../../_ne';
+import { InlamningFlik } from '../../_inlamning';
 import { formateraPris, kundensPris } from '@/lib/kundpris';
 
 /**
@@ -45,12 +46,13 @@ const TABS = [
   { id: 'verifikationer', label: 'Verifikationer' },
   { id: 'huvudbok', label: 'Huvudbok' },
   { id: 'rapporter', label: 'Rapporter' },
+  { id: 'inlamning', label: 'Inlämning' },
 ] as const;
 
 type Tab = (typeof TABS)[number]['id'];
 
 /** Flikarna som ligger i Bokföring-menyn i stället för på raden. */
-const BOKFORING: Tab[] = ['underlag', 'transaktioner', 'kontering', 'verifikationer', 'huvudbok', 'rapporter'];
+const BOKFORING: Tab[] = ['underlag', 'transaktioner', 'kontering', 'verifikationer', 'huvudbok', 'rapporter', 'inlamning'];
 
 export default function PersonPage() {
   const params = useParams<{ key: string }>();
@@ -1668,6 +1670,9 @@ export default function PersonPage() {
               />
             )
           )}
+
+          {/* Moms och NE till Skatteverket — låg förut som en egen sida i toppmenyn */}
+          {tab === 'inlamning' && <InlamningFlik profileId={person.profileId} />}
 
         </div>
       </div>

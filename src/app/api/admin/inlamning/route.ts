@@ -11,7 +11,7 @@ import { flaggaBokforing } from '@/lib/inlamning-status';
  * Inlämningssidan: vilka kunder vi ska lämna moms eller NE för just nu, och
  * vad som redan är inlämnat.
  *
- * GET    ?typ=moms|ne              → kunderna med sina aktuella perioder
+ * GET    ?typ=moms|ne[&profileId=] → kunderna med sina aktuella perioder
  * GET    ?kvittens=<id>            → kvittensen, som omdirigering till lagringen
  * POST   { profileId, typ, period } → markera inlämnad
  * POST   { action: 'prepare' | 'confirm', id, fileName, path } → ladda upp kvittens
@@ -42,10 +42,15 @@ export async function GET(request: NextRequest) {
 
   try {
     const idag = new Date().toISOString().slice(0, 10);
-    const [{ data: profiler, error: pFel }, { data: gjorda, error: iFel }] = await Promise.all([
-      supabase.from('profiles').select('id, email, full_name, company_name, org_nr, moms_period'),
-      supabase.from('inlamningar').select('id, profile_id, period, inlamnad_at, kvittens_namn').eq('typ', typ),
-    ]);
+    // ?profileId= ger bara den kunden, för Inlämning-fliken i kundvyn
+    const profileId = params.get('profileId');
+    let profilFraga = supabase.from('profiles').select('id, email, full_name, company_name, org_nr, moms_period');
+    let inlFraga = supabase.from('inlamningar').select('id, profile_id, period, inlamnad_at, kvittens_namn').eq('typ', typ);
+    if (profileId) {
+      profilFraga = profilFraga.eq('id', profileId);
+      inlFraga = inlFraga.eq('profile_id', profileId);
+    }
+    const [{ data: profiler, error: pFel }, { data: gjorda, error: iFel }] = await Promise.all([profilFraga, inlFraga]);
     if (pFel) throw new Error(pFel.message);
     if (iFel) throw new Error(iFel.message);
 

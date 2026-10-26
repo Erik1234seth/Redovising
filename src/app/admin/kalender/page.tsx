@@ -311,7 +311,7 @@ function Kundkort({ kund }: { kund: InlamningKund }) {
           : <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">Saknar underlag</span>}
         {p.inlamning
           ? <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white">Inlämnad ✓</span>
-          : <Link href="/admin/inlamning" className="px-1.5 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50">Ej inlämnad · lämna in →</Link>}
+          : <Link href={`/admin/person/${encodeURIComponent(nyckel)}#inlamning`} className="px-1.5 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50">Ej inlämnad · lämna in →</Link>}
       </div>
       {p.flaggor.filter((f) => f !== 'Ingen bokföring i perioden').length > 0 && (
         <p className="text-[11px] text-red-600 mt-1">{p.flaggor.filter((f) => f !== 'Ingen bokföring i perioden').join(' · ')}</p>

@@ -154,7 +154,7 @@ function CodeGate({ onUnlock }: { onUnlock: () => void }) {
 }
 
 /** Sidor med lista till vänster och detaljer till höger behöver hela bredden. */
-const BREDA = ['/admin/inlamning', '/admin/kalender', '/admin/inkorg'];
+const BREDA = ['/admin/kalender', '/admin/inkorg'];
 
 /** Flödesschemat ritas över hela fönstrets bredd. */
 const HELA_FONSTRET = ['/admin/flodesschema'];

@@ -119,7 +119,7 @@ export default function OversiktPage() {
             {kort('Utkast att skicka', data?.inkorg ? s.utkast.length : null, '/admin/inkorg', 'amber')}
             {kort('Ärenden idag', data?.arenden ? s.iDag.length + s.forsenade.length : null, '/admin/arenden', s.forsenade.length ? 'rod' : 'gra',
               s.forsenade.length ? `varav ${s.forsenade.length} försenade` : undefined)}
-            {kort('Kvar att lämna in', data?.moms ? s.kvarAttLamna : null, '/admin/inlamning', s.deadlineLista.some((r) => r.forsenad) ? 'rod' : 'gra',
+            {kort('Kvar att lämna in', data?.moms ? s.kvarAttLamna : null, '/admin/kalender', s.deadlineLista.some((r) => r.forsenad) ? 'rod' : 'gra',
               s.deadlineLista.find((r) => r.kvar) ? `nästa ${datum(s.deadlineLista.find((r) => r.kvar)!.datum)}` : undefined)}
             {kort('Nya leads, 7 dagar', data?.personer ? s.nyaLeads.length : null, '/admin/personer', 'gron')}
           </div>
@@ -190,7 +190,7 @@ export default function OversiktPage() {
                   <ul className="space-y-1.5">
                     {s.deadlineLista.slice(0, 6).map((r) => (
                       <li key={`${r.datum}|${r.typ}`}>
-                        <Link href="/admin/inlamning" className="flex items-center gap-3 hover:text-blue-700">
+                        <Link href="/admin/kalender" className="flex items-center gap-3 hover:text-blue-700">
                           <span className={`text-xs w-20 shrink-0 ${r.forsenad ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>{datum(r.datum)}</span>
                           <span className="text-sm text-slate-900 mr-auto">{r.typ} · {[...r.perioder].join(', ')}</span>
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded ${r.kvar ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>

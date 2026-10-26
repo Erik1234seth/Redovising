@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { Arende, InkorgKonversation, InlamningKund } from '@/lib/admin-types';
+import type { Arende, InkorgKonversation } from '@/lib/admin-types';
 
 /**
  * Huvudsidorna, som vanliga länkar i menyraden — ingen dropdown.
@@ -16,7 +16,6 @@ import type { Arende, InkorgKonversation, InlamningKund } from '@/lib/admin-type
  * - Inkorg: olästa konversationer
  * - Ärenden: öppna ärenden för idag och försenade
  * - Kalender: det som står i kalendern idag, med möten
- * - Inlämning: perioder kvar att lämna in, moms och NE, med deadline inom en vecka eller passerad
  * Röd när något är försenat. En siffra som inte gick att hämta visas inte alls.
  */
 
@@ -25,7 +24,6 @@ const ITEMS: { href: string; label: string }[] = [
   { href: '/admin/ringlista', label: 'Ringlista' },
   { href: '/admin/arenden', label: 'Ärenden' },
   { href: '/admin/kalender', label: 'Kalender' },
-  { href: '/admin/inlamning', label: 'Inlämning' },
   { href: '/admin/flodesschema', label: 'Flödesschema' },
 ];
 
@@ -41,23 +39,18 @@ const hamta = <T,>(url: string, valj: (d: Record<string, unknown>) => T): Promis
 
 async function raknaAlla(): Promise<Raknare> {
   const idag = new Date().toLocaleDateString('sv-SE');
-  const omEnVecka = new Date(Date.now() + 7 * 86_400_000).toLocaleDateString('sv-SE');
-  const [inkorg, arenden, kalender, moms, ne] = await Promise.all([
+  const [inkorg, arenden, kalender] = await Promise.all([
     hamta('/api/admin/inkorg', (d) => d.konversationer as InkorgKonversation[]),
     hamta('/api/admin/arenden', (d) => d.arenden as Arende[]),
     hamta(`/api/admin/kalender?fran=${idag}&tom=${idag}`, (d) => ((d.handelser as unknown[]).length + (d.moten as unknown[]).length)),
-    hamta('/api/admin/inlamning?typ=moms', (d) => d.kunder as InlamningKund[]),
-    hamta('/api/admin/inlamning?typ=ne', (d) => d.kunder as InlamningKund[]),
   ]);
 
   const oppna = (arenden ?? []).filter((a) => a.status === 'oppen' && a.datum && a.datum <= idag);
-  const kvar = moms && ne ? [...moms, ...ne].flatMap((k) => k.perioder).filter((p) => !p.inlamning && p.deadline <= omEnVecka) : null;
 
   return {
     '/admin/inkorg': inkorg ? { antal: inkorg.filter((k) => k.olast).length, bradskande: false } : null,
     '/admin/arenden': arenden ? { antal: oppna.length, bradskande: oppna.some((a) => a.datum! < idag) } : null,
     '/admin/kalender': kalender !== null ? { antal: kalender, bradskande: false } : null,
-    '/admin/inlamning': kvar ? { antal: kvar.length, bradskande: kvar.some((p) => p.forsenad) } : null,
   };
 }
 
