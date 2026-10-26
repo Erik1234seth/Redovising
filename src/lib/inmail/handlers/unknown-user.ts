@@ -4,7 +4,7 @@ import { ENKLA_BOKSLUT_CONTEXT } from '../service-context';
 import { REPLY_RULES } from '../reply-rules';
 import { anteckningarForPrompt } from '../../inkorg/anteckningar';
 import { byggMejlkontext } from '../../mejlkontext';
-import { tidigarePrisRegel } from '../../tidigare-pris';
+import { tidigarePrisRegel, TIDIGARE_PRIS_LANK } from '../../tidigare-pris';
 
 // Förut 1000 tecken av mejlet och de sista 3000 av tråden. Ett långt frågemejl
 // från ett lead blev då början (hälsningen) plus slutet (sista frågorna, som
@@ -37,7 +37,9 @@ ${prisRegel}
 ` : ''}
 Du jobbar på Enkla Bokslut och svarar en potentiell kund. Håll det kort. Ingen säljig ton, inga tomma fraser. Svara rakt på frågan, var hjälpsam och professionell men avslappnad.
 
-Lägg bara med registreringslänken (${registrationLink}) om de tydligt vill komma igång eller skapa konto, och sätt då includeLink till true. Annars svarar du bara på frågan. Andra länkar får du bara använda om de står i länkregistret och passar frågan.
+${prisRegel
+  ? `Personen har rätt till det tidigare priset. Lägg med registreringslänken (${registrationLink}) om de tydligt vill komma igång eller skapa konto, eller när priset tas upp i svaret, och sätt då includeLink till true. Skriv då att länken är för att få det tidigare priset och att de ska registrera sig via just den. Använd aldrig den vanliga registreringslänken. Annars svarar du bara på frågan.`
+  : `Lägg bara med registreringslänken (${registrationLink}) om de tydligt vill komma igång eller skapa konto, och sätt då includeLink till true. Annars svarar du bara på frågan.`} Andra länkar får du bara använda om de står i länkregistret och passar frågan.
 ${attachmentNames.length ? `
 Personen har bifogat filer. De är redan sparade, och att vi tagit emot dem bekräftas automatiskt i ett eget stycke efter ditt svar. Nämn inte filerna och ställ inga frågor om dem.
 Innehåller mejltexten ingen egen fråga eller begäran utöver filerna (tom text, bara en hälsning eller signatur, "se bifogat" och liknande), sätt message till en tom sträng och includeLink till false. Då skickas bara bekräftelsen.
@@ -102,13 +104,15 @@ export async function handleUnknownUser(params: {
   // Skapa konto-länken ur länkregistret (knowledge/lankregister.md). Förut gick
   // länken till /skaffa, men registret säger att den som vill komma igång ska
   // till registreringen.
-  const registrationLink = 'https://www.enklabokslut.se/auth/signup';
+  // Hade vi kontakt före prishöjningen får de länken med det tidigare priset.
+  const prisRegel = await tidigarePrisRegel(supabase, [senderEmail]);
+  const registrationLink = prisRegel ? TIDIGARE_PRIS_LANK : 'https://www.enklabokslut.se/auth/signup';
 
   let reply: InitialReply;
   try {
     reply = await generateInitialReply(body, subject, registrationLink, emailHistory, attachmentNames,
       await anteckningarForPrompt(supabase, { email: senderEmail }),
-      await tidigarePrisRegel(supabase, [senderEmail]));
+      prisRegel);
   } catch (err) {
     // Inget standardsvar här. Tidigare gick ett hårdkodat "registrera dig"-mejl ut
     // så fort AI:n fallerade — även till avsändare som aldrig frågat efter det, som
