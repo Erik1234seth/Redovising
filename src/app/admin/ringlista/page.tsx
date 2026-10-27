@@ -10,7 +10,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
  * inkorgen över.
  */
 
-type Status = 'ej_ringd' | 'ringd' | 'ej_intresserad' | 'info_skickad';
+type Status = 'ej_ringd' | 'ringd' | 'ej_intresserad';
+// "Info skickad" är ingen status utan läses från info_skickad_at — de har också status Ringd
+type Filter = Status | 'info_skickad' | 'alla';
 
 interface Rad {
   id: string;
@@ -18,28 +20,63 @@ interface Rad {
   bransch: string | null;
   email: string | null;
   telefon: string | null;
+  postnr: string | null;
   ort: string | null;
   registrerad: string | null;
   anteckning: string | null;
   status: Status;
   info_skickad_at: string | null;
+  updated_at: string | null;
 }
 
 const STATUS_NAMN: Record<Status, string> = {
   ej_ringd: 'Ej ringd',
   ringd: 'Ringd',
   ej_intresserad: 'Ej intresserad',
-  info_skickad: 'Info skickad',
 };
 
 const STATUS_FARG: Record<Status, string> = {
   ej_ringd: 'bg-slate-100 text-slate-700',
   ringd: 'bg-amber-100 text-amber-800',
   ej_intresserad: 'bg-red-50 text-red-700',
-  info_skickad: 'bg-emerald-100 text-emerald-800',
 };
 
 const PER_SIDA = 50;
+
+type Sortering = 'standard' | 'namn' | 'bransch' | 'postnr' | 'ort' | 'telefon' | 'registrerad' | 'status' | 'andrad' | 'info_skickad';
+
+const SORTERING_NAMN: Record<Sortering, string> = {
+  standard: 'Som utskriften',
+  namn: 'Namn',
+  bransch: 'Bransch',
+  postnr: 'Postnummer',
+  ort: 'Ort',
+  telefon: 'Telefon',
+  registrerad: 'Registrerad',
+  status: 'Status',
+  andrad: 'Senast ändrad',
+  info_skickad: 'Info skickad',
+};
+
+const sv = new Intl.Collator('sv');
+
+const traffar = (r: Rad, f: Filter) => f === 'alla' || (f === 'info_skickad' ? !!r.info_skickad_at : r.status === f);
+
+/** Värdet en rad sorteras på. Tomma fält hamnar alltid sist. */
+function sorteringsvarde(r: Rad, s: Sortering): string | null {
+  switch (s) {
+    case 'namn': return r.namn;
+    case 'bransch': return r.bransch;
+    case 'postnr': return r.postnr?.replace(/\D/g, '') || null;
+    case 'ort': return r.ort;
+    case 'telefon': return r.telefon?.replace(/\D/g, '') || null;
+    case 'registrerad': return r.registrerad;
+    case 'status': return String((['ej_ringd', 'ringd', 'ej_intresserad'] as Status[]).indexOf(r.status));
+    case 'andrad': return r.updated_at;
+    case 'info_skickad': return r.info_skickad_at;
+    default: return null;
+  }
+}
 
 async function post(body: Record<string, unknown>) {
   const res = await fetch('/api/admin/ringlista', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -52,7 +89,9 @@ export default function RinglistaPage() {
   const [rader, setRader] = useState<Rad[] | null>(null);
   const [fel, setFel] = useState('');
   const [sok, setSok] = useState('');
-  const [filter, setFilter] = useState<Status | 'alla'>('ej_ringd');
+  const [filter, setFilter] = useState<Filter>('ej_ringd');
+  const [sortering, setSortering] = useState<Sortering>('standard');
+  const [fallande, setFallande] = useState(false);
   const [antal, setAntal] = useState(PER_SIDA);
 
   const ladda = useCallback(() => {
@@ -61,16 +100,24 @@ export default function RinglistaPage() {
     }).catch(() => setFel('Kunde inte hämta listan'));
   }, []);
   useEffect(() => { ladda(); }, [ladda]);
-  useEffect(() => { setAntal(PER_SIDA); }, [sok, filter]);
+  useEffect(() => { setAntal(PER_SIDA); }, [sok, filter, sortering, fallande]);
 
   const synliga = useMemo(() => {
     const q = sok.trim().toLowerCase();
-    return (rader ?? []).filter((r) =>
-      (filter === 'alla' || r.status === filter)
-      && (!q || [r.namn, r.email, r.telefon, r.ort, r.bransch, r.anteckning].some((f) => f?.toLowerCase().includes(q))));
-  }, [rader, sok, filter]);
+    const urval = (rader ?? []).filter((r) =>
+      traffar(r, filter)
+      && (!q || [r.namn, r.email, r.telefon, r.postnr, r.ort, r.bransch, r.anteckning].some((f) => f?.toLowerCase().includes(q))));
+    if (sortering === 'standard') return fallande ? urval.reverse() : urval;
+    // Sorteringen är stabil, så lika värden behåller utskriftens ordning
+    return urval.sort((a, b) => {
+      const va = sorteringsvarde(a, sortering), vb = sorteringsvarde(b, sortering);
+      if (!va || !vb) return (va ? 0 : 1) - (vb ? 0 : 1);
+      const j = sortering === 'telefon' || sortering === 'postnr' ? Number(va) - Number(vb) : sv.compare(va, vb);
+      return fallande ? -j : j;
+    });
+  }, [rader, sok, filter, sortering, fallande]);
 
-  const raknare = (s: Status) => (rader ?? []).filter((r) => r.status === s).length;
+  const raknare = (f: Filter) => (rader ?? []).filter((r) => traffar(r, f)).length;
   const andra = (id: string, andring: Partial<Rad>) => setRader((l) => l?.map((r) => (r.id === id ? { ...r, ...andring } : r)) ?? null);
 
   return (
@@ -84,14 +131,25 @@ export default function RinglistaPage() {
           className="w-full sm:w-64 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500" />
       </div>
 
-      <div className="flex gap-1 mb-4 flex-wrap">
+      <div className="flex gap-1 mb-4 flex-wrap items-center">
         {(['ej_ringd', 'ringd', 'info_skickad', 'ej_intresserad', 'alla'] as const).map((s) => (
           <button key={s} onClick={() => setFilter(s)}
             className={`px-2.5 py-1 text-xs rounded-lg transition ${filter === s ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-            {s === 'alla' ? 'Alla' : STATUS_NAMN[s]}
+            {s === 'alla' ? 'Alla' : s === 'info_skickad' ? 'Info skickad' : STATUS_NAMN[s]}
             {s !== 'alla' && rader && <span className={`ml-1 ${filter === s ? 'text-white/80' : 'text-slate-400'}`}>{raknare(s)}</span>}
           </button>
         ))}
+        <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-500">
+          Sortera
+          <select value={sortering} onChange={(e) => setSortering(e.target.value as Sortering)}
+            className="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-900 focus:outline-none focus:border-blue-500">
+            {(Object.keys(SORTERING_NAMN) as Sortering[]).map((s) => <option key={s} value={s}>{SORTERING_NAMN[s]}</option>)}
+          </select>
+        </label>
+        <button onClick={() => setFallande((f) => !f)} title={fallande ? 'Fallande — klicka för stigande' : 'Stigande — klicka för fallande'}
+          className="px-2 py-1 text-xs rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">
+          {fallande ? '↓' : '↑'}
+        </button>
       </div>
 
       {fel && <p className="text-red-600 text-sm mb-3">{fel}</p>}
@@ -138,7 +196,7 @@ function Kort({ r, onAndrat }: { r: Rad; onAndrat: (a: Partial<Rad>) => void }) 
         onAndrat({ email: email.trim().toLowerCase() || null, anteckning: anteckning.trim() || null });
       }
       const d = await post({ action: 'skicka-info', id: r.id });
-      onAndrat({ status: 'info_skickad', info_skickad_at: new Date().toISOString() });
+      onAndrat({ status: 'ringd', info_skickad_at: new Date().toISOString() });
       setSparat(d.sms ? 'Mejl och SMS skickat' : d.smsFel ? `Mejlet skickat, SMS:et misslyckades: ${d.smsFel}` : 'Mejlet skickat');
     } catch (e) { setFel(e instanceof Error ? e.message : 'Kunde inte skicka'); }
     finally { setSkickar(false); }
@@ -152,7 +210,7 @@ function Kort({ r, onAndrat }: { r: Rad; onAndrat: (a: Partial<Rad>) => void }) 
         <div className="mr-auto min-w-0">
           <p className="font-semibold text-slate-900">{r.namn}</p>
           <p className="text-xs text-slate-500">
-            {[r.ort, r.bransch, r.registrerad && `reg. ${r.registrerad}`].filter(Boolean).join(' · ')}
+            {[[r.postnr, r.ort].filter(Boolean).join(' '), r.bransch, r.registrerad && `reg. ${r.registrerad}`].filter(Boolean).join(' · ')}
           </p>
         </div>
         {r.telefon && (

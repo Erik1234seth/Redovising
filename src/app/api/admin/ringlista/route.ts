@@ -17,7 +17,8 @@ import { ringlistaInfoEmail } from '@/lib/emails/lead-welcome';
  * som privatpersoner, och reklam på mejl och SMS kräver samtycke.
  */
 
-const STATUSAR =['ej_ringd', 'ringd', 'ej_intresserad', 'info_skickad'] as const;
+// Att infon skickats syns på info_skickad_at, inte i statusen
+const STATUSAR = ['ej_ringd', 'ringd', 'ej_intresserad'] as const;
 
 const fel = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
 
@@ -33,7 +34,7 @@ export async function GET() {
   // Supabase ger högst 1 000 rader per fråga
   for (let fran = 0; ; fran += 1000) {
     const { data, error } = await supabase.from('ringlista')
-      .select('id, namn, bransch, email, telefon, ort, registrerad, anteckning, status, info_skickad_at, updated_at')
+      .select('id, namn, bransch, email, telefon, postnr, ort, registrerad, anteckning, status, info_skickad_at, updated_at')
       .order('id').range(fran, fran + 999);
     if (error) return fel(error.message, 500);
     rader.push(...(data ?? []));
@@ -99,7 +100,8 @@ export async function POST(request: NextRequest) {
         await supabase.from('ringlista').update({ info_skickad_at: null }).eq('id', id);
         return fel('Mejlet kunde inte skickas. Försök igen om en stund.', 502);
       }
-      await supabase.from('ringlista').update({ status: 'info_skickad' }).eq('id', id);
+      // Har man skickat info har man ringt — att infon gått iväg syns på info_skickad_at
+      await supabase.from('ringlista').update({ status: 'ringd' }).eq('id', id);
       return NextResponse.json({
         ok: true,
         sms: resultat.outcome === 'sent',
