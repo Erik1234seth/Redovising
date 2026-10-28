@@ -117,6 +117,16 @@ function galler(regel: Regel, datum: string | null) {
 const PROVBAR_ENHET = /^SEK( inkl\. moms| exkl\. moms)?$/;
 
 /**
+ * Regler som gäller en del av underlaget, inte kontots belopp. "Mindre
+ * avvikande kostnadsrad" säger att en liten rad som hör till ett annat konto
+ * får följa med på huvudkontot om den är högst 1 000 kr — prövad mot hela
+ * kontots belopp blev varje grossistkvitto över 1 000 kr gult. Konteringen
+ * delar upp kvittot per konto i stället för att slå ihop, så reglerna prövas
+ * inte i kod. De står kvar i kontots regeltext.
+ */
+const INTE_PER_KONTO = new Set(['minor_line_merge_amount_limit', 'minor_line_merge_share_limit', 'minor_line_recurring_annual_limit']);
+
+/**
  * Prövar ett föreslaget konto mot regelverket.
  *
  * `netto` är beloppet utan moms, `brutto` med. Gränsvärdena anges oftast
@@ -163,6 +173,7 @@ export function provaKonto({ konto, netto, brutto, datum }: {
   const trosklar = new Set(rad.trosklar);
   for (const regel of REGLER) {
     if (!regel.konton.includes(nummer) && !trosklar.has(regel.id)) continue;
+    if (INTE_PER_KONTO.has(regel.id)) continue;
     if (!['<', '<=', '>', '>='].includes(regel.operator) || !galler(regel, datum)) continue;
     const lost = losVarde(regel.parameterId);
     if (!lost || !PROVBAR_ENHET.test(lost.parameter.enhet)) continue;
