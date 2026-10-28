@@ -125,6 +125,8 @@ export interface Kontering {
    * Fälten `battre_konto` och `konton` finns kvar från den gamla granskningen.
    */
   granskning: {
+    /** Modellens egen säkerhet. Låg gör raden gul, medel visas bara. */
+    sakerhet: 'hog' | 'medel' | 'lag';
     stammer: boolean;
     battre_konto: string | null;
     brutna_regler: string[];
@@ -509,7 +511,8 @@ function byggKontering(
     flaggor.push({ typ: 'dublett', allvar: 'granskning', text: `Kan vara en dubblett${t.dublettkoll.avFil ? ` av en transaktion i ${t.dublettkoll.avFil}` : ''}: ${t.dublettkoll.motivering}` });
   }
   if (t.valuta && t.valuta !== 'SEK') flaggor.push({ typ: 'valuta', allvar: 'granskning', text: `Beloppet är i ${t.valuta} och måste räknas om till kronor.` });
-  if (beslut.sakerhet !== 'hog') flaggor.push({ typ: 'osaker', allvar: 'granskning', text: `Modellens säkerhet: ${beslut.sakerhet === 'lag' ? 'låg' : 'medel'}.` });
+  // Medel sparas och visas men skickar inte raden till Granska — bara låg gör det
+  if (beslut.sakerhet === 'lag') flaggor.push({ typ: 'osaker', allvar: 'granskning', text: 'Modellens säkerhet: låg.' });
 
   const svensk = beslut.momshantering === 'svensk';
   const sparade = slutdelar.map((d) => (svensk ? d : { ...d, momssats: 0, moms: null }));
@@ -524,6 +527,7 @@ function byggKontering(
     motivering: String(beslut.motivering ?? ''),
     regler,
     granskning: {
+      sakerhet: beslut.sakerhet === 'hog' || beslut.sakerhet === 'lag' ? beslut.sakerhet : 'medel',
       stammer: !brutna.length,
       battre_konto: null,
       brutna_regler: brutna,

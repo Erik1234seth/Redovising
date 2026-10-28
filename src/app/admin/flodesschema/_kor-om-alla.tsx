@@ -113,6 +113,7 @@ export function ForslagKort({ f }: { f: Forslag }) {
         <span className="text-slate-500"> · moms {momsText(f.momssats, f.momsdelar)}</span>
         {byttFran && <span className="text-slate-400 text-xs"> (bytt från {byttFran} i {g?.jamkning ? 'jämkningen' : 'granskningen'})</span>}
       </p>
+      {g?.sakerhet && g.sakerhet !== 'hog' && <p className="text-xs text-slate-500">Säkerhet: {g.sakerhet === 'lag' ? 'låg' : 'medel'}</p>}
       {f.regler.length > 0 && <p className="text-violet-700 text-xs">Kundregel: {f.regler.join(', ')}</p>}
       <p className="text-slate-600 text-xs leading-relaxed">{f.motivering}</p>
       {g?.motivering && <p className="text-slate-500 text-xs leading-relaxed"><span className="text-slate-600">Granskning:</span> {g.motivering}</p>}

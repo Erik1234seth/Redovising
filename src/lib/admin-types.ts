@@ -388,6 +388,7 @@ export interface AdminKontering {
   granskning: {
     stammer?: boolean; battre_konto?: string | null; granskning_kravs?: boolean; motivering?: string; forstaKonto?: string; svarade?: string;
     brutna_regler?: string[];
+    sakerhet?: 'hog' | 'medel' | 'lag';
     analys?: string;
     kandidater?: { konto: string; namn: string; varfor: string }[];
     jamkning?: {
