@@ -407,7 +407,11 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
           <p className="text-xs text-slate-700">{helhet.sammanfattning}</p>
           {helhet.anmarkningar.length > 0 && (
             <ul className="mt-1 space-y-0.5">
-              {helhet.anmarkningar.map((a, i) => <li key={i} className="text-xs text-amber-800">• {a.text}</li>)}
+              {helhet.anmarkningar.map((a, i) => (
+                <li key={i} className={`text-xs ${a.granska !== false && a.rader.length ? 'text-amber-800' : 'text-slate-600'}`}>
+                  • {a.granska !== false && a.rader.length ? <span className="font-semibold">Till Granska: </span> : null}{a.text}
+                </li>
+              ))}
             </ul>
           )}
         </div>

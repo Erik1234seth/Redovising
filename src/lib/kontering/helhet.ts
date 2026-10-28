@@ -12,9 +12,11 @@ import { slaUppKonto, type Flagga } from './regelverk';
  * transaktion åt gången — samma motpart på olika konton, privata mönster,
  * moms som inte går ihop, ett abonnemang som hoppar över en månad.
  *
- * En anmärkning om en transaktion som inte är bokförd blir en flagga på båda
- * modellernas kontering, och en grön rad blir gul och går till Granska.
- * Anmärkningar om kunden i stort sparas i `kundbilder.helhet`.
+ * En anmärkning om ett troligt fel på en transaktion som inte är bokförd blir
+ * en flagga på båda modellernas kontering, och en grön rad blir gul och går
+ * till Granska. Principfrågor — förpackningar på två konton, köp som kanske är
+ * privata — och anmärkningar om kunden i stort blir anteckningar till byrån.
+ * Allt sparas i `kundbilder.helhet`.
  */
 
 const MODELL = 'claude-opus-5-5' as const;
@@ -30,10 +32,11 @@ const SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['rader', 'text'],
+        required: ['rader', 'text', 'granska'],
         properties: {
           rader: { type: 'array', items: { type: 'integer' }, description: 'Numren (K12 → 12) på transaktionerna det gäller. Tom lista när det gäller kunden i stort.' },
           text: { type: 'string' },
+          granska: { type: 'boolean', description: 'true bara när raderna troligen är fel konterade och en människa måste rätta just dem' },
         },
       },
     },
@@ -51,11 +54,16 @@ Varje transaktion har konterats för sig. Du ser nu alla kundens transaktioner t
 
 Anmärk bara på det som sannolikt är fel eller som en människa bör titta på. Inga anmärkningar alls är ett bra svar när allt ser rimligt ut. Varje anmärkning: en eller två meningar på svenska som säger vad som ser fel ut och vad som troligen är rätt, med raderna det gäller (numren, utan K). Har en transaktion inget konto än är den inte konterad — anmärk inte på det.
 
+granska avgör om raderna går till manuell granskning:
+- true när just de raderna troligen är fel konterade: fel konto, fel moms, en trolig dubblett, en uppenbart privat post bokförd som kostnad.
+- false för principfrågor och avvägningar — att något kan konteras på två sätt och byrån bör välja ett, att något kanske är privat utan att något tyder på det, att underlag saknas för kunden i stort. De blir en anteckning till byrån och stoppar inte bokföringen.
+
 sammanfattning: två eller tre meningar om hur kundens bokföring ser ut i stort.`;
 
 export interface Helhet {
   sammanfattning: string;
-  anmarkningar: { rader: number[]; text: string }[];
+  /** granska: raderna går till Granska. Annars är anmärkningen en anteckning till byrån. */
+  anmarkningar: { rader: number[]; text: string; granska: boolean }[];
   /** Transaktionerna som fick en flagga. */
   flaggade: number;
 }
@@ -101,7 +109,7 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
     return `K${i + 1} ${r.datum ?? 'okänt datum'} ${r.riktning === 'in' ? 'IN ' : 'UT '} ${Number(r.belopp)} ${r.valuta || 'SEK'} · ${r.motpart || '—'} · ${(r.beskrivning ?? '').slice(0, 80)} · ${kalla.slice(0, 40)} → ${konto ? `${konto} ${slaUppKonto(konto)?.namn ?? ''}, moms ${moms}` : '—'} (${lage})`;
   });
 
-  const { data } = await fraga<{ sammanfattning: string; anmarkningar: { rader: number[]; text: string }[] }>(MODELL, {
+  const { data } = await fraga<{ sammanfattning: string; anmarkningar: { rader: number[]; text: string; granska: boolean }[] }>(MODELL, {
     system: { fast: FAST, kund: '' },
     user: [
       byggKundkontext(profil as unknown as Kund | null),
@@ -112,12 +120,13 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
     schema: SCHEMA,
   });
   const anmarkningar = (Array.isArray(data.anmarkningar) ? data.anmarkningar : [])
-    .map((a) => ({ rader: (Array.isArray(a.rader) ? a.rader : []).filter((n) => Number.isInteger(n) && n >= 1 && n <= arslista.rader.length), text: String(a.text ?? '').trim() }))
+    .map((a) => ({ rader: (Array.isArray(a.rader) ? a.rader : []).filter((n) => Number.isInteger(n) && n >= 1 && n <= arslista.rader.length), text: String(a.text ?? '').trim(), granska: a.granska === true }))
     .filter((a) => a.text);
 
   // Förra kontrollens flaggor tas bort först, så att en rättad rad inte ligger kvar som anmärkt
   const perTransaktion = new Map<string, string[]>();
-  for (const a of anmarkningar) {
+  // Bara anmärkningar om troliga fel flaggar raderna — principfrågor blir anteckningar
+  for (const a of anmarkningar.filter((x) => x.granska)) {
     for (const n of a.rader) {
       const id = arslista.rader[n - 1].id;
       if (bokforda.has(id)) continue;
