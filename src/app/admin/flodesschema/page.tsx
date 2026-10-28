@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link';
 import type { FlodesInstruktion, FlodesKund, FlodesUnderlag } from '@/lib/admin-types';
 import { momsText, sammaMoms, type Momsdel } from '@/lib/kontering/momsdelar';
+import { KorOmAlla, Resonemang } from './_kor-om-alla';
 
 /** Kontot en granskad transaktion bokförs på. momsdelar när förslaget har flera momssatser. */
 type Bokval = { transaktionId: string; konto: string; momssats: number; momsdelar?: Momsdel[] | null };
@@ -703,6 +704,12 @@ export default function FlodesschemaPage() {
     };
     // Kundbilden först, om den behöver byggas om, och helhetskontrollen efteråt.
     // Utan kundbild konteras det ändå — med kundens transaktioner som enda bild.
+    /** Komplettera och Dublettcheck samtidigt. Det svar som kommer sist har båda stegen i sig. */
+    const bada = async () => {
+      setKorText('Komplettera och Dublettcheck');
+      const [k, d] = await Promise.all([ett('komplettera'), ett('dublett')]);
+      return !!(k && d);
+    };
     const konteraMedKund = async () => {
       await ett('kundbild');
       if (await kontera()) await ett('helhet');
@@ -718,7 +725,10 @@ export default function FlodesschemaPage() {
         // utkast finns, eller när instruktionen skrevs på Skriv mail —
         // annars tar dygnsmejlet kl 18 det.
         const utkast = foljer.mejl?.status === 'draft';
+        // Dublettchecken behöver inte kompletteringen — de körs samtidigt
+        if (!(await bada())) return;
         for (const steg of OMKORNING) {
+          if (steg === 'komplettera' || steg === 'dublett') continue;
           if (steg === 'konteras') { await konteraMedKund(); return; }
           if (steg === 'skriv-mejl') {
             if (fran === 'skriv-mejl' || utkast) await ett('skriv-mejl', { omkorning: true });
@@ -755,7 +765,7 @@ export default function FlodesschemaPage() {
       const ut = await ett('plocka-trans');
       if (!ut || ut.typ !== 'transaktioner') return;
       // Det som saknas frågas i dygnsmejlet kl 18; resten konteras ändå
-      for (const steg of ['komplettera', 'dublett', 'tillrackligt'] as const) if (!(await ett(steg))) return;
+      if (!(await bada()) || !(await ett('tillrackligt'))) return;
       // Konteringen är preliminär och blir verifikation om 14 dagar — inget bokförs här
       await konteraMedKund();
     } finally {
@@ -890,11 +900,14 @@ export default function FlodesschemaPage() {
         {laddar && <span className="text-slate-400">Hämtar…</span>}
         {sparFel && <span className="text-red-600">{sparFel}</span>}
         {foljer && (
-          <button onClick={() => { setFoljer(null); setValtId(''); setKundKey(''); }} className="text-slate-500 hover:text-slate-800 underline">
+          <button onClick={() => { setFoljer(null); setValtId(''); }} className="text-slate-500 hover:text-slate-800 underline">
             Sluta följa
           </button>
         )}
       </div>
+
+      {/* Ligger kvar medan man följer en fil, så att resultatet finns kvar när man går tillbaka */}
+      {kund && <div className={foljer ? 'hidden' : ''}><KorOmAlla key={kund.key} kund={kund} onFolj={(id) => valjUnderlag(id)} onKlar={laddaKunder} /></div>}
 
       <div className="relative bg-white border border-slate-200 rounded-2xl overflow-hidden h-[calc(100vh-190px)] min-h-[420px]">
         <svg
@@ -1664,40 +1677,6 @@ type FlodesTransaktion = FlodesUnderlag['transaktioner'][number];
 /** Konterad men inte grön, och inte bokförd än — väntar på granskning. */
 const attGranska = (t: FlodesTransaktion) => t.kontering === 'granska' && !t.bokford && !t.dublettAv;
 const MODELL: Record<string, string> = { 'gpt-6-astra': 'GPT-6 Astra', 'gpt-6.1-sol': 'GPT-6.1 Sol', 'gpt-5.5': 'GPT-5.5', 'claude-opus-5-5': 'Claude Opus 5.5' };
-
-type Granskning = FlodesUnderlag['transaktioner'][number]['forslag'][number]['granskning'];
-
-/** Hur modellen kom fram: jämkningen, analysen och kandidatkontona. Tomt för äldre konteringar. */
-function Resonemang({ g }: { g: Granskning }) {
-  if (!g) return null;
-  const j = g.jamkning;
-  return (
-    <>
-      {j && (
-        <p className="text-xs leading-relaxed text-slate-500">
-          <span className="text-slate-600">Jämkning:</span>{' '}
-          {j.andradeSig
-            ? <>ändrade sig från <span className="tabular-nums">{j.fore.konto ?? '—'}</span> (moms {momsText(j.fore.momssats ?? 0, j.fore.momsdelar)}) efter att ha sett den andra modellens förslag.</>
-            : 'stod fast vid sitt förslag efter att ha sett den andra modellens.'}
-        </p>
-      )}
-      {(g.analys || g.kandidater?.length) && (
-        <details className="text-xs">
-          <summary className="text-slate-500 cursor-pointer">Analys och kandidatkonton</summary>
-          {g.analys && <p className="mt-1 text-slate-600 leading-relaxed">{g.analys}</p>}
-          {!!g.kandidater?.length && (
-            <ul className="mt-1 space-y-0.5">
-              {g.kandidater.map((k) => (
-                <li key={k.konto} className="text-slate-600"><span className="tabular-nums font-semibold">{k.konto}</span> {k.namn}{k.varfor ? <span className="text-slate-500"> — {k.varfor}</span> : null}</li>
-              ))}
-            </ul>
-          )}
-          {j && <p className="mt-1 text-slate-500 leading-relaxed"><span className="text-slate-600">Före jämkningen:</span> {j.fore.motivering}</p>}
-        </details>
-      )}
-    </>
-  );
-}
 const PRICK: Record<string, string> = { gron: 'bg-emerald-400', gul: 'bg-amber-400', rod: 'bg-red-500' };
 
 /**

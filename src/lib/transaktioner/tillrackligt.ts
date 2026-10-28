@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkontext';
 import { kompletteringText, type Komplettering } from './komplettera';
 import { hamtaInstruktioner, kontextFor, reglerText } from './instruktioner';
+import { iKo, openaiFetch } from '@/lib/ai-anrop';
 
 /**
  * Steget "Tillräckligt?" i flödesschemat: räcker det vi samlat om varje
@@ -130,34 +131,32 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
   const resultat = new Map<string, Tillrackligt | null>();
   for (const t of rader as Rad[]) if (t.dublett_av) resultat.set(t.id, null);
 
-  for (let i = 0; i < grupper.length; i += SAMTIDIGA) {
-    await Promise.all(grupper.slice(i, i + SAMTIDIGA).map(async (grupp) => {
-      const user = [
-        kund || 'Inga uppgifter om kunden.',
-        okompletterade ? 'OBS: transaktionerna har inte kompletterats med historik och mejl.' : '',
-        regler,
-        ...grupp.map((t, j) => [`TRANSAKTION ${j + 1}\n${radText(t)}`, kontextFor(instruktioner, { ...t, underlag_id: underlagId, user_id: u.user_id })].filter(Boolean).join('\n')),
-      ].filter(Boolean).join('\n\n');
-      const svar = await fraga(user);
-      grupp.forEach((t, j) => {
-        const s = svar.find((x) => Number(x.nr) === j + 1);
-        if (!s) {
-          resultat.set(t.id, { status: 'saknar', saknas: [{ vad: 'kontroll', varfor: 'AI:n bedömde inte transaktionen — kör steget igen' }], antaganden: '', modell: MODELL });
-          return;
-        }
-        const saknas = (Array.isArray(s.saknas) ? s.saknas : [])
-          .map((x) => ({ vad: String(x?.vad ?? '').trim(), varfor: String(x?.varfor ?? '').trim() }))
-          .filter((x) => x.vad);
-        resultat.set(t.id, {
-          // Något som saknas gör den otillräcklig, vad statusen än säger
-          status: s.status === 'tillrackligt' && saknas.length === 0 ? 'tillrackligt' : 'saknar',
-          saknas,
-          antaganden: typeof s.antaganden === 'string' ? s.antaganden.trim() : '',
-          modell: MODELL,
-        });
+  await iKo(grupper, SAMTIDIGA, async (grupp) => {
+    const user = [
+      kund || 'Inga uppgifter om kunden.',
+      okompletterade ? 'OBS: transaktionerna har inte kompletterats med historik och mejl.' : '',
+      regler,
+      ...grupp.map((t, j) => [`TRANSAKTION ${j + 1}\n${radText(t)}`, kontextFor(instruktioner, { ...t, underlag_id: underlagId, user_id: u.user_id })].filter(Boolean).join('\n')),
+    ].filter(Boolean).join('\n\n');
+    const svar = await fraga(user);
+    grupp.forEach((t, j) => {
+      const s = svar.find((x) => Number(x.nr) === j + 1);
+      if (!s) {
+        resultat.set(t.id, { status: 'saknar', saknas: [{ vad: 'kontroll', varfor: 'AI:n bedömde inte transaktionen — kör steget igen' }], antaganden: '', modell: MODELL });
+        return;
+      }
+      const saknas = (Array.isArray(s.saknas) ? s.saknas : [])
+        .map((x) => ({ vad: String(x?.vad ?? '').trim(), varfor: String(x?.varfor ?? '').trim() }))
+        .filter((x) => x.vad);
+      resultat.set(t.id, {
+        // Något som saknas gör den otillräcklig, vad statusen än säger
+        status: s.status === 'tillrackligt' && saknas.length === 0 ? 'tillrackligt' : 'saknar',
+        saknas,
+        antaganden: typeof s.antaganden === 'string' ? s.antaganden.trim() : '',
+        modell: MODELL,
       });
-    }));
-  }
+    });
+  });
 
   // Oskickade frågemejl: räcker en transaktion nu ska den inte frågas om
   const utkastIds = [...new Set((rader as Rad[]).map((t) => t.fraga_utkast_id).filter((x): x is string => !!x))];
@@ -214,7 +213,7 @@ function radText(t: Rad): string {
 async function fraga(user: string): Promise<{ nr?: unknown; status?: unknown; saknas?: { vad?: unknown; varfor?: unknown }[]; antaganden?: unknown }[]> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await openaiFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({

@@ -7,6 +7,7 @@ import { reglerAttValja } from '@/lib/transaktioner/kundregler';
 import { hamtaInstruktioner, kontextFor, reglerFor } from '@/lib/transaktioner/instruktioner';
 import { tolkaBetalsatt, type Betalsatt } from './betalsatt';
 import { hamtaArslista, hamtaKundbild } from './kundbild';
+import { iKo } from '@/lib/ai-anrop';
 import { MODELLER, fraga, type Del, type Modell } from './modeller';
 import { momsText, rensaMomsdelar, sammaMoms, slaIhopDelar, type Momsdel } from './momsdelar';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
@@ -611,14 +612,21 @@ async function jamka(t: Transaktion, betalsatt: Betalsatt, f: Underlagsfraga, fo
 
 // ---------- flera transaktioner ----------
 
-/** Så många transaktioner i taget. Varje transaktion kör båda modellerna samtidigt. */
-const SAMTIDIGA = 3;
+/** Så många transaktioner samtidigt. Varje transaktion kör båda modellerna samtidigt. */
+const SAMTIDIGA = 4;
 
 export async function konteraTransaktioner(
   supabase: SupabaseClient,
   userId: string,
   transaktionIds: string[],
-  { torrkorning = false }: { torrkorning?: boolean } = {},
+  {
+    torrkorning = false,
+    medBokforda = false,
+  }: {
+    torrkorning?: boolean;
+    /** Kör om alla: bokförda konteras också, och verifikationen ersätts om konteringen ändrats (se ./ersatt). */
+    medBokforda?: boolean;
+  } = {},
 ): Promise<Utfall[]> {
   const { data: profil, error: profilFel } = await supabase
     .from('profiles').select(KUND_KOLUMNER).eq('id', userId).maybeSingle();
@@ -642,7 +650,7 @@ export async function konteraTransaktioner(
   const { data: bokforda } = await supabase
     .from('verifikationer').select('transaktion_id').in('transaktion_id', transaktionIds);
   const klara = new Set((bokforda ?? []).map((v) => v.transaktion_id as string));
-  const kvar = (rader as Transaktion[]).filter((t) => !klara.has(t.id) && Number(t.belopp) > 0);
+  const kvar = (rader as Transaktion[]).filter((t) => (medBokforda || !klara.has(t.id)) && Number(t.belopp) > 0);
   if (!kvar.length) return [];
 
   // Byråns kontext och regler från flödesschemat
@@ -679,28 +687,24 @@ export async function konteraTransaktioner(
     return filer.get(underlagId)!;
   };
 
-  const utfall: Utfall[] = [];
-  for (let i = 0; i < kvar.length; i += SAMTIDIGA) {
-    utfall.push(...await Promise.all(kvar.slice(i, i + SAMTIDIGA).map(async (t) => {
-      const kontext = kontextFor(instruktioner, t);
-      try {
-        if (kontext && !torrkorning) t = await rattaEfterKontext(supabase, t, betalsatt, kontext);
-        const fil = t.underlag_id ? await filen(t.underlag_id) : { delat: [], nummer: new Map<string, number>() };
-        const f = fil.nummer.get(t.id);
-        const k = arslista.nummer.get(t.id);
-        const var_ = [f ? `F${f} i filen` : '', k ? `K${k} i kundens lista` : ''].filter(Boolean).join(', ');
-        return konteraEn(supabase, t, betalsatt, {
-          kund,
-          delat: fil.delat,
-          user: [`TRANSAKTIONEN ATT KONTERA${var_ ? ` (${var_})` : ''}:\n${transaktionText(t, betalsatt)}`, kontext].filter(Boolean).join('\n\n'),
-          regelIdn: allaRegler.map((r) => r.id),
-        }, torrkorning);
-      } catch (err) {
-        return { transaktionId: t.id, konteringar: [], fel: err instanceof Error ? err.message : String(err) };
-      }
-    })));
-  }
-  return utfall;
+  return iKo(kvar, SAMTIDIGA, async (t): Promise<Utfall> => {
+    const kontext = kontextFor(instruktioner, t);
+    try {
+      if (kontext && !torrkorning) t = await rattaEfterKontext(supabase, t, betalsatt, kontext);
+      const fil = t.underlag_id ? await filen(t.underlag_id) : { delat: [], nummer: new Map<string, number>() };
+      const f = fil.nummer.get(t.id);
+      const k = arslista.nummer.get(t.id);
+      const var_ = [f ? `F${f} i filen` : '', k ? `K${k} i kundens lista` : ''].filter(Boolean).join(', ');
+      return konteraEn(supabase, t, betalsatt, {
+        kund,
+        delat: fil.delat,
+        user: [`TRANSAKTIONEN ATT KONTERA${var_ ? ` (${var_})` : ''}:\n${transaktionText(t, betalsatt)}`, kontext].filter(Boolean).join('\n\n'),
+        regelIdn: allaRegler.map((r) => r.id),
+      }, torrkorning);
+    } catch (err) {
+      return { transaktionId: t.id, konteringar: [], fel: err instanceof Error ? err.message : String(err) };
+    }
+  });
 }
 
 /**
@@ -951,6 +955,30 @@ export async function konteraMedInstruktion(
 }
 
 /**
+ * Raderna en kontering blir i verifikationen, debet positivt. Samma räkning
+ * när den bokförs som när en ny kontering jämförs med en bokförd (./ersatt).
+ */
+export function verifikationsrader(
+  t: Transaktion,
+  konto: string,
+  momssats: number,
+  betalsatt: Betalsatt,
+  motkontoOverride?: string,
+  momsdelar?: Momsdel[] | null,
+): { konto: string; belopp: number }[] {
+  if (!slaUppKonto(konto)) throw new Error(`${konto} finns inte bland K1-kontona`);
+  const motkonto = motkontoOverride ?? betalkonto(betalsatt, t.riktning);
+  if (!motkonto) throw new Error('Betalkonto saknas');
+  const uppdelad = rensaMomsdelar(momsdelar);
+  for (const d of uppdelad ?? []) {
+    if (d.konto && !slaUppKonto(d.konto)) throw new Error(`${d.konto} finns inte bland K1-kontona`);
+  }
+  const delar: Momsdel[] = uppdelad ?? [{ konto, momssats, belopp: Number(t.belopp), moms: null }];
+  const { delar: bokdelar } = raknaMoms(t, delar, momssats || uppdelad ? 'svensk' : 'ingen', konto);
+  return byggRader(t, bokdelar, motkonto);
+}
+
+/**
  * Bokför en transaktion som verifikation. Används både när modellerna är
  * överens och när Erik väljer ett förslag. Momsen räknas på samma sätt som i
  * konteringen, så att det som bokförs är det som visades.
@@ -965,19 +993,8 @@ export async function bokfor(
   motkontoOverride?: string,
   momsdelar?: Momsdel[] | null,
 ) {
-  const k1 = slaUppKonto(konto);
-  if (!k1) throw new Error(`${konto} finns inte bland K1-kontona`);
-  const motkonto = motkontoOverride ?? betalkonto(betalsatt, t.riktning);
-  if (!motkonto) throw new Error('Betalkonto saknas');
   if (!t.datum) throw new Error('Transaktionen saknar datum');
-
-  const uppdelad = rensaMomsdelar(momsdelar);
-  for (const d of uppdelad ?? []) {
-    if (d.konto && !slaUppKonto(d.konto)) throw new Error(`${d.konto} finns inte bland K1-kontona`);
-  }
-  const delar: Momsdel[] = uppdelad ?? [{ konto, momssats, belopp: Number(t.belopp), moms: null }];
-  const { delar: bokdelar } = raknaMoms(t, delar, momssats || uppdelad ? 'svensk' : 'ingen', konto);
-  const rader = byggRader(t, bokdelar, motkonto);
+  const rader = verifikationsrader(t, konto, momssats, betalsatt, motkontoOverride, momsdelar);
 
   const id = crypto.randomUUID();
   const { error } = await supabase.from('verifikationer').insert({

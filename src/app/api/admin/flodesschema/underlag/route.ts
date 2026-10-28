@@ -12,6 +12,7 @@ import { skrivFragemejl } from '@/lib/transaktioner/fragemejl';
 import { konteraTransaktioner, valjKonto, type ValdKontering } from '@/lib/kontering/kontera';
 import { byggKundbild } from '@/lib/kontering/kundbild';
 import { helhetskontroll } from '@/lib/kontering/helhet';
+import { ersattVerifikationer } from '@/lib/kontering/ersatt';
 import { rensaMomsdelar } from '@/lib/kontering/momsdelar';
 import { bokforForfallna, slutligKontering, verifikationFran } from '@/lib/kontering/preliminar';
 import { slaUppKonto } from '@/lib/kontering/regelverk';
@@ -29,6 +30,8 @@ export const maxDuration = 300;
  *            | skriv-mejl (kundens samlade frågemejl nu, i stället för kl 18; med omkorning: true är det inget fel om inget finns att fråga om)
  *            | kundbild (bygger om kundbilden när den är inaktuell, alltid med tvinga: true; svarar { byggd })
  *            | helhet (helhetskontrollen av kundens alla konteringar; svarar { flaggade })
+ *            (konteras med medBokforda: true konterar också bokförda och ersätter verifikationen
+ *            när konteringen ändrats; svarar också { ersatt } — se `@/lib/kontering/ersatt`)
  *            (skapa-verif med val: { transaktionId, konto, momssats, momsdelar? } bokför en granskad för hand)
  *
  * Varje steg är ett eget anrop, så att vart och ett har hela tidsgränsen på
@@ -50,8 +53,8 @@ export async function GET(request: NextRequest) {
 }
 
 const STEG = ['definiera', 'plocka-trans', 'plocka-verif', 'komplettera', 'dublett', 'tillrackligt', 'skriv-mejl', 'kundbild', 'konteras', 'helhet', 'skapa-verif'];
-/** Transaktioner per konteringsanrop. Båda modellerna, två pass var och en jämkning, ryms inom tidsgränsen. */
-const KONTERA_PER_ANROP = 3;
+/** Transaktioner per konteringsanrop, alla samtidigt. Båda modellerna, två pass var och en jämkning, ryms inom tidsgränsen. */
+const KONTERA_PER_ANROP = 4;
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
@@ -73,7 +76,7 @@ export async function POST(request: NextRequest) {
     if (body.steg === 'tillrackligt') await kollaTillrackligt(supabase, body.id);
     if (body.steg === 'skriv-mejl') await fragemejl(body.id, body.omkorning === true);
     if (body.steg === 'kundbild') extra.byggd = await byggKundbild(supabase, await kundensId(body.id), { tvinga: body.tvinga === true });
-    if (body.steg === 'konteras') extra.kvar = await kontera(body.id, typeof body.fran === 'string' ? body.fran : new Date().toISOString());
+    if (body.steg === 'konteras') Object.assign(extra, await kontera(body.id, typeof body.fran === 'string' ? body.fran : new Date().toISOString(), body.medBokforda === true));
     if (body.steg === 'helhet') extra.flaggade = (await helhetskontroll(supabase, await kundensId(body.id))).flaggade;
     if (body.steg === 'skapa-verif') extra.bokforda = await skapaVerifikationer(body.id, body.val);
   } catch (e) {
@@ -129,8 +132,12 @@ async function fragemejl(underlagId: string, omkorning = false) {
  * om konto och moms, blir verifikationer om 14 dagar; resten väntar på Granska.
  * Dubbletter och de som saknar uppgifter konteras inte. Svarar med hur många
  * som är kvar.
+ *
+ * Med medBokforda konteras också de bokförda, och deras verifikationer
+ * ersätts när konteringen ändrats. När inget är kvar tas verifikationerna
+ * bort från dem som dublettkollen nu säger är dubbletter.
  */
-async function kontera(underlagId: string, fran: string): Promise<number> {
+async function kontera(underlagId: string, fran: string, medBokforda = false): Promise<{ kvar: number; ersatt?: Awaited<ReturnType<typeof ersattVerifikationer>> }> {
   const supabase = createServerClient();
   const { data: u } = await supabase.from('bokforing_underlag').select('user_id').eq('id', underlagId).maybeSingle();
   if (!u?.user_id) throw new Error('Underlaget hör inte till ett kundkonto — det går inte att kontera');
@@ -148,17 +155,22 @@ async function kontera(underlagId: string, fran: string): Promise<number> {
   const konteradSedan = new Set((k ?? []).filter((x) => x.created_at >= fran).map((x) => x.transaktion_id));
 
   const att = (trans ?? []).filter((t) => !t.dublett_av && !t.dublett_orsak && Number(t.belopp) > 0
-    && (t.tillrackligt as { status?: string } | null)?.status !== 'saknar' && !bokforda.has(t.id));
+    && (t.tillrackligt as { status?: string } | null)?.status !== 'saknar' && (medBokforda || !bokforda.has(t.id)));
   const kvar = att.filter((t) => !konteradSedan.has(t.id));
-  if (!kvar.length) return 0;
+  if (!kvar.length) {
+    const dubletter = (trans ?? []).filter((t) => (t.dublett_av || t.dublett_orsak) && bokforda.has(t.id)).map((t) => t.id);
+    return medBokforda && dubletter.length ? { kvar: 0, ersatt: await ersattVerifikationer(supabase, u.user_id, dubletter) } : { kvar: 0 };
+  }
 
   const omgang = kvar.slice(0, KONTERA_PER_ANROP).map((t) => t.id);
-  const utfall = await konteraTransaktioner(supabase, u.user_id, omgang);
+  const utfall = await konteraTransaktioner(supabase, u.user_id, omgang, { medBokforda });
   const fel = utfall.filter((x) => x.fel);
   // Går ingen i omgången att kontera stannar körningen här — annars försöker
   // sidan med samma transaktioner igen och igen
   if (fel.length === omgang.length) throw new Error(fel.map((x) => x.fel).join('; '));
-  return kvar.length - omgang.length + fel.length;
+  const bokfordaNu = omgang.filter((id) => bokforda.has(id) && !fel.some((x) => x.transaktionId === id));
+  const ersatt = bokfordaNu.length ? await ersattVerifikationer(supabase, u.user_id, bokfordaNu) : undefined;
+  return { kvar: kvar.length - omgang.length + fel.length, ersatt };
 }
 
 /**

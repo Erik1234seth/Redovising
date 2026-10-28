@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkontext';
 import { byggMejlkontext } from '@/lib/mejlkontext';
 import { hamtaInstruktioner, kontextFor } from './instruktioner';
+import { iKo, openaiFetch } from '@/lib/ai-anrop';
 
 /**
  * Steget "Komplettera med kundhistorik" i flödesschemat.
@@ -136,14 +137,12 @@ async function komplettera(supabase: SupabaseClient, underlagId: string): Promis
   for (let i = 0; i < medKontext.length; i += PER_ANROP) grupper.push(medKontext.slice(i, i + PER_ANROP));
 
   const nu = new Date().toISOString();
-  for (let i = 0; i < grupper.length; i += SAMTIDIGA) {
-    await Promise.all(grupper.slice(i, i + SAMTIDIGA).map(async (grupp) => {
-      const resultat = await kompletteraGrupp(supabase, grupp, { userId: u.user_id, epost, kundtext, mejl, verksamhet: kund?.verksamhet ?? null });
-      const fel = (await Promise.all(grupp.map((t, j) => supabase.from('transaktioner')
-        .update({ komplettering: resultat[j], kompletterad_at: nu }).eq('id', t.id)))).find((r) => r.error);
-      if (fel?.error) throw new Error(`Kunde inte spara kompletteringen: ${fel.error.message}`);
-    }));
-  }
+  await iKo(grupper, SAMTIDIGA, async (grupp) => {
+    const resultat = await kompletteraGrupp(supabase, grupp, { userId: u.user_id, epost, kundtext, mejl, verksamhet: kund?.verksamhet ?? null });
+    const fel = (await Promise.all(grupp.map((t, j) => supabase.from('transaktioner')
+      .update({ komplettering: resultat[j], kompletterad_at: nu }).eq('id', t.id)))).find((r) => r.error);
+    if (fel?.error) throw new Error(`Kunde inte spara kompletteringen: ${fel.error.message}`);
+  });
   return trans.length;
 }
 
@@ -235,7 +234,7 @@ async function sok(
 const EMBED_MODELL = 'text-embedding-3-small';
 
 async function embed(texter: string[]): Promise<number[][]> {
-  const res = await fetch('https://api.openai.com/v1/embeddings', {
+  const res = await openaiFetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
     body: JSON.stringify({ model: EMBED_MODELL, input: texter.map((t) => t.slice(0, 2000)) }),
@@ -270,7 +269,7 @@ function kandidatText(c: Kandidat): string {
 async function fraga(user: string): Promise<{ nr?: unknown; kundens?: { ref?: unknown; varfor?: unknown }[]; andra?: { ref?: unknown; varfor?: unknown }[]; mejl?: unknown; sammanfattning?: unknown }[]> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await openaiFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { openaiFetch } from '@/lib/ai-anrop';
 
 /**
  * De två modellerna som konterar, bakom samma anrop.
@@ -23,7 +24,8 @@ export interface Svar<T> {
 let anthropic: Anthropic | null = null;
 function claude() {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY saknas');
-  anthropic ??= new Anthropic();
+  // SDK:n försöker själv igen vid 429 och överbelastning — fler gånger när flera filer körs samtidigt
+  anthropic ??= new Anthropic({ maxRetries: 4 });
   return anthropic;
 }
 
@@ -63,7 +65,7 @@ async function fragaGpt<T>(system: System, delat: Del[], user: string, namn: str
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await openaiFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({

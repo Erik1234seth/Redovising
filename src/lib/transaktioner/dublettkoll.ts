@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { hamtaInstruktioner, kontextFor } from './instruktioner';
+import { iKo, openaiFetch } from '@/lib/ai-anrop';
 
 /**
  * Steget "Dublettcheck" i flödesschemat: finns samma affär redan i ett annat
@@ -142,39 +143,37 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
 
   const grupper: typeof attFraga[] = [];
   for (let i = 0; i < attFraga.length; i += PER_ANROP) grupper.push(attFraga.slice(i, i + PER_ANROP));
-  for (let i = 0; i < grupper.length; i += SAMTIDIGA) {
-    await Promise.all(grupper.slice(i, i + SAMTIDIGA).map(async (grupp) => {
-      const user = grupp.map((n, j) => [
-        `NY TRANSAKTION ${j + 1}`,
-        radText(n.t),
-        kontextFor(instruktioner, { id: n.t.id, underlag_id: underlagId, user_id: u.user_id }),
-        'KANDIDATER:',
-        ...n.kandidater.map((k, m) => `[${j + 1}${String.fromCharCode(65 + m)}] ur ${k.underlag_id ? `"${filer.get(k.underlag_id)?.namn ?? 'okänd fil'}", inkommen ${(filer.get(k.underlag_id)?.at ?? '').slice(0, 10)}` : 'en källa utan fil'}\n${radText(k)}`),
-      ].filter(Boolean).join('\n')).join('\n\n');
+  await iKo(grupper, SAMTIDIGA, async (grupp) => {
+    const user = grupp.map((n, j) => [
+      `NY TRANSAKTION ${j + 1}`,
+      radText(n.t),
+      kontextFor(instruktioner, { id: n.t.id, underlag_id: underlagId, user_id: u.user_id }),
+      'KANDIDATER:',
+      ...n.kandidater.map((k, m) => `[${j + 1}${String.fromCharCode(65 + m)}] ur ${k.underlag_id ? `"${filer.get(k.underlag_id)?.namn ?? 'okänd fil'}", inkommen ${(filer.get(k.underlag_id)?.at ?? '').slice(0, 10)}` : 'en källa utan fil'}\n${radText(k)}`),
+    ].filter(Boolean).join('\n')).join('\n\n');
 
-      const svar = await fraga(user);
-      grupp.forEach((n, j) => {
-        const s = svar.find((x) => Number(x.nr) === j + 1);
-        const ref = typeof s?.ref === 'string' ? s.ref.trim().replace(/[[\]]/g, '') : '';
-        const m = ref.match(/^(\d+)([A-Z])$/);
-        const kandidat = m && Number(m[1]) === j + 1 ? n.kandidater[m[2].charCodeAt(0) - 65] : undefined;
-        const status: Dublettstatus = s?.status === 'dublett' || s?.status === 'tveksam' ? s.status : 'unik';
-        const motivering = typeof s?.motivering === 'string' ? s.motivering.trim() : '';
-        // En dublett utan giltig kandidat går inte att peka ut — då får en människa titta
-        if (status !== 'unik' && !kandidat) {
-          resultat.set(n.t.id, { status: 'tveksam', av: null, avFil: null, motivering: motivering || 'AI:n pekade inte ut vilken transaktion den liknar', modell: MODELL });
-          return;
-        }
-        resultat.set(n.t.id, {
-          status,
-          av: status === 'unik' ? null : kandidat!.id,
-          avFil: status === 'unik' || !kandidat!.underlag_id ? null : filer.get(kandidat!.underlag_id)?.namn ?? null,
-          motivering,
-          modell: MODELL,
-        });
+    const svar = await fraga(user);
+    grupp.forEach((n, j) => {
+      const s = svar.find((x) => Number(x.nr) === j + 1);
+      const ref = typeof s?.ref === 'string' ? s.ref.trim().replace(/[[\]]/g, '') : '';
+      const m = ref.match(/^(\d+)([A-Z])$/);
+      const kandidat = m && Number(m[1]) === j + 1 ? n.kandidater[m[2].charCodeAt(0) - 65] : undefined;
+      const status: Dublettstatus = s?.status === 'dublett' || s?.status === 'tveksam' ? s.status : 'unik';
+      const motivering = typeof s?.motivering === 'string' ? s.motivering.trim() : '';
+      // En dublett utan giltig kandidat går inte att peka ut — då får en människa titta
+      if (status !== 'unik' && !kandidat) {
+        resultat.set(n.t.id, { status: 'tveksam', av: null, avFil: null, motivering: motivering || 'AI:n pekade inte ut vilken transaktion den liknar', modell: MODELL });
+        return;
+      }
+      resultat.set(n.t.id, {
+        status,
+        av: status === 'unik' ? null : kandidat!.id,
+        avFil: status === 'unik' || !kandidat!.underlag_id ? null : filer.get(kandidat!.underlag_id)?.namn ?? null,
+        motivering,
+        modell: MODELL,
       });
-    }));
-  }
+    });
+  });
 
   let dubletter = 0;
   let tveksamma = 0;
@@ -234,7 +233,7 @@ function radText(t: Rad): string {
 async function fraga(user: string): Promise<{ nr?: unknown; status?: unknown; ref?: unknown; motivering?: unknown }[]> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await openaiFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
