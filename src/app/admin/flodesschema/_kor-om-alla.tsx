@@ -207,6 +207,8 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
         uppdatera(f.id, { lage: 'kor' });
         try {
           await tidta('dublett', () => post(f.id, 'dublett'), f.id);
+          // Väntar på en plats i kön till Komplettera
+          uppdatera(f.id, { lage: 'vantar', steg: '' });
         } catch (e) {
           trasiga.add(f.id);
           uppdatera(f.id, { lage: 'fel', fel: (e as Error).message, steg: '' });

@@ -113,8 +113,10 @@ export async function samlaSidor(supabase: SupabaseClient, underlagId: string): 
   // Det som redan lästs ut ur en sida som nu är del av ett annat underlag tas
   // bort, och huvudunderlaget läses om med alla sidor. Underlaget som
   // definieras nu läses av den som anropade.
+  // Blir underlaget självt en sida rensas det här också: flödet fortsätter på
+  // huvudunderlaget, och det som lästs ut ur sidan förut låg annars kvar.
   for (const s of andrade) {
-    if (s.id === egen.id || !s.transaktioner_utlasta_at) continue;
+    if ((s.id === egen.id && !s.del_av) || !s.transaktioner_utlasta_at) continue;
     if (s.id === huvud.id || s.del_av) {
       await lasUtTransaktioner(supabase, s.id).catch((err) =>
         console.error(`[sidor] kunde inte läsa om ${s.file_name}:`, err instanceof Error ? err.message : err));

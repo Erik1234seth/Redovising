@@ -60,14 +60,19 @@ export async function hamtaArslista(supabase: SupabaseClient, userId: string): P
     rader.push(...(data ?? []) as Arsrad[]);
     if ((data ?? []).length < 1000) break;
   }
-  const lista = rader.slice(0, MAX_RADER).reverse();
-
-  const underlagIds = [...new Set(lista.map((r) => r.underlag_id).filter((x): x is string => !!x))];
+  const underlagIds = [...new Set(rader.map((r) => r.underlag_id).filter((x): x is string => !!x))];
   const filnamn = new Map<string, string>();
+  // En sida som läses med ett annat underlag har inga egna transaktioner —
+  // står det ändå några kvar på den är de gamla och hör inte hit
+  const sidor = new Set<string>();
   for (let i = 0; i < underlagIds.length; i += 200) {
-    const { data } = await supabase.from('bokforing_underlag').select('id, file_name').in('id', underlagIds.slice(i, i + 200));
-    for (const f of data ?? []) filnamn.set(f.id, f.file_name);
+    const { data } = await supabase.from('bokforing_underlag').select('id, file_name, del_av').in('id', underlagIds.slice(i, i + 200));
+    for (const f of data ?? []) {
+      filnamn.set(f.id, f.file_name);
+      if (f.del_av) sidor.add(f.id);
+    }
   }
+  const lista = rader.filter((r) => !r.underlag_id || !sidor.has(r.underlag_id)).slice(0, MAX_RADER).reverse();
 
   const nummer = new Map(lista.map((r, i) => [r.id, i + 1]));
   const text = lista.map((r, i) => {
