@@ -122,7 +122,9 @@ const STEG: Steg[] = [
   { id: 'bank-till-bokslut', namn: 'Spara till årsbokslutet', typ: 'system', rad: 2, kol: 14, beskrivning: 'Bankrader utan underlag vid momsdeadline sparas och tas upp igen inför årsbokslutet.' },
   { id: 'hopp-ut-b', namn: 'B', typ: 'hopp', rad: 2, kol: 15, hopp: 'hopp-in-b', etikett: 'till Inför årsbokslut', beskrivning: 'Fortsätter vid Inför årsbokslut.' },
   { id: 'hopp-in-b', namn: 'B', typ: 'hopp', rad: 6, kol: 16, beskrivning: 'Bankrader utan underlag kommer in i bokslutet här.' },
-  { id: 'konteras', klar: true, namn: 'Konteras', typ: 'ai', rad: 5, kol: 10, beskrivning: 'Två AI-modeller (GPT-6 Astra och Claude Opus 5.5) konterar var för sig enligt K1, i två pass: först väljs konto, sedan prövas det mot kontots regler. Grönt när båda är säkra och överens om konto och moms. Kontot väljs bara ur byråns egen K1-dokumentation — kundhistoriken är en ledtråd om vad affären är, inte om kontot. Modellerna väljer också vilka kundspecifika regler som gäller transaktionen, t.ex. periodisk sammanställning vid försäljning till företag i andra EU-länder (3108/3308), och följer dem — transaktionen styr, inte kryssrutorna på kunden. Dubbletter och transaktioner som saknar uppgifter konteras inte.', finns: 'Fliken Kontering i personvyn. Reglerna finns i src/lib/transaktioner/kundregler.ts. Körs när man följer ett underlag här. Gröna blir preliminära, resten går till Granska.' },
+  { id: 'kundbild', klar: true, namn: 'Kundbild', typ: 'ai', rad: 4, kol: 10, beskrivning: 'Innan kundens transaktioner konteras sammanställer Claude Opus 5.5 vad den ser i kundens alla transaktioner, mejl och kundprofil: vad verksamheten gör, återkommande motparter och vad de är, privata mönster, lån, abonnemang och vad som är oklart. Sammanställningen sparas och byggs om först när kunden fått många nya transaktioner (minst 10 och 20 %), när den är äldre än 30 dagar eller vid Kör om alla. Listan med alla kundens transaktioner byggs med kod varje gång och är alltid aktuell.', finns: 'Tabellen kundbilder (src/lib/kontering/kundbild.ts). Körs före konteringen när man följer ett underlag här.' },
+  { id: 'konteras', klar: true, namn: 'Konteras', typ: 'ai', rad: 5, kol: 10, beskrivning: 'Två AI-modeller (GPT-6 Astra och Claude Opus 5.5) konterar var för sig enligt K1. Båda ser kundbilden och kundens alla transaktioner, mejlen, originalunderlaget som det ser ut (PDF, bild eller kalkylblad) och alla transaktioner i filen. Först tar modellen reda på vad affären är och väljer själv 1–5 kandidatkonton, sedan får den kandidaternas hela regeltext och konterar: konto, moms, uppdelning och vilka regler som inte stämmer. Är modellerna oense eller osäkra får var och en se den andras kontering och kontera om en gång (jämkning). Grönt när båda är säkra och överens om konto och moms. Kontot väljs bara ur byråns egen K1-dokumentation — historiken och byråns tidigare val är ledtrådar om vad affären är, inte facit. Modellerna väljer också vilka kundspecifika regler som gäller, t.ex. periodisk sammanställning vid försäljning till företag i andra EU-länder (3108/3308). Dubbletter och transaktioner som saknar uppgifter konteras inte.', finns: 'src/lib/kontering/kontera.ts, originalet via src/lib/kontering/underlag.ts. Reglerna finns i src/lib/transaktioner/kundregler.ts. Körs när man följer ett underlag här. Gröna blir preliminära, resten går till Granska.' },
+  { id: 'helhet', klar: true, namn: 'Helhetskontroll', typ: 'ai', rad: 6, kol: 10, beskrivning: 'När transaktionerna är konterade läser Claude Opus 5.5 alla kundens konteringar tillsammans och letar efter det man inte ser en transaktion åt gången: samma motpart på olika konton, privata mönster, moms som inte går ihop, återkommande poster som saknas eller dubblerats. En anmärkning på en transaktion som inte är bokförd gör den gul, och den går till Granska.', finns: 'src/lib/kontering/helhet.ts. Körs efter konteringen när man följer ett underlag här. Sammanfattningen sparas i kundbilder.helhet.' },
   { id: 'val-resultat', namn: 'Grönt?', typ: 'val', rad: 5, kol: 11 },
   { id: 'granska', namn: 'Granska', typ: 'manuell', rad: 7, kol: 11, beskrivning: 'Det AI:n inte är överens om eller osäker på granskar vi själva.', finns: 'Rätta kontering i fliken Kontering' },
   { id: 'preliminar', klar: true, namn: 'Preliminär i 14 dagar', typ: 'vanta', rad: 5, kol: 12, beskrivning: 'Konteringen är preliminär och går att ändra fritt: kontera om, välja ett annat konto, rätta beloppet — eller läsa om underlaget när en sida till kommer in. Varje ändring startar om de 14 dagarna. Sedan blir den verifikation av sig själv.', finns: 'transaktioner.preliminar_at och vald_kontering (src/lib/kontering/preliminar.ts). Bokför nu hoppar över väntan för ett underlag.' },
@@ -175,7 +177,9 @@ const PILAR: Pil[] = [
   { fran: 'skriv-mejl', till: 'kund-svarar-1', mejl: true },
   { fran: 'kund-svarar-1', till: 'hopp-ut-1' },
   { fran: 'val-tillrackligt', till: 'konteras', text: 'Tillräckligt' },
-  { fran: 'konteras', till: 'val-resultat' },
+  { fran: 'kundbild', till: 'konteras' },
+  { fran: 'konteras', till: 'helhet' },
+  { fran: 'helhet', till: 'val-resultat', form: 'hv' },
   { fran: 'val-resultat', till: 'preliminar', text: 'Grönt' },
   { fran: 'val-resultat', till: 'granska', text: 'Manuell granskning' },
   { fran: 'granska', till: 'preliminar', form: 'hv' },
@@ -540,14 +544,24 @@ function foljUnderlag(u: FlodesUnderlag): Spar {
   }
 
   ga('val-tillrackligt', 'konteras');
+  const kb = u.kundbild;
+  if (kb?.fel && !kb.text) satt('kundbild', 'fel', kb.fel);
+  else if (kb?.text) { satt('kundbild', 'klar', `Byggd ${kb.at ? kort(kb.at) : ''} på ${kb.antal} transaktioner`); ga('kundbild', 'konteras'); }
+  else satt('kundbild', 'har', 'Inte byggd än');
   if (T.length === 0) { satt('konteras', 'fel', 'Avläsningen gav inga transaktioner'); return { steg, pilar }; }
   // Dubbletter och de som saknar uppgifter konteras inte
   const attKontera = T.filter((t) => !t.dublettAv && t.tillrackligt?.status !== 'saknar');
   const konteradeNu = attKontera.filter((t) => t.kontering !== 'ingen' || t.bokford);
   if (attKontera.length === 0) { satt('konteras', 'oppen', 'Inget att kontera — resten väntar på uppgifter'); return { steg, pilar }; }
   if (konteradeNu.length === 0) { satt('konteras', 'har', `Ingen av ${attKontera.length} transaktioner konterad än`); return { steg, pilar }; }
-  satt('konteras', konteradeNu.length < attKontera.length ? 'har' : 'klar', `${konteradeNu.length} av ${attKontera.length} konterade av båda modellerna`);
-  ga('konteras', 'val-resultat');
+  const jamkade = konteradeNu.filter((t) => t.forslag.some((f) => f.granskning?.jamkning));
+  satt('konteras', konteradeNu.length < attKontera.length ? 'har' : 'klar', `${konteradeNu.length} av ${attKontera.length} konterade av båda modellerna${jamkade.length ? `, ${jamkade.length} jämkade` : ''}`);
+  ga('konteras', 'helhet');
+  const h = u.helhet;
+  if (h?.fel) satt('helhet', 'fel', h.fel);
+  else if (h) satt('helhet', h.flaggade ? 'oppen' : 'klar', `${h.anmarkningar.length ? `${h.anmarkningar.length} anmärkningar, ${h.flaggade} transaktioner till Granska` : 'Inga anmärkningar'} ${h.at ? kort(h.at) : ''}`);
+  else satt('helhet', 'har', 'Inte körd än');
+  ga('helhet', 'val-resultat');
 
   const gron = attKontera.filter((t) => t.kontering === 'gron');
   const granska = attKontera.filter((t) => t.kontering === 'granska');
@@ -687,6 +701,12 @@ export default function FlodesschemaPage() {
       }
       return true;
     };
+    // Kundbilden först, om den behöver byggas om, och helhetskontrollen efteråt.
+    // Utan kundbild konteras det ändå — med kundens transaktioner som enda bild.
+    const konteraMedKund = async () => {
+      await ett('kundbild');
+      if (await kontera()) await ett('helhet');
+    };
     try {
       if (stegId === 'konteras') { await kontera(); return; }
       if (stegId === 'omkorning') {
@@ -699,7 +719,7 @@ export default function FlodesschemaPage() {
         // annars tar dygnsmejlet kl 18 det.
         const utkast = foljer.mejl?.status === 'draft';
         for (const steg of OMKORNING) {
-          if (steg === 'konteras') { await kontera(); return; }
+          if (steg === 'konteras') { await konteraMedKund(); return; }
           if (steg === 'skriv-mejl') {
             if (fran === 'skriv-mejl' || utkast) await ett('skriv-mejl', { omkorning: true });
             continue;
@@ -708,7 +728,8 @@ export default function FlodesschemaPage() {
         }
         return;
       }
-      if (stegId !== 'alla') { await ett(stegId as Exclude<KorSteg, 'alla' | 'omkorning'>, val ? { val } : {}); return; }
+      // Kundbilden byggs om när man ber om det, även om den inte är inaktuell
+      if (stegId !== 'alla') { await ett(stegId as Exclude<KorSteg, 'alla' | 'omkorning'>, val ? { val } : stegId === 'kundbild' ? { tvinga: true } : {}); return; }
       // Från början så långt flödet är byggt. Vägen tar slut för övriga
       // filer, efter inläsningen för verifikationer, och vid fel.
       const sidorFore = foljer.sidor?.delar ?? [];
@@ -736,7 +757,7 @@ export default function FlodesschemaPage() {
       // Det som saknas frågas i dygnsmejlet kl 18; resten konteras ändå
       for (const steg of ['komplettera', 'dublett', 'tillrackligt'] as const) if (!(await ett(steg))) return;
       // Konteringen är preliminär och blir verifikation om 14 dagar — inget bokförs här
-      await kontera();
+      await konteraMedKund();
     } finally {
       setKor(null);
       setKorText('');
@@ -1135,7 +1156,7 @@ function vagFor(u: FlodesUnderlag): 'ovrigt' | 'verifikationer' | 'transaktioner
 }
 
 /** AI-stegen som går att köra på underlaget härifrån. */
-type KorSteg = 'alla' | 'omkorning' | 'definiera' | 'plocka-trans' | 'plocka-verif' | 'komplettera' | 'dublett' | 'tillrackligt' | 'skriv-mejl' | 'konteras' | 'skapa-verif';
+type KorSteg = 'alla' | 'omkorning' | 'definiera' | 'plocka-trans' | 'plocka-verif' | 'komplettera' | 'dublett' | 'tillrackligt' | 'skriv-mejl' | 'kundbild' | 'konteras' | 'helhet' | 'skapa-verif';
 
 /** Stegen som tar byråns kontext och regler, i ordning — alla körs om när en instruktion läggs till. */
 const OMKORNING = ['komplettera', 'dublett', 'tillrackligt', 'skriv-mejl', 'konteras'] as const;
@@ -1150,7 +1171,7 @@ const INSTRUKTION_I_SCHEMAT: Record<string, Omkorning> = {
 /** Var i schemat varje körbart steg står. */
 const STEG_I_SCHEMAT: Record<Exclude<KorSteg, 'alla' | 'omkorning'>, string> = {
   definiera: 'definiera', 'plocka-trans': 'plocka-trans', 'plocka-verif': 'plocka-verif', komplettera: 'komplettera',
-  dublett: 'val-dublett', tillrackligt: 'val-tillrackligt', 'skriv-mejl': 'skriv-mejl', konteras: 'konteras', 'skapa-verif': 'skapa-verif',
+  dublett: 'val-dublett', tillrackligt: 'val-tillrackligt', 'skriv-mejl': 'skriv-mejl', kundbild: 'kundbild', konteras: 'konteras', helhet: 'helhet', 'skapa-verif': 'skapa-verif',
 };
 
 function Sparpanel({ u, spar, steg, onVal, onKor, kor, korText, valdFil }: {
@@ -1395,6 +1416,31 @@ function Sparpanel({ u, spar, steg, onVal, onKor, kor, korText, valdFil }: {
         );
       })()}
 
+      {vag === 'transaktioner' && u.transaktioner.length > 0 && (
+        <div className="mb-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700 mb-1">Kundbild</div>
+          <p className="text-xs text-slate-700 mb-2">
+            {kor === 'kundbild' ? 'Sammanställer kunden…'
+              : u.kundbild?.text ? `Byggd ${u.kundbild.at ? kort(u.kundbild.at) : ''} på ${u.kundbild.antal} transaktioner. Byggs om av sig själv när kunden fått många nya.`
+              : 'Inte byggd än. Den byggs före konteringen.'}
+          </p>
+          {u.kundbild?.fel && <p className="text-xs text-red-600 mb-2">{u.kundbild.fel}</p>}
+          {u.kundbild?.text && (
+            <details className="mb-2">
+              <summary className="text-xs text-slate-500 cursor-pointer">Visa kundbilden</summary>
+              <p className="mt-1 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{u.kundbild.text}</p>
+            </details>
+          )}
+          <button
+            onClick={() => onKor('kundbild')}
+            disabled={kor !== null}
+            className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md"
+          >
+            {kor === 'kundbild' ? 'Bygger…' : u.kundbild?.text ? 'Bygg om kundbilden' : 'Bygg kundbilden'}
+          </button>
+        </div>
+      )}
+
       {vag === 'transaktioner' && u.transaktioner.length > 0 && (() => {
         const att = u.transaktioner.filter((t) => !t.dublettAv && t.tillrackligt?.status !== 'saknar');
         const gron = att.filter((t) => t.kontering === 'gron').length;
@@ -1417,6 +1463,32 @@ function Sparpanel({ u, spar, steg, onVal, onKor, kor, korText, valdFil }: {
           </div>
         );
       })()}
+
+      {vag === 'transaktioner' && u.transaktioner.some((t) => t.kontering !== 'ingen' || t.bokford) && (
+        <div className="mb-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-violet-700 mb-1">Helhetskontroll</div>
+          <p className="text-xs text-slate-700 mb-2">
+            {kor === 'helhet' ? 'Läser kundens alla konteringar…'
+              : u.helhet ? `${u.helhet.sammanfattning}${u.helhet.at ? ` (${kort(u.helhet.at)})` : ''}`
+              : 'Inte körd än. Den körs efter konteringen.'}
+          </p>
+          {u.helhet?.fel && <p className="text-xs text-red-600 mb-2">{u.helhet.fel}</p>}
+          {u.helhet && u.helhet.anmarkningar.length > 0 && (
+            <ul className="mb-2 space-y-1">
+              {u.helhet.anmarkningar.map((a, i) => (
+                <li key={i} className="text-xs text-amber-800">• {a.text}{a.rader.length ? <span className="text-slate-400"> ({a.rader.map((n) => `K${n}`).join(', ')})</span> : null}</li>
+              ))}
+            </ul>
+          )}
+          <button
+            onClick={() => onKor('helhet')}
+            disabled={kor !== null}
+            className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md"
+          >
+            {kor === 'helhet' ? 'Kontrollerar…' : u.helhet ? 'Kör helhetskontrollen igen' : 'Kör helhetskontrollen'}
+          </button>
+        </div>
+      )}
 
       {vag === 'transaktioner' && u.transaktioner.length > 0 && (() => {
         const bokforda = u.transaktioner.filter((t) => t.bokford).length;
@@ -1592,6 +1664,40 @@ type FlodesTransaktion = FlodesUnderlag['transaktioner'][number];
 /** Konterad men inte grön, och inte bokförd än — väntar på granskning. */
 const attGranska = (t: FlodesTransaktion) => t.kontering === 'granska' && !t.bokford && !t.dublettAv;
 const MODELL: Record<string, string> = { 'gpt-6-astra': 'GPT-6 Astra', 'gpt-6.1-sol': 'GPT-6.1 Sol', 'gpt-5.5': 'GPT-5.5', 'claude-opus-5-5': 'Claude Opus 5.5' };
+
+type Granskning = FlodesUnderlag['transaktioner'][number]['forslag'][number]['granskning'];
+
+/** Hur modellen kom fram: jämkningen, analysen och kandidatkontona. Tomt för äldre konteringar. */
+function Resonemang({ g }: { g: Granskning }) {
+  if (!g) return null;
+  const j = g.jamkning;
+  return (
+    <>
+      {j && (
+        <p className="text-xs leading-relaxed text-slate-500">
+          <span className="text-slate-600">Jämkning:</span>{' '}
+          {j.andradeSig
+            ? <>ändrade sig från <span className="tabular-nums">{j.fore.konto ?? '—'}</span> (moms {momsText(j.fore.momssats ?? 0, j.fore.momsdelar)}) efter att ha sett den andra modellens förslag.</>
+            : 'stod fast vid sitt förslag efter att ha sett den andra modellens.'}
+        </p>
+      )}
+      {(g.analys || g.kandidater?.length) && (
+        <details className="text-xs">
+          <summary className="text-slate-500 cursor-pointer">Analys och kandidatkonton</summary>
+          {g.analys && <p className="mt-1 text-slate-600 leading-relaxed">{g.analys}</p>}
+          {!!g.kandidater?.length && (
+            <ul className="mt-1 space-y-0.5">
+              {g.kandidater.map((k) => (
+                <li key={k.konto} className="text-slate-600"><span className="tabular-nums font-semibold">{k.konto}</span> {k.namn}{k.varfor ? <span className="text-slate-500"> — {k.varfor}</span> : null}</li>
+              ))}
+            </ul>
+          )}
+          {j && <p className="mt-1 text-slate-500 leading-relaxed"><span className="text-slate-600">Före jämkningen:</span> {j.fore.motivering}</p>}
+        </details>
+      )}
+    </>
+  );
+}
 const PRICK: Record<string, string> = { gron: 'bg-emerald-400', gul: 'bg-amber-400', rod: 'bg-red-500' };
 
 /**
@@ -1693,11 +1799,12 @@ function GranskaPopup({ u, kor, korText, onBokfor, onKommentar, onStang }: {
                     <p className="text-slate-900 text-sm">
                       <span className="tabular-nums font-semibold">{f.konto ?? '—'}</span> {f.kontonamn}
                       <span className="text-slate-500"> · moms {momsText(f.momssats, f.momsdelar)}</span>
-                      {byttFran && <span className="text-slate-400 text-xs"> (bytt från {byttFran} i granskningen)</span>}
+                      {byttFran && <span className="text-slate-400 text-xs"> (bytt från {byttFran} i {g?.jamkning ? 'jämkningen' : 'granskningen'})</span>}
                     </p>
                     {f.regler.length > 0 && <p className="text-violet-700 text-xs">Kundregel: {f.regler.join(', ')}</p>}
                     <p className="text-slate-600 text-xs leading-relaxed">{f.motivering}</p>
                     {g?.motivering && <p className="text-slate-500 text-xs leading-relaxed"><span className="text-slate-600">Granskning:</span> {g.motivering}</p>}
+                    <Resonemang g={g} />
                     {flaggor.length > 0 && (
                       <ul className="space-y-0.5">
                         {flaggor.map((x, n) => (

@@ -37,7 +37,29 @@ export interface System {
   kund: string;
 }
 
-async function fragaGpt<T>(system: System, user: string, namn: string, schema: object): Promise<Svar<T>> {
+/**
+ * Det som är samma för många anrop i rad — originaldokumentet och filens
+ * andra transaktioner. Det läggs först i användarmeddelandet, före det som
+ * gäller just den här transaktionen, så att båda leverantörerna kan cacha det.
+ */
+export type Del =
+  | { typ: 'text'; text: string }
+  | { typ: 'pdf'; namn: string; data: string }
+  | { typ: 'bild'; mime: 'image/png' | 'image/jpeg'; data: string };
+
+function gptDel(d: Del): unknown {
+  if (d.typ === 'text') return { type: 'text', text: d.text };
+  if (d.typ === 'pdf') return { type: 'file', file: { filename: d.namn, file_data: `data:application/pdf;base64,${d.data}` } };
+  return { type: 'image_url', image_url: { url: `data:${d.mime};base64,${d.data}` } };
+}
+
+function claudeDel(d: Del): Anthropic.Beta.Messages.BetaContentBlockParam {
+  if (d.typ === 'text') return { type: 'text', text: d.text };
+  if (d.typ === 'pdf') return { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: d.data } };
+  return { type: 'image', source: { type: 'base64', media_type: d.mime, data: d.data } };
+}
+
+async function fragaGpt<T>(system: System, delat: Del[], user: string, namn: string, schema: object): Promise<Svar<T>> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
 
@@ -50,7 +72,7 @@ async function fragaGpt<T>(system: System, user: string, namn: string, schema: o
       response_format: { type: 'json_schema', json_schema: { name: namn, strict: true, schema } },
       messages: [
         { role: 'system', content: [system.fast, system.kund].filter(Boolean).join('\n\n') },
-        { role: 'user', content: user },
+        { role: 'user', content: delat.length ? [...delat.map(gptDel), { type: 'text', text: user }] : user },
       ],
       max_completion_tokens: 32000,
     }),
@@ -64,7 +86,12 @@ async function fragaGpt<T>(system: System, user: string, namn: string, schema: o
   return { data: JSON.parse(choice?.message?.content ?? '') as T, modell: json.model ?? 'gpt-6-astra' };
 }
 
-async function fragaClaude<T>(system: System, user: string, schema: object): Promise<Svar<T>> {
+async function fragaClaude<T>(system: System, delat: Del[], user: string, schema: object): Promise<Svar<T>> {
+  // Tre cachepunkter: den fasta instruktionen, kunden och det delade
+  // underlaget. Allt före en punkt läses ur cachen när nästa anrop börjar likadant.
+  const cache = { type: 'ephemeral' as const, ttl: '1h' as const };
+  const delar = delat.map(claudeDel);
+  if (delar.length) delar[delar.length - 1] = { ...delar[delar.length - 1], cache_control: cache } as Anthropic.Beta.Messages.BetaContentBlockParam;
   // Strömmat, eftersom tänkandet kan ta längre tid än ett
   // vanligt anrop hinner vänta. Vid en vägran tar en annan modell över i
   // samma anrop (fallbacks), och vilken som svarade sparas.
@@ -76,10 +103,10 @@ async function fragaClaude<T>(system: System, user: string, schema: object): Pro
     thinking: { type: 'adaptive' },
     output_config: { effort: 'high', format: { type: 'json_schema', schema } },
     system: [
-      { type: 'text', text: system.fast, cache_control: { type: 'ephemeral', ttl: '1h' } },
-      ...(system.kund ? [{ type: 'text' as const, text: system.kund }] : []),
+      { type: 'text', text: system.fast, cache_control: cache },
+      ...(system.kund ? [{ type: 'text' as const, text: system.kund, cache_control: cache }] : []),
     ],
-    messages: [{ role: 'user', content: user }],
+    messages: [{ role: 'user', content: [...delar, { type: 'text', text: user }] }],
   } as Anthropic.Beta.Messages.MessageCreateParamsStreaming);
   const msg = await stream.finalMessage();
 
@@ -90,8 +117,8 @@ async function fragaClaude<T>(system: System, user: string, schema: object): Pro
   return { data: JSON.parse(text.text) as T, modell: msg.model };
 }
 
-export function fraga<T>(modell: Modell, o: { system: System; user: string; namn: string; schema: object }): Promise<Svar<T>> {
+export function fraga<T>(modell: Modell, o: { system: System; delat?: Del[]; user: string; namn: string; schema: object }): Promise<Svar<T>> {
   return modell === 'gpt-6-astra'
-    ? fragaGpt<T>(o.system, o.user, o.namn, o.schema)
-    : fragaClaude<T>(o.system, o.user, o.schema);
+    ? fragaGpt<T>(o.system, o.delat ?? [], o.user, o.namn, o.schema)
+    : fragaClaude<T>(o.system, o.delat ?? [], o.user, o.schema);
 }

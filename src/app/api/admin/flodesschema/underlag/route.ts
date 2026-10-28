@@ -10,6 +10,8 @@ import { kollaDubbletter } from '@/lib/transaktioner/dublettkoll';
 import { kollaTillrackligt } from '@/lib/transaktioner/tillrackligt';
 import { skrivFragemejl } from '@/lib/transaktioner/fragemejl';
 import { konteraTransaktioner, valjKonto, type ValdKontering } from '@/lib/kontering/kontera';
+import { byggKundbild } from '@/lib/kontering/kundbild';
+import { helhetskontroll } from '@/lib/kontering/helhet';
 import { rensaMomsdelar } from '@/lib/kontering/momsdelar';
 import { bokforForfallna, slutligKontering, verifikationFran } from '@/lib/kontering/preliminar';
 import { slaUppKonto } from '@/lib/kontering/regelverk';
@@ -25,6 +27,8 @@ export const maxDuration = 300;
  * POST { id, steg } → kör ett steg på underlaget och svarar { underlag, ... } som GET ?id=
  *            steg: definiera | plocka-trans | plocka-verif | komplettera | dublett | tillrackligt | konteras | skapa-verif
  *            | skriv-mejl (kundens samlade frågemejl nu, i stället för kl 18; med omkorning: true är det inget fel om inget finns att fråga om)
+ *            | kundbild (bygger om kundbilden när den är inaktuell, alltid med tvinga: true; svarar { byggd })
+ *            | helhet (helhetskontrollen av kundens alla konteringar; svarar { flaggade })
  *            (skapa-verif med val: { transaktionId, konto, momssats, momsdelar? } bokför en granskad för hand)
  *
  * Varje steg är ett eget anrop, så att vart och ett har hela tidsgränsen på
@@ -45,8 +49,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
-const STEG = ['definiera', 'plocka-trans', 'plocka-verif', 'komplettera', 'dublett', 'tillrackligt', 'skriv-mejl', 'konteras', 'skapa-verif'];
-/** Transaktioner per konteringsanrop. Båda modellerna, två pass var, ryms inom tidsgränsen. */
+const STEG = ['definiera', 'plocka-trans', 'plocka-verif', 'komplettera', 'dublett', 'tillrackligt', 'skriv-mejl', 'kundbild', 'konteras', 'helhet', 'skapa-verif'];
+/** Transaktioner per konteringsanrop. Båda modellerna, två pass var och en jämkning, ryms inom tidsgränsen. */
 const KONTERA_PER_ANROP = 3;
 
 export async function POST(request: NextRequest) {
@@ -68,7 +72,9 @@ export async function POST(request: NextRequest) {
     if (body.steg === 'dublett') await kollaDubbletter(supabase, body.id);
     if (body.steg === 'tillrackligt') await kollaTillrackligt(supabase, body.id);
     if (body.steg === 'skriv-mejl') await fragemejl(body.id, body.omkorning === true);
+    if (body.steg === 'kundbild') extra.byggd = await byggKundbild(supabase, await kundensId(body.id), { tvinga: body.tvinga === true });
     if (body.steg === 'konteras') extra.kvar = await kontera(body.id, typeof body.fran === 'string' ? body.fran : new Date().toISOString());
+    if (body.steg === 'helhet') extra.flaggade = (await helhetskontroll(supabase, await kundensId(body.id))).flaggade;
     if (body.steg === 'skapa-verif') extra.bokforda = await skapaVerifikationer(body.id, body.val);
   } catch (e) {
     // Felet står på underlaget och syns i spåret, så underlaget skickas med ändå
@@ -99,6 +105,13 @@ async function plockaVerifikationer(supabase: ReturnType<typeof createServerClie
   const res = await lasUtTransaktioner(supabase, underlagId);
   if (res.fel) throw new Error(res.fel);
   return res.typ;
+}
+
+/** Kundkontot underlaget hör till. Kundbilden och helhetskontrollen gäller hela kunden. */
+async function kundensId(underlagId: string): Promise<string> {
+  const { data: u } = await createServerClient().from('bokforing_underlag').select('user_id').eq('id', underlagId).maybeSingle();
+  if (!u?.user_id) throw new Error('Underlaget hör inte till ett kundkonto');
+  return u.user_id;
 }
 
 /** Skriver underlagets kunds frågemejl nu, med alla frågor kunden inte fått än — inte bara det här underlagets. */
@@ -223,10 +236,11 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
   if (error) throw new Error(error.message);
   if (!u) throw new Error('Underlaget finns inte');
 
-  const [trans, verif, profil] = await Promise.all([
+  const [trans, verif, profil, bild] = await Promise.all([
     supabase.from('transaktioner').select('id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, vat_nummer, anteckning, detaljer, uppgifter, komplettering, dublettkoll, dublett_av, tillrackligt, fraga_utkast_id, vald_kontering, preliminar_at').eq('underlag_id', id).order('radnr'),
     supabase.from('verifikationer').select('id, transaktion_id, serie, nummer, datum, signatur, verifikation_rader(radnr, konto, kontonamn, belopp, borttagen)').eq('underlag_id', id),
     u.user_id ? supabase.from('profiles').select('email').eq('id', u.user_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    u.user_id ? supabase.from('kundbilder').select('text, byggd_at, antal_transaktioner, fel, helhet, helhet_at, helhet_fel').eq('user_id', u.user_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
   ]);
   const fel = trans.error ?? verif.error;
   if (fel) throw new Error(fel.message);
@@ -346,5 +360,17 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
       id: i.id, typ: i.typ, omfang: i.omfang, steg: i.steg, transaktionId: i.transaktion_id,
       namn: i.namn, galler: i.galler, text: i.text, at: i.created_at,
     })),
+    kundbild: bild.data && (bild.data.text || bild.data.fel)
+      ? { text: bild.data.text ?? '', at: bild.data.byggd_at ?? null, antal: bild.data.antal_transaktioner ?? 0, fel: bild.data.fel ?? null }
+      : null,
+    helhet: bild.data && (bild.data.helhet || bild.data.helhet_fel)
+      ? {
+        at: bild.data.helhet_at ?? null,
+        fel: bild.data.helhet_fel ?? null,
+        sammanfattning: bild.data.helhet?.sammanfattning ?? '',
+        anmarkningar: bild.data.helhet?.anmarkningar ?? [],
+        flaggade: bild.data.helhet?.flaggade ?? 0,
+      }
+      : null,
   };
 }

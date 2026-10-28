@@ -380,8 +380,22 @@ export interface AdminKontering {
   /** Flera momssatser på samma underlag, annars null. */
   momsdelar: Momsdel[] | null;
   motivering: string;
-  /** Granskningens svar, när kontot fanns att pröva. */
-  granskning: { stammer?: boolean; battre_konto?: string | null; granskning_kravs?: boolean; motivering?: string; forstaKonto?: string; svarade?: string } | null;
+  /**
+   * Hur modellen kom fram (se `@/lib/kontering/kontera`): analysen och
+   * kandidaterna ur första passet, reglerna som inte stämde och jämkningen.
+   * Äldre konteringar har bara granskningens fält.
+   */
+  granskning: {
+    stammer?: boolean; battre_konto?: string | null; granskning_kravs?: boolean; motivering?: string; forstaKonto?: string; svarade?: string;
+    brutna_regler?: string[];
+    analys?: string;
+    kandidater?: { konto: string; namn: string; varfor: string }[];
+    jamkning?: {
+      fore: { konto: string | null; momssats: number | null; momsdelar: Momsdel[] | null; omdome: string; motivering: string };
+      andradeSig: boolean;
+      motivering: string;
+    } | null;
+  } | null;
   flaggor: { typ: string; allvar: 'stopp' | 'granskning'; text: string }[];
   omdome: 'gron' | 'gul' | 'rod';
 }
@@ -652,6 +666,10 @@ export interface FlodesUnderlag {
   verifikationer: number;
   /** Byråns kontext och regler som gäller underlaget, skrivna på ett steg i schemat. */
   instruktioner: FlodesInstruktion[];
+  /** Kundbilden konteringen läser (se `@/lib/kontering/kundbild`). Null när den inte byggts. */
+  kundbild: { text: string; at: string | null; antal: number; fel: string | null } | null;
+  /** Senaste helhetskontrollen av kundens konteringar (se `@/lib/kontering/helhet`). */
+  helhet: { at: string | null; fel: string | null; sammanfattning: string; anmarkningar: { rader: number[]; text: string }[]; flaggade: number } | null;
 }
 
 export interface FlodesInstruktion {

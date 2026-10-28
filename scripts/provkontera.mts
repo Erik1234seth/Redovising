@@ -12,12 +12,12 @@ const utfall = await konteraTransaktioner(sb, process.argv[2], ids, { torrkornin
 for (const u of utfall) {
   console.log('\n=== ' + u.transaktionId + (u.fel ? '  FEL: ' + u.fel : ''));
   for (const k of u.konteringar) {
+    const g = k.granskning;
     console.log(`  ${k.modell.padEnd(16)} ${k.omdome.padEnd(5)} konto ${k.konto} moms ${k.momsdelar ? JSON.stringify(k.momsdelar) : k.momssats + '%'}  (${k.svarade})`);
-    console.log(`     pass1: ${k.motivering}`);
-    for (const g of k.granskning?.konton ?? []) {
-      const byte = g.forstaKonto !== g.konto ? ` (${g.forstaKonto} → ${g.konto})` : '';
-      console.log(`     pass2 ${g.konto}${byte}: stämmer=${g.stammer} bättre=${g.battre_konto} kräver=${g.granskning_kravs} — ${g.motivering}`);
-    }
+    if (g?.analys) console.log(`     analys: ${g.analys}`);
+    if (g?.kandidater.length) console.log(`     kandidater: ${g.kandidater.map((x) => `${x.konto} ${x.namn}`).join(', ')}`);
+    console.log(`     motivering: ${k.motivering}`);
+    if (g?.jamkning) console.log(`     jämkning: ${g.jamkning.andradeSig ? `ändrade sig från ${g.jamkning.fore.konto}` : 'stod fast'}`);
     for (const f of k.flaggor) console.log(`     [${f.allvar}] ${f.text}`);
   }
 }

@@ -3,31 +3,42 @@ import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkon
 import { svenskDag } from '@/lib/dagskassa';
 import { byggMejlkontext } from '@/lib/mejlkontext';
 import { kompletteringText, type Komplettering } from '@/lib/transaktioner/komplettera';
-import { regelText, reglerAttValja, type Kundregel } from '@/lib/transaktioner/kundregler';
+import { reglerAttValja } from '@/lib/transaktioner/kundregler';
 import { hamtaInstruktioner, kontextFor, reglerFor } from '@/lib/transaktioner/instruktioner';
 import { tolkaBetalsatt, type Betalsatt } from './betalsatt';
-import { MODELLER, fraga, type Modell, type System } from './modeller';
+import { hamtaArslista, hamtaKundbild } from './kundbild';
+import { MODELLER, fraga, type Del, type Modell } from './modeller';
 import { momsText, rensaMomsdelar, sammaMoms, slaIhopDelar, type Momsdel } from './momsdelar';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
+import { filensRader, underlagetsDelar, type Filrad } from './underlag';
 
 /**
  * Konterar utlästa transaktioner enligt K1.
  *
  * Varje transaktion konteras av båda modellerna, var för sig och med samma
- * prompter:
+ * prompter. Båda ser samma underlag:
  *
- *   Pass 1     Modellen delar upp transaktionen per konto ur K1-kontoplanen
- *              och momssats — livsmedel på 4000 och diskmedel på 5400, eller
- *              livsmedel 6 % och förpackningar 25 % — och väljer vilka
- *              kundregler (`@/lib/transaktioner/kundregler`) som gäller. Ett
- *              konto utanför K1 ger modellen ett nytt försök, en gång.
+ *   - kundbilden (./kundbild): en sparad sammanställning av kunden, och en
+ *     lista med alla kundens transaktioner
+ *   - kundens mejl, kundprofilen och kundreglerna
+ *   - originalunderlaget som det ser ut — PDF, bild eller kalkylblad — och
+ *     alla transaktioner som lästs ut ur filen (./underlag)
+ *
+ * Kunden och filen ligger först i anropen och cachas, så att nästa
+ * transaktion ur samma fil inte läser om dem.
+ *
+ *   Pass 1     Analys: vad affären är, och 1–5 kandidatkonton ur
+ *              K1-kontoplanen som modellen själv väljer.
+ *   Pass 2     Kontering: modellen får kandidaternas hela regeltext —
+ *              beskrivning, använd när, använd inte när, beslutsregler,
+ *              granskning — och delar upp transaktionen per konto och
+ *              momssats, väljer kundregler och säger vilka regler som inte
+ *              stämmer. Ett konto utanför K1 ger ett nytt försök, en gång.
  *   Kod        Varje konto prövas: får det väljas automatiskt, håller
- *              beloppsgränserna.
- *   Pass 2     Per konto: modellen får kontots hela regeltext — beskrivning,
- *              använd när, använd inte när, beslutsregler — och prövar om
- *              delen stämmer. Pekar granskningen ut ett annat konto prövas
- *              det också; går det igenom byts kontot, annars behålls det
- *              första och raden blir gul.
+ *              beloppsgränserna. Momsen räknas och flaggorna sätts.
+ *   Jämkning   Är modellerna oense eller osäkra får var och en se den andras
+ *              kontering och kontera om en gång. Är de fortfarande oense går
+ *              transaktionen till Granska med båda resonemangen.
  *
  * Betalkontot väljer inte modellen. Det följer av kunden: företagskonto ger
  * 1930, privatkonto ger 2017 vid köp och 2013 vid försäljning.
@@ -65,20 +76,33 @@ interface Transaktion {
   kalla: string;
 }
 
-interface Pass1 {
+interface Kandidatsvar {
+  analys: string;
+  kandidater: { konto: string; varfor: string }[];
+}
+
+/** Ett konto modellen övervägde i pass 1. */
+export interface Kandidat {
+  konto: string;
+  namn: string;
+  varfor: string;
+}
+
+interface Beslut {
   /** En del per konto och momssats — en enda när hela beloppet har samma konto och sats. */
   delar: { konto: string; momssats: 0 | 6 | 12 | 25; belopp: number; moms: number | null }[];
   momshantering: Momshantering;
   sakerhet: 'hog' | 'medel' | 'lag';
   motivering: string;
   regler: string[];
-}
-
-interface Pass2 {
-  stammer: boolean;
-  battre_konto: string | null;
   brutna_regler: string[];
   granskning_kravs: boolean;
+}
+
+/** Vad modellen tyckte före jämkningen, och om den ändrade sig. */
+export interface Jamkning {
+  fore: { konto: string | null; momssats: number | null; momsdelar: Momsdel[] | null; omdome: Omdome; motivering: string };
+  andradeSig: boolean;
   motivering: string;
 }
 
@@ -94,16 +118,25 @@ export interface Kontering {
   motivering: string;
   /** Kundreglerna modellen valde. */
   regler: string[];
-  /** Granskningen av huvudkontot, med alla konton i `konton`. */
-  granskning: (Pass2 & { forstaKonto: string; konton: GranskatKonto[] }) | null;
+  /**
+   * Hur modellen kom fram: analysen och kandidaterna ur pass 1, reglerna som
+   * inte stämde, och jämkningen. `forstaKonto` är kontot före jämkningen.
+   * Fälten `battre_konto` och `konton` finns kvar från den gamla granskningen.
+   */
+  granskning: {
+    stammer: boolean;
+    battre_konto: string | null;
+    brutna_regler: string[];
+    granskning_kravs: boolean;
+    motivering: string;
+    forstaKonto: string;
+    konton: unknown[];
+    analys: string;
+    kandidater: Kandidat[];
+    jamkning: Jamkning | null;
+  } | null;
   flaggor: Flagga[];
   omdome: Omdome;
-}
-
-/** Pass 2 för ett konto. `forstaKonto` är kontot pass 1 valde, `konto` det som gäller efter granskningen. */
-interface GranskatKonto extends Pass2 {
-  konto: string;
-  forstaKonto: string;
 }
 
 export interface Utfall {
@@ -114,11 +147,33 @@ export interface Utfall {
 
 // ---------- prompter ----------
 
-/** Reglerna att välja bland skiljer mellan kunder, så schemat byggs per kund. */
-const pass1Schema = (regelIdn: string[]) => ({
+const KANDIDAT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['delar', 'momshantering', 'sakerhet', 'motivering', 'regler'],
+  required: ['analys', 'kandidater'],
+  properties: {
+    analys: { type: 'string' },
+    kandidater: {
+      type: 'array',
+      description: '1–5 K1-konton som kan vara rätt, det troligaste först',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['konto', 'varfor'],
+        properties: {
+          konto: { type: 'string', description: 'Fyrsiffrigt konto ur K1-kontoplanen' },
+          varfor: { type: 'string' },
+        },
+      },
+    },
+  },
+};
+
+/** Reglerna att välja bland skiljer mellan kunder, så schemat byggs per kund. */
+const beslutSchema = (regelIdn: string[]) => ({
+  type: 'object',
+  additionalProperties: false,
+  required: ['delar', 'momshantering', 'sakerhet', 'motivering', 'regler', 'brutna_regler', 'granskning_kravs'],
   properties: {
     delar: {
       type: 'array',
@@ -139,65 +194,66 @@ const pass1Schema = (regelIdn: string[]) => ({
     sakerhet: { type: 'string', enum: ['hog', 'medel', 'lag'] },
     motivering: { type: 'string' },
     regler: { type: 'array', items: { type: 'string', enum: regelIdn }, description: 'Id på kundreglerna som gäller transaktionen' },
+    brutna_regler: { type: 'array', items: { type: 'string' } },
+    granskning_kravs: { type: 'boolean' },
   },
 });
 
-const PASS2_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['stammer', 'battre_konto', 'brutna_regler', 'granskning_kravs', 'motivering'],
-  properties: {
-    stammer: { type: 'boolean' },
-    battre_konto: { type: ['string', 'null'] },
-    brutna_regler: { type: 'array', items: { type: 'string' } },
-    granskning_kravs: { type: 'boolean' },
-    motivering: { type: 'string' },
-  },
-};
+const GEMENSAMT = `Du konterar transaktioner åt en svensk enskild näringsidkare som upprättar förenklat årsbokslut (K1) och bokför enligt kontantmetoden.
 
-const PASS1_FAST = `Du konterar transaktioner åt en svensk enskild näringsidkare som upprättar förenklat årsbokslut (K1) och bokför enligt kontantmetoden.
+Du får, i den här ordningen:
+- KUNDBILDEN: en kollegas sammanställning av kunden.
+- KUNDENS TRANSAKTIONER: alla kundens transaktioner, en rad var (K1, K2 …).
+- Kundens mejl till byrån och kundreglerna.
+- ORIGINALUNDERLAGET som transaktionen kommer ifrån — kvittot, fakturan eller kontoutdraget som det ser ut — och alla transaktioner som lästs ut ur filen (F1, F2 …).
+- Sist EN transaktion att kontera, med var den står i filen och i kundens lista.
 
-Du får EN transaktion. Välj konto för vad transaktionen avser: kostnad, intäkt, tillgång, skuld eller eget kapital. Välj aldrig betalkontot — bank- eller privatsidan bokförs av systemet.
+Titta på originalet själv. Avskriften kan ha missat något eller läst fel — säg det i så fall i motiveringen. Använd filens andra rader och kundens övriga transaktioner för att förstå vad affären är: en återkommande leverantör, en insättning och ett uttag med samma belopp, en bankrad vars kvitto finns i en annan fil. Hänvisa till raderna (F3, K120).
 
-Regler:
-- Välj bara konton ur K1-kontoplanen nedan. Inga andra konton, inte heller BAS-underkonton som 3001 eller 5410.
+Allmänna regler:
+- Välj bara konton ur K1-kontoplanen nedan. Inga andra konton, inte heller BAS-underkonton som 3001 eller 5410. Välj aldrig betalkontot — bank- eller privatsidan bokförs av systemet.
+- Kontot väljs utifrån K1-kontoplanen och kontobeskrivningarna — byråns egen dokumentation. Hur kunden, byrån eller andra kunder bokfört liknande tidigare är en ledtråd om vad affären är, inte om vilket konto som är rätt: tidigare bokföringar kan vara gjorda i ett annat program, med BAS-underkonton, eller vara fel. Det gäller också "byrån valde" i kundens lista.
+- Använd kundens verksamhet för att avgöra vad ett köp är till för. Har kunden i ett mejl förklarat vad ett köp eller en inbetalning avser, väger det tyngre än en gissning — säg det i motiveringen.
+- Står det en instruktion från byrån i anteckningen följer du den. Den väger tyngst av allt. Står det BYRÅNS KONTEXT vid transaktionen följer du den på samma sätt.`;
+
+const KANDIDAT_FAST = `${GEMENSAMT}
+
+I DET HÄR STEGET väljer du inte konto. Du tar reda på vad affären är och vilka konton som kan komma i fråga. I nästa steg får du kandidaternas fullständiga regler och väljer.
+
+- analys: vad transaktionen är och hur du vet det — vad som syns på originalet, vad filens andra rader och kundens övriga transaktioner säger, vad kunden skrivit. Säg vad som är oklart. Några meningar på svenska.
+- kandidater: 1–5 konton ur K1-kontoplanen som kan vara rätt, det troligaste först, med en kort mening om varför. Ta med de konton du på allvar övervägt, också de mindre troliga — ett konto du inte tar med får du inte reglerna för. Hör delar av transaktionen till olika konton, till exempel livsmedel och diskmedel på samma kvitto, ta med alla de kontona.
+
+K1-KONTOPLAN (konto namn — beskrivning [sökord]):
+${kontolista()}`;
+
+const BESLUT_FAST = `${GEMENSAMT}
+
+I DET HÄR STEGET konterar du. Du har redan analyserat transaktionen och valt kandidatkonton, och nu får du deras fullständiga regler: beskrivning, "Använd när", "Använd INTE när", beslutsregler och när en människa ska granska. Välj bland kandidaterna och pröva valet mot reglerna. Passar ingen av dem får du välja ett annat konto ur K1-kontoplanen — säg då varför i motiveringen.
+
 - delar: en rad per konto och momssats, med beloppet inklusive moms. Hör allt till samma konto och har samma momssats blir det en enda rad med hela beloppet.
-- Hör delar av transaktionen till olika konton, dela upp den — även när en del är liten. Ett kvitto med livsmedel till försäljning och diskmedel blir t.ex. en rad på 4000 och en på 5400. Ta beloppen ur underlagets rader.
+- Hör delar av transaktionen till olika konton, dela upp den — även när en del är liten. Ta beloppen ur underlagets rader.
 - Har underlaget flera momssatser — t.ex. livsmedel på 6 % och förpackningar på 25 % — blir det en rad per sats, även när satserna har samma konto. Ta beloppen ur underlagets momsspecifikation när den finns.
 - momssats: svensk moms som ingår i delens belopp (25, 12, 6 eller 0). 0 när ingen avdragsgill eller utgående moms finns.
 - moms: delens moms enligt underlaget. Anger underlaget bara momsen per sats och satsen delas på flera konton, räkna ut varje dels andel. null när underlaget inte visar någon moms.
 - En del kan vara negativ, t.ex. returnerad pant på 0 %. Delarna ska tillsammans bli transaktionens belopp.
 - momshantering: "svensk" vid vanlig svensk moms, "ingen" när momsen inte hanteras (momsfritt, privat, lån, överföringar, skatter), "omvand" vid omvänd skattskyldighet, EU-förvärv eller import.
-- sakerhet: "hog" bara när underlaget tydligt visar vad det är. "lag" när du gissar.
-- motivering: en eller två meningar om varför, på svenska.
-- Använd kundens verksamhet för att avgöra vad ett köp är till för. Har kunden i ett mejl förklarat vad ett köp eller en inbetalning avser, väger det tyngre än en gissning — säg det i motiveringen.
-- Står det en instruktion från byrån i anteckningen följer du den. Den väger tyngst av allt.
-- Står det BYRÅNS KONTEXT vid transaktionen följer du den på samma sätt som anteckningen.
-- regler: id på de KUNDREGLER (sist i instruktionen) som gäller transaktionen. Ta bara med en regel när underlaget, uppgifterna, mejlen eller byråns kontext visar att den gäller — tom lista annars. En regel du tar med följer du: dess instruktion är byråns och väger lika tungt som anteckningen. Nämn regeln i motiveringen.
-- Kontot väljs bara utifrån K1-kontoplanen och kontobeskrivningarna nedan — byråns egen dokumentation. Använd ingen annan källa. Hur kunden eller andra kunder bokfört liknande saker tidigare är en ledtråd om vad affären är, inte om vilket konto som är rätt: tidigare bokföringar kan vara gjorda i ett annat program, med BAS-underkonton eller fel. Stämmer historiken inte med kontobeskrivningarna gäller beskrivningarna.
+- sakerhet: "hog" bara när underlaget tydligt visar vad det är och reglerna pekar ut kontot. "lag" när du gissar.
+- motivering: två eller tre meningar på svenska om vad affären är och varför kontot är rätt enligt reglerna.
+- regler: id på de KUNDREGLER som gäller transaktionen. Ta bara med en regel när underlaget, uppgifterna, mejlen eller byråns kontext visar att den gäller — tom lista annars. En regel du tar med följer du: dess instruktion är byråns och väger lika tungt som anteckningen. Nämn regeln i motiveringen.
+- brutna_regler: punkter ur reglerna för de konton du valt som inte stämmer på transaktionen, citerade ur texten. Tom lista när allt stämmer. Kan du inte välja ett konto utan att bryta en regel, välj det bästa och citera regeln här.
+- granskning_kravs: true om någon punkt under "Kräver manuell granskning när" stämmer på transaktionen, eller om underlaget inte räcker för att avgöra.
+
+Gränsprövningarna i reglerna är uträknade i kod. Godta siffrorna.
+
+Transaktionen konteras direkt från underlaget, inte från en tidigare bokföring. Punkter som handlar om vilket BAS-konto en post tidigare bokförts på stämmer därför aldrig — bortse från dem. Bokslutsjusteringar — t.ex. lagerinventering, periodiseringar och avskrivningar — görs i bokslutet. Punkter som tydligt gäller dem bryter inga regler och kräver ingen granskning här.
 
 K1-KONTOPLAN (konto namn — beskrivning [sökord]):
 ${kontolista()}`;
 
-const PASS2_FAST = `Du granskar en kontering åt en svensk enskild näringsidkare som upprättar förenklat årsbokslut (K1) och bokför enligt kontantmetoden.
+/** Läggs till när modellerna inte är överens och var och en får se den andras kontering. */
+const JAMKNING = `EN ANNAN MODELL HAR KONTERAT SAMMA TRANSAKTION, och ni kom inte fram till samma sak eller var inte säkra. Nedan står ditt förslag och den andras, med motiveringar. Pröva båda mot reglerna och underlaget på nytt.
 
-Du får en transaktion, kontot som valts och kontots regler ur K1-kontobeskrivningarna. Pröva transaktionen mot kontots beskrivning, "Använd när", "Använd INTE när" och beslutsreglerna.
-
-En transaktion kan vara uppdelad på flera konton. Då prövar du bara delen som ligger på kontot du får — de andra delarna prövas för sig, och det som hör till dem gör inte ditt konto fel.
-
-- stammer: true om delen passar kontot. false om beskrivningen inte passar eller om någon punkt under "Använd INTE när" stämmer på delen.
-- battre_konto: när stammer är false, kontot som reglerna pekar på för hela delen (fyrsiffrigt K1-konto), annars null. Gissa inte — null om reglerna inte pekar ut något. Innehåller delen saker som hör till olika konton ska den delas upp: sätt stammer till false, battre_konto till null och skriv i motiveringen vad som ska delas ut till vilket konto.
-- brutna_regler: de regler eller punkter som inte stämmer, citerade ur texten.
-- granskning_kravs: true om någon punkt under "Kräver manuell granskning när" stämmer på transaktionen, eller om underlaget inte räcker för att avgöra.
-- motivering: en eller två meningar på svenska.
-
-Gränsprövningarna är uträknade i kod. Godta siffrorna.
-
-Transaktionen konteras direkt från underlaget, inte från en tidigare bokföring. Punkter som handlar om vilket BAS-konto en post tidigare bokförts på stämmer därför aldrig — bortse från dem.
-
-Bokslutsjusteringar — t.ex. lagerinventering, periodiseringar och avskrivningar — görs i bokslutet, inte när en transaktion konteras. Punkter som tydligt gäller bokslutsjusteringar är därför irrelevanta här: de bryter inga regler och kräver ingen manuell granskning.
-
-Står det en instruktion från byrån i anteckningen och kontot följer den, är kontot rätt om inte reglerna uttryckligen förbjuder det. Detsamma gäller KUNDREGLER SOM GÄLLER och BYRÅNS KONTEXT.`;
+Ändra dig om den andras resonemang är bättre — men bara då. Står du fast vid ditt, säg varför den andras inte håller. Är ni fortfarande oense eller osäkra får en människa avgöra, och då hjälper det att du är tydlig med vad som är oklart. Skriv i motiveringen vad du tog ställning till.`;
 
 const RATTELSE_SCHEMA = {
   type: 'object',
@@ -259,11 +315,11 @@ const ore = (n: number) => Math.round(n * 100) / 100;
 interface Bokdel { konto: string; sats: number; belopp: number; moms: number }
 
 /**
- * Delarna ur pass 1, ihopslagna per konto och sats och med största beloppet
+ * Delarna ur konteringen, ihopslagna per konto och sats och med största beloppet
  * först — det kontot är transaktionens huvudkonto. Är det bara en del gäller
  * transaktionens belopp, oavsett vad modellen skrev.
  */
-function delarUrPass1(t: Transaktion, p: Pass1): Momsdel[] {
+function delarUrBeslut(t: Transaktion, p: Beslut): Momsdel[] {
   const delar = slaIhopDelar(p.delar);
   return delar.length === 1 ? [{ ...delar[0], belopp: Number(t.belopp) }] : delar;
 }
@@ -346,103 +402,103 @@ function byggRader(t: Transaktion, delar: Bokdel[], motkonto: string) {
 
 // ---------- en modell, en transaktion ----------
 
-async function konteraMedModell(
-  modell: Modell,
-  t: Transaktion,
-  betalsatt: Betalsatt,
-  kund: string,
-  { allaRegler, kontext }: Byran,
-): Promise<Kontering> {
-  const user = [transaktionText(t, betalsatt), kontext].filter(Boolean).join('\n\n');
-  const flaggor: Flagga[] = [];
-  const regelIdn = allaRegler.map((r) => r.id);
-  // Reglerna skiljer mellan kunder och ligger därför i kunddelen, efter den cachade
-  const system: System = { fast: PASS1_FAST, kund: [kund, `KUNDREGLER:\n${reglerAttValja(allaRegler)}`].filter(Boolean).join('\n\n') };
-  const schema = pass1Schema(regelIdn);
+/** Det som är gemensamt för båda modellerna och alla pass för en transaktion. */
+interface Underlagsfraga {
+  /** Kunddelen av systemprompten: profil, kundbild, årslista, mejl och kundregler. */
+  kund: string;
+  /** Originalunderlaget och filens transaktioner. */
+  delat: Del[];
+  /** Transaktionen som konteras, och byråns kontext. */
+  user: string;
+  regelIdn: string[];
+}
 
-  // Pass 1, och ett nytt försök om något konto inte finns i K1
-  const saknas = (p: Pass1) => (Array.isArray(p.delar) ? p.delar : []).map((d) => d.konto).filter((k) => !slaUppKonto(k));
-  let svar = await fraga<Pass1>(modell, { system, user, namn: 'kontering', schema });
+/** Ett första steg: vad affären är och vilka konton som kan komma i fråga. */
+async function valjKandidater(modell: Modell, f: Underlagsfraga): Promise<{ analys: string; kandidater: Kandidat[]; svarade: string }> {
+  const fraga1 = (extra = '') => fraga<Kandidatsvar>(modell, {
+    system: { fast: KANDIDAT_FAST, kund: f.kund }, delat: f.delat, user: f.user + extra, namn: 'kandidater', schema: KANDIDAT_SCHEMA,
+  });
+  const lista = (s: Kandidatsvar) => (Array.isArray(s.kandidater) ? s.kandidater : []).map((k) => ({ ...k, konto: String(k.konto ?? '').trim() }));
+  let svar = await fraga1();
+  const saknas = lista(svar.data).filter((k) => !slaUppKonto(k.konto)).map((k) => k.konto);
+  if (saknas.length) svar = await fraga1(`\n\nDitt förra svar hade ${saknas.join(', ')}, som inte finns i K1-kontoplanen. Välj konton ur listan.`);
+
+  const kandidater = lista(svar.data)
+    .filter((k, i, a) => slaUppKonto(k.konto) && a.findIndex((x) => x.konto === k.konto) === i)
+    .slice(0, 5)
+    .map((k) => ({ konto: k.konto, namn: slaUppKonto(k.konto)!.namn, varfor: String(k.varfor ?? '') }));
+  if (!kandidater.length) throw new Error(`${modell} gav inga kandidatkonton ur K1`);
+  return { analys: String(svar.data.analys ?? ''), kandidater, svarade: svar.modell };
+}
+
+/** Kandidatkontonas hela regeltext, med gränsprövningarna uträknade på hela beloppet. */
+function kandidatRegler(t: Transaktion, kandidater: Kandidat[]): string {
+  const brutto = Number(t.belopp);
+  const netto = ore(brutto - (Number(t.moms) || 0));
+  return kandidater.map((k) => kontoBlock(provaKonto({ konto: k.konto, netto, brutto, datum: t.datum }))).join('\n\n---\n\n');
+}
+
+/** Andra steget: konteringen, med kandidaternas regler framför sig. */
+async function besluta(
+  modell: Modell, f: Underlagsfraga, t: Transaktion, analys: string, kandidater: Kandidat[], jamkning?: string,
+): Promise<{ beslut: Beslut; svarade: string }> {
+  const user = [
+    f.user,
+    `DIN ANALYS FRÅN FÖRRA STEGET:\n${analys}`,
+    `KANDIDATKONTONA OCH DERAS REGLER:\n\n${kandidatRegler(t, kandidater)}`,
+    jamkning ?? '',
+  ].filter(Boolean).join('\n\n');
+  const schema = beslutSchema(f.regelIdn);
+  const saknas = (b: Beslut) => (Array.isArray(b.delar) ? b.delar : []).map((d) => d.konto).filter((k) => !slaUppKonto(k));
+  let svar = await fraga<Beslut>(modell, { system: { fast: BESLUT_FAST, kund: f.kund }, delat: f.delat, user, namn: 'kontering', schema });
   if (saknas(svar.data).length) {
-    svar = await fraga<Pass1>(modell, {
-      system,
+    svar = await fraga<Beslut>(modell, {
+      system: { fast: BESLUT_FAST, kund: f.kund },
+      delat: f.delat,
       user: `${user}\n\nDitt förra svar hade ${saknas(svar.data).join(', ')}, som inte finns i K1-kontoplanen. Välj konton ur listan.`,
       namn: 'kontering',
       schema,
     });
   }
-  const p1 = svar.data;
-  const svarade = new Set([svar.modell]);
-  // Bara regler som finns, en gång var
-  const regler = [...new Set((Array.isArray(p1.regler) ? p1.regler : []).filter((id) => regelIdn.includes(id)))];
+  return { beslut: svar.data, svarade: svar.modell };
+}
 
-  const forstaDelar = delarUrPass1(t, p1);
+/**
+ * Konteringen ur modellens beslut, med det som avgörs i kod: momsen,
+ * kontonas gränsprövningar och det som gör en rad osäker oavsett konto.
+ */
+function byggKontering(
+  modell: Modell,
+  t: Transaktion,
+  betalsatt: Betalsatt,
+  beslut: Beslut,
+  regelIdn: string[],
+  svarade: Set<string>,
+  extra: { analys: string; kandidater: Kandidat[]; forstaKonto: string | null; jamkning: Jamkning | null },
+): Kontering {
+  const flaggor: Flagga[] = [];
+  // Bara regler som finns, en gång var
+  const regler = [...new Set((Array.isArray(beslut.regler) ? beslut.regler : []).filter((id) => regelIdn.includes(id)))];
+
+  const forstaDelar = delarUrBeslut(t, beslut);
   if (!forstaDelar.length) throw new Error(`${modell} gav inget konto`);
   const huvudkonto = forstaDelar[0].konto ?? '';
-  const { delar: bokdelar, flaggor: momsflaggor } = raknaMoms(t, forstaDelar, p1.momshantering, huvudkonto);
+  const { delar: bokdelar, flaggor: momsflaggor } = raknaMoms(t, forstaDelar, beslut.momshantering, huvudkonto);
   flaggor.push(...momsflaggor);
 
-  // Pass 2 per konto. Underkänns kontot och granskningen pekar ut ett annat,
-  // prövas det också — går det igenom byts kontot, annars behålls det första.
-  const konton = [...new Set(bokdelar.map((d) => d.konto))];
-  const uppdelning = konton.length > 1
-    ? `Transaktionen är uppdelad: ${konton.map((k) => `${k} ${ore(bokdelar.filter((d) => d.konto === k).reduce((s, d) => s + d.belopp, 0))} kr`).join(', ')}.`
-    : '';
-  const granskade = await Promise.all(konton.map(async (forsta) => {
-    const del = bokdelar.filter((d) => d.konto === forsta);
+  // Varje konto prövas i kod: får det väljas automatiskt, håller beloppsgränserna
+  for (const konto of new Set(bokdelar.map((d) => d.konto))) {
+    const del = bokdelar.filter((d) => d.konto === konto);
     const brutto = ore(del.reduce((s, d) => s + d.belopp, 0));
     const netto = ore(del.reduce((s, d) => s + d.belopp - d.moms, 0));
-    const prova = (konto: string) => provaKonto({ konto, netto, brutto, datum: t.datum });
-    const granska = async (provning: ReturnType<typeof prova>) => {
-      const g = await fraga<Pass2>(modell, {
-        system: { fast: PASS2_FAST, kund },
-        user: [
-          `TRANSAKTIONEN:\n${user}`,
-          uppdelning,
-          `VALT KONTO: ${provning.rad!.konto} ${provning.rad!.namn}${konton.length > 1 ? ` för ${brutto} kr inklusive moms` : ''}, momssats ${momsText(del[0].sats, del.length > 1 ? del.map((d) => ({ momssats: d.sats, belopp: d.belopp, moms: d.moms })) : null)}\nMotivering: ${p1.motivering}`,
-          regelText(regler, allaRegler),
-          `KONTOTS REGLER:\n${kontoBlock(provning)}`,
-        ].filter(Boolean).join('\n\n'),
-        namn: 'granskning',
-        schema: PASS2_SCHEMA,
-      });
-      svarade.add(g.modell);
-      return g.data;
-    };
-
-    const provning = prova(forsta);
-    // Pass 2 bara när kontot alls finns att pröva mot
-    if (!provning.rad) return { konto: forsta, provning, granskning: null, egna: [] as Flagga[] };
-    const g = await granska(provning);
-    const nytt = g.battre_konto?.trim();
-    if (g.stammer || !nytt || nytt === forsta || !slaUppKonto(nytt)) {
-      return {
-        konto: forsta, provning, granskning: { ...g, konto: forsta, forstaKonto: forsta },
-        egna: g.stammer ? [] : [{ typ: 'granskning', allvar: 'granskning', text: `Granskningen av ${forsta}: ${g.motivering}` } as Flagga],
-      };
-    }
-    const andraProvning = prova(nytt);
-    const g2 = await granska(andraProvning);
-    if (g2.stammer) return { konto: nytt, provning: andraProvning, granskning: { ...g2, konto: nytt, forstaKonto: forsta }, egna: [] as Flagga[] };
-    return {
-      konto: forsta, provning, granskning: { ...g, konto: forsta, forstaKonto: forsta },
-      egna: [{ typ: 'granskning', allvar: 'granskning', text: `Granskningen av ${forsta}: ${g.motivering} Förslaget ${nytt} underkändes också: ${g2.motivering}` } as Flagga],
-    };
-  }));
-
-  for (const x of granskade) {
-    flaggor.push(...x.egna, ...x.provning.flaggor);
-    if (x.granskning?.granskning_kravs) {
-      flaggor.push({ typ: 'manuell-granskning', allvar: 'granskning', text: `Reglerna för ${x.konto} kräver manuell granskning för den här transaktionen.` });
-    }
+    flaggor.push(...provaKonto({ konto, netto, brutto, datum: t.datum }).flaggor);
   }
-  // Byten från granskningen slås in i delarna. Två delar kan hamna på samma konto.
-  const byte = new Map(granskade.map((x, i) => [konton[i], x.konto]));
-  const slutdelar = slaIhopDelar(forstaDelar.map((d) => ({ ...d, konto: byte.get(d.konto ?? huvudkonto) ?? d.konto ?? huvudkonto })));
-  const huvud = granskade.find((x) => x.konto === slutdelar[0]?.konto) ?? granskade[0];
-  const konton2 = granskade.flatMap((x) => (x.granskning ? [x.granskning] : []));
+  const brutna = (Array.isArray(beslut.brutna_regler) ? beslut.brutna_regler : []).filter((r) => String(r).trim());
+  if (brutna.length) flaggor.push({ typ: 'brutna-regler', allvar: 'granskning', text: `Stämmer inte med kontots regler: ${brutna.join(' · ')}` });
+  if (beslut.granskning_kravs) flaggor.push({ typ: 'manuell-granskning', allvar: 'granskning', text: 'Reglerna kräver manuell granskning för den här transaktionen, eller underlaget räcker inte för att avgöra.' });
 
   // Det som gör en rad osäker oavsett konto
+  const slutdelar = slaIhopDelar(forstaDelar);
   const motkonto = betalkonto(betalsatt, t.riktning);
   if (!motkonto) flaggor.push({ typ: 'betalsatt', allvar: 'granskning', text: 'Kunden betalar via både företags- och privatkonto — välj betalkonto.' });
   if (motkonto && slutdelar.some((d) => d.konto === motkonto)) flaggor.push({ typ: 'samma-konto', allvar: 'stopp', text: `${motkonto} är också betalkontot.` });
@@ -452,28 +508,105 @@ async function konteraMedModell(
     flaggor.push({ typ: 'dublett', allvar: 'granskning', text: `Kan vara en dubblett${t.dublettkoll.avFil ? ` av en transaktion i ${t.dublettkoll.avFil}` : ''}: ${t.dublettkoll.motivering}` });
   }
   if (t.valuta && t.valuta !== 'SEK') flaggor.push({ typ: 'valuta', allvar: 'granskning', text: `Beloppet är i ${t.valuta} och måste räknas om till kronor.` });
-  if (p1.sakerhet !== 'hog') flaggor.push({ typ: 'osaker', allvar: 'granskning', text: `Modellens säkerhet: ${p1.sakerhet === 'lag' ? 'låg' : 'medel'}.` });
+  if (beslut.sakerhet !== 'hog') flaggor.push({ typ: 'osaker', allvar: 'granskning', text: `Modellens säkerhet: ${beslut.sakerhet === 'lag' ? 'låg' : 'medel'}.` });
 
-  const svensk = p1.momshantering === 'svensk';
+  const svensk = beslut.momshantering === 'svensk';
   const sparade = slutdelar.map((d) => (svensk ? d : { ...d, momssats: 0, moms: null }));
   const omdome: Omdome = flaggor.some((f) => f.allvar === 'stopp') ? 'rod' : flaggor.length ? 'gul' : 'gron';
+  const konto = slutdelar[0]?.konto ?? null;
   return {
     modell,
     svarade: [...svarade].join(', '),
-    konto: slutdelar[0]?.konto ?? null,
+    konto,
     momssats: svensk ? slutdelar[0]?.momssats ?? 0 : 0,
     momsdelar: rensaMomsdelar(sparade),
-    motivering: p1.motivering,
+    motivering: String(beslut.motivering ?? ''),
     regler,
-    granskning: huvud?.granskning ? {
-      ...huvud.granskning,
-      // Med flera konton står varje kontos granskning i motiveringen
-      motivering: konton2.length > 1 ? konton2.map((g) => `${g.konto}: ${g.motivering}`).join(' ') : huvud.granskning.motivering,
-      konton: konton2,
-    } : null,
+    granskning: {
+      stammer: !brutna.length,
+      battre_konto: null,
+      brutna_regler: brutna,
+      granskning_kravs: !!beslut.granskning_kravs,
+      motivering: '',
+      forstaKonto: extra.forstaKonto ?? konto ?? '',
+      konton: [],
+      analys: extra.analys,
+      kandidater: extra.kandidater,
+      jamkning: extra.jamkning,
+    },
     flaggor,
     omdome,
   };
+}
+
+interface Forslag {
+  kontering: Kontering;
+  analys: string;
+  kandidater: Kandidat[];
+  svarade: Set<string>;
+}
+
+async function konteraMedModell(modell: Modell, t: Transaktion, betalsatt: Betalsatt, f: Underlagsfraga): Promise<Forslag> {
+  const k = await valjKandidater(modell, f);
+  const { beslut, svarade } = await besluta(modell, f, t, k.analys, k.kandidater);
+  const alla = new Set([k.svarade, svarade]);
+  return {
+    kontering: byggKontering(modell, t, betalsatt, beslut, f.regelIdn, alla, { analys: k.analys, kandidater: k.kandidater, forstaKonto: null, jamkning: null }),
+    analys: k.analys,
+    kandidater: k.kandidater,
+    svarade: alla,
+  };
+}
+
+/** Båda gröna och överens om konto och moms — samma regel som när konteringen blir verifikation. */
+function overens(k: Kontering[]): boolean {
+  const [a] = k;
+  return k.length >= 2 && k.every((x) => x.omdome === 'gron' && x.konto && x.konto === a.konto
+    && sammaMoms({ momssats: Number(x.momssats), momsdelar: x.momsdelar }, { momssats: Number(a.momssats), momsdelar: a.momsdelar }));
+}
+
+const MODELLNAMN: Record<string, string> = { 'gpt-6-astra': 'GPT-6 Astra', 'claude-opus-5-5': 'Claude Opus 5.5' };
+
+function forslagText(k: Kontering, analys: string): string {
+  return [
+    `Konto: ${k.konto ?? '—'} ${k.konto ? slaUppKonto(k.konto)?.namn ?? '' : ''}, moms ${momsText(k.momssats ?? 0, k.momsdelar)}`,
+    `Analys: ${analys}`,
+    `Motivering: ${k.motivering}`,
+    k.flaggor.length ? `Flaggor: ${k.flaggor.map((x) => x.text).join(' · ')}` : '',
+  ].filter(Boolean).join('\n');
+}
+
+function jamkningText(egen: Forslag, annan: Forslag): string {
+  return `${JAMKNING}\n\nDITT FÖRSLAG:\n${forslagText(egen.kontering, egen.analys)}\n\nDEN ANDRA MODELLENS FÖRSLAG (${MODELLNAMN[annan.kontering.modell] ?? annan.kontering.modell}):\n${forslagText(annan.kontering, annan.analys)}`;
+}
+
+/**
+ * Modellerna var oense eller osäkra. Var och en får se den andras kontering
+ * och kontera om en gång, med båda modellernas kandidater. Är de fortfarande
+ * oense går transaktionen till Granska med båda resonemangen.
+ */
+async function jamka(t: Transaktion, betalsatt: Betalsatt, f: Underlagsfraga, forsta: Forslag[]): Promise<Kontering[]> {
+  return Promise.all(forsta.map(async (egen, i) => {
+    const annan = forsta[1 - i];
+    const kandidater = [...egen.kandidater, ...annan.kandidater]
+      .filter((k, n, a) => a.findIndex((x) => x.konto === k.konto) === n).slice(0, 8);
+    const { beslut, svarade } = await besluta(egen.kontering.modell, f, t, egen.analys, kandidater, jamkningText(egen, annan));
+    const ny = byggKontering(egen.kontering.modell, t, betalsatt, beslut, f.regelIdn, new Set([...egen.svarade, svarade]), {
+      analys: egen.analys,
+      kandidater,
+      forstaKonto: egen.kontering.konto,
+      jamkning: null,
+    });
+    const fore = egen.kontering;
+    const andradeSig = ny.konto !== fore.konto
+      || !sammaMoms({ momssats: Number(ny.momssats), momsdelar: ny.momsdelar }, { momssats: Number(fore.momssats), momsdelar: fore.momsdelar });
+    ny.granskning!.jamkning = {
+      fore: { konto: fore.konto, momssats: fore.momssats, momsdelar: fore.momsdelar, omdome: fore.omdome, motivering: fore.motivering },
+      andradeSig,
+      motivering: ny.motivering,
+    };
+    return ny;
+  }));
 }
 
 // ---------- flera transaktioner ----------
@@ -492,10 +625,6 @@ export async function konteraTransaktioner(
   if (profilFel) throw new Error(`Kunde inte läsa kunden: ${profilFel.message}`);
   const betalsatt = tolkaBetalsatt((profil as unknown as Kund | null)?.har_foretagskonto ?? null);
   if (!betalsatt) throw new Error('Välj först om kunden betalar via företagskonto eller privatkonto (Kundkontext).');
-  const kund = [
-    byggKundkontext(profil as unknown as Kund | null),
-    await byggMejlkontext(supabase, { userId, emails: [(profil as unknown as Kund | null)?.email] }),
-  ].filter(Boolean).join('\n\n');
 
   const { data: rader, error } = await supabase
     .from('transaktioner')
@@ -514,6 +643,7 @@ export async function konteraTransaktioner(
     .from('verifikationer').select('transaktion_id').in('transaktion_id', transaktionIds);
   const klara = new Set((bokforda ?? []).map((v) => v.transaktion_id as string));
   const kvar = (rader as Transaktion[]).filter((t) => !klara.has(t.id) && Number(t.belopp) > 0);
+  if (!kvar.length) return [];
 
   // Byråns kontext och regler från flödesschemat
   const instruktioner = await hamtaInstruktioner(supabase, {
@@ -521,16 +651,53 @@ export async function konteraTransaktioner(
   });
   const allaRegler = reglerFor(instruktioner, userId);
 
+  // Kunden: samma för alla transaktioner, och cachas därför i systemprompten
+  const [kundbild, arslista, mejl] = await Promise.all([
+    hamtaKundbild(supabase, userId),
+    hamtaArslista(supabase, userId),
+    byggMejlkontext(supabase, { userId, emails: [(profil as unknown as Kund | null)?.email] }),
+  ]);
+  const kund = [
+    byggKundkontext(profil as unknown as Kund | null),
+    kundbild ? `KUNDBILDEN:\n${kundbild}` : 'KUNDBILDEN: inte sammanställd än — utgå från kundens transaktioner nedan.',
+    `KUNDENS TRANSAKTIONER (${arslista.rader.length} st, äldst först):\n${arslista.text || '(inga)'}`,
+    mejl,
+    `KUNDREGLER:\n${reglerAttValja(allaRegler)}`,
+  ].filter(Boolean).join('\n\n');
+
+  // Filen: samma för transaktionerna ur samma underlag
+  const filer = new Map<string, Promise<{ delat: Del[]; nummer: Map<string, number> }>>();
+  const filen = (underlagId: string) => {
+    if (!filer.has(underlagId)) {
+      filer.set(underlagId, (async () => {
+        const { data: filrader } = await supabase.from('transaktioner')
+          .select('id, datum, riktning, belopp, valuta, motpart, beskrivning').eq('underlag_id', underlagId).order('radnr');
+        const lista = (filrader ?? []) as Filrad[];
+        return { delat: await underlagetsDelar(supabase, underlagId, lista), nummer: filensRader(lista).nummer };
+      })());
+    }
+    return filer.get(underlagId)!;
+  };
+
   const utfall: Utfall[] = [];
   for (let i = 0; i < kvar.length; i += SAMTIDIGA) {
     utfall.push(...await Promise.all(kvar.slice(i, i + SAMTIDIGA).map(async (t) => {
       const kontext = kontextFor(instruktioner, t);
       try {
         if (kontext && !torrkorning) t = await rattaEfterKontext(supabase, t, betalsatt, kontext);
+        const fil = t.underlag_id ? await filen(t.underlag_id) : { delat: [], nummer: new Map<string, number>() };
+        const f = fil.nummer.get(t.id);
+        const k = arslista.nummer.get(t.id);
+        const var_ = [f ? `F${f} i filen` : '', k ? `K${k} i kundens lista` : ''].filter(Boolean).join(', ');
+        return konteraEn(supabase, t, betalsatt, {
+          kund,
+          delat: fil.delat,
+          user: [`TRANSAKTIONEN ATT KONTERA${var_ ? ` (${var_})` : ''}:\n${transaktionText(t, betalsatt)}`, kontext].filter(Boolean).join('\n\n'),
+          regelIdn: allaRegler.map((r) => r.id),
+        }, torrkorning);
       } catch (err) {
         return { transaktionId: t.id, konteringar: [], fel: err instanceof Error ? err.message : String(err) };
       }
-      return konteraEn(supabase, t, betalsatt, kund, { allaRegler, kontext }, torrkorning);
     })));
   }
   return utfall;
@@ -566,26 +733,29 @@ async function rattaEfterKontext(supabase: SupabaseClient, t: Transaktion, betal
   return { ...t, ...andringar } as Transaktion;
 }
 
-/** Det byrån lagt till i flödesschemat: alla regler kunden har, och kontexten för transaktionen. */
-interface Byran {
-  allaRegler: Kundregel[];
-  kontext: string;
-}
-
 /** En torrkörning konterar men sparar ingenting — för att prova prompter och modeller. */
 async function konteraEn(
   supabase: SupabaseClient,
   t: Transaktion,
   betalsatt: Betalsatt,
-  kund: string,
-  byran: Byran,
+  f: Underlagsfraga,
   torrkorning: boolean,
 ): Promise<Utfall> {
-  let konteringar: Kontering[];
+  let forsta: Forslag[];
   try {
-    konteringar = await Promise.all(MODELLER.map((m) => konteraMedModell(m, t, betalsatt, kund, byran)));
+    forsta = await Promise.all(MODELLER.map((m) => konteraMedModell(m, t, betalsatt, f)));
   } catch (err) {
     return { transaktionId: t.id, konteringar: [], fel: err instanceof Error ? err.message : String(err) };
+  }
+  let konteringar = forsta.map((x) => x.kontering);
+  if (!overens(konteringar)) {
+    try {
+      konteringar = await jamka(t, betalsatt, f, forsta);
+    } catch (err) {
+      // Utan jämkning gäller de första förslagen, och raden går till Granska ändå
+      const text = `Jämkningen misslyckades: ${err instanceof Error ? err.message : String(err)}`;
+      konteringar = konteringar.map((k) => ({ ...k, flaggor: [...k.flaggor, { typ: 'jamkning', allvar: 'granskning', text }], omdome: k.omdome === 'gron' ? 'gul' : k.omdome }));
+    }
   }
   if (torrkorning) return { transaktionId: t.id, konteringar };
 
