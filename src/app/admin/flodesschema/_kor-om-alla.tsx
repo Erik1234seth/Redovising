@@ -128,6 +128,22 @@ export function ForslagKort({ f }: { f: Forslag }) {
   );
 }
 
+/** Öppnar originalfilen i en ny flik, utan att raden fälls ut. */
+function FilLank({ id, namn }: { id: string; namn: string }) {
+  return (
+    <a
+      href={`/api/admin/underlag/${id}/ladda-ner?visa`}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      title={`Öppna ${namn} i en ny flik`}
+      className="text-blue-700 hover:underline"
+    >
+      {namn}
+    </a>
+  );
+}
+
 async function post(id: string, steg: string, extra: Record<string, unknown> = {}) {
   const d = await fetch('/api/admin/flodesschema/underlag', {
     method: 'POST',
@@ -327,7 +343,12 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
                   <tr className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => setOppen(oppen === f.id ? null : f.id)}>
                     <td className="py-1.5 pr-2 text-slate-900">
                       <span className="text-slate-400 mr-1">{oppen === f.id ? '▾' : '▸'}</span>
-                      {f.fileName} <span className="text-slate-400">· {s.antal} st</span>
+                      <FilLank id={f.id} namn={f.fileName} />
+                      {/* Dokumentets andra sidor, när filen är första sidan av flera */}
+                      {(f.u?.sidor?.delar ?? []).filter((d) => d.id !== f.id).map((d) => (
+                        <span key={d.id} className="text-slate-400"> + <FilLank id={d.id} namn={`sida ${d.sida ?? '?'}`} /></span>
+                      ))}
+                      <span className="text-slate-400"> · {s.antal} st</span>
                     </td>
                     <td className={`py-1.5 pr-2 ${LAGE[f.lage].klass}`}>
                       {f.steg || LAGE[f.lage].namn}

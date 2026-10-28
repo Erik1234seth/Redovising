@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Laddar ned ett underlag med sitt ursprungliga filnamn.
+ * Laddar ned ett underlag med sitt ursprungliga filnamn. Med ?visa öppnas
+ * det i webbläsaren i stället — en PDF eller bild visas direkt i fliken.
  *
  * Länken signeras först när någon klickar, i stället för att personvyn skapar
  * en signerad länk per fil varje gång den öppnas. Routen svarar med en
@@ -20,8 +21,9 @@ function getSupabase() {
   );
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const visa = new URL(request.url).searchParams.has('visa');
   const supabase = getSupabase();
 
   const { data: row, error } = await supabase
@@ -35,7 +37,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { data, error: signError } = await supabase.storage
     .from(BUCKET)
-    .createSignedUrl(row.file_path, SIGNED_URL_TTL, { download: row.file_name || true });
+    .createSignedUrl(row.file_path, SIGNED_URL_TTL, visa ? undefined : { download: row.file_name || true });
 
   if (signError || !data?.signedUrl) {
     return NextResponse.json({ error: signError?.message || 'Filen saknas i lagringen' }, { status: 404 });
