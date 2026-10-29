@@ -57,7 +57,8 @@ export interface Definition {
   antalSidor?: number | null;
 }
 
-const MODELL = 'gpt-6.1-sol';
+// Luna räcker här och kostar en tjugondel av Sol — provkört på två kunders alla underlag 2026-10-29
+const MODELL = 'gpt-6-luna';
 // Bara ett litet JSON-svar, men modellens tänkande ryms i samma budget
 const MAX_TOKENS = 16000;
 const BUCKET = 'bokforing-underlag';

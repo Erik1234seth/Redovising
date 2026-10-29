@@ -8,7 +8,7 @@ import { kr } from './_verifikationer';
 /**
  * Konteringen av kundens transaktioner enligt K1.
  *
- * Båda modellerna (gpt-6-astra och Claude Opus 5.5) konterar varje transaktion.
+ * Båda modellerna (GPT-6.1 Sol och Claude Opus 5.5) konterar varje transaktion.
  * När båda är gröna och har valt samma konto och moms är den klar; annars blir
  * det förslag, och här väljer Erik ett av dem eller ett eget konto. Allt är
  * preliminärt och blir verifikation 14 dagar efter senaste ändringen (se
@@ -27,8 +27,8 @@ type Status = 'okonterad' | 'forslag' | 'preliminar' | 'bokford';
 type Filter = Status | 'alla';
 
 const MODELLNAMN: Record<string, string> = {
-  'gpt-6-astra': 'GPT-6 Astra',
   'gpt-6.1-sol': 'GPT-6.1 Sol',
+  'gpt-6-astra': 'GPT-6 Astra',
   'gpt-5.5': 'GPT-5.5',
   'claude-opus-5-5': 'Claude Opus 5.5',
 };

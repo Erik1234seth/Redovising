@@ -49,7 +49,7 @@ interface Fil {
   u: FlodesUnderlag | null;
 }
 
-const MODELL: Record<string, string> = { 'gpt-6-astra': 'GPT-6 Astra', 'claude-opus-5-5': 'Claude Opus 5.5' };
+const MODELL: Record<string, string> = { 'gpt-6.1-sol': 'GPT-6.1 Sol', 'gpt-6-astra': 'GPT-6 Astra', 'claude-opus-5-5': 'Claude Opus 5.5' };
 const PRICK: Record<string, string> = { gron: 'bg-emerald-500', gul: 'bg-amber-400', rod: 'bg-red-500' };
 const STEGNAMN: Record<string, string> = {
   kundbild: 'Kundbild', dublett: 'Dublettcheck', komplettera: 'Komplettera', tillrackligt: 'Tillräckligt?',

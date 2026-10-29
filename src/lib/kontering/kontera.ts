@@ -574,7 +574,7 @@ function overens(k: Kontering[]): boolean {
     && sammaMoms({ momssats: Number(x.momssats), momsdelar: x.momsdelar }, { momssats: Number(a.momssats), momsdelar: a.momsdelar }));
 }
 
-const MODELLNAMN: Record<string, string> = { 'gpt-6-astra': 'GPT-6 Astra', 'claude-opus-5-5': 'Claude Opus 5.5' };
+const MODELLNAMN: Record<string, string> = { 'gpt-6.1-sol': 'GPT-6.1 Sol', 'gpt-6-astra': 'GPT-6 Astra', 'claude-opus-5-5': 'Claude Opus 5.5' };
 
 function forslagText(k: Kontering, analys: string): string {
   return [
@@ -727,7 +727,7 @@ async function rattaEfterKontext(supabase: SupabaseClient, t: Transaktion, betal
   const { data: r } = await fraga<{
     datum: string | null; belopp: number | null; moms: number | null;
     valuta: string | null; riktning: 'in' | 'ut' | null; kommentar: string;
-  }>('gpt-6-astra', {
+  }>('gpt-6.1-sol', {
     system: { fast: RATTELSE_FAST, kund: '' },
     user: `TRANSAKTIONEN:\n${transaktionText(t, betalsatt)}\n\nBYRÅNS INSTRUKTION:\n${kontext}`,
     namn: 'rattelse',
@@ -772,6 +772,12 @@ async function konteraEn(
     }
   }
   if (torrkorning) return { transaktionId: t.id, konteringar };
+
+  // Förslag från en modell som inte konterar längre (GPT-6 Astra) tas bort — annars ligger
+  // tre förslag på transaktionen, och de blir aldrig överens
+  const { error: gFel } = await supabase.from('konteringar').delete()
+    .eq('transaktion_id', t.id).not('modell', 'in', `(${MODELLER.join(',')})`);
+  if (gFel) return { transaktionId: t.id, konteringar, fel: `Kunde inte ta bort gamla förslag: ${gFel.message}` };
 
   const { error } = await supabase.from('konteringar').upsert(
     konteringar.map((k) => ({
@@ -941,7 +947,7 @@ export async function konteraMedInstruktion(
   const { data: r } = await fraga<{
     datum: string | null; belopp: number | null; moms: number | null;
     valuta: string | null; riktning: 'in' | 'ut' | null; kommentar: string;
-  }>('gpt-6-astra', {
+  }>('gpt-6.1-sol', {
     system: { fast: RATTELSE_FAST, kund: '' },
     user: `TRANSAKTIONEN:\n${transaktionText(t, betalsatt)}\n\nBYRÅNS INSTRUKTION:\n${instruktion}`,
     namn: 'rattelse',

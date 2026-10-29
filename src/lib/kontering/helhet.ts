@@ -37,7 +37,7 @@ import { hamtaInstruktioner, reglerFor } from '@/lib/transaktioner/instruktioner
  */
 
 const MODELL = 'claude-opus-5-5' as const;
-const MODELLNAMN: Record<string, string> = { 'gpt-6-astra': 'GPT', 'claude-opus-5-5': 'Claude' };
+const MODELLNAMN: Record<string, string> = { 'gpt-6.1-sol': 'GPT', 'gpt-6-astra': 'GPT', 'claude-opus-5-5': 'Claude' };
 
 const SCHEMA = {
   type: 'object',

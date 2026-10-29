@@ -4,6 +4,9 @@ import { openaiFetch } from '@/lib/ai-anrop';
 /**
  * De två modellerna som konterar, bakom samma anrop.
  *
+ * GPT-6.1 Sol ersatte GPT-6 Astra (2026-10-29): en provkörning på två kunders
+ * alla transaktioner gav samma konton till en femtedel av priset.
+ *
  * Båda kör båda passen med samma prompter, så att svaren går att jämföra rad
  * för rad. Svaret tvingas till ett JSON-schema hos båda leverantörerna — då
  * behöver vi aldrig gissa oss fram i fritext.
@@ -12,8 +15,9 @@ import { openaiFetch } from '@/lib/ai-anrop';
  * minuter, och den måste hinna klart inom Vercels fem minuter.
  */
 
-export const MODELLER = ['gpt-6-astra', 'claude-opus-5-5'] as const;
-export type Modell = (typeof MODELLER)[number];
+export const MODELLER = ['gpt-6.1-sol', 'claude-opus-5-5'] as const;
+/** Konteringens modeller, och de andra som går genom samma anrop (kundbilden och helhetskontrollen). */
+export type Modell = (typeof MODELLER)[number] | 'claude-sonnet-5-5';
 
 export interface Svar<T> {
   data: T;
@@ -61,7 +65,7 @@ function claudeDel(d: Del): Anthropic.Beta.Messages.BetaContentBlockParam {
   return { type: 'image', source: { type: 'base64', media_type: d.mime, data: d.data } };
 }
 
-async function fragaGpt<T>(system: System, delat: Del[], user: string, namn: string, schema: object): Promise<Svar<T>> {
+async function fragaGpt<T>(modell: string, system: System, delat: Del[], user: string, namn: string, schema: object): Promise<Svar<T>> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
 
@@ -69,7 +73,7 @@ async function fragaGpt<T>(system: System, delat: Del[], user: string, namn: str
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: 'gpt-6-astra',
+      model: modell,
       reasoning_effort: 'high',
       response_format: { type: 'json_schema', json_schema: { name: namn, strict: true, schema } },
       messages: [
@@ -79,16 +83,16 @@ async function fragaGpt<T>(system: System, delat: Del[], user: string, namn: str
       max_completion_tokens: 32000,
     }),
   });
-  if (!res.ok) throw new Error(`gpt-6-astra svarade ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) throw new Error(`${modell} svarade ${res.status}: ${(await res.text()).slice(0, 300)}`);
 
   const json = await res.json();
   const choice = json.choices?.[0];
-  if (choice?.message?.refusal) throw new Error(`gpt-6-astra vägrade: ${choice.message.refusal}`);
-  if (choice?.finish_reason === 'length') throw new Error('gpt-6-astra hann inte svara klart');
-  return { data: JSON.parse(choice?.message?.content ?? '') as T, modell: json.model ?? 'gpt-6-astra' };
+  if (choice?.message?.refusal) throw new Error(`${modell} vägrade: ${choice.message.refusal}`);
+  if (choice?.finish_reason === 'length') throw new Error(`${modell} hann inte svara klart`);
+  return { data: JSON.parse(choice?.message?.content ?? '') as T, modell: json.model ?? modell };
 }
 
-async function fragaClaude<T>(system: System, delat: Del[], user: string, schema: object): Promise<Svar<T>> {
+async function fragaClaude<T>(modell: string, system: System, delat: Del[], user: string, schema: object): Promise<Svar<T>> {
   // Tre cachepunkter: den fasta instruktionen, kunden och det delade
   // underlaget. Allt före en punkt läses ur cachen när nästa anrop börjar likadant.
   const cache = { type: 'ephemeral' as const, ttl: '1h' as const };
@@ -98,7 +102,7 @@ async function fragaClaude<T>(system: System, delat: Del[], user: string, schema
   // vanligt anrop hinner vänta. Vid en vägran tar en annan modell över i
   // samma anrop (fallbacks), och vilken som svarade sparas.
   const stream = claude().beta.messages.stream({
-    model: 'claude-opus-5-5',
+    model: modell,
     max_tokens: 64000,
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default',
@@ -112,15 +116,15 @@ async function fragaClaude<T>(system: System, delat: Del[], user: string, schema
   } as Anthropic.Beta.Messages.MessageCreateParamsStreaming);
   const msg = await stream.finalMessage();
 
-  if (msg.stop_reason === 'refusal') throw new Error('claude-opus-5-5 vägrade svara');
-  if (msg.stop_reason === 'max_tokens') throw new Error('claude-opus-5-5 hann inte svara klart');
+  if (msg.stop_reason === 'refusal') throw new Error(`${modell} vägrade svara`);
+  if (msg.stop_reason === 'max_tokens') throw new Error(`${modell} hann inte svara klart`);
   const text = msg.content.find((b) => b.type === 'text');
-  if (!text || text.type !== 'text') throw new Error('claude-opus-5-5 gav inget svar');
+  if (!text || text.type !== 'text') throw new Error(`${modell} gav inget svar`);
   return { data: JSON.parse(text.text) as T, modell: msg.model };
 }
 
 export function fraga<T>(modell: Modell, o: { system: System; delat?: Del[]; user: string; namn: string; schema: object }): Promise<Svar<T>> {
-  return modell === 'gpt-6-astra'
-    ? fragaGpt<T>(o.system, o.delat ?? [], o.user, o.namn, o.schema)
-    : fragaClaude<T>(o.system, o.delat ?? [], o.user, o.schema);
+  return modell.startsWith('gpt-')
+    ? fragaGpt<T>(modell, o.system, o.delat ?? [], o.user, o.namn, o.schema)
+    : fragaClaude<T>(modell, o.system, o.delat ?? [], o.user, o.schema);
 }

@@ -28,7 +28,8 @@ import { slaUppKonto } from './regelverk';
 /** Betal- och momskonton. De säger inget om vad affären är, så de visas inte för en bokförd rad. */
 const BETAL_OCH_MOMS = new Set(['1930', '2013', '2017', '2641', '2611', '2614', '2615', '2621', '2631', '2645', '2647']);
 
-const MODELL = 'claude-opus-5-5' as const;
+// Sonnet räcker: kundbilden byggs sällan och kräver inget djupt resonemang (provkört 2026-10-29)
+const MODELL = 'claude-sonnet-5-5' as const;
 // Så många rader får årslistan, de senaste först. Fler än så får inte plats med marginal.
 const MAX_RADER = 1500;
 const GAMMAL_DAGAR = 30;

@@ -22,7 +22,8 @@ import { iKo, openaiFetch } from '@/lib/ai-anrop';
  * `komplettering` och skickas med till konteringen.
  */
 
-const MODELL = 'gpt-6.1-sol';
+// Luna räcker här och kostar en tjugondel av Sol — provkört på två kunders alla underlag 2026-10-29
+const MODELL = 'gpt-6-luna';
 /** Transaktioner per AI-anrop, och anrop samtidigt. Ett kontoutdrag kan ha hundratals rader. */
 const PER_ANROP = 10;
 const SAMTIDIGA = 3;

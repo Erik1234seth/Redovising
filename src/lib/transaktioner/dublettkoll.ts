@@ -34,7 +34,8 @@ import { iKo, openaiFetch } from '@/lib/ai-anrop';
  * egen koll (se `dubbletter.ts`) och är inte med här.
  */
 
-const MODELL = 'gpt-6.1-sol';
+// Luna räcker här och kostar en tjugondel av Sol — provkört på två kunders alla underlag 2026-10-29
+const MODELL = 'gpt-6-luna';
 const PER_ANROP = 10;
 const SAMTIDIGA = 3;
 const KANDIDATER = 6;
