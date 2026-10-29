@@ -5,6 +5,7 @@ import { FLYTTAD_FOR_HAND, sorteraEfterRegler } from './sortering';
 import { OVRIGTREGEL } from '@/lib/transaktioner/normalisera';
 import { isSieFile } from '@/lib/sie/parse';
 import { samlaSidor } from './sidor';
+import { arKontoutdrag } from '@/lib/transaktioner/normalisera';
 
 /**
  * Definiera underlaget — första steget efter att ett underlag tagits emot.
@@ -70,7 +71,7 @@ Du ska INTE skriva av underlaget. Du ska bara avgöra vad det är, så att det k
 Avgör tre saker:
 
 1. "kategori" — vilken väg underlaget ska gå:
-- "transaktioner": ett kvitto, en faktura, ett kontoutdrag eller en lista med köp, försäljningar eller betalningar. Underlaget säger vad som hänt, men inte hur det bokförts. Det är det vanliga.
+- "transaktioner": ett kvitto, en faktura eller en lista med köp, försäljningar eller betalningar — inte ett kontoutdrag, som är "ovrigt". Underlaget säger vad som hänt, men inte hur det bokförts. Det är det vanliga.
 - "verifikationer": ett underlag som REDAN är bokfört — en verifikationslista, grundbok, dagbok eller huvudbok ur ett bokföringsprogram. Kännetecknet är att raderna har kontonummer (t.ex. 1930, 2641, 3001) med belopp i debet eller kredit. Välj det bara när kontonumren faktiskt står i underlaget.
 ${OVRIGTREGEL}
 
@@ -151,6 +152,27 @@ function avgorMedRegler(row: UnderlagRad): Definition | null {
   return null;
 }
 
+/**
+ * Hur många sidor en PDF har. En PDF på 19 sidor där första sidan säger
+ * "Sida 1 (19)" är ett helt dokument, inte första sidan av 19 som skickats
+ * var för sig. Null när filen inte går att läsa — då gäller AI:ns svar.
+ */
+async function pdfSidor(buffer: Buffer): Promise<number | null> {
+  try {
+    const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.mjs'); // eslint-disable-line @typescript-eslint/no-explicit-any
+    // Samma arbetare som avläsningen av inmejlade PDF:er (@/lib/inmail/handlers/new-transaction)
+    const { resolve } = await import('path');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${resolve(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs')}`;
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+    const antal = Number(pdf.numPages);
+    await pdf.destroy?.();
+    return Number.isInteger(antal) && antal > 0 ? antal : null;
+  } catch (err) {
+    console.error('[definiera] kunde inte räkna PDF:ens sidor:', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 async function fragaAi(supabase: SupabaseClient, row: UnderlagRad): Promise<Definition> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
@@ -159,7 +181,10 @@ async function fragaAi(supabase: SupabaseClient, row: UnderlagRad): Promise<Defi
   if (error || !fil) throw new Error(`Filen saknas i lagringen: ${error?.message ?? 'okänt fel'}`);
   const buffer = Buffer.from(await fil.arrayBuffer());
 
-  const fraga = `Underlag: ${row.file_name}. Avgör vad det är, vilket år det hör till och vilken väg det ska gå.`;
+  const arPdfFil = row.file_name.toLowerCase().endsWith('.pdf') || row.mime_type === 'application/pdf';
+  const filSidor = arPdfFil ? await pdfSidor(buffer) : null;
+  const fraga = `Underlag: ${row.file_name}. Avgör vad det är, vilket år det hör till och vilken väg det ska gå.`
+    + (filSidor && filSidor > 1 ? ` Filen har ${filSidor} sidor — finns alla dokumentets sidor i filen är "sida" och "antal_sidor" null.` : '');
   let content: unknown[];
   if (arTabellfil(row.file_name, row.mime_type)) {
     const text = await spreadsheetToText(buffer, row.mime_type ?? '', row.file_name);
@@ -206,13 +231,17 @@ async function fragaAi(supabase: SupabaseClient, row: UnderlagRad): Promise<Defi
     throw new Error('AI:n svarade inte med JSON');
   }
 
-  const kategori: Kategori = svar.kategori === 'verifikationer' || svar.kategori === 'ovrigt' ? svar.kategori : 'transaktioner';
+  // Ett kontoutdrag är inget underlag, vad AI:n än valt för kategori
+  const kategori: Kategori = arKontoutdrag(String(svar.dokumenttyp ?? '')) ? 'ovrigt'
+    : svar.kategori === 'verifikationer' || svar.kategori === 'ovrigt' ? svar.kategori : 'transaktioner';
   const ar = Number(svar.ar);
   const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
   const sida = Number(svar.sida);
   const antalSidor = Number(svar.antal_sidor);
-  // Sidnumren gäller bara när båda finns och går ihop
-  const sidor = Number.isInteger(sida) && Number.isInteger(antalSidor) && antalSidor >= 2 && antalSidor <= 50 && sida >= 1 && sida <= antalSidor;
+  // Sidnumren gäller bara när båda finns och går ihop — och inte när hela
+  // dokumentet redan finns i filen, som en PDF med alla sidorna
+  const sidor = Number.isInteger(sida) && Number.isInteger(antalSidor) && antalSidor >= 2 && antalSidor <= 50 && sida >= 1 && sida <= antalSidor
+    && !(filSidor && filSidor >= antalSidor);
   const datum = text(svar.datum, 10);
   return {
     dokumentnummer: text(svar.dokumentnummer, 60),
@@ -246,4 +275,20 @@ async function spara(supabase: SupabaseClient, row: UnderlagRad, d: Definition) 
     ...sortering,
   }).eq('id', row.id);
   if (error) throw new Error(`Kunde inte spara definitionen: ${error.message}`);
+
+  // Blir ett underlag övrigt — ett kontoutdrag som lästs ut förut — tas det som
+  // lästes ut bort, så att raderna inte konteras. Det som redan bokförts rörs inte.
+  if (d.kategori === 'ovrigt') {
+    const { data: trans } = await supabase.from('transaktioner').select('id').eq('underlag_id', row.id);
+    const ids = (trans ?? []).map((t) => t.id);
+    if (ids.length) {
+      const { data: bokforda } = await supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', ids);
+      const behall = new Set((bokforda ?? []).map((v) => v.transaktion_id));
+      const bort = ids.filter((id) => !behall.has(id));
+      for (let i = 0; i < bort.length; i += 200) {
+        const { error: dFel } = await supabase.from('transaktioner').delete().in('id', bort.slice(i, i + 200));
+        if (dFel) throw new Error(`Kunde inte ta bort det som lästs ut: ${dFel.message}`);
+      }
+    }
+  }
 }

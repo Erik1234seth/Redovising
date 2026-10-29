@@ -45,7 +45,7 @@ const SYSTEM_PROMPT = `Du läser av underlag åt en svensk bokföringsbyrå, som
 
 Börja med att avgöra vilken sorts underlag det är:
 
-- "transaktioner": ett kvitto, en faktura eller ett kontoutdrag. Det är det vanliga. Underlaget säger vad som köpts, sålts eller betalats, men inte hur det bokförts.
+- "transaktioner": ett kvitto, en faktura eller en lista med köp eller försäljningar. Det är det vanliga. Underlaget säger vad som köpts, sålts eller betalats, men inte hur det bokförts.
 - "verifikationer": ett underlag som REDAN är bokfört — en verifikationslista, grundbok, dagbok eller huvudbok ur ett bokföringsprogram. Kännetecknet är att raderna har kontonummer (t.ex. 1930, 2641, 3001) med belopp i debet eller kredit.
 
 ${OVRIGTREGEL}

@@ -21,8 +21,15 @@ import { iKo, openaiFetch } from '@/lib/ai-anrop';
  *   att någon tittat.
  * - "unik": inget som liknar.
  *
+ * Kandidaterna är också kundens bokförda verifikationer som inte kommer från
+ * en transaktion här — inlästa verifikationslistor, SIE-filer, dagskassor.
+ * Finns affären redan där är den bokförd, och transaktionen får
+ * `dublett_orsak` i stället för `dublett_av`. AI:n jämför då också texten:
+ * samma belopp och datum men en annan beskrivning är inte samma affär.
+ *
  * Transaktionerna jämförs bara mot underlag som kom in tidigare, så att det
- * alltid är den senare som blir dubbletten. Rader inom samma fil jämförs
+ * alltid är den senare som blir dubbletten. Bokförda verifikationer gäller
+ * oavsett när de kom in. Rader inom samma fil jämförs
  * inte — ett kontoutdrag kan ha två likadana dragningar. Bankrader har en
  * egen koll (se `dubbletter.ts`) och är inte med här.
  */
@@ -68,9 +75,18 @@ interface Rad {
 
 const KOLUMNER = 'id, underlag_id, datum, beskrivning, motpart, belopp, valuta, riktning, detaljer, uppgifter, dublett_av';
 
+/** Kandidater som är bokförda verifikationer har ett id som börjar så här. */
+const VERIF = 'v:';
+/** `dublett_orsak` för en transaktion som redan finns i en bokförd verifikation — så att en ny koll kan ta bort den. */
+const REDAN_BOKFORD = 'Redan bokförd:';
+/** Konton där pengarna går in eller ut — de avgör verifikationens riktning. */
+const BETALKONTON = new Set(['1910', '1920', '1930', '1940', '2013', '2017', '2018']);
+
 const SYSTEM = `Du letar dubbletter åt en svensk bokföringsbyrå. En affär får bara bokföras en gång.
 
-För varje NY transaktion får du KANDIDATER: transaktioner ur kundens tidigare underlag med liknande belopp och datum. Avgör för varje ny transaktion om någon kandidat är samma affär.
+För varje NY transaktion får du KANDIDATER med liknande belopp och datum: transaktioner ur kundens tidigare underlag, och BOKFÖRDA VERIFIKATIONER ur kundens bokföring (markerade "bokförd verifikation", med text och konton). Avgör för varje ny transaktion om någon kandidat är samma affär.
+
+En bokförd verifikation är samma affär bara när beskrivningen stämmer: verifikationens text och konton ska handla om samma sak som transaktionen — samma motpart, samma slags köp eller försäljning. Samma belopp och datum räcker inte; kunden kan ha flera affärer med samma belopp. Är verifikationen samma affär är transaktionen redan bokförd, och status är "dublett".
 
 Samma affär kan synas på flera sätt:
 - Samma underlag inskickat två gånger — då är allt lika eller nästan lika.
@@ -132,7 +148,36 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
   const tidigare = ovriga.filter((r) => r.underlag_id !== underlagId && !r.dublett_av
     && (!r.underlag_id || (filer.get(r.underlag_id)?.at ?? '') < u.created_at));
 
-  const nya = (egna as Rad[]).map((t) => ({ t, kandidater: kandidaterFor(t, tidigare) }));
+  // Kundens bokförda verifikationer som inte kommer från en transaktion här, i samma tidsspann som filen
+  const datumen = (egna as Rad[]).map((t) => t.datum).filter((d): d is string => !!d).sort();
+  const verifikationer: (Rad & { verifText: string })[] = [];
+  if (datumen.length) {
+    const fran = new Date(Date.parse(`${datumen[0]}T00:00:00Z`) - DAGAR_SAMMA_BELOPP * 86_400_000).toISOString().slice(0, 10);
+    const till = new Date(Date.parse(`${datumen[datumen.length - 1]}T00:00:00Z`) + DAGAR * 86_400_000).toISOString().slice(0, 10);
+    for (let from = 0; ; from += PAGE) {
+      const { data, error: vFel } = await supabase.from('verifikationer')
+        .select('id, underlag_id, serie, nummer, datum, text, summa, verifikation_rader(konto, kontonamn, belopp, borttagen)')
+        .eq(agare.kolumn, agare.varde).is('transaktion_id', null).gte('datum', fran).lte('datum', till)
+        .range(from, from + PAGE - 1);
+      if (vFel) throw new Error(`Kunde inte läsa kundens verifikationer: ${vFel.message}`);
+      for (const v of data ?? []) {
+        if (v.underlag_id === underlagId) continue;
+        const rader = ((v.verifikation_rader ?? []) as { konto: string; kontonamn: string | null; belopp: number; borttagen: boolean }[]).filter((r) => !r.borttagen);
+        // Riktningen syns på betalkontot: debet är pengar in, kredit pengar ut
+        const betal = rader.filter((r) => BETALKONTON.has(r.konto)).reduce((sum, r) => sum + Number(r.belopp), 0);
+        if (!betal) continue;
+        verifikationer.push({
+          id: `${VERIF}${v.id}`, underlag_id: v.underlag_id, datum: v.datum, beskrivning: v.text, motpart: null,
+          belopp: Math.abs(betal), valuta: 'SEK', riktning: betal > 0 ? 'in' : 'ut', detaljer: null, uppgifter: null, dublett_av: null,
+          verifText: `bokförd verifikation ${[v.serie, v.nummer].filter(Boolean).join('')} ${v.datum}: "${v.text ?? ''}" — ${rader.map((r) => `${r.konto} ${r.kontonamn ?? ''} ${Number(r.belopp)}`.trim()).join(', ')}`,
+        });
+      }
+      if ((data ?? []).length < PAGE) break;
+    }
+  }
+  const verifText = new Map(verifikationer.map((v) => [v.id, v.verifText]));
+
+  const nya = (egna as Rad[]).map((t) => ({ t, kandidater: kandidaterFor(t, [...tidigare, ...verifikationer]) }));
   const instruktioner = await hamtaInstruktioner(supabase, { userId: u.user_id, underlagIds: [underlagId] });
 
   const resultat = new Map<string, Dublettkoll>();
@@ -149,7 +194,9 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
       radText(n.t),
       kontextFor(instruktioner, { id: n.t.id, underlag_id: underlagId, user_id: u.user_id }),
       'KANDIDATER:',
-      ...n.kandidater.map((k, m) => `[${j + 1}${String.fromCharCode(65 + m)}] ur ${k.underlag_id ? `"${filer.get(k.underlag_id)?.namn ?? 'okänd fil'}", inkommen ${(filer.get(k.underlag_id)?.at ?? '').slice(0, 10)}` : 'en källa utan fil'}\n${radText(k)}`),
+      ...n.kandidater.map((k, m) => verifText.has(k.id)
+        ? `[${j + 1}${String.fromCharCode(65 + m)}] ${verifText.get(k.id)}`
+        : `[${j + 1}${String.fromCharCode(65 + m)}] ur ${k.underlag_id ? `"${filer.get(k.underlag_id)?.namn ?? 'okänd fil'}", inkommen ${(filer.get(k.underlag_id)?.at ?? '').slice(0, 10)}` : 'en källa utan fil'}\n${radText(k)}`),
     ].filter(Boolean).join('\n')).join('\n\n');
 
     const svar = await fraga(user);
@@ -165,10 +212,12 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
         resultat.set(n.t.id, { status: 'tveksam', av: null, avFil: null, motivering: motivering || 'AI:n pekade inte ut vilken transaktion den liknar', modell: MODELL });
         return;
       }
+      const arVerif = !!kandidat && kandidat.id.startsWith(VERIF);
       resultat.set(n.t.id, {
         status,
-        av: status === 'unik' ? null : kandidat!.id,
-        avFil: status === 'unik' || !kandidat!.underlag_id ? null : filer.get(kandidat!.underlag_id)?.namn ?? null,
+        // En bokförd verifikation är ingen transaktion att peka på — den står i avFil och orsaken
+        av: status === 'unik' || arVerif ? null : kandidat!.id,
+        avFil: status === 'unik' ? null : arVerif ? verifText.get(kandidat!.id)!.split(':')[0] : !kandidat!.underlag_id ? null : filer.get(kandidat!.underlag_id)?.namn ?? null,
         motivering,
         modell: MODELL,
       });
@@ -177,14 +226,22 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
 
   let dubletter = 0;
   let tveksamma = 0;
+  // dublett_orsak sätts också av kassarapporter och dagskassor — bara den här kollens egen orsak skrivs om
+  const { data: orsaker } = await supabase.from('transaktioner').select('id, dublett_orsak').eq('underlag_id', underlagId);
+  const orsak = new Map((orsaker ?? []).map((o) => [o.id as string, o.dublett_orsak as string | null]));
   for (const t of egna as Rad[]) {
     const k = resultat.get(t.id)!;
     if (k.status === 'dublett') dubletter++;
     if (k.status === 'tveksam') tveksamma++;
+    const redanBokford = k.status === 'dublett' && !k.av && !!k.avFil?.startsWith('bokförd verifikation');
+    const gammal = orsak.get(t.id) ?? null;
     const { error: sFel } = await supabase.from('transaktioner').update({
       dublettkoll: k,
       // Bara de säkra bokförs inte. Den tveksamma stoppas i konteringen i stället.
       dublett_av: k.status === 'dublett' ? k.av : null,
+      ...(redanBokford
+        ? { dublett_orsak: `${REDAN_BOKFORD} ${k.avFil}` }
+        : gammal?.startsWith(REDAN_BOKFORD) ? { dublett_orsak: null } : {}),
     }).eq('id', t.id);
     if (sFel) throw new Error(`Kunde inte spara dublettkollen: ${sFel.message}`);
   }

@@ -5,7 +5,7 @@ import { byggMejlkontext } from '@/lib/mejlkontext';
 import { markeraDubbletter } from './dubbletter';
 import { arVarAdress } from '@/lib/underlag/var-fil';
 import { extraheraTransaktioner, kanLasasAvAi, type ExtraheradTransaktion, type ExtraheradVerifikation } from './extract';
-import type { Underlagstyp } from './normalisera';
+import { arKontoutdrag, type Underlagstyp } from './normalisera';
 import { FLYTTAD_FOR_HAND } from '@/lib/underlag/sortering';
 import { definieraUnderlag } from '@/lib/underlag/definiera';
 import { dokumentetsSidor } from '@/lib/underlag/sidor';
@@ -200,6 +200,11 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
     await rensa(supabase, row);
     const { data: huvud } = await supabase.from('bokforing_underlag').select('file_name').eq('id', row.del_av).maybeSingle();
     return { typ: 'transaktioner', antal: 0, notering: `Sida ${row.definition?.sida ?? '?'} av ${row.definition?.antalSidor ?? '?'} — läses ut tillsammans med ${huvud?.file_name ?? 'dokumentets första sida'}` };
+  }
+  // Ett kontoutdrag är inget underlag — det som lästs ut förut tas bort, och inget läses ut
+  if (arKontoutdrag(row.definition?.dokumenttyp)) {
+    await rensa(supabase, row);
+    return { typ: 'ovrigt', antal: 0, vad: 'Kontoutdrag', notering: 'Kontoutdrag används inte som underlag' };
   }
   if (row.sidor_saknas?.length) {
     await rensa(supabase, row);

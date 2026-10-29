@@ -9,6 +9,10 @@ import { momsText } from '@/lib/kontering/momsdelar';
  *
  * Alla kundens filer med transaktioner körs om — också de bokförda. Ordningen:
  *
+ *   0. Filer som aldrig gått igenom flödet börjar från början: Definiera fil
+ *      för fil, äldst först — sidor i samma dokument kopplas ihop där — och
+ *      sedan Plocka ut, tre åt gången. Verifikationslistor läses in och
+ *      övriga filer sorteras undan; resten fortsätter nedan.
  *   1. Kundbilden byggs om, en gång.
  *   2. Dublettcheck fil för fil, äldst först. Den jämför med tidigare filer,
  *      och två filer som kontrolleras samtidigt kan se varandra i ett mellanläge.
@@ -207,7 +211,32 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
       // Filerna med transaktioner, äldst först. Övriga filer och sidor som läses med en annan hoppas över.
       setText('Hämtar kundens underlag…');
       const kandidater = kund.underlag.filter((u) => u.sortering !== 'ovrigt').sort((a, b) => a.at.localeCompare(b.at));
-      const hamtade = await Promise.all(kandidater.map(async (k) => ({ k, u: await hamta(k.id) })));
+      let hamtade = await Promise.all(kandidater.map(async (k) => ({ k, u: await hamta(k.id) })));
+
+      // 0. Filer som aldrig gått igenom flödet: Definiera och Plocka ut först
+      const odefinierade = hamtade.filter(({ u }) => u && !u.definition);
+      for (const [i, { k }] of odefinierade.entries()) {
+        setText(`Definierar ${i + 1} av ${odefinierade.length}…`);
+        await post(k.id, 'definiera').catch((e) => setFel(`Definiera ${k.fileName}: ${e.message}`));
+      }
+      if (odefinierade.length) hamtade = await Promise.all(kandidater.map(async (k) => ({ k, u: await hamta(k.id) })));
+      // Sidor som läses med ett annat underlag, och dokument som väntar på en sida, läses inte ut här
+      const attLasa = hamtade.filter(({ u }) => u && !u.sidor?.huvudId && !u.sidor?.saknas.length && (
+        (u.definition?.kategori === 'transaktioner' && !u.utlasning) || (u.definition?.kategori === 'verifikationer' && !u.sie)));
+      if (attLasa.length) {
+        let n = 0;
+        let klara = 0;
+        await Promise.all(Array.from({ length: Math.min(FILER_SAMTIDIGT, attLasa.length) }, async () => {
+          while (n < attLasa.length) {
+            const { k, u } = attLasa[n++];
+            setText(`Plockar ut ${klara + 1} av ${attLasa.length}…`);
+            await post(k.id, u!.definition?.kategori === 'verifikationer' ? 'plocka-verif' : 'plocka-trans')
+              .catch((e) => setFel(`Plocka ut ${k.fileName}: ${e.message}`));
+            klara++;
+          }
+        }));
+        hamtade = await Promise.all(kandidater.map(async (k) => ({ k, u: await hamta(k.id) })));
+      }
       const lista: Fil[] = hamtade
         .filter(({ u }) => u && !u.sidor?.huvudId && u.definition?.kategori !== 'verifikationer' && u.definition?.kategori !== 'ovrigt' && u.transaktioner.length > 0)
         .map(({ k, u }) => ({

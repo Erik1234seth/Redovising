@@ -16,7 +16,19 @@
  * övriga filer, och ingenting läses ut ur dem — annars kan en NE-bilaga eller
  * ett avtal bli transaktioner som konteras.
  */
-export const OVRIGTREGEL = `- "ovrigt": filen är inget underlag för bokföringen — den visar inga köp, försäljningar eller betalningar att bokföra, utan är bra att ha av andra skäl. Till exempel förra årets deklaration eller NE-bilaga, slutskattebesked, beslut och brev från Skatteverket, skattekontoutdrag, avtal, offerter, registreringsbevis, F-skattebevis, inventarie- och lagerlistor, ID-handlingar och skärmdumpar av inställningar. Välj "ovrigt" bara när du är säker. Är du osäker är det ett underlag.`;
+/**
+ * Ett kontoutdrag är inget underlag: bokföringen bygger på kvitton, fakturor
+ * och rapporter, och kontoutdragets rader konteras inte. Känns det igen på
+ * dokumenttypen stoppas det i Definiera och Plocka ut, även om AI:n skulle
+ * ha valt en annan kategori. Skattekontoutdrag är något annat och sorteras
+ * som övrigt av sig själv.
+ */
+export function arKontoutdrag(dokumenttyp: string | null | undefined): boolean {
+  const d = (dokumenttyp ?? '').toLowerCase();
+  return /kontoutdrag|kontohändelse|kontoöversikt|bankutdrag|kontotransaktioner/.test(d) && !d.includes('skattekonto');
+}
+
+export const OVRIGTREGEL = `- "ovrigt": filen är inget underlag för bokföringen — den visar inga köp, försäljningar eller betalningar att bokföra, utan är bra att ha av andra skäl. Till exempel förra årets deklaration eller NE-bilaga, slutskattebesked, beslut och brev från Skatteverket, skattekontoutdrag, kontoutdrag och kontohändelser från banken (vi använder inte kontoutdrag som underlag — bokföringen bygger på kvitton, fakturor och rapporter), avtal, offerter, registreringsbevis, F-skattebevis, inventarie- och lagerlistor, ID-handlingar och skärmdumpar av inställningar. Välj "ovrigt" bara när du är säker. Är du osäker är det ett underlag.`;
 
 /**
  * Det steget Definiera kom fram till, som utgångsläge för avläsningen. Utan
