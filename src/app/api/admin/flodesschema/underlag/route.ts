@@ -29,9 +29,11 @@ export const maxDuration = 300;
  *            steg: definiera | plocka-trans | plocka-verif | komplettera | dublett | tillrackligt | konteras | skapa-verif
  *            | skriv-mejl (kundens samlade frågemejl nu, i stället för kl 18; med omkorning: true är det inget fel om inget finns att fråga om)
  *            | kundbild (bygger om kundbilden när den är inaktuell, alltid med tvinga: true; svarar { byggd })
- *            | helhet (helhetskontrollen av kundens alla konteringar; svarar { flaggade })
+ *            | helhet (helhetskontrollen av kundens alla konteringar; svarar { flaggade, samordna } —
+ *            samordna är transaktionerna att kontera om med kontrollens instruktion, per underlag)
  *            (konteras med medBokforda: true konterar också bokförda och ersätter verifikationen
- *            när konteringen ändrats; svarar också { ersatt } — se `@/lib/kontering/ersatt`)
+ *            när konteringen ändrats; svarar också { ersatt } — se `@/lib/kontering/ersatt`.
+ *            Med bara: [transaktions-id] konteras bara de, t.ex. efter helhetskontrollen)
  *            (skapa-verif med val: { transaktionId, konto, momssats, momsdelar? } bokför en granskad för hand)
  *
  * Varje steg är ett eget anrop, så att vart och ett har hela tidsgränsen på
@@ -76,8 +78,15 @@ export async function POST(request: NextRequest) {
     if (body.steg === 'tillrackligt') await kollaTillrackligt(supabase, body.id);
     if (body.steg === 'skriv-mejl') await fragemejl(body.id, body.omkorning === true);
     if (body.steg === 'kundbild') extra.byggd = await byggKundbild(supabase, await kundensId(body.id), { tvinga: body.tvinga === true });
-    if (body.steg === 'konteras') Object.assign(extra, await kontera(body.id, typeof body.fran === 'string' ? body.fran : new Date().toISOString(), body.medBokforda === true));
-    if (body.steg === 'helhet') extra.flaggade = (await helhetskontroll(supabase, await kundensId(body.id))).flaggade;
+    if (body.steg === 'konteras') {
+      const bara = Array.isArray(body.bara) ? body.bara.filter((x: unknown): x is string => typeof x === 'string') : undefined;
+      Object.assign(extra, await kontera(body.id, typeof body.fran === 'string' ? body.fran : new Date().toISOString(), body.medBokforda === true, bara));
+    }
+    if (body.steg === 'helhet') {
+      const h = await helhetskontroll(supabase, await kundensId(body.id));
+      extra.flaggade = h.flaggade;
+      extra.samordna = h.samordna;
+    }
     if (body.steg === 'skapa-verif') extra.bokforda = await skapaVerifikationer(body.id, body.val);
   } catch (e) {
     // Felet står på underlaget och syns i spåret, så underlaget skickas med ändå
@@ -137,7 +146,7 @@ async function fragemejl(underlagId: string, omkorning = false) {
  * ersätts när konteringen ändrats. När inget är kvar tas verifikationerna
  * bort från dem som dublettkollen nu säger är dubbletter.
  */
-async function kontera(underlagId: string, fran: string, medBokforda = false): Promise<{ kvar: number; ersatt?: Awaited<ReturnType<typeof ersattVerifikationer>> }> {
+async function kontera(underlagId: string, fran: string, medBokforda = false, bara?: string[]): Promise<{ kvar: number; ersatt?: Awaited<ReturnType<typeof ersattVerifikationer>> }> {
   const supabase = createServerClient();
   const { data: u } = await supabase.from('bokforing_underlag').select('user_id').eq('id', underlagId).maybeSingle();
   if (!u?.user_id) throw new Error('Underlaget hör inte till ett kundkonto — det går inte att kontera');
@@ -155,7 +164,8 @@ async function kontera(underlagId: string, fran: string, medBokforda = false): P
   const konteradSedan = new Set((k ?? []).filter((x) => x.created_at >= fran).map((x) => x.transaktion_id));
 
   const att = (trans ?? []).filter((t) => !t.dublett_av && !t.dublett_orsak && Number(t.belopp) > 0
-    && (t.tillrackligt as { status?: string } | null)?.status !== 'saknar' && (medBokforda || !bokforda.has(t.id)));
+    && (t.tillrackligt as { status?: string } | null)?.status !== 'saknar' && (medBokforda || !bokforda.has(t.id))
+    && (!bara || bara.includes(t.id)));
   const kvar = att.filter((t) => !konteradSedan.has(t.id));
   if (!kvar.length) {
     const dubletter = (trans ?? []).filter((t) => (t.dublett_av || t.dublett_orsak) && bokforda.has(t.id)).map((t) => t.id);

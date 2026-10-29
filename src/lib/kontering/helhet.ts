@@ -12,14 +12,24 @@ import { slaUppKonto, type Flagga } from './regelverk';
  * transaktion åt gången — samma motpart på olika konton, privata mönster,
  * moms som inte går ihop, ett abonnemang som hoppar över en månad.
  *
- * En anmärkning om ett troligt fel på en transaktion som inte är bokförd blir
- * en flagga på båda modellernas kontering, och en grön rad blir gul och går
- * till Granska. Principfrågor — förpackningar på två konton, köp som kanske är
- * privata — och anmärkningar om kunden i stort blir anteckningar till byrån.
- * Allt sparas i `kundbilder.helhet`.
+ * Varje anmärkning har en åtgärd:
+ *
+ *   granska     Ett troligt fel — fel moms, en trolig dubblett. Båda
+ *               modellernas kontering flaggas, och raden går till Granska.
+ *   samordna    Likadana köp har konterats olika och kundens egna
+ *               transaktioner visar vilken linje som gäller. Kontrollen skriver
+ *               en instruktion, som sparas som en kontext på transaktionen i
+ *               `flodes_instruktioner` (namn "Helhetskontrollen"), och raden
+ *               konteras om av båda modellerna med den. Är de överens blir den
+ *               grön — kravet på två modeller ligger kvar.
+ *   anteckning  Principfrågor och sådant som gäller kunden i stort. Stoppar inget.
+ *
+ * Bara rader som inte är bokförda flaggas eller konteras om. Varje kontroll
+ * ersätter förra kontrollens instruktioner. Allt sparas i `kundbilder.helhet`.
  */
 
 const MODELL = 'claude-opus-5-5' as const;
+const MODELLNAMN: Record<string, string> = { 'gpt-6-astra': 'GPT', 'claude-opus-5-5': 'Claude' };
 
 const SCHEMA = {
   type: 'object',
@@ -32,11 +42,12 @@ const SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['rader', 'text', 'granska'],
+        required: ['rader', 'text', 'atgard', 'instruktion'],
         properties: {
-          rader: { type: 'array', items: { type: 'integer' }, description: 'Numren (K12 → 12) på transaktionerna det gäller. Tom lista när det gäller kunden i stort.' },
+          rader: { type: 'array', items: { type: 'integer' }, description: 'Numren (K12 → 12) på transaktionerna det gäller. Vid samordna bara de rader som ska konteras om. Tom lista när det gäller kunden i stort.' },
           text: { type: 'string' },
-          granska: { type: 'boolean', description: 'true bara när raderna troligen är fel konterade och en människa måste rätta just dem' },
+          atgard: { type: 'string', enum: ['granska', 'samordna', 'anteckning'] },
+          instruktion: { type: 'string', description: 'Vid samordna: instruktionen till konteringen. Annars tom sträng.' },
         },
       },
     },
@@ -45,7 +56,7 @@ const SCHEMA = {
 
 const FAST = `Du kontrollerar bokföringen för en svensk enskild näringsidkare med förenklat årsbokslut (K1) och kontantmetoden, åt en bokföringsbyrå.
 
-Varje transaktion har konterats för sig. Du ser nu alla kundens transaktioner tillsammans (K1, K2 …), med kontot och momsen de fått och vem som bestämt det (byrån, AI eller bokförd). Leta efter det man inte ser i en transaktion åt gången:
+Varje transaktion har konterats för sig av två modeller. Du ser nu alla kundens transaktioner tillsammans (K1, K2 …), med kontot och momsen de fått och vem som bestämt det (byrån, AI, bokförd — eller "AI oense", då står båda modellernas förslag). En uppdelning på flera konton står som "4000 Varor + 2013 Övriga egna uttag". Leta efter det man inte ser i en transaktion åt gången:
 - Samma motpart eller samma slags köp på olika konton utan synlig anledning.
 - Privata mönster: insättningar och uttag som tar ut varandra, överföringar mellan egna konton, privata köp bokförda som kostnad.
 - Moms som inte går ihop: samma leverantör med olika momssatser, moms på något som borde vara momsfritt eller tvärtom, utländska köp med svensk moms.
@@ -54,19 +65,32 @@ Varje transaktion har konterats för sig. Du ser nu alla kundens transaktioner t
 
 Anmärk bara på det som sannolikt är fel eller som en människa bör titta på. Inga anmärkningar alls är ett bra svar när allt ser rimligt ut. Varje anmärkning: en eller två meningar på svenska som säger vad som ser fel ut och vad som troligen är rätt, med raderna det gäller (numren, utan K). Har en transaktion inget konto än är den inte konterad — anmärk inte på det.
 
-granska avgör om raderna går till manuell granskning:
-- true när just de raderna troligen är fel konterade: fel konto, fel moms, en trolig dubblett, en uppenbart privat post bokförd som kostnad.
-- false för principfrågor och avvägningar — att något kan konteras på två sätt och byrån bör välja ett, att något kanske är privat utan att något tyder på det, att underlag saknas för kunden i stort. De blir en anteckning till byrån och stoppar inte bokföringen.
+atgard avgör vad som händer med raderna:
+- "samordna" när likadana köp har konterats olika och kundens egna transaktioner visar vilken linje som är rimlig — oftast hur de flesta liknande raderna redan ligger. Ange i rader bara de rader som avviker och ska konteras om, inte de som redan följer linjen. Skriv i instruktion vad konteringen ska göra och varför, med hänvisning till raderna, t.ex. "Kundens övriga småköp av fika och pålägg hos Coop (K31, K37) ligger på 4000 som varuinköp. Behandla det här köpet likadant om inget i underlaget talar emot det." Instruktionen läses av konteringen för varje rad för sig, så den ska gå att förstå utan din anmärkning. Samordna bara när du kan peka på ett mönster i kundens transaktioner — inte för att du tycker att något borde vara annorlunda.
+- "granska" bara när just de raderna är tydligt fel och det inte går att rätta med ett mönster: fel moms, en trolig dubblett, en post som uppenbart inte kan höra till verksamheten (t.ex. cigaretter eller kläder bokförda som varuinköp).
+
+En rad där modellerna är oense och den ena följer kundens linje är ett typiskt fall för samordna.
+
+Är något en bedömningsfråga — ett litet köp som kan vara privat eller höra till verksamheten, något som kan konteras på två rimliga sätt — och har kundens liknande köp redan en linje, så samordna efter den linjen. Fråga inte kunden och skicka det inte till granskning: byrån vill att småsaker behandlas konsekvent, inte att varje osäkerhet granskas. Välj den linje de flesta liknande raderna redan följer, och säg i instruktionen att det är därför.
+- "anteckning" för principfrågor där det inte finns någon tydlig linje att följa, och för sådant som gäller kunden i stort — att underlag saknas, att intäkter inte finns. Det stoppar inte bokföringen.
+instruktion är en tom sträng utom vid samordna.
 
 sammanfattning: två eller tre meningar om hur kundens bokföring ser ut i stort.`;
 
+export type Atgard = 'granska' | 'samordna' | 'anteckning';
+
 export interface Helhet {
   sammanfattning: string;
-  /** granska: raderna går till Granska. Annars är anmärkningen en anteckning till byrån. */
-  anmarkningar: { rader: number[]; text: string; granska: boolean }[];
+  /** `granska` finns kvar för äldre kontroller, där det var den enda åtgärden. */
+  anmarkningar: { rader: number[]; text: string; atgard: Atgard; granska: boolean; instruktion: string }[];
   /** Transaktionerna som fick en flagga. */
   flaggade: number;
+  /** Transaktionerna som ska konteras om med kontrollens instruktion, per underlag. */
+  samordna: { underlagId: string; transaktionIds: string[] }[];
 }
+
+/** Namnet på kontrollens instruktioner i `flodes_instruktioner`, så att de kan ersättas. */
+export const HELHET_NAMN = 'Helhetskontrollen';
 
 /** Kör helhetskontrollen för kunden och flaggar konteringarna. Ett fel sparas, så att det syns i schemat. */
 export async function helhetskontroll(supabase: SupabaseClient, userId: string): Promise<Helhet> {
@@ -103,13 +127,24 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
     const k = konteringar.filter((x) => x.transaktion_id === r.id);
     const slutlig = slutligKontering(r.vald_kontering, k);
     const lage = bokforda.has(r.id) ? 'bokförd' : slutlig?.signatur === 'Erik' ? 'byrån' : slutlig ? 'AI' : k.length ? 'AI oense' : 'ej konterad';
-    const konto = slutlig?.konto ?? k[0]?.konto ?? null;
-    const moms = slutlig ? momsText(slutlig.momssats, slutlig.momsdelar) : k[0] ? momsText(Number(k[0].momssats ?? 0), rensaMomsdelar(k[0].momsdelar)) : '';
+    // En del per konto, så att en uppdelning syns — 4000 + 2013 är inte samma sak som 4000
+    const kontering = (konto: string | null, momssats: number, momsdelar: ReturnType<typeof rensaMomsdelar>) => {
+      if (!konto) return '—';
+      const konton = [...new Set((momsdelar ?? []).map((d) => d.konto).filter((x): x is string => !!x))];
+      const namn = (konton.length > 1 ? konton : [konto]).map((x) => `${x} ${slaUppKonto(x)?.namn ?? ''}`.trim()).join(' + ');
+      return `${namn}, moms ${momsText(momssats, momsdelar)}`;
+    };
+    // Oense modeller visas med båda förslagen, så att kontrollen kan samordna efter kundens linje
+    const vad = slutlig
+      ? kontering(slutlig.konto, slutlig.momssats, slutlig.momsdelar)
+      : k.length > 1
+        ? k.map((x) => `${MODELLNAMN[x.modell] ?? x.modell}: ${kontering(x.konto, Number(x.momssats ?? 0), rensaMomsdelar(x.momsdelar))}`).join(' / ')
+        : k[0] ? kontering(k[0].konto, Number(k[0].momssats ?? 0), rensaMomsdelar(k[0].momsdelar)) : '—';
     const kalla = r.kalla === 'bank' ? 'bankrad' : r.kalla === 'woocommerce' ? 'webbutik' : arslista.filnamn.get(r.underlag_id ?? '') ?? 'fil';
-    return `K${i + 1} ${r.datum ?? 'okänt datum'} ${r.riktning === 'in' ? 'IN ' : 'UT '} ${Number(r.belopp)} ${r.valuta || 'SEK'} · ${r.motpart || '—'} · ${(r.beskrivning ?? '').slice(0, 80)} · ${kalla.slice(0, 40)} → ${konto ? `${konto} ${slaUppKonto(konto)?.namn ?? ''}, moms ${moms}` : '—'} (${lage})`;
+    return `K${i + 1} ${r.datum ?? 'okänt datum'} ${r.riktning === 'in' ? 'IN ' : 'UT '} ${Number(r.belopp)} ${r.valuta || 'SEK'} · ${r.motpart || '—'} · ${(r.beskrivning ?? '').slice(0, 80)} · ${kalla.slice(0, 40)} → ${vad} (${lage})`;
   });
 
-  const { data } = await fraga<{ sammanfattning: string; anmarkningar: { rader: number[]; text: string; granska: boolean }[] }>(MODELL, {
+  const { data } = await fraga<{ sammanfattning: string; anmarkningar: { rader: number[]; text: string; atgard: string; instruktion: string }[] }>(MODELL, {
     system: { fast: FAST, kund: '' },
     user: [
       byggKundkontext(profil as unknown as Kund | null),
@@ -120,13 +155,40 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
     schema: SCHEMA,
   });
   const anmarkningar = (Array.isArray(data.anmarkningar) ? data.anmarkningar : [])
-    .map((a) => ({ rader: (Array.isArray(a.rader) ? a.rader : []).filter((n) => Number.isInteger(n) && n >= 1 && n <= arslista.rader.length), text: String(a.text ?? '').trim(), granska: a.granska === true }))
+    .map((a) => {
+      const instruktion = String(a.instruktion ?? '').trim();
+      // Samordna utan instruktion går inte att kontera om med — då är det en anteckning
+      const atgard: Atgard = a.atgard === 'granska' ? 'granska' : a.atgard === 'samordna' && instruktion ? 'samordna' : 'anteckning';
+      return {
+        rader: (Array.isArray(a.rader) ? a.rader : []).filter((n) => Number.isInteger(n) && n >= 1 && n <= arslista.rader.length),
+        text: String(a.text ?? '').trim(),
+        atgard,
+        granska: atgard === 'granska',
+        instruktion: atgard === 'samordna' ? instruktion : '',
+      };
+    })
     .filter((a) => a.text);
+
+  // Förra kontrollens instruktioner ersätts av den här kontrollens
+  const { error: rFel } = await supabase.from('flodes_instruktioner').delete().eq('user_id', userId).eq('namn', HELHET_NAMN);
+  if (rFel) throw new Error(`Kunde inte ta bort förra kontrollens instruktioner: ${rFel.message}`);
+  const perUnderlag = new Map<string, string[]>();
+  const nyaInstruktioner = anmarkningar.filter((a) => a.atgard === 'samordna').flatMap((a) => a.rader.flatMap((n) => {
+    const r = arslista.rader[n - 1];
+    // En instruktion på en transaktion hör till dess underlag. Bokförda och rader utan fil konteras inte om härifrån.
+    if (bokforda.has(r.id) || !r.underlag_id) return [];
+    if (!perUnderlag.get(r.underlag_id)?.includes(r.id)) perUnderlag.set(r.underlag_id, [...(perUnderlag.get(r.underlag_id) ?? []), r.id]);
+    return [{ typ: 'kontext', omfang: 'transaktion', steg: 'konteras', user_id: userId, underlag_id: r.underlag_id, transaktion_id: r.id, namn: HELHET_NAMN, text: a.instruktion }];
+  }));
+  if (nyaInstruktioner.length) {
+    const { error: iFel } = await supabase.from('flodes_instruktioner').insert(nyaInstruktioner);
+    if (iFel) throw new Error(`Kunde inte spara kontrollens instruktioner: ${iFel.message}`);
+  }
 
   // Förra kontrollens flaggor tas bort först, så att en rättad rad inte ligger kvar som anmärkt
   const perTransaktion = new Map<string, string[]>();
   // Bara anmärkningar om troliga fel flaggar raderna — principfrågor blir anteckningar
-  for (const a of anmarkningar.filter((x) => x.granska)) {
+  for (const a of anmarkningar.filter((x) => x.atgard === 'granska')) {
     for (const n of a.rader) {
       const id = arslista.rader[n - 1].id;
       if (bokforda.has(id)) continue;
@@ -146,7 +208,12 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
     if (error) throw new Error(`Kunde inte spara helhetskontrollen: ${error.message}`);
   }
 
-  const helhet: Helhet = { sammanfattning: String(data.sammanfattning ?? ''), anmarkningar, flaggade: perTransaktion.size };
+  const helhet: Helhet = {
+    sammanfattning: String(data.sammanfattning ?? ''),
+    anmarkningar,
+    flaggade: perTransaktion.size,
+    samordna: [...perUnderlag].map(([underlagId, transaktionIds]) => ({ underlagId, transaktionIds })),
+  };
   await supabase.from('kundbilder').upsert({ user_id: userId, helhet, helhet_at: new Date().toISOString(), helhet_fel: null }, { onConflict: 'user_id' });
   return helhet;
 }

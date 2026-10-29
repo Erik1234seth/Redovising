@@ -670,7 +670,11 @@ export interface FlodesUnderlag {
   /** Kundbilden konteringen läser (se `@/lib/kontering/kundbild`). Null när den inte byggts. */
   kundbild: { text: string; at: string | null; antal: number; fel: string | null } | null;
   /** Senaste helhetskontrollen av kundens konteringar (se `@/lib/kontering/helhet`). */
-  helhet: { at: string | null; fel: string | null; sammanfattning: string; anmarkningar: { rader: number[]; text: string; granska?: boolean }[]; flaggade: number } | null;
+  helhet: {
+    at: string | null; fel: string | null; sammanfattning: string; flaggade: number;
+    /** atgard saknas i äldre kontroller, där granska var den enda åtgärden. */
+    anmarkningar: { rader: number[]; text: string; granska?: boolean; atgard?: 'granska' | 'samordna' | 'anteckning'; instruktion?: string }[];
+  } | null;
 }
 
 export interface FlodesInstruktion {

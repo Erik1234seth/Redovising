@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link';
 import type { FlodesInstruktion, FlodesKund, FlodesUnderlag } from '@/lib/admin-types';
 import { momsText, sammaMoms, type Momsdel } from '@/lib/kontering/momsdelar';
-import { KorOmAlla, Resonemang } from './_kor-om-alla';
+import { ANMARKNING, KorOmAlla, Resonemang, atgardFor } from './_kor-om-alla';
 
 /** Kontot en granskad transaktion bokförs på. momsdelar när förslaget har flera momssatser. */
 type Bokval = { transaktionId: string; konto: string; momssats: number; momsdelar?: Momsdel[] | null };
@@ -125,7 +125,7 @@ const STEG: Steg[] = [
   { id: 'hopp-in-b', namn: 'B', typ: 'hopp', rad: 6, kol: 16, beskrivning: 'Bankrader utan underlag kommer in i bokslutet här.' },
   { id: 'kundbild', klar: true, namn: 'Kundbild', typ: 'ai', rad: 4, kol: 10, beskrivning: 'Innan kundens transaktioner konteras sammanställer Claude Opus 5.5 vad den ser i kundens alla transaktioner, mejl och kundprofil: vad verksamheten gör, återkommande motparter och vad de är, privata mönster, lån, abonnemang och vad som är oklart. Sammanställningen sparas och byggs om först när kunden fått många nya transaktioner (minst 10 och 20 %), när den är äldre än 30 dagar eller vid Kör om alla. Listan med alla kundens transaktioner byggs med kod varje gång och är alltid aktuell.', finns: 'Tabellen kundbilder (src/lib/kontering/kundbild.ts). Körs före konteringen när man följer ett underlag här.' },
   { id: 'konteras', klar: true, namn: 'Konteras', typ: 'ai', rad: 5, kol: 10, beskrivning: 'Två AI-modeller (GPT-6 Astra och Claude Opus 5.5) konterar var för sig enligt K1. Båda ser kundbilden och kundens alla transaktioner, mejlen, originalunderlaget som det ser ut (PDF, bild eller kalkylblad) och alla transaktioner i filen. Först tar modellen reda på vad affären är och väljer själv 1–5 kandidatkonton, sedan får den kandidaternas hela regeltext och konterar: konto, moms, uppdelning och vilka regler som inte stämmer. Är modellerna oense eller osäkra får var och en se den andras kontering och kontera om en gång (jämkning). Grönt när båda är säkra och överens om konto och moms. Kontot väljs bara ur byråns egen K1-dokumentation — historiken och byråns tidigare val är ledtrådar om vad affären är, inte facit. Modellerna väljer också vilka kundspecifika regler som gäller, t.ex. periodisk sammanställning vid försäljning till företag i andra EU-länder (3108/3308). Dubbletter och transaktioner som saknar uppgifter konteras inte.', finns: 'src/lib/kontering/kontera.ts, originalet via src/lib/kontering/underlag.ts. Reglerna finns i src/lib/transaktioner/kundregler.ts. Körs när man följer ett underlag här. Gröna blir preliminära, resten går till Granska.' },
-  { id: 'helhet', klar: true, namn: 'Helhetskontroll', typ: 'ai', rad: 6, kol: 10, beskrivning: 'När transaktionerna är konterade läser Claude Opus 5.5 alla kundens konteringar tillsammans och letar efter det man inte ser en transaktion åt gången: samma motpart på olika konton, privata mönster, moms som inte går ihop, återkommande poster som saknas eller dubblerats. Ett troligt fel på en transaktion som inte är bokförd — fel konto, fel moms, en trolig dubblett — gör den gul, och den går till Granska. Principfrågor, som att förpackningar konteras på två sätt eller att ett köp kanske är privat, blir anteckningar till byrån.', finns: 'src/lib/kontering/helhet.ts. Körs efter konteringen när man följer ett underlag här. Sammanfattningen sparas i kundbilder.helhet.' },
+  { id: 'helhet', klar: true, namn: 'Helhetskontroll', typ: 'ai', rad: 6, kol: 10, beskrivning: 'När transaktionerna är konterade läser Claude Opus 5.5 alla kundens konteringar tillsammans och letar efter det man inte ser en transaktion åt gången: samma motpart på olika konton, privata mönster, moms som inte går ihop, återkommande poster som saknas eller dubblerats. Ett troligt fel på en transaktion som inte är bokförd — fel konto, fel moms, en trolig dubblett — gör den gul, och den går till Granska. Har likadana köp konterats olika och kundens egna transaktioner visar vilken linje som gäller, skriver kontrollen en instruktion till de avvikande raderna, och de konteras om av båda modellerna med den — överens blir de gröna. Principfrågor utan tydlig linje, och sådant som gäller kunden i stort, blir anteckningar till byrån.', finns: 'src/lib/kontering/helhet.ts. Körs efter konteringen när man följer ett underlag här. Sammanfattningen sparas i kundbilder.helhet.' },
   { id: 'val-resultat', namn: 'Grönt?', typ: 'val', rad: 5, kol: 11 },
   { id: 'granska', namn: 'Granska', typ: 'manuell', rad: 7, kol: 11, beskrivning: 'Det AI:n inte är överens om eller osäker på granskar vi själva.', finns: 'Rätta kontering i fliken Kontering' },
   { id: 'preliminar', klar: true, namn: 'Preliminär i 14 dagar', typ: 'vanta', rad: 5, kol: 12, beskrivning: 'Konteringen är preliminär och går att ändra fritt: kontera om, välja ett annat konto, rätta beloppet — eller läsa om underlaget när en sida till kommer in. Varje ändring startar om de 14 dagarna. Sedan blir den verifikation av sig själv.', finns: 'transaktioner.preliminar_at och vald_kontering (src/lib/kontering/preliminar.ts). Bokför nu hoppar över väntan för ett underlag.' },
@@ -689,7 +689,7 @@ export default function FlodesschemaPage() {
       }).then((r) => r.json()).catch(() => ({ error: 'Kunde inte nå servern' }));
       if (d.underlag && !pa) setFoljer(d.underlag);
       if (d.error) { setSparFel(d.error); return null; }
-      return d as { kategori?: string; typ?: string; kvar?: number; underlag?: FlodesUnderlag };
+      return d as { kategori?: string; typ?: string; kvar?: number; underlag?: FlodesUnderlag; samordna?: { underlagId: string; transaktionIds: string[] }[] };
     };
     // Konteringen görs några transaktioner i taget, tills inga är kvar
     const kontera = async () => {
@@ -712,10 +712,28 @@ export default function FlodesschemaPage() {
     };
     const konteraMedKund = async () => {
       await ett('kundbild');
-      if (await kontera()) await ett('helhet');
+      if (await kontera()) await helhetOchSamordning();
+    };
+    /**
+     * Helhetskontrollen, och sedan det den vill samordna — likadana köp som
+     * konterats olika — konterat om med dess instruktion. Det kan vara
+     * transaktioner i andra filer än den man följer.
+     */
+    const helhetOchSamordning = async () => {
+      const h = await ett('helhet');
+      const fran = new Date().toISOString();
+      for (const s of h?.samordna ?? []) {
+        for (let varv = 0; varv < 20; varv++) {
+          const d = await ett('konteras', { fran, bara: s.transaktionIds }, s.underlagId === id ? undefined : s.underlagId);
+          setKorText(`Konterar om efter helhetskontrollen`);
+          if (!d?.kvar) break;
+        }
+      }
+      if (h?.samordna?.length) { const u = await hamtaUnderlag(id); if (u) setFoljer(u); }
     };
     try {
       if (stegId === 'konteras') { await kontera(); return; }
+      if (stegId === 'helhet') { await helhetOchSamordning(); return; }
       if (stegId === 'omkorning') {
         // Efter en ny instruktion: alla AI-steg från början. Gröna blir
         // preliminära; resten väntar på Granska.
@@ -1489,7 +1507,7 @@ function Sparpanel({ u, spar, steg, onVal, onKor, kor, korText, valdFil }: {
           {u.helhet && u.helhet.anmarkningar.length > 0 && (
             <ul className="mb-2 space-y-1">
               {u.helhet.anmarkningar.map((a, i) => (
-                <li key={i} className={`text-xs ${a.granska !== false && a.rader.length ? 'text-amber-800' : 'text-slate-600'}`}>• {a.granska !== false && a.rader.length ? <span className="font-semibold">Till Granska: </span> : null}{a.text}{a.rader.length ? <span className="text-slate-400"> ({a.rader.map((n) => `K${n}`).join(', ')})</span> : null}</li>
+                <li key={i} className={`text-xs ${ANMARKNING[atgardFor(a)].klass}`}>• <span className="font-semibold">{ANMARKNING[atgardFor(a)].etikett}</span>{a.text}{a.rader.length ? <span className="text-slate-400"> ({a.rader.map((n) => `K${n}`).join(', ')})</span> : null}</li>
               ))}
             </ul>
           )}

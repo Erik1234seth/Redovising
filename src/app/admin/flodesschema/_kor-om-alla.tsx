@@ -18,7 +18,9 @@ import { momsText } from '@/lib/kontering/momsdelar';
  *   4. Frågemejlet, en gång för kunden, när ett oskickat utkast finns —
  *      annars tar dygnsmejlet kl 18 det. Två filer som skriver det samtidigt
  *      skulle ge två utkast.
- *   5. Helhetskontrollen, en gång.
+ *   5. Helhetskontrollen, en gång. De transaktioner den vill samordna —
+ *      likadana köp som konterats olika — konteras om av båda modellerna med
+ *      kontrollens instruktion.
  *
  * Läget före körningen sparas här i webbläsaren, så att resultatet kan visa
  * vad som ändrats.
@@ -47,7 +49,7 @@ const MODELL: Record<string, string> = { 'gpt-6-astra': 'GPT-6 Astra', 'claude-o
 const PRICK: Record<string, string> = { gron: 'bg-emerald-500', gul: 'bg-amber-400', rod: 'bg-red-500' };
 const STEGNAMN: Record<string, string> = {
   kundbild: 'Kundbild', dublett: 'Dublettcheck', komplettera: 'Komplettera', tillrackligt: 'Tillräckligt?',
-  konteras: 'Konteras', 'skriv-mejl': 'Skriv mail', helhet: 'Helhetskontroll',
+  konteras: 'Konteras', 'skriv-mejl': 'Skriv mail', helhet: 'Helhetskontroll', samordna: 'Samordning',
 };
 const kr = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -129,6 +131,15 @@ export function ForslagKort({ f }: { f: Forslag }) {
   );
 }
 
+type Anmarkning = NonNullable<FlodesUnderlag['helhet']>['anmarkningar'][number];
+/** Äldre kontroller har bara granska. */
+export const atgardFor = (a: Anmarkning) => a.atgard ?? (a.granska !== false && a.rader.length ? 'granska' : 'anteckning');
+export const ANMARKNING: Record<'granska' | 'samordna' | 'anteckning', { etikett: string; klass: string }> = {
+  granska: { etikett: 'Till Granska: ', klass: 'text-amber-800' },
+  samordna: { etikett: 'Konteras om: ', klass: 'text-violet-800' },
+  anteckning: { etikett: '', klass: 'text-slate-600' },
+};
+
 /** Öppnar originalfilen i en ny flik, utan att raden fälls ut. */
 function FilLank({ id, namn }: { id: string; namn: string }) {
   return (
@@ -152,7 +163,10 @@ async function post(id: string, steg: string, extra: Record<string, unknown> = {
     body: JSON.stringify({ id, steg, ...extra }),
   }).then((r) => r.json()).catch(() => ({ error: 'Kunde inte nå servern' }));
   if (d.error) throw new Error(d.error);
-  return d as { underlag?: FlodesUnderlag; kvar?: number; ersatt?: { ersatta: number; oforandrade: number; inlamnade: number } };
+  return d as {
+    underlag?: FlodesUnderlag; kvar?: number; ersatt?: { ersatta: number; oforandrade: number; inlamnade: number };
+    samordna?: { underlagId: string; transaktionIds: string[] }[];
+  };
 }
 
 async function hamta(id: string): Promise<FlodesUnderlag | null> {
@@ -266,7 +280,28 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
         await tidta('skriv-mejl', () => post(lista[0].id, 'skriv-mejl', { omkorning: true })).catch((e) => setFel(`Frågemejlet: ${e.message}`));
       }
       setText('Helhetskontroll…');
-      await tidta('helhet', () => post(lista[0].id, 'helhet')).catch((e) => setFel(`Helhetskontrollen: ${e.message}`));
+      const h = await tidta('helhet', () => post(lista[0].id, 'helhet')).catch((e) => { setFel(`Helhetskontrollen: ${e.message}`); return null; });
+
+      // 6. Det helhetskontrollen vill samordna konteras om, fyra filer åt gången
+      const samordna = h?.samordna ?? [];
+      if (samordna.length) {
+        setText(`Konterar om ${samordna.reduce((n, s) => n + s.transaktionIds.length, 0)} efter helhetskontrollen…`);
+        const franSamordning = new Date().toISOString();
+        let i = 0;
+        await tidta('samordna', () => Promise.all(Array.from({ length: Math.min(4, samordna.length) }, async () => {
+          while (i < samordna.length) {
+            const s = samordna[i++];
+            try {
+              for (let varv = 0; varv < 20; varv++) {
+                const d = await post(s.underlagId, 'konteras', { fran: franSamordning, bara: s.transaktionIds });
+                if (!d.kvar) break;
+              }
+            } catch (e) {
+              uppdatera(s.underlagId, { fel: `Samordningen: ${(e as Error).message}` });
+            }
+          }
+        })));
+      }
 
       setText('Hämtar resultatet…');
       const efter = await Promise.all(lista.map(async (f) => ({ id: f.id, u: await hamta(f.id) })));
@@ -382,6 +417,9 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
                                   <span className={`ml-auto ${t.kontering === 'gron' || t.bokford ? 'text-emerald-700' : t.kontering === 'granska' ? 'text-amber-700' : 'text-slate-500'}`}>{nu}</span>
                                   {fore !== undefined && fore !== nu && <span className="w-full text-right text-slate-400">före: {fore}</span>}
                                 </button>
+                                {(f.u?.instruktioner ?? []).filter((x) => x.namn === 'Helhetskontrollen' && x.transaktionId === t.id).map((x) => (
+                                  <p key={x.id} className="text-[11px] text-violet-700 px-1">Helhetskontrollen: {x.text}</p>
+                                ))}
                                 {oppenTrans === t.id && (
                                   <div className="grid md:grid-cols-2 gap-2 my-2">
                                     {t.forslag.length ? t.forslag.map((x) => <ForslagKort key={x.modell} f={x} />) : <p className="text-slate-500">Inga konteringar — {t.dublettAv ? 'dubblett' : t.tillrackligt?.status === 'saknar' ? `saknar ${t.tillrackligt.saknas.map((m) => m.vad).join(', ')}` : 'inte konterad'}.</p>}
@@ -407,11 +445,7 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
           <p className="text-xs text-slate-700">{helhet.sammanfattning}</p>
           {helhet.anmarkningar.length > 0 && (
             <ul className="mt-1 space-y-0.5">
-              {helhet.anmarkningar.map((a, i) => (
-                <li key={i} className={`text-xs ${a.granska !== false && a.rader.length ? 'text-amber-800' : 'text-slate-600'}`}>
-                  • {a.granska !== false && a.rader.length ? <span className="font-semibold">Till Granska: </span> : null}{a.text}
-                </li>
-              ))}
+              {helhet.anmarkningar.map((a, i) => <li key={i} className={`text-xs ${ANMARKNING[atgardFor(a)].klass}`}>• {ANMARKNING[atgardFor(a)].etikett}{a.text}</li>)}
             </ul>
           )}
         </div>
