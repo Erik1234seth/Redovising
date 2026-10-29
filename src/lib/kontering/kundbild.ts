@@ -3,6 +3,7 @@ import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkon
 import { byggMejlkontext } from '@/lib/mejlkontext';
 import type { ValdKontering } from './kontera';
 import { fraga } from './modeller';
+import { rensaMomsdelar, sammaMoms } from './momsdelar';
 import { slaUppKonto } from './regelverk';
 
 /**
@@ -18,8 +19,14 @@ import { slaUppKonto } from './regelverk';
  *   gammal eller när någon ber om det (Kör om alla).
  *
  * Byråns val i Granska står med i årslistan som en stark ledtråd, inte som
- * facit — de kan vara fel de också.
+ * facit — de kan vara fel de också. Till konteringen visas också kontot varje
+ * rad redan fått (`medKonton`): bokfört, byråns val, eller AI:ns när båda
+ * modellerna är gröna och överens. Då kan modellen själv se hur kundens
+ * liknande köp konterats, också innan något hunnit bli verifikation.
  */
+
+/** Betal- och momskonton. De säger inget om vad affären är, så de visas inte för en bokförd rad. */
+const BETAL_OCH_MOMS = new Set(['1930', '2013', '2017', '2641', '2611', '2614', '2615', '2621', '2631', '2645', '2647']);
 
 const MODELL = 'claude-opus-5-5' as const;
 // Så många rader får årslistan, de senaste först. Fler än så får inte plats med marginal.
@@ -47,8 +54,18 @@ export interface Arslista {
   filnamn: Map<string, string>;
 }
 
-/** Kundens transaktioner, utom säkra dubbletter, som en kompakt lista i datumordning. */
-export async function hamtaArslista(supabase: SupabaseClient, userId: string): Promise<Arslista> {
+/**
+ * Kundens transaktioner, utom säkra dubbletter, som en kompakt lista i
+ * datumordning. Med `medKonton` står kontot varje rad fått, utom för raderna
+ * i `utanKontoFor` — de som konteras just nu. Ser modellen sitt eget gamla
+ * svar upprepar den det, och då blir en omkörning efter en ny instruktion
+ * meningslös.
+ */
+export async function hamtaArslista(
+  supabase: SupabaseClient,
+  userId: string,
+  { medKonton = false, utanKontoFor = new Set<string>() }: { medKonton?: boolean; utanKontoFor?: Set<string> } = {},
+): Promise<Arslista> {
   const rader: Arsrad[] = [];
   for (let fran = 0; rader.length < MAX_RADER; fran += 1000) {
     const { data, error } = await supabase.from('transaktioner')
@@ -74,13 +91,59 @@ export async function hamtaArslista(supabase: SupabaseClient, userId: string): P
   }
   const lista = rader.filter((r) => !r.underlag_id || !sidor.has(r.underlag_id)).slice(0, MAX_RADER).reverse();
 
+  const konton = medKonton ? await kontonFor(supabase, lista.map((r) => r.id).filter((id) => !utanKontoFor.has(id))) : new Map<string, string>();
   const nummer = new Map(lista.map((r, i) => [r.id, i + 1]));
   const text = lista.map((r, i) => {
-    const vald = r.vald_kontering?.konto ? ` · byrån valde ${r.vald_kontering.konto} ${slaUppKonto(r.vald_kontering.konto)?.namn ?? ''}`.trimEnd() : '';
+    const vald = utanKontoFor.has(r.id) ? ''
+      : konton.has(r.id) ? ` → ${konton.get(r.id)}`
+      : r.vald_kontering?.konto ? ` · byrån valde ${r.vald_kontering.konto} ${slaUppKonto(r.vald_kontering.konto)?.namn ?? ''}`.trimEnd() : '';
     const kalla = r.kalla === 'bank' ? 'bankrad' : r.kalla === 'woocommerce' ? 'webbutik' : filnamn.get(r.underlag_id ?? '') ?? 'fil';
     return `K${i + 1} ${r.datum ?? 'okänt datum'} ${r.riktning === 'in' ? 'IN ' : 'UT '} ${Number(r.belopp)} ${r.valuta || 'SEK'} · ${r.motpart || '—'} · ${(r.beskrivning ?? '').slice(0, 80)} · ${kalla.slice(0, 40)}${vald}`;
   }).join('\n');
   return { rader: lista, nummer, text, filnamn };
+}
+
+const kontonamn = (konton: string[]) => konton.map((k) => `${k} ${slaUppKonto(k)?.namn ?? ''}`.trim()).join(' + ');
+
+/**
+ * Kontot varje transaktion fått, med varifrån: bokförd, byrån eller AI. En
+ * bokförd rad visar verifikationens konton. Byråns val går före AI:n, och
+ * AI:n visas bara när båda modellerna är gröna och överens — oense säger inget.
+ */
+async function kontonFor(supabase: SupabaseClient, ids: string[]): Promise<Map<string, string>> {
+  const ut = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const del = ids.slice(i, i + 200);
+    const [t, k, v] = await Promise.all([
+      supabase.from('transaktioner').select('id, vald_kontering').in('id', del),
+      supabase.from('konteringar').select('transaktion_id, konto, momssats, momsdelar, omdome').in('transaktion_id', del),
+      supabase.from('verifikationer').select('transaktion_id, verifikation_rader(konto, borttagen)').in('transaktion_id', del),
+    ]);
+    if (t.error ?? k.error ?? v.error) throw new Error(`Kunde inte läsa kundens konteringar: ${(t.error ?? k.error ?? v.error)!.message}`);
+    for (const x of v.data ?? []) {
+      const rader = ((x.verifikation_rader ?? []) as { konto: string; borttagen: boolean }[]).filter((r) => !r.borttagen && !BETAL_OCH_MOMS.has(r.konto));
+      const konton = [...new Set(rader.map((r) => r.konto))];
+      if (x.transaktion_id && konton.length) ut.set(x.transaktion_id, `${kontonamn(konton)} (bokförd)`);
+    }
+    for (const x of t.data ?? []) {
+      const vald = x.vald_kontering as ValdKontering | null;
+      if (ut.has(x.id) || !vald?.konto) continue;
+      const delar = rensaMomsdelar(vald.momsdelar);
+      ut.set(x.id, `${kontonamn(delar ? [...new Set(delar.map((d) => d.konto ?? vald.konto))] : [vald.konto])} (byrån valde)`);
+    }
+    const perTransaktion = new Map<string, { konto: string | null; momssats: number | null; momsdelar: unknown; omdome: string }[]>();
+    for (const x of k.data ?? []) perTransaktion.set(x.transaktion_id, [...(perTransaktion.get(x.transaktion_id) ?? []), x]);
+    for (const [id, lista] of perTransaktion) {
+      if (ut.has(id) || lista.length < 2) continue;
+      const [a] = lista;
+      const overens = lista.every((x) => x.omdome === 'gron' && x.konto && x.konto === a.konto
+        && sammaMoms({ momssats: Number(x.momssats), momsdelar: rensaMomsdelar(x.momsdelar) }, { momssats: Number(a.momssats), momsdelar: rensaMomsdelar(a.momsdelar) }));
+      if (!overens) continue;
+      const delar = rensaMomsdelar(a.momsdelar);
+      ut.set(id, `${kontonamn(delar ? [...new Set(delar.map((d) => d.konto ?? a.konto!))] : [a.konto!])} (AI, båda överens)`);
+    }
+  }
+  return ut;
 }
 
 const SCHEMA = {

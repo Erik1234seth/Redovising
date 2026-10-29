@@ -206,12 +206,14 @@ const GEMENSAMT = `Du konterar transaktioner åt en svensk enskild näringsidkar
 
 Du får, i den här ordningen:
 - KUNDBILDEN: en kollegas sammanställning av kunden.
-- KUNDENS TRANSAKTIONER: alla kundens transaktioner, en rad var (K1, K2 …).
+- KUNDENS TRANSAKTIONER: alla kundens transaktioner, en rad var (K1, K2 …), med kontot de redan fått när det finns: "(bokförd)", "(byrån valde)" eller "(AI, båda överens)". Rader utan konto är inte konterade än, modellerna var oense, eller så konteras de just nu.
 - Kundens mejl till byrån och kundreglerna.
 - ORIGINALUNDERLAGET som transaktionen kommer ifrån — kvittot, fakturan eller kontoutdraget som det ser ut — och alla transaktioner som lästs ut ur filen (F1, F2 …).
 - Sist EN transaktion att kontera, med var den står i filen och i kundens lista.
 
 Titta på originalet själv. Avskriften kan ha missat något eller läst fel — säg det i så fall i motiveringen. Använd filens andra rader och kundens övriga transaktioner för att förstå vad affären är: en återkommande leverantör, en insättning och ett uttag med samma belopp, en bankrad vars kvitto finns i en annan fil. Hänvisa till raderna (F3, K120).
+
+Se efter hur kundens liknande köp redan konterats — samma leverantör, samma slags varor — och följ samma linje när reglerna tillåter det, så att kundens bokföring blir konsekvent. Byråns val och bokförda rader väger tyngst, AI:ns gröna lite lättare. Det är ändå ledtrådar: stämmer en tidigare kontering inte med K1-reglerna gäller reglerna, och då säger du det i motiveringen.
 
 Allmänna regler:
 - Välj bara konton ur K1-kontoplanen nedan. Inga andra konton, inte heller BAS-underkonton som 3001 eller 5410. Välj aldrig betalkontot — bank- eller privatsidan bokförs av systemet.
@@ -666,7 +668,7 @@ export async function konteraTransaktioner(
   // Kunden: samma för alla transaktioner, och cachas därför i systemprompten
   const [kundbild, arslista, mejl] = await Promise.all([
     hamtaKundbild(supabase, userId),
-    hamtaArslista(supabase, userId),
+    hamtaArslista(supabase, userId, { medKonton: true, utanKontoFor: new Set(kvar.map((t) => t.id)) }),
     byggMejlkontext(supabase, { userId, emails: [(profil as unknown as Kund | null)?.email] }),
   ]);
   const kund = [
