@@ -4,7 +4,9 @@ import { hamtaArslista, hamtaKundbild } from './kundbild';
 import { fraga } from './modeller';
 import { momsText, rensaMomsdelar } from './momsdelar';
 import { slutligKontering } from './preliminar';
-import { slaUppKonto, type Flagga } from './regelverk';
+import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
+import { reglerAttValja } from '@/lib/transaktioner/kundregler';
+import { hamtaInstruktioner, reglerFor } from '@/lib/transaktioner/instruktioner';
 
 /**
  * Helhetskontrollen: när kundens transaktioner är konterade läser en modell
@@ -23,6 +25,12 @@ import { slaUppKonto, type Flagga } from './regelverk';
  *               konteras om av båda modellerna med den. Är de överens blir den
  *               grön — kravet på två modeller ligger kvar.
  *   anteckning  Principfrågor och sådant som gäller kunden i stort. Stoppar inget.
+ *
+ * Kontrollen har samma regler som konteringen: K1-kontoplanen, hela regeltexten
+ * för kontona kunden använder, kundreglerna och byråns kontext för kunden. En
+ * linje att samordna efter ska stämma med reglerna — annars blir
+ * omkonteringen gul, som när pant på engångsförpackningar lades på 0 % trots
+ * att regeln säger att den följer drycken.
  *
  * Bara rader som inte är bokförda flaggas eller konteras om. Varje kontroll
  * ersätter förra kontrollens instruktioner. Allt sparas i `kundbilder.helhet`.
@@ -63,10 +71,12 @@ Varje transaktion har konterats för sig av två modeller. Du ser nu alla kunden
 - Återkommande poster som saknas eller dubblerats: ett abonnemang som hoppar över en månad, samma faktura två gånger.
 - Konton som inte passar verksamheten i kundbilden.
 
+Du har byråns regler — samma som konteringen följer: K1-kontoplanen, hela regeltexten för de konton kunden använder, kundreglerna och byråns kontext. Reglerna går före kundens mönster. Innan du anmärker eller samordnar: pröva både de nuvarande raderna och linjen du vill samordna efter mot kontots regler — "Använd när", "Använd INTE när", beslutsregler och momsregler. Att raderna konterats olika kan ha en förklaring i reglerna (till exempel att pant på engångsförpackningar följer drycken medan returlådor är momsfria) — då är det ingen avvikelse. Strider en rad mot reglerna är det reglerna som är linjen, inte hur de flesta rader ligger.
+
 Anmärk bara på det som sannolikt är fel eller som en människa bör titta på. Inga anmärkningar alls är ett bra svar när allt ser rimligt ut. Varje anmärkning: en eller två meningar på svenska som säger vad som ser fel ut och vad som troligen är rätt, med raderna det gäller (numren, utan K). Har en transaktion inget konto än är den inte konterad — anmärk inte på det.
 
 atgard avgör vad som händer med raderna:
-- "samordna" när likadana köp har konterats olika och kundens egna transaktioner visar vilken linje som är rimlig — oftast hur de flesta liknande raderna redan ligger. Ange i rader bara de rader som avviker och ska konteras om, inte de som redan följer linjen. Skriv i instruktion vad konteringen ska göra och varför, med hänvisning till raderna, t.ex. "Kundens övriga småköp av fika och pålägg hos Coop (K31, K37) ligger på 4000 som varuinköp. Behandla det här köpet likadant om inget i underlaget talar emot det." Instruktionen läses av konteringen för varje rad för sig, så den ska gå att förstå utan din anmärkning. Samordna bara när du kan peka på ett mönster i kundens transaktioner — inte för att du tycker att något borde vara annorlunda.
+- "samordna" när likadana köp har konterats olika och kundens egna transaktioner visar vilken linje som är rimlig — oftast hur de flesta liknande raderna redan ligger — och linjen stämmer med reglerna. Samordna också rader som bryter mot reglerna, mot det reglerna säger. Ange i rader bara de rader som avviker och ska konteras om, inte de som redan följer linjen. Skriv i instruktion vad konteringen ska göra och varför, med hänvisning till raderna, t.ex. "Kundens övriga småköp av fika och pålägg hos Coop (K31, K37) ligger på 4000 som varuinköp. Behandla det här köpet likadant om inget i underlaget talar emot det." Instruktionen läses av konteringen för varje rad för sig, så den ska gå att förstå utan din anmärkning. Samordna bara när du kan peka på ett mönster i kundens transaktioner — inte för att du tycker att något borde vara annorlunda.
 - "granska" bara när just de raderna är tydligt fel och det inte går att rätta med ett mönster: fel moms, en trolig dubblett, en post som uppenbart inte kan höra till verksamheten (t.ex. cigaretter eller kläder bokförda som varuinköp).
 
 En rad där modellerna är oense och den ena följer kundens linje är ett typiskt fall för samordna.
@@ -104,10 +114,11 @@ export async function helhetskontroll(supabase: SupabaseClient, userId: string):
 }
 
 async function kontrollera(supabase: SupabaseClient, userId: string): Promise<Helhet> {
-  const [arslista, kundbild, { data: profil }] = await Promise.all([
+  const [arslista, kundbild, { data: profil }, instruktioner] = await Promise.all([
     hamtaArslista(supabase, userId),
     hamtaKundbild(supabase, userId),
     supabase.from('profiles').select(KUND_KOLUMNER).eq('id', userId).maybeSingle(),
+    hamtaInstruktioner(supabase, { userId }),
   ]);
   const ids = arslista.rader.map((r) => r.id);
   const konteringar: { transaktion_id: string; modell: string; konto: string | null; momssats: number | null; momsdelar: unknown; omdome: string; flaggor: Flagga[] }[] = [];
@@ -144,11 +155,30 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
     return `K${i + 1} ${r.datum ?? 'okänt datum'} ${r.riktning === 'in' ? 'IN ' : 'UT '} ${Number(r.belopp)} ${r.valuta || 'SEK'} · ${r.motpart || '—'} · ${(r.beskrivning ?? '').slice(0, 80)} · ${kalla.slice(0, 40)} → ${vad} (${lage})`;
   });
 
+  // Hela regeltexten för kontona kunden använder. Gränsprövningarna gäller en
+  // enskild transaktion och räknas inte här.
+  const anvanda = new Set<string>();
+  for (const k of konteringar) {
+    if (k.konto) anvanda.add(k.konto);
+    for (const d of rensaMomsdelar(k.momsdelar) ?? []) if (d.konto) anvanda.add(d.konto);
+  }
+  for (const r of arslista.rader) if (r.vald_kontering?.konto) anvanda.add(r.vald_kontering.konto);
+  const kontoregler = [...anvanda].filter((k) => slaUppKonto(k)).sort()
+    .map((k) => kontoBlock({ ...provaKonto({ konto: k, netto: 0, brutto: 0, datum: null }), gransprovningar: [] }))
+    .join('\n\n---\n\n');
+  // Byråns kontext för kunden och alla kunder — inte den på enskilda transaktioner, och inte kontrollens egen
+  const byransKontext = instruktioner
+    .filter((i) => i.typ === 'kontext' && (i.omfang === 'kund' || i.omfang === 'alla') && i.namn !== HELHET_NAMN)
+    .map((i) => `- (${i.omfang === 'alla' ? 'alla kunder' : 'kunden'}) ${i.text}`).join('\n');
+
   const { data } = await fraga<{ sammanfattning: string; anmarkningar: { rader: number[]; text: string; atgard: string; instruktion: string }[] }>(MODELL, {
-    system: { fast: FAST, kund: '' },
+    system: { fast: `${FAST}\n\nK1-KONTOPLAN (konto namn — beskrivning [sökord]):\n${kontolista()}`, kund: '' },
     user: [
       byggKundkontext(profil as unknown as Kund | null),
       kundbild ? `KUNDBILDEN:\n${kundbild}` : '',
+      kontoregler ? `REGLERNA FÖR KONTONA KUNDEN ANVÄNDER:\n\n${kontoregler}` : '',
+      `KUNDREGLER:\n${reglerAttValja(reglerFor(instruktioner, userId))}`,
+      byransKontext ? `BYRÅNS KONTEXT FÖR KUNDEN:\n${byransKontext}` : '',
       `KUNDENS TRANSAKTIONER MED KONTERING (${rader.length} st, äldst först):\n${rader.join('\n')}`,
     ].filter(Boolean).join('\n\n'),
     namn: 'helhet',
