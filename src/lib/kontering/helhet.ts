@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkontext';
-import { hamtaArslista, hamtaKundbild } from './kundbild';
+import { betalsattText, hamtaArslista, hamtaKundbild, verifikationsSammanfattning } from './kundbild';
 import { fraga } from './modeller';
 import { momsText, rensaMomsdelar } from './momsdelar';
 import { slutligKontering } from './preliminar';
@@ -72,6 +72,8 @@ Varje transaktion har konterats för sig av två modeller. Du ser nu alla kunden
 - Konton som inte passar verksamheten i kundbilden.
 
 Du har byråns regler — samma som konteringen följer: K1-kontoplanen, hela regeltexten för de konton kunden använder, kundreglerna och byråns kontext. Reglerna går före kundens mönster. Innan du anmärker eller samordnar: pröva både de nuvarande raderna och linjen du vill samordna efter mot kontots regler — "Använd när", "Använd INTE när", beslutsregler och momsregler. Att raderna konterats olika kan ha en förklaring i reglerna (till exempel att pant på engångsförpackningar följer drycken medan returlådor är momsfria) — då är det ingen avvikelse. Strider en rad mot reglerna är det reglerna som är linjen, inte hur de flesta rader ligger.
+
+Betalkontot (1930, 2013, 2017) sätts av systemet utifrån kundens betalsätt och står inte vid raderna — anmärk inte på det. Det som står under REDAN BOKFÖRT är kundens inlästa bokföring, till exempel försäljning från kassarapporter: räkna med den när du bedömer om något saknas, och anmärk på det bara om en transaktion ser ut att bokföra samma sak igen.
 
 Varje transaktion har konterats med originalunderlaget framför sig — kvittot, fakturan — och momsen på underlaget står vid raden. Anmärk inte på sådant som bara skulle kräva att någon tittar på originalet, till exempel om fakturan verkligen anger moms: det har konteringen redan sett. Anmärk på det som syns när kundens transaktioner läses tillsammans.
 
@@ -182,7 +184,9 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
       kontoregler ? `REGLERNA FÖR KONTONA KUNDEN ANVÄNDER:\n\n${kontoregler}` : '',
       `KUNDREGLER:\n${reglerAttValja(reglerFor(instruktioner, userId))}`,
       byransKontext ? `BYRÅNS KONTEXT FÖR KUNDEN:\n${byransKontext}` : '',
+      betalsattText((profil as unknown as Kund | null)?.har_foretagskonto),
       `KUNDENS TRANSAKTIONER MED KONTERING (${rader.length} st, äldst först):\n${rader.join('\n')}`,
+      await verifikationsSammanfattning(supabase, userId),
     ].filter(Boolean).join('\n\n'),
     namn: 'helhet',
     schema: SCHEMA,

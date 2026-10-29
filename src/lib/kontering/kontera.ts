@@ -6,7 +6,7 @@ import { kompletteringText, type Komplettering } from '@/lib/transaktioner/kompl
 import { reglerAttValja } from '@/lib/transaktioner/kundregler';
 import { hamtaInstruktioner, kontextFor, reglerFor } from '@/lib/transaktioner/instruktioner';
 import { tolkaBetalsatt, type Betalsatt } from './betalsatt';
-import { hamtaArslista, hamtaKundbild } from './kundbild';
+import { hamtaArslista, hamtaKundbild, verifikationsSammanfattning } from './kundbild';
 import { iKo } from '@/lib/ai-anrop';
 import { MODELLER, fraga, type Del, type Modell } from './modeller';
 import { momsText, rensaMomsdelar, sammaMoms, slaIhopDelar, type Momsdel } from './momsdelar';
@@ -249,6 +249,8 @@ I DET HÄR STEGET konterar du. Du har redan analyserat transaktionen och valt ka
 - granskning_kravs: true bara när en punkt under "Kräver manuell granskning när" konkret stämmer på just den här transaktionen, eller när underlaget verkligen inte räcker för att välja konto och moms. Allmänna punkter som "Användningen är oklar" eller "Inköpet kan vara privat" stämmer inte bara för att det i teorin skulle kunna vara så: passar köpet verksamheten i kundbilden, och syns inget som tyder på något annat, är användningen klar och granskning_kravs false. Sätt inte true för en punkt som inte kan ändra kontot eller momsen — till exempel att flera föremål hör samman, när också summan av dem ligger under gränsen för kontot. Säg i motiveringen vilken punkt som stämmer när du sätter true.
 
 Gränsprövningarna i reglerna är uträknade i kod. Godta siffrorna.
+
+Regler om vad underlaget ska innehålla — leverantör, fakturanummer, köpare, beskattningsunderlag — är redan prövade i steget före konteringen, och transaktionen har gått igenom där. Underlaget är godkänt: citera inte sådana regler som brutna och låt dem inte kräva granskning. Pröva bara vad affären är och om kontot och momsen är rätt.
 
 Transaktionen konteras direkt från underlaget, inte från en tidigare bokföring. Punkter som handlar om vilket BAS-konto en post tidigare bokförts på stämmer därför aldrig — bortse från dem. Bokslutsjusteringar — t.ex. lagerinventering, periodiseringar och avskrivningar — görs i bokslutet. Punkter som tydligt gäller dem bryter inga regler och kräver ingen granskning här.
 
@@ -666,15 +668,17 @@ export async function konteraTransaktioner(
   const allaRegler = reglerFor(instruktioner, userId);
 
   // Kunden: samma för alla transaktioner, och cachas därför i systemprompten
-  const [kundbild, arslista, mejl] = await Promise.all([
+  const [kundbild, arslista, mejl, bokfort] = await Promise.all([
     hamtaKundbild(supabase, userId),
     hamtaArslista(supabase, userId, { medKonton: true, utanKontoFor: new Set(kvar.map((t) => t.id)) }),
     byggMejlkontext(supabase, { userId, emails: [(profil as unknown as Kund | null)?.email] }),
+    verifikationsSammanfattning(supabase, userId),
   ]);
   const kund = [
     byggKundkontext(profil as unknown as Kund | null),
     kundbild ? `KUNDBILDEN:\n${kundbild}` : 'KUNDBILDEN: inte sammanställd än — utgå från kundens transaktioner nedan.',
     `KUNDENS TRANSAKTIONER (${arslista.rader.length} st, äldst först):\n${arslista.text || '(inga)'}`,
+    bokfort,
     mejl,
     `KUNDREGLER:\n${reglerAttValja(allaRegler)}`,
   ].filter(Boolean).join('\n\n');

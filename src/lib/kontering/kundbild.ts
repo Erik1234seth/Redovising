@@ -104,6 +104,55 @@ export async function hamtaArslista(
   return { rader: lista, nummer, text, filnamn };
 }
 
+/**
+ * Kundens bokförda verifikationer som inte kommer från en transaktion här —
+ * inlästa verifikationslistor, kassarapporter, SIE-filer — sammanfattade per
+ * månad och konto. Utan dem ser kundens bokföring ut att sakna allt som
+ * redan bokförts den vägen, till exempel försäljningen från ett kassasystem.
+ */
+export async function verifikationsSammanfattning(supabase: SupabaseClient, userId: string): Promise<string> {
+  const rader: { datum: string; konto: string; belopp: number }[] = [];
+  let antal = 0;
+  for (let fran = 0; ; fran += 1000) {
+    const { data, error } = await supabase.from('verifikationer')
+      .select('datum, verifikation_rader(konto, belopp, borttagen)')
+      .eq('user_id', userId).is('transaktion_id', null).order('datum').range(fran, fran + 999);
+    if (error) throw new Error(`Kunde inte läsa kundens verifikationer: ${error.message}`);
+    for (const v of data ?? []) {
+      antal++;
+      for (const r of (v.verifikation_rader ?? []) as { konto: string; belopp: number; borttagen: boolean }[]) {
+        if (!r.borttagen) rader.push({ datum: String(v.datum), konto: r.konto, belopp: Number(r.belopp) });
+      }
+    }
+    if ((data ?? []).length < 1000) break;
+  }
+  if (!antal) return '';
+  const perManad = new Map<string, Map<string, number>>();
+  const antalPerManad = new Map<string, number>();
+  for (const r of rader) {
+    const m = r.datum.slice(0, 7);
+    const k = perManad.get(m) ?? perManad.set(m, new Map()).get(m)!;
+    k.set(r.konto, (k.get(r.konto) ?? 0) + r.belopp);
+  }
+  const { data: datum } = await supabase.from('verifikationer').select('datum').eq('user_id', userId).is('transaktion_id', null).limit(5000);
+  for (const d of datum ?? []) antalPerManad.set(String(d.datum).slice(0, 7), (antalPerManad.get(String(d.datum).slice(0, 7)) ?? 0) + 1);
+  const kr = (n: number) => Math.round(n).toLocaleString('sv-SE');
+  const text = [...perManad].sort((a, b) => a[0].localeCompare(b[0])).slice(-18).map(([m, konton]) => {
+    const delar = [...konton].filter(([, b]) => Math.abs(b) >= 1).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 10)
+      .map(([k, b]) => `${k} ${slaUppKonto(k)?.namn ?? ''} ${b > 0 ? 'debet' : 'kredit'} ${kr(Math.abs(b))}`.replace(/\s+/g, ' '));
+    return `${m} (${antalPerManad.get(m) ?? 0} verifikationer): ${delar.join(' · ')}`;
+  }).join('\n');
+  return `REDAN BOKFÖRT — kundens inlästa verifikationer (verifikationslistor, kassarapporter, SIE), ${antal} st, per månad och konto:\n${text}\nDet som står här är bokfört. Det syns inte bland kundens transaktioner ovan, och det ska inte bokföras igen.`;
+}
+
+/** Betalsättet med orden konteringen använder. Betalkontot sätts av systemet, inte av modellen. */
+export function betalsattText(harForetagskonto: string | null | undefined): string {
+  if (harForetagskonto === 'privatkonto' || harForetagskonto === 'nej') return 'BETALSÄTT: kunden betalar via privatkonto. Systemet sätter betalkontot: 2017 Egna insättningar vid köp och 2013 Övriga egna uttag vid försäljning.';
+  if (harForetagskonto === 'bada') return 'BETALSÄTT: kunden betalar via både företagskonto och privatkonto. Betalkontot väljs per transaktion.';
+  if (harForetagskonto) return 'BETALSÄTT: kunden betalar via företagskonto. Systemet sätter betalkontot 1930.';
+  return '';
+}
+
 const kontonamn = (konton: string[]) => konton.map((k) => `${k} ${slaUppKonto(k)?.namn ?? ''}`.trim()).join(' + ');
 
 /**
@@ -202,7 +251,9 @@ export async function byggKundbild(supabase: SupabaseClient, userId: string, { t
       user: [
         byggKundkontext(profil as unknown as Kund | null),
         mejl ? `KUNDENS MEJL MED BYRÅN:\n${mejl}` : 'Det finns inga mejl från kunden.',
+        betalsattText((profil as unknown as Kund | null)?.har_foretagskonto),
         `KUNDENS TRANSAKTIONER (${arslista.rader.length} st, äldst först):\n${arslista.text || '(inga än)'}`,
+        await verifikationsSammanfattning(supabase, userId),
       ].filter(Boolean).join('\n\n'),
       namn: 'kundbild',
       schema: SCHEMA,
