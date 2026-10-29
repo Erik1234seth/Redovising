@@ -187,12 +187,13 @@ export async function skrivFragemejl(
   // Hur mycket som var tydligt, så att mejlet inte bara handlar om det som saknas
   const aldsta = [...(underlag ?? [])].map((u) => String(u.created_at)).sort()[0] ?? null;
   const tydliga = await tydligaUnderlag(supabase, userId, aldsta);
-  const underlagKontext = (tydliga ? `ÖVRIGA UNDERLAG: ${tydliga} andra underlag från samma period var tydliga och kunde bokföras utan frågor.\n\n` : '')
+  const underlagKontext = (tydliga ? 'ÖVRIGA UNDERLAG: kundens övriga underlag från samma period var tydliga och kunde bokföras utan frågor.\n\n' : '')
     + (fragor.length ? `TRANSAKTIONER SOM SAKNAR UPPGIFTER (${fragor.length} st):\n${block.join('\n\n')}\n\n` : '')
     + (sidor.length ? `UNDERLAG DÄR SIDOR SAKNAS (${sidor.length} st) — be kunden skicka de saknade sidorna, gärna som foto:\n${sidblock.join('\n')}\n\n` : '')
     + 'Skriv ETT vänligt och personligt mejl till kunden. Börja med att tacka för underlagen och säga att det mesta var tydligt'
-    + (tydliga ? ' — nämn att de övriga underlagen var tydliga och är klara — ' : ' ')
+    + (tydliga ? ' — nämn att de övriga underlagen var tydliga och är klara, utan att räkna dem — ' : ' ')
     + 'innan du kommer till det som saknas. Tonen ska vara varm och enkel, som från en byrå som gärna hjälper till, inte som en lista med krav. '
+    + 'Skriv inte hur många underlag eller transaktioner det gäller — varken de tydliga eller dem du frågar om. '
     + 'Avsluta med en kort vänlig rad, till exempel att kunden bara kan svara på mejlet och att det går bra att höra av sig om något är oklart. '
     + 'Fråga efter just det som saknas ovan, för alla transaktionerna och underlagen. Gå igenom dem en och en, '
     + 'med datum, motpart och belopp så att kunden ser vilken det gäller. '
