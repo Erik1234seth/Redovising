@@ -198,8 +198,11 @@ export async function skrivFragemejl(
     + 'Fråga efter just det som saknas ovan, för alla transaktionerna och underlagen. Gå igenom dem en och en, '
     + 'med datum, motpart och belopp så att kunden ser vilken det gäller. '
     + 'Är det samma fråga för flera transaktioner — till exempel om bilen i verksamheten är firmans eller privat — ställer du den en gång, '
-    + 'med transaktionerna den gäller uppräknade kort under, i stället för att upprepa frågan för varje. Förklara kort och begripligt varför vi behöver det — '
-    + 'utan facktermer där det går. Be kunden svara på mejlet. Fråga inte om något annat, och aldrig om sådant kunden redan svarat på i mejlhistoriken. '
+    + 'med transaktionerna den gäller uppräknade kort under, i stället för att upprepa frågan för varje. '
+    + 'Det ska kännas som att vi ber om hjälp att göra klart, inte som ett förhör. Utgå från att allt är i sin ordning: '
+    + 'skriv inte varför något ser oklart eller misstänkt ut (till exempel att en faktura är ställd till en annan person, eller att något kan vara privat), '
+    + 'ställ inga motfrågor eller dubbla frågor, och upprepa inte frågan vid varje rad. Formulera frågorna mjukt, till exempel "Kan du berätta …" eller '
+    + '"Vi skulle behöva …". Förklara varför vi behöver något bara där det hjälper kunden, i en kort mening, utan facktermer. Be kunden svara på mejlet. Fråga inte om något annat, och aldrig om sådant kunden redan svarat på i mejlhistoriken. '
     + 'Står det BYRÅNS KONTEXT eller BYRÅNS REGLER följer du dem — fråga inte om sådant de redan besvarar.'
     + (reglerText(instruktioner, userId) ? `\n\n${reglerText(instruktioner, userId)}` : '');
 
