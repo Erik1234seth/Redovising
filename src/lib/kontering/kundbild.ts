@@ -38,6 +38,7 @@ export interface Arsrad {
   datum: string | null;
   riktning: 'in' | 'ut';
   belopp: number;
+  moms: number | null;
   valuta: string | null;
   motpart: string | null;
   beskrivning: string | null;
@@ -69,7 +70,7 @@ export async function hamtaArslista(
   const rader: Arsrad[] = [];
   for (let fran = 0; rader.length < MAX_RADER; fran += 1000) {
     const { data, error } = await supabase.from('transaktioner')
-      .select('id, datum, riktning, belopp, valuta, motpart, beskrivning, kalla, underlag_id, vald_kontering')
+      .select('id, datum, riktning, belopp, moms, valuta, motpart, beskrivning, kalla, underlag_id, vald_kontering')
       .eq('user_id', userId).is('dublett_av', null)
       .order('datum', { ascending: false, nullsFirst: false }).order('id')
       .range(fran, fran + 999);

@@ -73,6 +73,8 @@ Varje transaktion har konterats för sig av två modeller. Du ser nu alla kunden
 
 Du har byråns regler — samma som konteringen följer: K1-kontoplanen, hela regeltexten för de konton kunden använder, kundreglerna och byråns kontext. Reglerna går före kundens mönster. Innan du anmärker eller samordnar: pröva både de nuvarande raderna och linjen du vill samordna efter mot kontots regler — "Använd när", "Använd INTE när", beslutsregler och momsregler. Att raderna konterats olika kan ha en förklaring i reglerna (till exempel att pant på engångsförpackningar följer drycken medan returlådor är momsfria) — då är det ingen avvikelse. Strider en rad mot reglerna är det reglerna som är linjen, inte hur de flesta rader ligger.
 
+Varje transaktion har konterats med originalunderlaget framför sig — kvittot, fakturan — och momsen på underlaget står vid raden. Anmärk inte på sådant som bara skulle kräva att någon tittar på originalet, till exempel om fakturan verkligen anger moms: det har konteringen redan sett. Anmärk på det som syns när kundens transaktioner läses tillsammans.
+
 Anmärk bara på det som sannolikt är fel eller som en människa bör titta på. Inga anmärkningar alls är ett bra svar när allt ser rimligt ut. Varje anmärkning: en eller två meningar på svenska som säger vad som ser fel ut och vad som troligen är rätt, med raderna det gäller (numren, utan K). Har en transaktion inget konto än är den inte konterad — anmärk inte på det.
 
 atgard avgör vad som händer med raderna:
@@ -152,7 +154,8 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
         ? k.map((x) => `${MODELLNAMN[x.modell] ?? x.modell}: ${kontering(x.konto, Number(x.momssats ?? 0), rensaMomsdelar(x.momsdelar))}`).join(' / ')
         : k[0] ? kontering(k[0].konto, Number(k[0].momssats ?? 0), rensaMomsdelar(k[0].momsdelar)) : '—';
     const kalla = r.kalla === 'bank' ? 'bankrad' : r.kalla === 'woocommerce' ? 'webbutik' : arslista.filnamn.get(r.underlag_id ?? '') ?? 'fil';
-    return `K${i + 1} ${r.datum ?? 'okänt datum'} ${r.riktning === 'in' ? 'IN ' : 'UT '} ${Number(r.belopp)} ${r.valuta || 'SEK'} · ${r.motpart || '—'} · ${(r.beskrivning ?? '').slice(0, 80)} · ${kalla.slice(0, 40)} → ${vad} (${lage})`;
+    const underlagsmoms = Number(r.moms) ? ` (moms på underlaget ${Number(r.moms)} kr)` : '';
+    return `K${i + 1} ${r.datum ?? 'okänt datum'} ${r.riktning === 'in' ? 'IN ' : 'UT '} ${Number(r.belopp)} ${r.valuta || 'SEK'}${underlagsmoms} · ${r.motpart || '—'} · ${(r.beskrivning ?? '').slice(0, 80)} · ${kalla.slice(0, 40)} → ${vad} (${lage})`;
   });
 
   // Hela regeltexten för kontona kunden använder. Gränsprövningarna gäller en
