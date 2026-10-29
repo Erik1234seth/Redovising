@@ -165,7 +165,9 @@ export async function skrivFragemejl(
   const underlagKontext = (fragor.length ? `TRANSAKTIONER SOM SAKNAR UPPGIFTER (${fragor.length} st):\n${block.join('\n\n')}\n\n` : '')
     + (sidor.length ? `UNDERLAG DÄR SIDOR SAKNAS (${sidor.length} st) — be kunden skicka de saknade sidorna, gärna som foto:\n${sidblock.join('\n')}\n\n` : '')
     + 'Skriv ETT mejl till kunden och fråga efter just det som saknas ovan, för alla transaktionerna och underlagen. Gå igenom dem en och en, '
-    + 'med datum, motpart och belopp så att kunden ser vilken det gäller. Förklara kort och begripligt varför vi behöver det — '
+    + 'med datum, motpart och belopp så att kunden ser vilken det gäller. '
+    + 'Är det samma fråga för flera transaktioner — till exempel om bilen i verksamheten är firmans eller privat — ställer du den en gång, '
+    + 'med transaktionerna den gäller uppräknade kort under, i stället för att upprepa frågan för varje. Förklara kort och begripligt varför vi behöver det — '
     + 'utan facktermer där det går. Be kunden svara på mejlet. Fråga inte om något annat, och aldrig om sådant kunden redan svarat på i mejlhistoriken. '
     + 'Står det BYRÅNS KONTEXT eller BYRÅNS REGLER följer du dem — fråga inte om sådant de redan besvarar.'
     + (reglerText(instruktioner, userId) ? `\n\n${reglerText(instruktioner, userId)}` : '');

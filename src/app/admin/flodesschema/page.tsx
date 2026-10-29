@@ -104,7 +104,7 @@ const STEG: Steg[] = [
   { id: 'val-dublett', klar: true, namn: 'Dublettcheck', typ: 'val', rad: 5, kol: 8, beskrivning: 'Finns samma affär redan i ett tidigare underlag hos kunden? Samma kvitto inskickat två gånger, eller samma köp på olika papper (order och kvitto, faktura och betalkvitto). Koden letar fram transaktioner med riktning, belopp och datum i närheten, och AI:n jämför beskrivning, motpart, datum, belopp och nummer. Säkra dubbletter går till Radera, tveksamma flaggas och stoppas i konteringen.', finns: 'Underlagens transaktioner mot kundens tidigare underlag. Bankrader har en egen koll mot kvitton.' },
   { id: 'radera', namn: 'Radera', typ: 'slut', rad: 4, kol: 8, beskrivning: 'Dubbletter bokförs inte. De markeras i stället för att raderas, så att det går att ångra.', finns: 'Säkra dubbletter från dublettkollen, och bankrader som troligen redan bokförts' },
   { id: 'val-tillrackligt', klar: true, namn: 'Tillräckligt?', typ: 'val', rad: 5, kol: 9, beskrivning: 'AI:n avgör om det vi samlat — underlaget, kompletteringen med historik och mejl, och kundkontexten — räcker för att bokföra varje transaktion: datum, belopp, moms och vad den gäller. Pekar transaktionen på något som kräver mer ska det också finnas, t.ex. köparens VAT-nummer vid försäljning inom EU, omvänd byggmoms, deltagare vid representation eller personnummer vid ROT/RUT. Rimliga antaganden görs hellre än onödiga frågor.', finns: 'Kontrollen per transaktion. Körs när man följer ett underlag här. Mejlflödet har en egen kontroll per fil.' },
-  { id: 'skriv-mejl', klar: true, namn: 'Skriv mail', typ: 'ai', rad: 4, kol: 9, beskrivning: 'Saknas något skriver AI:n till kunden och frågar efter just det. Frågorna samlas per kund: kl 18 varje dag skrivs ett mejl per kund om alla transaktioner vi har frågor om och inte frågat om än. Mejlet blir ett utkast i inkorgen — svar i tråden om allt kom i samma mejl, annars ett nytt mejl.', finns: 'Dygnsmejlet kl 18 (Apps Script: fragemejl.gs), eller direkt härifrån när man följer ett underlag. Underlagskontrollen i mejlflödet frågar tills underlaget är komplett.' },
+  { id: 'skriv-mejl', klar: true, namn: 'Skriv mail', typ: 'ai', rad: 4, kol: 9, beskrivning: 'Saknas något skriver AI:n till kunden och frågar efter just det. Frågorna samlas per kund: kl 18 varje dag skrivs ett mejl per kund om alla transaktioner vi har frågor om och inte frågat om än. Mejlet blir ett utkast i inkorgen — svar i tråden om allt kom i samma mejl, annars ett nytt mejl.', finns: 'Skrivs som utkast direkt när Tillräckligt? hittar något som saknas och man kör flödet här (Skicka in i flödet, Kör om, Kör om alla). Annars dygnsmejlet kl 18 (Apps Script: fragemejl.gs). Underlagskontrollen i mejlflödet frågar tills underlaget är komplett.' },
   { id: 'kund-svarar-1', namn: 'Svara mail', typ: 'kund', rad: 0, kol: 9, beskrivning: 'Kunden svarar med det som saknades.' },
   { id: 'hopp-ut-1', namn: 'A', typ: 'hopp', rad: 0, kol: 10, hopp: 'hopp-in', beskrivning: 'Svaret tas emot som nytt underlag.' },
 
@@ -739,20 +739,22 @@ export default function FlodesschemaPage() {
         // preliminära; resten väntar på Granska.
         // Definiera och Plocka ut körs inte om — de tar inga instruktioner, och
         // en ny utläsning ersätter transaktionerna (och med dem instruktionerna
-        // på en transaktion). Frågemejlet skrivs om bara när ett oskickat
-        // utkast finns, eller när instruktionen skrevs på Skriv mail —
-        // annars tar dygnsmejlet kl 18 det.
+        // på en transaktion). Frågemejlet skrivs som utkast när något saknas,
+        // när ett oskickat utkast finns, eller när instruktionen skrevs på Skriv mail.
         const utkast = foljer.mejl?.status === 'draft';
+        let saknar = false;
         // Dublettchecken behöver inte kompletteringen — de körs samtidigt
         if (!(await bada())) return;
         for (const steg of OMKORNING) {
           if (steg === 'komplettera' || steg === 'dublett') continue;
           if (steg === 'konteras') { await konteraMedKund(); return; }
           if (steg === 'skriv-mejl') {
-            if (fran === 'skriv-mejl' || utkast) await ett('skriv-mejl', { omkorning: true });
+            if (fran === 'skriv-mejl' || utkast || saknar) await ett('skriv-mejl', { omkorning: true });
             continue;
           }
-          if (!(await ett(steg))) return;
+          const d = await ett(steg);
+          if (!d) return;
+          if (steg === 'tillrackligt') saknar = !!d.underlag?.transaktioner.some((t) => t.tillrackligt?.status === 'saknar');
         }
         return;
       }
@@ -783,7 +785,12 @@ export default function FlodesschemaPage() {
       const ut = await ett('plocka-trans');
       if (!ut || ut.typ !== 'transaktioner') return;
       // Det som saknas frågas i dygnsmejlet kl 18; resten konteras ändå
-      if (!(await bada()) || !(await ett('tillrackligt'))) return;
+      if (!(await bada())) return;
+      const till = await ett('tillrackligt');
+      if (!till) return;
+      // Saknas något skrivs frågemejlet som utkast direkt, i stället för kl 18.
+      // Det samlar alla kundens frågor, inte bara den här filens.
+      if (till.underlag?.transaktioner.some((t) => t.tillrackligt?.status === 'saknar')) await ett('skriv-mejl', { omkorning: true });
       // Konteringen är preliminär och blir verifikation om 14 dagar — inget bokförs här
       await konteraMedKund();
     } finally {

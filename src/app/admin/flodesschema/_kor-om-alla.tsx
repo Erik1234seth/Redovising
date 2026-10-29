@@ -15,9 +15,9 @@ import { momsText } from '@/lib/kontering/momsdelar';
  *   3. Tre filer åt gången: Komplettera, Tillräckligt? och Konteras. En
  *      bokförd transaktion vars kontering ändrats får sin verifikation ersatt
  *      (se `@/lib/kontering/ersatt`).
- *   4. Frågemejlet, en gång för kunden, när ett oskickat utkast finns —
- *      annars tar dygnsmejlet kl 18 det. Två filer som skriver det samtidigt
- *      skulle ge två utkast.
+ *   4. Frågemejlet som utkast, en gång för kunden, när något saknas eller
+ *      ett oskickat utkast finns. Två filer som skriver det samtidigt skulle
+ *      ge två utkast.
  *   5. Helhetskontrollen, en gång. De transaktioner den vill samordna —
  *      likadana köp som konterats olika — konteras om av båda modellerna med
  *      kontrollens instruktion.
@@ -275,8 +275,8 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
 
       // 4–5. Frågemejlet och helhetskontrollen, en gång för kunden
       const nu = await Promise.all(lista.map(async (f) => ({ id: f.id, u: await hamta(f.id) })));
-      if (nu.some(({ u }) => u?.mejl?.status === 'draft')) {
-        setText('Skriver om frågemejlet…');
+      if (nu.some(({ u }) => u?.mejl?.status === 'draft' || u?.transaktioner.some((t) => t.tillrackligt?.status === 'saknar'))) {
+        setText('Skriver frågemejlet…');
         await tidta('skriv-mejl', () => post(lista[0].id, 'skriv-mejl', { omkorning: true })).catch((e) => setFel(`Frågemejlet: ${e.message}`));
       }
       setText('Helhetskontroll…');
