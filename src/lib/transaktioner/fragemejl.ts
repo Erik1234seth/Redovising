@@ -82,6 +82,28 @@ async function fragorAttStalla(supabase: SupabaseClient, userId?: string): Promi
   return rader;
 }
 
+/**
+ * Kundens underlag från samma period som frågorna som gick att bokföra utan
+ * frågor — så att mejlet kan säga att resten var tydligt. Perioden börjar två
+ * veckor före det äldsta underlaget vi frågar om.
+ */
+async function tydligaUnderlag(supabase: SupabaseClient, userId: string, fragaFran: string | null): Promise<number> {
+  if (!fragaFran) return 0;
+  const fran = new Date(new Date(fragaFran).getTime() - 14 * 86_400_000).toISOString();
+  const { data: underlag } = await supabase.from('bokforing_underlag').select('id')
+    .eq('user_id', userId).is('del_av', null).gte('created_at', fran).limit(1000);
+  const ids = (underlag ?? []).map((u) => u.id);
+  if (!ids.length) return 0;
+  const { data: trans } = await supabase.from('transaktioner').select('underlag_id, tillrackligt, dublett_av').in('underlag_id', ids);
+  const perFil = new Map<string, boolean>();
+  for (const t of trans ?? []) {
+    if (t.dublett_av) continue;
+    const ok = (t.tillrackligt as { status?: string } | null)?.status === 'tillrackligt';
+    perFil.set(t.underlag_id, (perFil.get(t.underlag_id) ?? true) && ok);
+  }
+  return [...perFil.values()].filter(Boolean).length;
+}
+
 /** Dokument där sidor saknas, inkomna före i dag och inte frågade om än. */
 async function sidorAttFraga(supabase: SupabaseClient, userId?: string): Promise<Sidfraga[]> {
   let q = supabase.from('bokforing_underlag')
@@ -162,9 +184,17 @@ export async function skrivFragemejl(
       .filter(Boolean).join(' ');
     return `    • ${vad} (${u.file_name}, inskickat ${String(u.created_at).slice(0, 10)}): vi har inte fått sida ${u.sidor_saknas.join(', ')} av ${d?.antalSidor ?? '?'}`;
   });
-  const underlagKontext = (fragor.length ? `TRANSAKTIONER SOM SAKNAR UPPGIFTER (${fragor.length} st):\n${block.join('\n\n')}\n\n` : '')
+  // Hur mycket som var tydligt, så att mejlet inte bara handlar om det som saknas
+  const aldsta = [...(underlag ?? [])].map((u) => String(u.created_at)).sort()[0] ?? null;
+  const tydliga = await tydligaUnderlag(supabase, userId, aldsta);
+  const underlagKontext = (tydliga ? `ÖVRIGA UNDERLAG: ${tydliga} andra underlag från samma period var tydliga och kunde bokföras utan frågor.\n\n` : '')
+    + (fragor.length ? `TRANSAKTIONER SOM SAKNAR UPPGIFTER (${fragor.length} st):\n${block.join('\n\n')}\n\n` : '')
     + (sidor.length ? `UNDERLAG DÄR SIDOR SAKNAS (${sidor.length} st) — be kunden skicka de saknade sidorna, gärna som foto:\n${sidblock.join('\n')}\n\n` : '')
-    + 'Skriv ETT mejl till kunden och fråga efter just det som saknas ovan, för alla transaktionerna och underlagen. Gå igenom dem en och en, '
+    + 'Skriv ETT vänligt och personligt mejl till kunden. Börja med att tacka för underlagen och säga att det mesta var tydligt'
+    + (tydliga ? ' — nämn att de övriga underlagen var tydliga och är klara — ' : ' ')
+    + 'innan du kommer till det som saknas. Tonen ska vara varm och enkel, som från en byrå som gärna hjälper till, inte som en lista med krav. '
+    + 'Avsluta med en kort vänlig rad, till exempel att kunden bara kan svara på mejlet och att det går bra att höra av sig om något är oklart. '
+    + 'Fråga efter just det som saknas ovan, för alla transaktionerna och underlagen. Gå igenom dem en och en, '
     + 'med datum, motpart och belopp så att kunden ser vilken det gäller. '
     + 'Är det samma fråga för flera transaktioner — till exempel om bilen i verksamheten är firmans eller privat — ställer du den en gång, '
     + 'med transaktionerna den gäller uppräknade kort under, i stället för att upprepa frågan för varje. Förklara kort och begripligt varför vi behöver det — '
