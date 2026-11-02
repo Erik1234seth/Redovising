@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkontext';
 import { betalsattText, hamtaArslista, hamtaKundbild, verifikationsSammanfattning } from './kundbild';
 import { fraga } from './modeller';
-import { momsText, rensaMomsdelar } from './momsdelar';
+import { momsText, rensaMomsdelar, tolkaOmvand } from './momsdelar';
 import { slutligKontering } from './preliminar';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
 import { reglerAttValja } from '@/lib/transaktioner/kundregler';
@@ -125,12 +125,12 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
     hamtaInstruktioner(supabase, { userId }),
   ]);
   const ids = arslista.rader.map((r) => r.id);
-  const konteringar: { transaktion_id: string; modell: string; konto: string | null; momssats: number | null; momsdelar: unknown; omdome: string; flaggor: Flagga[] }[] = [];
+  const konteringar: { transaktion_id: string; modell: string; konto: string | null; momssats: number | null; momsdelar: unknown; omvand: string | null; omdome: string; flaggor: Flagga[] }[] = [];
   const bokforda = new Set<string>();
   for (let i = 0; i < ids.length; i += 200) {
     const del = ids.slice(i, i + 200);
     const [k, v] = await Promise.all([
-      supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, momsdelar, omdome, flaggor').in('transaktion_id', del),
+      supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, momsdelar, omvand, omdome, flaggor').in('transaktion_id', del),
       supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', del),
     ]);
     if (k.error ?? v.error) throw new Error((k.error ?? v.error)!.message);
@@ -143,18 +143,18 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
     const slutlig = slutligKontering(r.vald_kontering, k);
     const lage = bokforda.has(r.id) ? 'bokförd' : slutlig?.signatur === 'Erik' ? 'byrån' : slutlig ? 'AI' : k.length ? 'AI oense' : 'ej konterad';
     // En del per konto, så att en uppdelning syns — 4000 + 2013 är inte samma sak som 4000
-    const kontering = (konto: string | null, momssats: number, momsdelar: ReturnType<typeof rensaMomsdelar>) => {
+    const kontering = (konto: string | null, momssats: number, momsdelar: ReturnType<typeof rensaMomsdelar>, omvand: unknown) => {
       if (!konto) return '—';
       const konton = [...new Set((momsdelar ?? []).map((d) => d.konto).filter((x): x is string => !!x))];
       const namn = (konton.length > 1 ? konton : [konto]).map((x) => `${x} ${slaUppKonto(x)?.namn ?? ''}`.trim()).join(' + ');
-      return `${namn}, moms ${momsText(momssats, momsdelar)}`;
+      return `${namn}, moms ${momsText(momssats, momsdelar, tolkaOmvand(omvand))}`;
     };
     // Oense modeller visas med båda förslagen, så att kontrollen kan samordna efter kundens linje
     const vad = slutlig
-      ? kontering(slutlig.konto, slutlig.momssats, slutlig.momsdelar)
+      ? kontering(slutlig.konto, slutlig.momssats, slutlig.momsdelar, slutlig.omvand)
       : k.length > 1
-        ? k.map((x) => `${MODELLNAMN[x.modell] ?? x.modell}: ${kontering(x.konto, Number(x.momssats ?? 0), rensaMomsdelar(x.momsdelar))}`).join(' / ')
-        : k[0] ? kontering(k[0].konto, Number(k[0].momssats ?? 0), rensaMomsdelar(k[0].momsdelar)) : '—';
+        ? k.map((x) => `${MODELLNAMN[x.modell] ?? x.modell}: ${kontering(x.konto, Number(x.momssats ?? 0), rensaMomsdelar(x.momsdelar), x.omvand)}`).join(' / ')
+        : k[0] ? kontering(k[0].konto, Number(k[0].momssats ?? 0), rensaMomsdelar(k[0].momsdelar), k[0].omvand) : '—';
     const kalla = r.kalla === 'bank' ? 'bankrad' : r.kalla === 'woocommerce' ? 'webbutik' : arslista.filnamn.get(r.underlag_id ?? '') ?? 'fil';
     const underlagsmoms = Number(r.moms) ? ` (moms på underlaget ${Number(r.moms)} kr)` : '';
     return `K${i + 1} ${r.datum ?? 'okänt datum'} ${r.riktning === 'in' ? 'IN ' : 'UT '} ${Number(r.belopp)} ${r.valuta || 'SEK'}${underlagsmoms} · ${r.motpart || '—'} · ${(r.beskrivning ?? '').slice(0, 80)} · ${kalla.slice(0, 40)} → ${vad} (${lage})`;

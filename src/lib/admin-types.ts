@@ -4,7 +4,7 @@ import type { Deadlineperiod } from '@/lib/deadlines';
 import type { Komplettering } from '@/lib/transaktioner/komplettera';
 import type { Dublettkoll } from '@/lib/transaktioner/dublettkoll';
 import type { Tillrackligt } from '@/lib/transaktioner/tillrackligt';
-import type { Momsdel } from '@/lib/kontering/momsdelar';
+import type { Momsdel, Omvand } from '@/lib/kontering/momsdelar';
 /**
  * Formen på det adminpanelen visar.
  *
@@ -379,6 +379,8 @@ export interface AdminKontering {
   momssats: number | null;
   /** Flera momssatser på samma underlag, annars null. */
   momsdelar: Momsdel[] | null;
+  /** Omvänd skattskyldighet — momssatsen är då den köparen räknar ut momsen med. */
+  omvand: Omvand | null;
   motivering: string;
   /**
    * Hur modellen kom fram (se `@/lib/kontering/kontera`): analysen och
@@ -392,7 +394,7 @@ export interface AdminKontering {
     analys?: string;
     kandidater?: { konto: string; namn: string; varfor: string }[];
     jamkning?: {
-      fore: { konto: string | null; momssats: number | null; momsdelar: Momsdel[] | null; omdome: string; motivering: string };
+      fore: { konto: string | null; momssats: number | null; momsdelar: Momsdel[] | null; omvand?: Omvand | null; omdome: string; motivering: string };
       andradeSig: boolean;
       motivering: string;
     } | null;
@@ -419,7 +421,7 @@ export interface AdminKonteringRad {
   anteckning: string;
   konteringar: AdminKontering[];
   /** Kontot byrån valt för hand. Preliminärt tills det blir verifikation. */
-  vald: { konto: string; momssats: number; momsdelar: Momsdel[] | null; motkonto: string | null } | null;
+  vald: { konto: string; momssats: number; momsdelar: Momsdel[] | null; omvand: Omvand | null; motkonto: string | null } | null;
   /** Dagen konteringen blir verifikation, när den är klar men inte bokförd. */
   verifikationFran: string | null;
   verifikation: {
@@ -655,11 +657,11 @@ export interface FlodesUnderlag {
     kontering: 'ingen' | 'gron' | 'granska';
     bokford: boolean;
     /** Kontot byrån valt för hand. Preliminärt, som modellernas konteringar. */
-    vald: { konto: string; momssats: number; momsdelar: Momsdel[] | null } | null;
+    vald: { konto: string; momssats: number; momsdelar: Momsdel[] | null; omvand: Omvand | null } | null;
     /** Dagen den preliminära konteringen blir verifikation, när den är klar men inte bokförd. */
     verifikationFran: string | null;
     /** Modellernas konteringar — förslagen när transaktionen ska granskas. */
-    forslag: { modell: string; konto: string | null; kontonamn: string | null; momssats: number; momsdelar: Momsdel[] | null; omdome: string; motivering: string; granskning: AdminKontering['granskning']; flaggor: AdminKontering['flaggor']; /** Namnen på kundreglerna modellen valde. */ regler: string[] }[];
+    forslag: { modell: string; konto: string | null; kontonamn: string | null; momssats: number; momsdelar: Momsdel[] | null; omvand: Omvand | null; omdome: string; motivering: string; granskning: AdminKontering['granskning']; flaggor: AdminKontering['flaggor']; /** Namnen på kundreglerna modellen valde. */ regler: string[] }[];
     /** Verifikationen transaktionen blev, med sina rader. */
     verifikation: { id: string; datum: string | null; signatur: string; rader: { konto: string; kontonamn: string | null; belopp: number }[] } | null;
   }[];

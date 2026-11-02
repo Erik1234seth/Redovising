@@ -55,7 +55,7 @@ export async function ersattVerifikationer(supabase: SupabaseClient, userId: str
   const ids = verif.map((v) => v.transaktion_id as string);
   const [{ data: trans, error: tFel }, { data: konteringar, error: kFel }, { data: profil }, { data: inl }] = await Promise.all([
     supabase.from('transaktioner').select(`${TRANSAKTION_KOLUMNER}, vald_kontering, dublett_av, dublett_orsak`).in('id', ids),
-    supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, momsdelar, omdome, flaggor').in('transaktion_id', ids),
+    supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, momsdelar, omvand, omdome, flaggor').in('transaktion_id', ids),
     supabase.from('profiles').select('har_foretagskonto').eq('id', userId).maybeSingle(),
     supabase.from('inlamningar').select('typ, period').eq('profile_id', userId),
   ]);
@@ -78,7 +78,7 @@ export async function ersattVerifikationer(supabase: SupabaseClient, userId: str
     let samma = false;
     if (slutlig && betalsatt) {
       try {
-        const nya = verifikationsrader(t, slutlig.konto, slutlig.momssats, betalsatt, slutlig.motkonto ?? undefined, slutlig.momsdelar);
+        const nya = verifikationsrader(t, slutlig.konto, slutlig.momssats, betalsatt, slutlig.motkonto ?? undefined, slutlig.momsdelar, slutlig.omvand);
         const gamla = ((v.verifikation_rader ?? []) as { konto: string; belopp: number; borttagen: boolean }[])
           .filter((r) => !r.borttagen).map((r) => ({ konto: r.konto, belopp: Number(r.belopp) }));
         samma = nyckel(nya) === nyckel(gamla);

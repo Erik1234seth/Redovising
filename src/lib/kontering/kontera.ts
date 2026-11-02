@@ -9,7 +9,7 @@ import { tolkaBetalsatt, type Betalsatt } from './betalsatt';
 import { hamtaArslista, hamtaKundbild, verifikationsSammanfattning } from './kundbild';
 import { iKo } from '@/lib/ai-anrop';
 import { MODELLER, fraga, type Del, type Modell } from './modeller';
-import { momsText, rensaMomsdelar, sammaMoms, slaIhopDelar, type Momsdel } from './momsdelar';
+import { momsText, rensaMomsdelar, sammaMoms, slaIhopDelar, tolkaOmvand, type Momsdel, type Omvand } from './momsdelar';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
 import { filensRader, underlagetsDelar, type Filrad } from './underlag';
 import { arUtlandsk, iKronor, omrakningText, raknaOmTillKronor, type Kronor } from './kronor';
@@ -96,6 +96,8 @@ interface Beslut {
   /** En del per konto och momssats — en enda när hela beloppet har samma konto och sats. */
   delar: { konto: string; momssats: 0 | 6 | 12 | 25; belopp: number; moms: number | null }[];
   momshantering: Momshantering;
+  /** Vilket slags omvänd skattskyldighet, eller "inte". */
+  omvand_typ: string;
   sakerhet: 'hog' | 'medel' | 'lag';
   motivering: string;
   regler: string[];
@@ -105,7 +107,7 @@ interface Beslut {
 
 /** Vad modellen tyckte före jämkningen, och om den ändrade sig. */
 export interface Jamkning {
-  fore: { konto: string | null; momssats: number | null; momsdelar: Momsdel[] | null; omdome: Omdome; motivering: string };
+  fore: { konto: string | null; momssats: number | null; momsdelar: Momsdel[] | null; omvand?: Omvand | null; omdome: Omdome; motivering: string };
   andradeSig: boolean;
   motivering: string;
 }
@@ -119,6 +121,8 @@ export interface Kontering {
   momssats: number | null;
   /** Delarna per konto och sats när transaktionen är uppdelad, annars null. */
   momsdelar: Momsdel[] | null;
+  /** Omvänd skattskyldighet: momssatsen är då den som köparen räknar ut. */
+  omvand: Omvand | null;
   motivering: string;
   /** Kundreglerna modellen valde. */
   regler: string[];
@@ -179,7 +183,7 @@ const KANDIDAT_SCHEMA = {
 const beslutSchema = (regelIdn: string[]) => ({
   type: 'object',
   additionalProperties: false,
-  required: ['delar', 'momshantering', 'sakerhet', 'motivering', 'regler', 'brutna_regler', 'granskning_kravs'],
+  required: ['delar', 'momshantering', 'omvand_typ', 'sakerhet', 'motivering', 'regler', 'brutna_regler', 'granskning_kravs'],
   properties: {
     delar: {
       type: 'array',
@@ -197,6 +201,7 @@ const beslutSchema = (regelIdn: string[]) => ({
       },
     },
     momshantering: { type: 'string', enum: ['svensk', 'ingen', 'omvand'] },
+    omvand_typ: { type: 'string', enum: ['inte', 'eu-tjanst', 'eu-vara', 'utanfor-eu-tjanst', 'sverige-tjanst', 'sverige-vara', 'import'] },
     sakerhet: { type: 'string', enum: ['hog', 'medel', 'lag'] },
     motivering: { type: 'string' },
     regler: { type: 'array', items: { type: 'string', enum: regelIdn }, description: 'Id på kundreglerna som gäller transaktionen' },
@@ -242,10 +247,11 @@ I DET HÄR STEGET konterar du. Du har redan analyserat transaktionen och valt ka
 - delar: en rad per konto och momssats, med beloppet inklusive moms. Hör allt till samma konto och har samma momssats blir det en enda rad med hela beloppet.
 - Hör delar av transaktionen till olika konton, dela upp den — även när en del är liten. Ta beloppen ur underlagets rader.
 - Har underlaget flera momssatser — t.ex. livsmedel på 6 % och förpackningar på 25 % — blir det en rad per sats, även när satserna har samma konto. Ta beloppen ur underlagets momsspecifikation när den finns.
-- momssats: svensk moms som ingår i delens belopp (25, 12, 6 eller 0). 0 när ingen avdragsgill eller utgående moms finns.
+- momssats: svensk moms som ingår i delens belopp (25, 12, 6 eller 0). 0 när ingen avdragsgill eller utgående moms finns. Vid omvänd skattskyldighet är det i stället den svenska sats som hade gällt om köpet gjorts i Sverige — oftast 25 — fast ingen moms ingår i beloppet; 0 bara när köpet hade varit momsfritt i Sverige.
 - moms: delens moms enligt underlaget. Anger underlaget bara momsen per sats och satsen delas på flera konton, räkna ut varje dels andel. null när underlaget inte visar någon moms.
 - En del kan vara negativ, t.ex. returnerad pant på 0 %. Delarna ska tillsammans bli transaktionens belopp.
 - momshantering: "svensk" vid vanlig svensk moms, "ingen" när momsen inte hanteras (momsfritt, privat, lån, överföringar, skatter), "omvand" vid omvänd skattskyldighet, EU-förvärv eller import.
+- omvand_typ: vid "omvand" vilket slags förvärv det är — avgör det av säljarens land och om det är en vara eller en tjänst: "eu-tjanst" (tjänst från ett företag i ett annat EU-land, t.ex. annonser hos Meta Irland), "eu-vara" (vara från ett annat EU-land), "utanfor-eu-tjanst" (tjänst från ett företag utanför EU, t.ex. ett amerikanskt abonnemang), "sverige-tjanst" eller "sverige-vara" (svensk omvänd skattskyldighet, t.ex. byggtjänster eller mobiltelefoner i större partier), "import" (vara från ett land utanför EU). "inte" när momshantering inte är "omvand". Vid omvänd skattskyldighet räknar systemet själv ut momsen och bokför den som utgående och ingående moms — det är inget skäl till granskning.
 - sakerhet: "hog" bara när underlaget tydligt visar vad det är och reglerna pekar ut kontot. "lag" när du gissar.
 - motivering: två eller tre meningar på svenska om vad affären är och varför kontot är rätt enligt reglerna.
 - regler: id på de KUNDREGLER som gäller transaktionen. Ta bara med en regel när underlaget, uppgifterna, mejlen eller byråns kontext visar att den gäller — tom lista annars. En regel du tar med följer du: dess instruktion är byråns och väger lika tungt som anteckningen. Nämn regeln i motiveringen.
@@ -343,7 +349,9 @@ function delarUrBeslut(t: Transaktion, p: Beslut): Momsdel[] {
  * Varje del räknas för sig, och delarna ska tillsammans bli transaktionens
  * belopp och moms.
  */
-function raknaMoms(t: Transaktion, delar: Momsdel[], momshantering: Momshantering, huvudkonto: string): { moms: number; delar: Bokdel[]; flaggor: Flagga[] } {
+function raknaMoms(
+  t: Transaktion, delar: Momsdel[], momshantering: Momshantering, huvudkonto: string, omvand: Omvand | null = null,
+): { moms: number; delar: Bokdel[]; flaggor: Flagga[] } {
   const flaggor: Flagga[] = [];
   const konto = (d: Momsdel) => d.konto ?? huvudkonto;
   if (delar.length > 1) {
@@ -352,11 +360,23 @@ function raknaMoms(t: Transaktion, delar: Momsdel[], momshantering: Momshanterin
       flaggor.push({ typ: 'moms', allvar: 'granskning', text: `Delarna (${momsText(null, delar)}) blir ${summa} kr, men transaktionen är ${t.belopp} kr.` });
     }
   }
-  if (momshantering === 'omvand') {
-    flaggor.push({ typ: 'omvand-moms', allvar: 'granskning', text: 'Omvänd skattskyldighet eller import — momsen bokförs för hand.' });
-    return { moms: 0, delar: delar.map((d) => ({ konto: konto(d), sats: 0, belopp: d.belopp, moms: 0 })), flaggor };
-  }
   const underlag = Number(t.moms) || 0;
+  if (momshantering === 'omvand') {
+    // Köparen räknar ut momsen själv — det görs i byggRader. Import räknas på
+    // tullvärdet, och en försäljning eller återbetalning är inget förvärv, så
+    // de bokförs för hand.
+    if (!automatiskOmvand(omvand) || t.riktning !== 'ut') {
+      const text = omvand === 'import'
+        ? 'Import av varor — momsen räknas på tullvärdet och bokförs för hand.'
+        : 'Omvänd skattskyldighet — momsen bokförs för hand.';
+      flaggor.push({ typ: 'omvand-moms', allvar: 'granskning', text });
+      return { moms: 0, delar: delar.map((d) => ({ konto: konto(d), sats: 0, belopp: d.belopp, moms: 0 })), flaggor };
+    }
+    if (underlag > 0) {
+      flaggor.push({ typ: 'moms', allvar: 'granskning', text: `Underlaget visar ${underlag} kr i moms, men köpet har omvänd skattskyldighet — har säljaren tagit ut moms?` });
+    }
+    return { moms: 0, delar: delar.map((d) => ({ konto: konto(d), sats: d.momssats, belopp: d.belopp, moms: 0 })), flaggor };
+  }
   if (momshantering === 'ingen') {
     if (underlag > 0) flaggor.push({ typ: 'moms', allvar: 'granskning', text: `Underlaget visar ${underlag} kr i moms men transaktionen bokförs utan moms.` });
     return { moms: 0, delar: delar.map((d) => ({ konto: konto(d), sats: 0, belopp: d.belopp, moms: 0 })), flaggor };
@@ -384,13 +404,51 @@ function raknaMoms(t: Transaktion, delar: Momsdel[], momshantering: Momshanterin
 
 const MOMSKONTO_UT: Record<number, string> = { 25: '2611', 12: '2621', 6: '2631' };
 
+/** Omvänd skattskyldighet som bokförs av systemet — allt utom import. */
+const automatiskOmvand = (o: Omvand | null): o is Exclude<Omvand, 'import'> => !!o && o !== 'import';
+
+/** Satsens plats i BAS-kontonas sista siffror: 25 % först, sedan 12 och 6. */
+const SATSORDNING: Record<number, number> = { 25: 0, 12: 1, 6: 2 };
+
+/**
+ * Spegelkontona för underlaget till rutorna 20–24 i momsdeklarationen, för
+ * 25 %. De är BAS-konton utanför K1-planen och nollas mot 4598, så de
+ * påverkar inte resultatet. Se rutaForKonto i @/lib/moms/eskd.
+ */
+const SPEGELKONTO: Record<Exclude<Omvand, 'import'>, number> = {
+  'eu-vara': 4515,
+  'eu-tjanst': 4535,
+  'utanfor-eu-tjanst': 4531,
+  'sverige-vara': 4415,
+  'sverige-tjanst': 4425,
+};
+const SPEGELTEXT: Record<Exclude<Omvand, 'import'>, string> = {
+  'eu-vara': 'Inköp av varor från annat EU-land',
+  'eu-tjanst': 'Inköp av tjänster från annat EU-land',
+  'utanfor-eu-tjanst': 'Inköp av tjänster från land utanför EU',
+  'sverige-vara': 'Inköp av varor i Sverige, omvänd skattskyldighet',
+  'sverige-tjanst': 'Inköp av tjänster i Sverige, omvänd skattskyldighet',
+};
+
+/** Namnen på kontona utanför K1-planen som omvänd skattskyldighet bokförs på. */
+export const OMVAND_KONTONAMN: Record<string, string> = Object.fromEntries([
+  ['4598', 'Justering, omvänd moms'],
+  ...Object.entries(SPEGELKONTO).flatMap(([o, k]) => [25, 12, 6].map((sats) =>
+    [String(k + SATSORDNING[sats]), `${SPEGELTEXT[o as Exclude<Omvand, 'import'>]}, ${sats} %`])),
+]);
+
 /**
  * Raderna i verifikationen, debet positivt: en rad per konto, momsen och
  * betalkontot. Balanserar alltid — huvudkontot, den första delen, tar
  * öresavrundningen.
  * Ingående moms samlas på 2641; utgående får ett konto per sats.
+ *
+ * Vid omvänd skattskyldighet betalas ingen moms. Köparen räknar ut den på
+ * beloppet och bokför den som utgående moms (2614, 2624, 2634) och lika mycket
+ * som ingående (2645, eller 2640 för svensk omvänd skattskyldighet) — det tar
+ * ut varandra. Underlaget bokförs på ett spegelkonto mot 4598.
  */
-function byggRader(t: Transaktion, delar: Bokdel[], motkonto: string) {
+function byggRader(t: Transaktion, delar: Bokdel[], motkonto: string, omvand: Omvand | null = null) {
   const brutto = ore(t.belopp);
   const moms = ore(delar.reduce((s, d) => s + d.moms, 0));
   const ut = t.riktning === 'ut';
@@ -408,6 +466,22 @@ function byggRader(t: Transaktion, delar: Bokdel[], motkonto: string) {
     momskonton.set(k, ore((momskonton.get(k) ?? 0) + d.moms));
   }
   for (const [k, m] of momskonton) if (m) rader.push({ konto: k, belopp: ut ? m : -m });
+
+  if (automatiskOmvand(omvand) && ut) {
+    const omvanda = new Map<string, number>();
+    const lagg = (k: string, b: number) => omvanda.set(k, ore((omvanda.get(k) ?? 0) + b));
+    const ingaende = omvand.startsWith('sverige') ? '2640' : '2645';
+    for (const d of delar) {
+      const plats = SATSORDNING[d.sats];
+      if (plats === undefined) continue;
+      const moms = ore((d.belopp * d.sats) / 100);
+      lagg(String(SPEGELKONTO[omvand] + plats), d.belopp);
+      lagg('4598', -d.belopp);
+      lagg(String(2614 + plats * 10), -moms);
+      lagg(ingaende, moms);
+    }
+    for (const [k, b] of omvanda) if (b) rader.push({ konto: k, belopp: b });
+  }
   rader.push({ konto: motkonto, belopp: ut ? -brutto : brutto });
   return rader;
 }
@@ -495,7 +569,8 @@ function byggKontering(
   const forstaDelar = delarUrBeslut(t, beslut);
   if (!forstaDelar.length) throw new Error(`${modell} gav inget konto`);
   const huvudkonto = forstaDelar[0].konto ?? '';
-  const { delar: bokdelar, flaggor: momsflaggor } = raknaMoms(t, forstaDelar, beslut.momshantering, huvudkonto);
+  const omvand = beslut.momshantering === 'omvand' ? tolkaOmvand(beslut.omvand_typ) : null;
+  const { delar: bokdelar, flaggor: momsflaggor } = raknaMoms(t, forstaDelar, beslut.momshantering, huvudkonto, omvand);
   flaggor.push(...momsflaggor);
 
   // Varje konto prövas i kod: får det väljas automatiskt, håller beloppsgränserna
@@ -526,15 +601,18 @@ function byggKontering(
   if (beslut.sakerhet === 'lag') flaggor.push({ typ: 'osaker', allvar: 'granskning', text: 'Modellens säkerhet: låg.' });
 
   const svensk = beslut.momshantering === 'svensk';
-  const sparade = slutdelar.map((d) => (svensk ? d : { ...d, momssats: 0, moms: null }));
+  // Vid omvänd skattskyldighet sparas satsen köparen räknar ut momsen med
+  const medSats = svensk || (automatiskOmvand(omvand) && t.riktning === 'ut');
+  const sparade = slutdelar.map((d) => (svensk ? d : medSats ? { ...d, moms: null } : { ...d, momssats: 0, moms: null }));
   const omdome: Omdome = flaggor.some((f) => f.allvar === 'stopp') ? 'rod' : flaggor.length ? 'gul' : 'gron';
   const konto = slutdelar[0]?.konto ?? null;
   return {
     modell,
     svarade: [...svarade].join(', '),
     konto,
-    momssats: svensk ? slutdelar[0]?.momssats ?? 0 : 0,
+    momssats: medSats ? slutdelar[0]?.momssats ?? 0 : 0,
     momsdelar: rensaMomsdelar(sparade),
+    omvand,
     motivering: String(beslut.motivering ?? ''),
     regler,
     granskning: {
@@ -578,14 +656,14 @@ async function konteraMedModell(modell: Modell, t: Transaktion, betalsatt: Betal
 function overens(k: Kontering[]): boolean {
   const [a] = k;
   return k.length >= 2 && k.every((x) => x.omdome === 'gron' && x.konto && x.konto === a.konto
-    && sammaMoms({ momssats: Number(x.momssats), momsdelar: x.momsdelar }, { momssats: Number(a.momssats), momsdelar: a.momsdelar }));
+    && sammaMoms({ momssats: Number(x.momssats), momsdelar: x.momsdelar, omvand: x.omvand }, { momssats: Number(a.momssats), momsdelar: a.momsdelar, omvand: a.omvand }));
 }
 
 const MODELLNAMN: Record<string, string> = { 'gpt-6.1-sol': 'GPT-6.1 Sol', 'gpt-6-astra': 'GPT-6 Astra', 'claude-opus-5-5': 'Claude Opus 5.5' };
 
 function forslagText(k: Kontering, analys: string): string {
   return [
-    `Konto: ${k.konto ?? '—'} ${k.konto ? slaUppKonto(k.konto)?.namn ?? '' : ''}, moms ${momsText(k.momssats ?? 0, k.momsdelar)}`,
+    `Konto: ${k.konto ?? '—'} ${k.konto ? slaUppKonto(k.konto)?.namn ?? '' : ''}, moms ${momsText(k.momssats ?? 0, k.momsdelar, k.omvand)}`,
     `Analys: ${analys}`,
     `Motivering: ${k.motivering}`,
     k.flaggor.length ? `Flaggor: ${k.flaggor.map((x) => x.text).join(' · ')}` : '',
@@ -615,9 +693,9 @@ async function jamka(t: Transaktion, betalsatt: Betalsatt, f: Underlagsfraga, fo
     });
     const fore = egen.kontering;
     const andradeSig = ny.konto !== fore.konto
-      || !sammaMoms({ momssats: Number(ny.momssats), momsdelar: ny.momsdelar }, { momssats: Number(fore.momssats), momsdelar: fore.momsdelar });
+      || !sammaMoms(ny, fore);
     ny.granskning!.jamkning = {
-      fore: { konto: fore.konto, momssats: fore.momssats, momsdelar: fore.momsdelar, omdome: fore.omdome, motivering: fore.motivering },
+      fore: { konto: fore.konto, momssats: fore.momssats, momsdelar: fore.momsdelar, omvand: fore.omvand, omdome: fore.omdome, motivering: fore.motivering },
       andradeSig,
       motivering: ny.motivering,
     };
@@ -796,6 +874,7 @@ async function konteraEn(
       konto: k.konto,
       momssats: k.momssats,
       momsdelar: k.momsdelar,
+      omvand: k.omvand,
       motivering: k.motivering,
       regler: k.regler,
       granskning: k.granskning ? { ...k.granskning, svarade: k.svarade } : { svarade: k.svarade },
@@ -836,6 +915,8 @@ export async function valjKonto(
   motkonto?: string,
   /** Från ett förslag med flera momssatser. */
   momsdelar?: Momsdel[] | null,
+  /** Från ett förslag med omvänd skattskyldighet. */
+  omvand?: Omvand | null,
 ) {
   const { data: t, error } = await supabase
     .from('transaktioner').select(TRANSAKTION_KOLUMNER).eq('id', transaktionId).eq('user_id', userId).maybeSingle();
@@ -855,7 +936,7 @@ export async function valjKonto(
   }
   if (!motkonto && !betalkonto(betalsatt, (t as Transaktion).riktning)) throw new Error('Kunden betalar från båda hållen — välj betalkonto');
   const nu = new Date().toISOString();
-  const vald: ValdKontering = { konto, momssats, momsdelar: rensaMomsdelar(momsdelar), motkonto: motkonto ?? null, at: nu };
+  const vald: ValdKontering = { konto, momssats, momsdelar: rensaMomsdelar(momsdelar), omvand: omvand ?? null, motkonto: motkonto ?? null, at: nu };
   const { error: uFel } = await supabase.from('transaktioner').update({ vald_kontering: vald, preliminar_at: nu }).eq('id', transaktionId);
   if (uFel) throw new Error(`Kunde inte spara valet: ${uFel.message}`);
 }
@@ -865,6 +946,8 @@ export interface ValdKontering {
   konto: string;
   momssats: number;
   momsdelar: Momsdel[] | null;
+  /** Omvänd skattskyldighet. Saknas i val gjorda innan den bokfördes av systemet. */
+  omvand?: Omvand | null;
   /** Betalkontot, bara när kunden betalar från båda hållen. */
   motkonto: string | null;
   at: string;
@@ -990,6 +1073,7 @@ export function verifikationsrader(
   betalsatt: Betalsatt,
   motkontoOverride?: string,
   momsdelar?: Momsdel[] | null,
+  omvand?: Omvand | null,
 ): { konto: string; belopp: number }[] {
   // Verifikationen är alltid i kronor — ett belopp i euro bokfört som kronor är värre än inget
   t = iKronor(t);
@@ -1002,8 +1086,9 @@ export function verifikationsrader(
     if (d.konto && !slaUppKonto(d.konto)) throw new Error(`${d.konto} finns inte bland K1-kontona`);
   }
   const delar: Momsdel[] = uppdelad ?? [{ konto, momssats, belopp: Number(t.belopp), moms: null }];
-  const { delar: bokdelar } = raknaMoms(t, delar, momssats || uppdelad ? 'svensk' : 'ingen', konto);
-  return byggRader(t, bokdelar, motkonto);
+  const momshantering: Momshantering = omvand ? 'omvand' : momssats || uppdelad ? 'svensk' : 'ingen';
+  const { delar: bokdelar } = raknaMoms(t, delar, momshantering, konto, omvand ?? null);
+  return byggRader(t, bokdelar, motkonto, omvand ?? null);
 }
 
 /**
@@ -1020,11 +1105,12 @@ export async function bokfor(
   signatur: string,
   motkontoOverride?: string,
   momsdelar?: Momsdel[] | null,
+  omvand?: Omvand | null,
 ) {
   if (!t.datum) throw new Error('Transaktionen saknar datum');
   // Har beloppet ändrats sedan konteringen räknas kronorna om här
   t = await raknaOmTillKronor(supabase, t);
-  const rader = verifikationsrader(t, konto, momssats, betalsatt, motkontoOverride, momsdelar);
+  const rader = verifikationsrader(t, konto, momssats, betalsatt, motkontoOverride, momsdelar, omvand);
 
   const id = crypto.randomUUID();
   const { error } = await supabase.from('verifikationer').insert({
@@ -1048,7 +1134,7 @@ export async function bokfor(
     verifikation_id: id,
     radnr,
     konto: r.konto,
-    kontonamn: slaUppKonto(r.konto)?.namn ?? null,
+    kontonamn: slaUppKonto(r.konto)?.namn ?? OMVAND_KONTONAMN[r.konto] ?? null,
     belopp: r.belopp,
     datum: t.datum,
     text: null,

@@ -154,6 +154,8 @@ export function ignoreradeKonton(rader: { konto: string; kontonamn?: string; bel
   for (const r of rader) {
     if (rutaForKonto(r.konto)) continue;
     const k = Number(r.konto);
+    // Motkontot till spegelkontona för omvänd skattskyldighet (4515, 4531 …)
+    if (k === 4598) continue;
     const relevant = !/^\d{4}$/.test(r.konto)
       || (k >= 2600 && k <= 2699 && k !== 2650)
       || (k >= 3000 && k <= 3999)

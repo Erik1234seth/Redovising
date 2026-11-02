@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { AdminKontering, AdminKonteringRad, Betalsatt } from '@/lib/admin-types';
-import { momsText, type Momsdel } from '@/lib/kontering/momsdelar';
+import { momsText, type Momsdel, type Omvand } from '@/lib/kontering/momsdelar';
 import { kr } from './_verifikationer';
 
 /**
@@ -432,7 +432,7 @@ function KonteringsStatus({ rad: r, status: s, kor, fel }: { rad: AdminKontering
       <span className="text-xs" title="Preliminär — går att ändra tills den blir verifikation">
         <span className="px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-700 font-semibold mr-2">Preliminär</span>
         <span className="text-slate-700 tabular-nums">{k?.konto}</span>
-        <span className="text-slate-400"> {momsText(k?.momssats ?? 0, k?.momsdelar)}</span>
+        <span className="text-slate-400"> {momsText(k?.momssats ?? 0, k?.momsdelar, k?.omvand)}</span>
         {r.vald && <span className="text-slate-500"> · vald för hand</span>}
         <span className="text-slate-400"> · verifikation {dag(r.verifikationFran!)}</span>
       </span>
@@ -447,7 +447,7 @@ function KonteringsStatus({ rad: r, status: s, kor, fel }: { rad: AdminKontering
             <span className="text-slate-400 w-12">{k.modell.startsWith('gpt') ? 'GPT' : 'Claude'}</span>
             <span className="text-slate-800 tabular-nums">{k.konto ?? '—'}</span>
             <span className="text-slate-500 truncate max-w-[14rem]">{k.kontonamn}</span>
-            {k.momssats || k.momsdelar ? <span className="text-slate-400">{momsText(k.momssats, k.momsdelar)}</span> : null}
+            {k.momssats || k.momsdelar ? <span className="text-slate-400">{momsText(k.momssats, k.momsdelar, k.omvand)}</span> : null}
           </span>
         ))}
       </span>
@@ -514,13 +514,14 @@ function Detalj({
     </button>
   );
 
-  const bokfor = (k: string, m: number | string, momsdelar?: Momsdel[] | null) =>
+  const bokfor = (k: string, m: number | string, momsdelar?: Momsdel[] | null, omvand?: Omvand | null) =>
     anropa('PUT', {
       userId,
       transaktionId: r.id,
       konto: k,
       momssats: Number(m) || 0,
       momsdelar: momsdelar ?? undefined,
+      omvand: omvand ?? undefined,
       motkonto: betalsatt === 'bada' ? motkonto : undefined,
     });
 
@@ -592,7 +593,7 @@ function Detalj({
       {r.verifikationFran && (
         <p className="text-xs text-sky-800 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
           {r.vald
-            ? `Du har valt ${r.vald.konto} (${momsText(r.vald.momssats, r.vald.momsdelar)}${r.vald.motkonto ? `, betalt via ${r.vald.motkonto}` : ''}).`
+            ? `Du har valt ${r.vald.konto} (${momsText(r.vald.momssats, r.vald.momsdelar, r.vald.omvand)}${r.vald.motkonto ? `, betalt via ${r.vald.motkonto}` : ''}).`
             : 'Båda modellerna är gröna och överens.'}
           {' '}Preliminärt — blir verifikation {dag(r.verifikationFran)} om inget ändras. Väljer du ett annat konto börjar de 14 dagarna om.
         </p>
@@ -603,7 +604,7 @@ function Detalj({
             <Forslag
               key={k.modell}
               k={k}
-              onBokfor={k.konto && k.omdome !== 'rod' ? () => bokfor(k.konto!, k.momssats ?? 0, k.momsdelar) : undefined}
+              onBokfor={k.konto && k.omdome !== 'rod' ? () => bokfor(k.konto!, k.momssats ?? 0, k.momsdelar, k.omvand) : undefined}
               arbetar={arbetar}
             />
           ))}
@@ -817,7 +818,7 @@ function Forslag({ k, onBokfor, arbetar }: { k: AdminKontering; onBokfor?: () =>
       </div>
       <p className="text-slate-900 text-sm">
         <span className="tabular-nums font-semibold">{k.konto ?? '—'}</span> {k.kontonamn}
-        <span className="text-slate-500"> · moms {momsText(k.momssats, k.momsdelar)}</span>
+        <span className="text-slate-500"> · moms {momsText(k.momssats, k.momsdelar, k.omvand)}</span>
         {byttFran && <span className="text-slate-400 text-xs"> (bytt från {byttFran} i granskningen)</span>}
       </p>
       <p className="text-slate-600 text-xs leading-relaxed">{k.motivering}</p>

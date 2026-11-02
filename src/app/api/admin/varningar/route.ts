@@ -172,7 +172,7 @@ export async function GET() {
     for (let i = 0; i < ids.length; i += 200) {
       const del = ids.slice(i, i + 200);
       const [k, v] = await Promise.all([
-        supabase.from('konteringar').select('transaktion_id, konto, momssats, momsdelar, omdome').in('transaktion_id', del),
+        supabase.from('konteringar').select('transaktion_id, konto, momssats, momsdelar, omvand, omdome').in('transaktion_id', del),
         supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', del),
       ]);
       const bokforda = new Set((v.data ?? []).map((x) => x.transaktion_id));

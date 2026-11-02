@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { AdminKontering, AdminKonteringRad } from '@/lib/admin-types';
 import { andraTransaktion, konteraMedInstruktion, konteraTransaktioner, valjKonto, type Andringar, type ValdKontering } from '@/lib/kontering/kontera';
 import { slaUppKonto } from '@/lib/kontering/regelverk';
-import { rensaMomsdelar } from '@/lib/kontering/momsdelar';
+import { rensaMomsdelar, tolkaOmvand } from '@/lib/kontering/momsdelar';
 import { slutligKontering, verifikationFran } from '@/lib/kontering/preliminar';
 
 /**
@@ -72,7 +72,7 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string[]):
     const del = ids.slice(i, i + CHUNK);
     const [k, v] = await Promise.all([
       supabase.from('konteringar')
-        .select('transaktion_id, modell, konto, momssats, momsdelar, motivering, granskning, flaggor, omdome')
+        .select('transaktion_id, modell, konto, momssats, momsdelar, omvand, motivering, granskning, flaggor, omdome')
         .in('transaktion_id', del),
       supabase.from('verifikationer')
         .select('id, transaktion_id, signatur, verifikation_rader(konto, kontonamn, belopp, radnr)')
@@ -89,6 +89,7 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string[]):
         kontonamn: r.konto ? slaUppKonto(r.konto)?.namn ?? null : null,
         momssats: r.momssats === null ? null : Number(r.momssats),
         momsdelar: rensaMomsdelar(r.momsdelar),
+        omvand: tolkaOmvand(r.omvand),
         motivering: r.motivering ?? '',
         granskning: r.granskning,
         flaggor: r.flaggor ?? [],
@@ -112,7 +113,7 @@ async function rader(supabase: SupabaseClient, userId: string, bara?: string[]):
     const forslag = konteringar.get(t.id as string) ?? [];
     const klar = !!slutligKontering(vald, forslag);
     return {
-      vald: vald ? { konto: vald.konto, momssats: Number(vald.momssats) || 0, momsdelar: rensaMomsdelar(vald.momsdelar), motkonto: vald.motkonto } : null,
+      vald: vald ? { konto: vald.konto, momssats: Number(vald.momssats) || 0, momsdelar: rensaMomsdelar(vald.momsdelar), omvand: tolkaOmvand(vald.omvand), motkonto: vald.motkonto } : null,
       verifikationFran: klar && !verifikationer.has(t.id as string) ? verifikationFran(t.preliminar_at as string | null) : null,
       id: t.id as string,
       datum: (t.datum as string) ?? '',
@@ -161,13 +162,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const { userId, transaktionId, konto, momssats, motkonto, momsdelar } = await request.json().catch(() => ({}));
+  const { userId, transaktionId, konto, momssats, motkonto, momsdelar, omvand } = await request.json().catch(() => ({}));
   if (!userId || !transaktionId || !konto) {
     return NextResponse.json({ error: 'userId, transaktionId och konto behövs' }, { status: 400 });
   }
   try {
     const supabase = getSupabase();
-    await valjKonto(supabase, userId, transaktionId, String(konto).trim(), Number(momssats) || 0, motkonto || undefined, rensaMomsdelar(momsdelar));
+    await valjKonto(supabase, userId, transaktionId, String(konto).trim(), Number(momssats) || 0, motkonto || undefined, rensaMomsdelar(momsdelar), tolkaOmvand(omvand));
     const [rad] = await rader(supabase, userId, [transaktionId]);
     return NextResponse.json({ rad: rad ?? null });
   } catch (err) {

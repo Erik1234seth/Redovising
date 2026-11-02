@@ -13,7 +13,7 @@ import { konteraTransaktioner, valjKonto, type ValdKontering } from '@/lib/konte
 import { byggKundbild } from '@/lib/kontering/kundbild';
 import { helhetskontroll } from '@/lib/kontering/helhet';
 import { ersattVerifikationer } from '@/lib/kontering/ersatt';
-import { rensaMomsdelar } from '@/lib/kontering/momsdelar';
+import { rensaMomsdelar, tolkaOmvand } from '@/lib/kontering/momsdelar';
 import { bokforForfallna, slutligKontering, verifikationFran } from '@/lib/kontering/preliminar';
 import { slaUppKonto } from '@/lib/kontering/regelverk';
 import { hamtaInstruktioner, reglerFor } from '@/lib/transaktioner/instruktioner';
@@ -198,13 +198,13 @@ async function skapaVerifikationer(underlagId: string, val: unknown): Promise<nu
   if (!u?.user_id) throw new Error('Underlaget hör inte till ett kundkonto — det går inte att bokföra');
 
   if (val && typeof val === 'object') {
-    const v = val as { transaktionId?: unknown; konto?: unknown; momssats?: unknown; momsdelar?: unknown };
+    const v = val as { transaktionId?: unknown; konto?: unknown; momssats?: unknown; momsdelar?: unknown; omvand?: unknown };
     if (typeof v.transaktionId !== 'string' || typeof v.konto !== 'string') throw new Error('Välj transaktion och konto');
     const { data: t } = await supabase.from('transaktioner').select('underlag_id, dublett_av').eq('id', v.transaktionId).maybeSingle();
     if (t?.underlag_id !== underlagId) throw new Error('Transaktionen hör inte till underlaget');
     if (t.dublett_av) throw new Error('Transaktionen är markerad som dublett och bokförs inte');
     // Valet är preliminärt och blir verifikation om 14 dagar, som allt annat
-    await valjKonto(supabase, u.user_id, v.transaktionId, v.konto.trim(), Number(v.momssats ?? 0), undefined, rensaMomsdelar(v.momsdelar));
+    await valjKonto(supabase, u.user_id, v.transaktionId, v.konto.trim(), Number(v.momssats ?? 0), undefined, rensaMomsdelar(v.momsdelar), tolkaOmvand(v.omvand));
     return 0;
   }
 
@@ -269,7 +269,7 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
 
   const transIds = (trans.data ?? []).map((t) => t.id);
   const { data: konteringar, error: kFel } = transIds.length
-    ? await supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, momsdelar, omdome, motivering, regler, granskning, flaggor').in('transaktion_id', transIds)
+    ? await supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, momsdelar, omvand, omdome, motivering, regler, granskning, flaggor').in('transaktion_id', transIds)
     : { data: [], error: null };
   if (kFel) throw new Error(kFel.message);
 
@@ -346,7 +346,7 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
       const slutlig = slutligKontering(vald, k);
       const gron = !!slutlig;
       return {
-        vald: vald ? { konto: vald.konto, momssats: Number(vald.momssats) || 0, momsdelar: rensaMomsdelar(vald.momsdelar) } : null,
+        vald: vald ? { konto: vald.konto, momssats: Number(vald.momssats) || 0, momsdelar: rensaMomsdelar(vald.momsdelar), omvand: tolkaOmvand(vald.omvand) } : null,
         verifikationFran: slutlig && !bokforda.has(t.id) ? verifikationFran(t.preliminar_at) : null,
         id: t.id,
         datum: t.datum,
@@ -366,7 +366,7 @@ async function ettUnderlag(id: string): Promise<FlodesUnderlag> {
         tillrackligt: t.tillrackligt ?? null,
         kontering: gron ? 'gron' : k.length === 0 ? 'ingen' : 'granska',
         bokford: bokforda.has(t.id),
-        forslag: k.map((x) => ({ modell: x.modell, konto: x.konto, kontonamn: x.konto ? slaUppKonto(x.konto)?.namn ?? null : null, momssats: Number(x.momssats ?? 0), momsdelar: rensaMomsdelar(x.momsdelar), omdome: x.omdome, motivering: x.motivering ?? '', granskning: x.granskning ?? null, flaggor: x.flaggor ?? [], regler: (Array.isArray(x.regler) ? x.regler as string[] : []).map((r) => regelnamn.get(r) ?? 'Borttagen regel') })),
+        forslag: k.map((x) => ({ modell: x.modell, konto: x.konto, kontonamn: x.konto ? slaUppKonto(x.konto)?.namn ?? null : null, momssats: Number(x.momssats ?? 0), momsdelar: rensaMomsdelar(x.momsdelar), omvand: tolkaOmvand(x.omvand), omdome: x.omdome, motivering: x.motivering ?? '', granskning: x.granskning ?? null, flaggor: x.flaggor ?? [], regler: (Array.isArray(x.regler) ? x.regler as string[] : []).map((r) => regelnamn.get(r) ?? 'Borttagen regel') })),
         verifikation: (() => {
           const v = (verif.data ?? []).find((x) => x.transaktion_id === t.id);
           if (!v) return null;

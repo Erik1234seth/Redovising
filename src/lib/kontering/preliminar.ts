@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { tolkaBetalsatt, type Betalsatt } from './betalsatt';
 import { TRANSAKTION_KOLUMNER, bokfor, type ValdKontering } from './kontera';
-import { rensaMomsdelar, sammaMoms, type Momsdel } from './momsdelar';
+import { rensaMomsdelar, sammaMoms, tolkaOmvand, type Momsdel, type Omvand } from './momsdelar';
 
 /**
  * Konteringen är preliminär i 14 dagar. Under tiden går den att ändra hur
@@ -31,6 +31,8 @@ interface KonteringRad {
   konto: string | null;
   momssats: number | string | null;
   momsdelar: unknown;
+  /** Saknas där den inte valts ur databasen — då jämförs konteringarna utan den. */
+  omvand?: string | null;
   omdome: string;
 }
 
@@ -38,6 +40,7 @@ export interface SlutligKontering {
   konto: string;
   momssats: number;
   momsdelar: Momsdel[] | null;
+  omvand: Omvand | null;
   motkonto: string | null;
   signatur: 'Erik' | 'AI';
 }
@@ -45,13 +48,17 @@ export interface SlutligKontering {
 /** Det som blir verifikation, eller null när transaktionen väntar på granskning. */
 export function slutligKontering(vald: ValdKontering | null, konteringar: KonteringRad[]): SlutligKontering | null {
   if (vald?.konto) {
-    return { konto: vald.konto, momssats: Number(vald.momssats) || 0, momsdelar: rensaMomsdelar(vald.momsdelar), motkonto: vald.motkonto, signatur: 'Erik' };
+    return {
+      konto: vald.konto, momssats: Number(vald.momssats) || 0, momsdelar: rensaMomsdelar(vald.momsdelar),
+      omvand: tolkaOmvand(vald.omvand), motkonto: vald.motkonto, signatur: 'Erik',
+    };
   }
+  const moms = (k: KonteringRad) => ({ momssats: Number(k.momssats), momsdelar: rensaMomsdelar(k.momsdelar), omvand: tolkaOmvand(k.omvand) });
   const [a] = konteringar;
   const gron = konteringar.length >= 2 && konteringar.every((k) => k.omdome === 'gron' && k.konto && k.konto === a.konto
-    && sammaMoms({ momssats: Number(k.momssats), momsdelar: rensaMomsdelar(k.momsdelar) }, { momssats: Number(a.momssats), momsdelar: rensaMomsdelar(a.momsdelar) }));
+    && sammaMoms(moms(k), moms(a)));
   if (!gron) return null;
-  return { konto: a.konto!, momssats: Number(a.momssats) || 0, momsdelar: rensaMomsdelar(a.momsdelar), motkonto: null, signatur: 'AI' };
+  return { konto: a.konto!, ...moms(a), momssats: Number(a.momssats) || 0, motkonto: null, signatur: 'AI' };
 }
 
 type Rad = Parameters<typeof bokfor>[1] & { vald_kontering: ValdKontering | null; preliminar_at: string | null };
@@ -86,7 +93,7 @@ export async function bokforForfallna(
     const del = rader.slice(i, i + 200);
     const ids = del.map((t) => t.id);
     const [k, v] = await Promise.all([
-      supabase.from('konteringar').select('transaktion_id, konto, momssats, momsdelar, omdome').in('transaktion_id', ids),
+      supabase.from('konteringar').select('transaktion_id, konto, momssats, momsdelar, omvand, omdome').in('transaktion_id', ids),
       supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', ids),
     ]);
     if (k.error ?? v.error) throw new Error((k.error ?? v.error)!.message);
@@ -104,7 +111,7 @@ export async function bokforForfallna(
       const namn = [t.motpart, t.beskrivning].filter(Boolean).join(', ') || t.id;
       if (!bs) { res.fel.push(`${namn}: kunden saknar betalsätt (Kundkontext)`); continue; }
       try {
-        await bokfor(supabase, t, slutlig.konto, slutlig.momssats, bs, slutlig.signatur, slutlig.motkonto ?? undefined, slutlig.momsdelar);
+        await bokfor(supabase, t, slutlig.konto, slutlig.momssats, bs, slutlig.signatur, slutlig.motkonto ?? undefined, slutlig.momsdelar, slutlig.omvand);
         res.bokforda++;
       } catch (err) {
         res.fel.push(`${namn}: ${err instanceof Error ? err.message : String(err)}`);

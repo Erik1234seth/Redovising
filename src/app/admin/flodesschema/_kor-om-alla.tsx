@@ -61,7 +61,7 @@ const kr = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFra
 function lageFor(t: Trans): string {
   if (t.dublettAv || t.dublettkoll?.status === 'dublett') return 'Dubblett';
   if (t.tillrackligt?.status === 'saknar') return 'Saknar uppgifter';
-  const moms = (f: { momssats: number; momsdelar: Forslag['momsdelar'] }) => momsText(f.momssats, f.momsdelar);
+  const moms = (f: { momssats: number; momsdelar: Forslag['momsdelar']; omvand?: Forslag['omvand'] }) => momsText(f.momssats, f.momsdelar, f.omvand);
   if (t.bokford && t.verifikation) {
     const konton = t.verifikation.rader.map((r) => r.konto).filter((k) => !['1930', '2013', '2017', '2641', '2611', '2621', '2631'].includes(k));
     return `${[...new Set(konton)].join(' + ') || '—'} (bokförd)`;
@@ -81,7 +81,7 @@ export function Resonemang({ g }: { g: Forslag['granskning'] }) {
         <p className="text-xs leading-relaxed text-slate-500">
           <span className="text-slate-600">Jämkning:</span>{' '}
           {j.andradeSig
-            ? <>ändrade sig från <span className="tabular-nums">{j.fore.konto ?? '—'}</span> (moms {momsText(j.fore.momssats ?? 0, j.fore.momsdelar)}) efter att ha sett den andra modellens förslag.</>
+            ? <>ändrade sig från <span className="tabular-nums">{j.fore.konto ?? '—'}</span> (moms {momsText(j.fore.momssats ?? 0, j.fore.momsdelar, j.fore.omvand)}) efter att ha sett den andra modellens förslag.</>
             : 'stod fast vid sitt förslag efter att ha sett den andra modellens.'}
         </p>
       )}
@@ -116,7 +116,7 @@ export function ForslagKort({ f }: { f: Forslag }) {
       </div>
       <p className="text-slate-900 text-sm">
         <span className="tabular-nums font-semibold">{f.konto ?? '—'}</span> {f.kontonamn}
-        <span className="text-slate-500"> · moms {momsText(f.momssats, f.momsdelar)}</span>
+        <span className="text-slate-500"> · moms {momsText(f.momssats, f.momsdelar, f.omvand)}</span>
         {byttFran && <span className="text-slate-400 text-xs"> (bytt från {byttFran} i {g?.jamkning ? 'jämkningen' : 'granskningen'})</span>}
       </p>
       {g?.sakerhet && g.sakerhet !== 'hog' && <p className="text-xs text-slate-500">Säkerhet: {g.sakerhet === 'lag' ? 'låg' : 'medel'}</p>}

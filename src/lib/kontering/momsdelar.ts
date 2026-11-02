@@ -19,6 +19,27 @@ export interface Momsdel {
 
 const SATSER = [0, 6, 12, 25];
 
+/**
+ * Omvänd skattskyldighet: köparen räknar själv ut momsen och redovisar den.
+ * Vilken sort avgör rutorna i momsdeklarationen. Momssatsen i konteringen är
+ * då den svenska sats som hade gällt — ingen moms ingår i beloppet. Import
+ * av varor bokförs för hand, eftersom momsen räknas på tullvärdet.
+ */
+export type Omvand = 'eu-tjanst' | 'eu-vara' | 'utanfor-eu-tjanst' | 'sverige-tjanst' | 'sverige-vara' | 'import';
+
+export const OMVAND_NAMN: Record<Omvand, string> = {
+  'eu-tjanst': 'tjänst från annat EU-land',
+  'eu-vara': 'vara från annat EU-land',
+  'utanfor-eu-tjanst': 'tjänst från land utanför EU',
+  'sverige-tjanst': 'tjänst i Sverige, omvänd skattskyldighet',
+  'sverige-vara': 'vara i Sverige, omvänd skattskyldighet',
+  import: 'import av varor',
+};
+
+export function tolkaOmvand(v: unknown): Omvand | null {
+  return typeof v === 'string' && v in OMVAND_NAMN ? v as Omvand : null;
+}
+
 /** Delarna slagna ihop per konto och sats, största beloppet först. Okända satser och tomma delar tas bort. */
 export function slaIhopDelar(delar: unknown): Momsdel[] {
   if (!Array.isArray(delar)) return [];
@@ -53,18 +74,26 @@ function flerKonton(delar: Momsdel[]): boolean {
   return new Set(delar.map((d) => d.konto ?? '')).size > 1;
 }
 
-/** "6 %", "25 % + 6 %" eller, när delarna har olika konton, "4000 6 % + 5400 25 %". */
-export function momsText(momssats: number | null, delar: Momsdel[] | null | undefined): string {
-  if (!delar?.length) return `${momssats ?? 0} %`;
-  const konton = flerKonton(delar);
-  return delar.map((d) => `${konton && d.konto ? `${d.konto} ` : ''}${d.momssats} %`).join(' + ');
+/**
+ * "6 %", "25 % + 6 %" eller, när delarna har olika konton, "4000 6 % + 5400 25 %".
+ * Vid omvänd skattskyldighet "omvänd 25 % (tjänst från annat EU-land)".
+ */
+export function momsText(momssats: number | null, delar: Momsdel[] | null | undefined, omvand?: Omvand | null): string {
+  const satser = !delar?.length
+    ? `${momssats ?? 0} %`
+    : delar.map((d) => `${flerKonton(delar) && d.konto ? `${d.konto} ` : ''}${d.momssats} %`).join(' + ');
+  return omvand ? `omvänd ${satser} (${OMVAND_NAMN[omvand]})` : satser;
 }
 
-/** Samma uppdelning i två konteringar: samma konton och satser och, vid uppdelning, samma belopp per del. */
+/**
+ * Samma uppdelning i två konteringar: samma konton och satser och, vid
+ * uppdelning, samma belopp per del — och samma sorts omvänd skattskyldighet.
+ */
 export function sammaMoms(
-  a: { momssats: number | null; momsdelar?: Momsdel[] | null },
-  b: { momssats: number | null; momsdelar?: Momsdel[] | null },
+  a: { momssats: number | null; momsdelar?: Momsdel[] | null; omvand?: Omvand | null },
+  b: { momssats: number | null; momsdelar?: Momsdel[] | null; omvand?: Omvand | null },
 ): boolean {
+  if ((a.omvand ?? null) !== (b.omvand ?? null)) return false;
   const nyckel = (k: typeof a) => k.momsdelar?.length
     ? k.momsdelar.map((d) => `${d.konto ?? ''}:${d.momssats}:${Math.round(d.belopp)}`).sort().join('|')
     : String(Number(k.momssats ?? 0));

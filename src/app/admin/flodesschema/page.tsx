@@ -3,11 +3,11 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { FlodesInstruktion, FlodesKund, FlodesUnderlag } from '@/lib/admin-types';
-import { momsText, sammaMoms, type Momsdel } from '@/lib/kontering/momsdelar';
+import { momsText, sammaMoms, type Momsdel, type Omvand } from '@/lib/kontering/momsdelar';
 import { ANMARKNING, KorOmAlla, Resonemang, atgardFor } from './_kor-om-alla';
 
 /** Kontot en granskad transaktion bokförs på. momsdelar när förslaget har flera momssatser. */
-type Bokval = { transaktionId: string; konto: string; momssats: number; momsdelar?: Momsdel[] | null };
+type Bokval = { transaktionId: string; konto: string; momssats: number; momsdelar?: Momsdel[] | null; omvand?: Omvand | null };
 
 /**
  * Flödesschemat: hela processen från att kunden skickar underlag till
@@ -1599,7 +1599,7 @@ function Sparpanel({ u, spar, steg, onVal, onKor, kor, korText, valdFil }: {
                     </span>
                   )}
                 </button>
-                {oppenTrans === t.id && <TransaktionDetaljer t={t} format={belopp.format} onBokfor={(konto, momssats, momsdelar) => onKor('skapa-verif', { transaktionId: t.id, konto, momssats, momsdelar })} bokfor={kor === 'skapa-verif'} />}
+                {oppenTrans === t.id && <TransaktionDetaljer t={t} format={belopp.format} onBokfor={(konto, momssats, momsdelar, omvand) => onKor('skapa-verif', { transaktionId: t.id, konto, momssats, momsdelar, omvand })} bokfor={kor === 'skapa-verif'} />}
               </li>
             ))}
           </ul>
@@ -1612,7 +1612,7 @@ function Sparpanel({ u, spar, steg, onVal, onKor, kor, korText, valdFil }: {
 /** Allt som plockats ut om en transaktion, under raden i spårpanelen. */
 function TransaktionDetaljer({ t, format, onBokfor, bokfor }: {
   t: FlodesUnderlag['transaktioner'][number]; format: (n: number) => string;
-  onBokfor: (konto: string, momssats: number, momsdelar?: Momsdel[] | null) => void; bokfor: boolean;
+  onBokfor: (konto: string, momssats: number, momsdelar?: Momsdel[] | null, omvand?: Omvand | null) => void; bokfor: boolean;
 }) {
   const visa = (v: unknown): string => {
     if (typeof v === 'number') return format(v);
@@ -1802,7 +1802,7 @@ function GranskaPopup({ u, kor, korText, onBokfor, onKommentar, onStang }: {
                     </div>
                     <p className="text-slate-900 text-sm">
                       <span className="tabular-nums font-semibold">{f.konto ?? '—'}</span> {f.kontonamn}
-                      <span className="text-slate-500"> · moms {momsText(f.momssats, f.momsdelar)}</span>
+                      <span className="text-slate-500"> · moms {momsText(f.momssats, f.momsdelar, f.omvand)}</span>
                       {byttFran && <span className="text-slate-400 text-xs"> (bytt från {byttFran} i {g?.jamkning ? 'jämkningen' : 'granskningen'})</span>}
                     </p>
                     {g?.sakerhet && g.sakerhet !== 'hog' && <p className="text-xs text-slate-500">Säkerhet: {g.sakerhet === 'lag' ? 'låg' : 'medel'}</p>}
@@ -1818,8 +1818,8 @@ function GranskaPopup({ u, kor, korText, onBokfor, onKommentar, onStang }: {
                       </ul>
                     )}
                     {!overens && f.konto && (
-                      <button onClick={() => onBokfor({ transaktionId: t.id, konto: f.konto!, momssats: f.momssats, momsdelar: f.momsdelar })} disabled={upptagen} className={knapp}>
-                        Välj {f.konto} ({momsText(f.momssats, f.momsdelar)})
+                      <button onClick={() => onBokfor({ transaktionId: t.id, konto: f.konto!, momssats: f.momssats, momsdelar: f.momsdelar, omvand: f.omvand })} disabled={upptagen} className={knapp}>
+                        Välj {f.konto} ({momsText(f.momssats, f.momsdelar, f.omvand)})
                       </button>
                     )}
                   </div>
@@ -1829,8 +1829,8 @@ function GranskaPopup({ u, kor, korText, onBokfor, onKommentar, onStang }: {
 
             {overens && (
               <div className="flex items-center gap-3 mb-4">
-                <button onClick={() => onBokfor({ transaktionId: t.id, konto: forslag[0].konto!, momssats: forslag[0].momssats, momsdelar: forslag[0].momsdelar })} disabled={upptagen} className={knapp}>
-                  {kor === 'skapa-verif' ? 'Sparar…' : `Okej — välj ${forslag[0].konto} (${momsText(forslag[0].momssats, forslag[0].momsdelar)})`}
+                <button onClick={() => onBokfor({ transaktionId: t.id, konto: forslag[0].konto!, momssats: forslag[0].momssats, momsdelar: forslag[0].momsdelar, omvand: forslag[0].omvand })} disabled={upptagen} className={knapp}>
+                  {kor === 'skapa-verif' ? 'Sparar…' : `Okej — välj ${forslag[0].konto} (${momsText(forslag[0].momssats, forslag[0].momsdelar, forslag[0].omvand)})`}
                 </button>
                 <span className="text-xs text-slate-500">Båda modellerna valde samma konto.</span>
               </div>
@@ -1878,7 +1878,7 @@ function GranskaPopup({ u, kor, korText, onBokfor, onKommentar, onStang }: {
  * förslagen eller ett eget — och bokför bara den här.
  */
 function Bokforingsval({ t, onBokfor, bokfor }: {
-  t: FlodesUnderlag['transaktioner'][number]; onBokfor: (konto: string, momssats: number, momsdelar?: Momsdel[] | null) => void; bokfor: boolean;
+  t: FlodesUnderlag['transaktioner'][number]; onBokfor: (konto: string, momssats: number, momsdelar?: Momsdel[] | null, omvand?: Omvand | null) => void; bokfor: boolean;
 }) {
   const [konto, setKonto] = useState(t.forslag[0]?.konto ?? '');
   const [sats, setSats] = useState(t.forslag[0]?.momssats ?? 0);
@@ -1892,7 +1892,7 @@ function Bokforingsval({ t, onBokfor, bokfor }: {
         {t.forslag.map((f, i) => (
           <li key={i}>
             <span className="text-slate-500">{f.modell.startsWith('claude') ? 'Claude' : 'GPT'}: </span>
-            <span className="font-mono">{f.konto ?? '—'}</span> {f.kontonamn} · {momsText(f.momssats, f.momsdelar)} <span className={OMDOME[f.omdome] ?? ''}>({f.omdome})</span>
+            <span className="font-mono">{f.konto ?? '—'}</span> {f.kontonamn} · {momsText(f.momssats, f.momsdelar, f.omvand)} <span className={OMDOME[f.omdome] ?? ''}>({f.omdome})</span>
             {f.regler.length > 0 && <span className="block text-violet-700">Kundregel: {f.regler.join(', ')}</span>}
             {f.motivering && <span className="block text-slate-500">{f.motivering}</span>}
           </li>
@@ -1901,12 +1901,12 @@ function Bokforingsval({ t, onBokfor, bokfor }: {
       <div className="flex flex-wrap gap-1 mt-1.5">
         {unika.map((f) => (
           <button
-            key={`${f.konto}-${momsText(f.momssats, f.momsdelar)}`}
-            onClick={() => onBokfor(f.konto!, f.momssats, f.momsdelar)}
+            key={`${f.konto}-${momsText(f.momssats, f.momsdelar, f.omvand)}`}
+            onClick={() => onBokfor(f.konto!, f.momssats, f.momsdelar, f.omvand)}
             disabled={bokfor}
             className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white rounded"
           >
-            Välj {f.konto} ({momsText(f.momssats, f.momsdelar)})
+            Välj {f.konto} ({momsText(f.momssats, f.momsdelar, f.omvand)})
           </button>
         ))}
       </div>
