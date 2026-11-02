@@ -6,6 +6,8 @@ import { profilForAdress } from './profil';
 import { arVarAdress } from '@/lib/underlag/var-fil';
 import { sorteringVidUppladdning } from '@/lib/underlag/sortering';
 import { definieraTyst } from '@/lib/underlag/definiera';
+import { arZip } from '@/lib/underlag/filtyp';
+import { packaUppZip } from '@/lib/underlag/zip';
 
 /**
  * Sparar bilagorna i inkommande mejl som underlag — alla, oavsett filtyp.
@@ -166,8 +168,19 @@ async function insertRow(
       console.error(`[inmail/underlag] SIE-import av ${info.fileName}:`, err instanceof Error ? err.message : err));
   }
 
+  // Ett zip-arkiv packas upp innan svaret går tillbaka: Apps Script anropar
+  // mejlflödet strax efter, och då ska filerna i arkivet redan finnas där
+  const urZip = arZip(info.fileName, info.mimeType)
+    ? await packaUppZip(supabase, {
+      id: saved.id, user_id: userId, sender_email: info.email, source: 'mejl',
+      gmail_message_id: info.messageId, file_path: path, file_name: info.fileName,
+    })
+    : [];
+
   // AI:n definierar underlaget efter att svaret gått iväg — mejlflödet ska inte vänta på den
-  after(() => definieraTyst(supabase, saved.id));
+  after(async () => {
+    for (const id of [saved.id, ...urZip]) await definieraTyst(supabase, id);
+  });
 
   return { status: 'saved' };
 }

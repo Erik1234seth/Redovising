@@ -7,7 +7,7 @@
 
 const BILD_EXT = ['png', 'jpg', 'jpeg'];
 const PDF_EXT = ['pdf'];
-/** Filer sandlådan kan öppna med pandas. Zip och Word säger vi nej till. */
+/** Filer sandlådan kan öppna med pandas. Word säger vi nej till; zip packas upp i förväg. */
 const TABELL_EXT = ['csv', 'tsv', 'txt', 'xls', 'xlsx', 'xlsm'];
 const SIE_EXT = ['se', 'si', 'sie'];
 
@@ -31,6 +31,12 @@ export function arTabellfil(fileName: string, mimeType: string | null): boolean 
   const mime = mimeType ?? '';
   return mime === 'text/csv' || mime === 'text/plain'
     || mime.includes('spreadsheet') || mime.includes('excel');
+}
+
+/** Zip-arkiv packas upp när de kommer in (zip.ts) — själva arkivet läses aldrig ut. */
+export function arZip(fileName: string, mimeType: string | null): boolean {
+  const mime = mimeType ?? '';
+  return extension(fileName) === 'zip' || mime === 'application/zip' || mime === 'application/x-zip-compressed';
 }
 
 /**

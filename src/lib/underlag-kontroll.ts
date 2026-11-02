@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, parseJSON } from '@/lib/inmail/openai-client';
 import { byggMejlkontext } from '@/lib/mejlkontext';
 import { lasUtTransaktioner } from '@/lib/transaktioner/import';
-import { kanLasasAvAi } from '@/lib/underlag/filtyp';
+import { arZip, kanLasasAvAi } from '@/lib/underlag/filtyp';
 import { arVarAdress, varaFilerSomText } from '@/lib/underlag/var-fil';
 import { isSieFile } from '@/lib/sie/parse';
 import { handleGeneralQuestion } from '@/lib/inmail/handlers/general-question';
@@ -67,13 +67,14 @@ const arBokford = (f: FilRad) => !!f.verifikationer_inlagda_at && !f.verifikatio
 
 /**
  * Kundens egna underlag: inte de vi skickat, och inte övriga filer som en
- * NE-bilaga eller ett avtal — dem finns det inget att kontrollera i.
+ * NE-bilaga eller ett avtal — dem finns det inget att kontrollera i. Med
+ * medOvriga kommer de med ändå, för svaret som ska bekräfta att vi fått dem.
  */
-async function kundensFiler(supabase: SupabaseClient, userId: string): Promise<FilRad[]> {
+async function kundensFiler(supabase: SupabaseClient, userId: string, { medOvriga = false } = {}): Promise<FilRad[]> {
   const { data, error } = await supabase.from('bokforing_underlag')
     .select(FIL_KOLUMNER).eq('user_id', userId).order('created_at');
   if (error) throw new Error(`Kunde inte läsa underlagen: ${error.message}`);
-  return ((data ?? []) as FilRad[]).filter((f) => !arVarAdress(f.sender_email) && f.sortering !== 'ovrigt');
+  return ((data ?? []) as FilRad[]).filter((f) => !arVarAdress(f.sender_email) && (medOvriga || f.sortering !== 'ovrigt'));
 }
 
 /** Filer som inte är klara: aldrig kontrollerade, eller kontrollerade med något som saknas. */
@@ -546,8 +547,11 @@ async function lasOmgang(supabase: SupabaseClient, bas: string, profil: Profil, 
 
 /** Filerna flödet gäller: mejlens egna bilagor och de tidigare filer sorteringen pekade ut. */
 async function flodetsFiler(supabase: SupabaseClient, profil: Profil, opts: UnderlagsJobb) {
-  // Avläsningen sorterar: det som visade sig vara övriga filer kontrolleras inte
-  const filer = await kundensFiler(supabase, profil.id);
+  // Avläsningen sorterar: det som visade sig vara övriga filer kontrolleras inte.
+  // Mejlets egna bilagor (nya) har dem ändå med — annars tror svaret att
+  // bilagan saknas och ber kunden skicka den igen.
+  const medOvriga = await kundensFiler(supabase, profil.id, { medOvriga: true });
+  const filer = medOvriga.filter((f) => f.sortering !== 'ovrigt');
   const valda = new Set(opts.filer ?? []);
   const egna = mejlen(opts);
   const iFlodet = filer.filter((f) => egna.has(f.gmail_message_id ?? '') || valda.has(f.id));
@@ -556,7 +560,7 @@ async function flodetsFiler(supabase: SupabaseClient, profil: Profil, opts: Unde
   // dagen efter om den inte gjort det
   const sida = (f: FilRad) => !!f.del_av || !!f.sidor_saknas?.length;
   return {
-    nya: filer.filter((f) => egna.has(f.gmail_message_id ?? '') && !sida(f)),
+    nya: medOvriga.filter((f) => egna.has(f.gmail_message_id ?? '') && !sida(f)),
     alla: iFlodet.filter((f) => !sida(f)),
     sidor: iFlodet.filter(sida),
   };
@@ -629,7 +633,8 @@ async function svara(supabase: SupabaseClient, profil: Profil, opts: UnderlagsJo
     }).join('\n')}\n\nSvara kunden. Saknas något: förklara konkret, transaktion för transaktion, vilka uppgifter vi behöver och be kunden svara på mejlet. Fråga bara om det som står ovan, och aldrig om sådant kunden redan har svarat på. Gick en fil inte att läsa: be om en tydligare bild eller en annan fil. Är allt komplett: tacka kort och bekräfta att vi har det vi behöver. Ställer kunden också en annan fråga i mejlet: svara på den i samma mejl.`
     : 'UNDERLAGSKONTROLL: mejlet handlar om underlag, men vi hittade inga filer att kontrollera — varken bifogade nu eller tidigare inskickade som mejlet gäller. Svara på det kunden skriver, och be om underlaget om det behövs.';
   // Bilagor som sorterades bort är inte borttappade — kunden ska inte bli ombedd att skicka dem igen
-  const ovriga = nya.filter((f) => !alla.some((x) => x.id === f.id)).map((f) => f.file_name);
+  // Ett zip-arkiv är inte en övrig fil för kunden — filerna i det står bland underlagen
+  const ovriga = nya.filter((f) => !alla.some((x) => x.id === f.id) && !arZip(f.file_name, f.mime_type)).map((f) => f.file_name);
   const ovrigtKontext = (ovriga.length
     ? `\n\nÖVRIGA FILER: ${ovriga.join(', ')} är inga underlag för bokföringen (till exempel en NE-bilaga, ett avtal eller ett brev). De är sparade hos oss som övriga filer och behöver inte kontrolleras. Bekräfta kort att vi fått dem.`
     : '')

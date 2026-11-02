@@ -1,6 +1,6 @@
 import { arVarAdress } from './var-fil';
 import { isSieFile } from '@/lib/sie/parse';
-import { kanLasasAvAi } from './filtyp';
+import { arZip, kanLasasAvAi } from './filtyp';
 
 /**
  * Sorteringen av kundens filer: underlag för bokföringen, eller övriga filer
@@ -30,7 +30,9 @@ export function sorteraEfterRegler(fileName: string, mimeType: string | null, se
     return { sortering: 'ovrigt', sortering_orsak: 'Bokslutsfil (NE-bilaga eller lagerlista)' };
   }
   if (isSieFile(fileName)) return { sortering: 'underlag', sortering_orsak: 'SIE-fil' };
-  // Word, zip och liknande läser vi inte av, och då kan de inte heller konteras
+  // Arkivet sparas som original; filerna i det blir egna underlag (zip.ts)
+  if (arZip(fileName, mimeType)) return { sortering: 'ovrigt', sortering_orsak: 'Zip-arkiv — filerna i det sparas som egna underlag' };
+  // Word och liknande läser vi inte av, och då kan de inte heller konteras
   if (!kanLasasAvAi(fileName, mimeType)) return { sortering: 'ovrigt', sortering_orsak: 'Filtyp som inte läses av' };
   return null;
 }

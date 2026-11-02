@@ -5,6 +5,8 @@ import { isSieFile } from '@/lib/sie/parse';
 import { importSieUnderlag } from '@/lib/sie/import';
 import { sorteringVidUppladdning } from '@/lib/underlag/sortering';
 import { definieraTyst } from '@/lib/underlag/definiera';
+import { arZip } from '@/lib/underlag/filtyp';
+import { packaUppZip } from '@/lib/underlag/zip';
 
 // Definieringen av underlaget körs efter svaret och behöver tid för AI-anropet
 export const maxDuration = 300;
@@ -116,8 +118,17 @@ export async function POST(request: NextRequest) {
           inlagda: 0, dubbletter: 0, fel: err instanceof Error ? err.message : 'Okänt fel',
         }))
         : null;
-      after(() => definieraTyst(supabase, data.id));
-      return NextResponse.json({ ok: true, id: data.id, sie });
+      // Ett zip-arkiv packas upp direkt, så att filerna syns när sidan laddas om
+      const urZip = arZip(fileName, body.mimeType?.trim() || null)
+        ? await packaUppZip(supabase, {
+          id: data.id, user_id: userId, sender_email: email, source: 'admin',
+          gmail_message_id: null, file_path: body.path, file_name: fileName,
+        })
+        : [];
+      after(async () => {
+        for (const id of [data.id, ...urZip]) await definieraTyst(supabase, id);
+      });
+      return NextResponse.json({ ok: true, id: data.id, sie, uppackade: urZip.length });
     }
 
     return NextResponse.json({ error: "action måste vara 'prepare' eller 'confirm'" }, { status: 400 });
