@@ -216,11 +216,16 @@ export async function skrivFragemejl(
   const text = svar.replyBody?.trim();
   if (!text) throw new Error('AI:n skrev inget');
 
-  // Gamla utkast som aldrig skickades ersätts av det här
+  // Gamla utkast som aldrig skickades ersätts av det här — också andra svar i
+  // samma tråd, eftersom det här mejlet svarar på kundens mejl i sin helhet
   const gamla = [...new Set([...fragor.map((t) => t.fraga_utkast_id), ...sidor.map((u) => u.sidor_fraga_utkast_id)].filter(Boolean))] as string[];
   if (gamla.length) {
     await supabase.from('mejl_utkast').update({ status: 'discarded', updated_at: new Date().toISOString() })
       .in('id', gamla).eq('status', 'draft');
+  }
+  if (mejl?.gmail_thread_id) {
+    await supabase.from('mejl_utkast').update({ status: 'discarded', updated_at: new Date().toISOString() })
+      .eq('gmail_thread_id', mejl.gmail_thread_id).eq('status', 'draft');
   }
   // 'manuell': ett AI-utkast som svar på mejlet finns ofta redan, och det får bara finnas ett sådant
   const { data: utkast, error } = await supabase.from('mejl_utkast').insert({
