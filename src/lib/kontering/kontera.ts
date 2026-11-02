@@ -222,7 +222,8 @@ Allmänna regler:
 - Välj bara konton ur K1-kontoplanen nedan. Inga andra konton, inte heller BAS-underkonton som 3001 eller 5410. Välj aldrig betalkontot — bank- eller privatsidan bokförs av systemet.
 - Kontot väljs utifrån K1-kontoplanen och kontobeskrivningarna — byråns egen dokumentation. Hur kunden, byrån eller andra kunder bokfört liknande tidigare är en ledtråd om vad affären är, inte om vilket konto som är rätt: tidigare bokföringar kan vara gjorda i ett annat program, med BAS-underkonton, eller vara fel. Det gäller också "byrån valde" i kundens lista.
 - Använd kundens verksamhet för att avgöra vad ett köp är till för. Har kunden i ett mejl förklarat vad ett köp eller en inbetalning avser, väger det tyngre än en gissning — säg det i motiveringen.
-- Står det en instruktion från byrån i anteckningen följer du den. Den väger tyngst av allt. Står det BYRÅNS KONTEXT vid transaktionen följer du den på samma sätt.`;
+- Står det en instruktion från byrån i anteckningen följer du den. Den väger tyngst av allt. Står det BYRÅNS KONTEXT vid transaktionen följer du den på samma sätt.
+- Bokföringen sker i kronor. Är underlaget i en annan valuta har vi redan räknat om transaktionen: beloppet och momsen står i kronor, och inom parentes står originalbeloppet och kursen — kronbeloppet eller kursen på underlaget när de finns, annars Riksbankens dagskurs. Kontera på kronbeloppet och ange delarnas belopp och moms i kronor. Räkna inte om transaktionen själv, och se inte omräkningen som ett problem eller som skäl till granskning. Originalet, avskriften och filens rader (F1, F2 …) står kvar i originalvalutan — tar du belopp ur underlagets rader räknar du om dem med samma kurs. Momsen på ett utländskt underlag är oftast utländsk moms, och den ger aldrig avdrag för svensk ingående moms — bara svensk moms från en svensk säljare gör det.`;
 
 const KANDIDAT_FAST = `${GEMENSAMT}
 
@@ -293,7 +294,7 @@ function transaktionText(t: Transaktion, betalsatt: Betalsatt): string {
     `Riktning: ${t.riktning === 'in' ? 'pengar IN till företaget' : 'pengar UT från företaget'}`,
     // Omräknad har transaktionen redan beloppet i kronor — originalet står inom parentes
     `Belopp: ${t.belopp} ${t.valuta || 'SEK'}${t.kronor && !arUtlandsk(t) ? ` (${omrakningText(t.kronor)})` : ''}`,
-    `Moms enligt underlaget: ${t.moms ? `${t.moms} kr` : 'framgår inte'}`,
+    `Moms enligt underlaget: ${t.moms ? `${t.moms} kr${t.kronor && !arUtlandsk(t) ? ` (omräknad från ${t.kronor.for.valuta} med samma kurs)` : ''}` : 'framgår inte'}`,
     t.motpart ? `Motpart: ${t.motpart}` : '',
     t.vat_nummer ? `Motpartens VAT-nummer: ${t.vat_nummer}` : '',
     `Beskrivning: ${t.beskrivning || '—'}`,
