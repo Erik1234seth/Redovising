@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
-import { sendAndLog, INTERNAL_NOTICE_TO } from '@/lib/email-log';
+import { INTERNAL_NOTICE_TO } from '@/lib/email-log';
+import { sendViaGmail } from '@/lib/emails/send-via-gmail';
 import { createClient } from '@supabase/supabase-js';
 import { questions } from '@/data/kvalificera-questions';
 import { meetingConfirmationEmail, formatMeetingSlot } from '@/lib/emails/meeting-confirmation';
@@ -143,18 +144,12 @@ export async function POST(request: NextRequest) {
 
     // Confirmation to the visitor
     //
-    // Bekräftelsen skjuts upp 20 minuter, samma fördröjning som Facebook-leadsen
-    // får via delay-steget i Zapier. Här finns ingen Zapier emellan, så Resends
-    // egen schemaläggning får göra jobbet — den håller mejlet åt oss, vilket
-    // sparar oss både kö och cron-jobb. Notisen till oss ovan går fortfarande
-    // direkt: fördröjningen gäller besökaren, inte oss.
-    // En bokningsbekräftelse måste komma direkt — fördröjningen gäller bara
-    // det vanliga "vi hör av oss"-mejlet.
-    const CONFIRMATION_DELAY_MINUTES = 20;
-    const scheduledAt = hasMeeting
-      ? undefined
-      : new Date(Date.now() + CONFIRMATION_DELAY_MINUTES * 60_000).toISOString();
-
+    // Går från erik@ via Gmail och inte från noreply@ via Resend, precis som
+    // välkomstmejlet i handleNewLead: svarar besökaren landar svaret i inkorgen
+    // som mail-AI:n bevakar, i stället för hos en adress ingen läser.
+    //
+    // Gmail-vägen kan inte schemalägga, så bekräftelsen går direkt. Den 20
+    // minuters fördröjning som Resends scheduledAt gav tidigare finns inte kvar.
     const firstName = name ? String(name).split(' ')[0] : '';
 
     // Bokade tider får samma mejl som /boka-mote skickar — kunden ska se
@@ -163,12 +158,10 @@ export async function POST(request: NextRequest) {
       ? meetingConfirmationEmail({ name, phone, date: meetingDate, time: meetingTime })
       : null;
 
-    await sendAndLog(resend, {
-      from: 'Enkla Bokslut <noreply@enklabokslut.se>',
-      replyTo: 'erik@enklabokslut.se',
+    await sendViaGmail({
       to: email,
       subject: booking ? booking.subject : 'Tack — vi hör av oss inom kort',
-      scheduledAt,
+      kind: booking ? 'motebokning' : 'lead_bekraftelse',
       html: booking ? booking.html : `
         <!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"></head>
         <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
@@ -215,7 +208,7 @@ export async function POST(request: NextRequest) {
           </table>
         </body></html>
       `,
-    }, booking ? 'motebokning' : 'lead_bekraftelse');
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {
