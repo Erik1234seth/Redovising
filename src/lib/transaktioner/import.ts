@@ -186,7 +186,7 @@ export async function lasUtTransaktioner(
 }
 
 /** Tar bort det som lästes ut förra gången, av båda sorterna. */
-async function rensa(supabase: SupabaseClient, row: UnderlagRad) {
+async function rensa(supabase: SupabaseClient, row: Pick<UnderlagRad, 'id'>) {
   const { error: deleteError } = await supabase.from('transaktioner').delete().eq('underlag_id', row.id);
   if (deleteError) throw new Error(`Kunde inte rensa tidigare transaktioner: ${deleteError.message}`);
   const { error: deleteVerError } = await supabase.from('verifikationer').delete().eq('underlag_id', row.id).eq('kalla', 'ai');
@@ -228,7 +228,8 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
   const mejl = await byggMejlkontext(supabase, { userId: row.user_id, emails: [email, kontoEmail] });
 
   // Dokumentets andra sidor läses med i samma avläsning
-  const sidor = await Promise.all((await dokumentetsSidor(supabase, row.id)).map(async (s) => {
+  const sidrader = await dokumentetsSidor(supabase, row.id);
+  const sidor = await Promise.all(sidrader.map(async (s) => {
     const { data, error: fel } = await supabase.storage.from(BUCKET).download(s.file_path);
     if (fel || !data) throw new Error(`Sidan ${s.file_name} saknas i lagringen: ${fel?.message ?? 'okänt fel'}`);
     return { buffer: Buffer.from(await data.arrayBuffer()), fileName: s.file_name, mimeType: s.mime_type };
@@ -250,7 +251,9 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
   // Det som lästes ut förra gången ersätts — annars dubbleras raderna vid en
   // omkörning, och det är just omkörningen man vill göra när avskriften blev
   // fel. Båda sorterna rensas, ifall filen lästes som den andra sorten då.
-  await rensa(supabase, row);
+  // De andra sidorna också: lästes en av dem ut innan den kopplades ihop med
+  // dokumentet ligger det kvar där, och samma köp skulle bokföras två gånger.
+  for (const s of [row, ...sidrader]) await rensa(supabase, s);
 
   if (svar.typ === 'ovrigt') return { typ: 'ovrigt', antal: 0, vad: svar.vad, notering: svar.notering };
 
