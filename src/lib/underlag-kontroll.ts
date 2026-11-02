@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { send } from '@vercel/queue';
 import { callOpenAI, parseJSON } from '@/lib/inmail/openai-client';
 import { byggMejlkontext } from '@/lib/mejlkontext';
 import { lasUtTransaktioner } from '@/lib/transaktioner/import';
@@ -460,9 +461,22 @@ export interface UnderlagsJobb {
  * Undantaget är när allt underlag är komplett och kunden inte frågar något:
  * då behövs inget svar.
  *
- * `bas` är adressen till appen själv, där nästa omgång postas.
+ * Omgången läggs i kön (Vercel Queues), och /api/queues/underlagsflode kör
+ * den. Förr postade varje omgång nästa direkt till /api/inmail/flode, men en
+ * funktion som anropar sig själv i kedja stoppar Vercel efter ungefär fem led
+ * (508 Infinite loop detected) — ett mejl med sju bilagor räckte för att
+ * fastna. Via kön är varje omgång ett eget anrop utan kedja.
+ *
+ * `bas` är adressen till appen själv. Den används bara när kön inte går att nå
+ * (lokalt utan Vercel-inloggning), och då postas omgången direkt som förr.
  */
 export async function startaUnderlagsflode(bas: string, jobb: UnderlagsJobb): Promise<void> {
+  try {
+    await send<UnderlagsMeddelande>(UNDERLAGSFLODE_AMNE, { bas, jobb });
+    return;
+  } catch (err) {
+    console.warn('[underlag-kontroll] kön gick inte att nå, postar omgången direkt:', err instanceof Error ? err.message : err);
+  }
   const res = await fetch(`${bas}/api/inmail/flode`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-inmail-secret': process.env.INMAIL_SECRET ?? '' },
@@ -470,6 +484,12 @@ export async function startaUnderlagsflode(bas: string, jobb: UnderlagsJobb): Pr
   });
   if (!res.ok) throw new Error(`Nästa omgång kunde inte startas: ${res.status} ${(await res.text()).slice(0, 200)}`);
 }
+
+/** Ämnet i kön. Konsumenten är kopplad till det i vercel.json. */
+export const UNDERLAGSFLODE_AMNE = 'underlagsflode';
+
+/** Det som ligger i kön: omgången, och adressen nästa omgång postas till om kön inte går att nå. */
+export interface UnderlagsMeddelande { bas: string; jobb: UnderlagsJobb }
 
 /** Mejlen flödet gäller: det senaste plus de andra nya i samma tråd. */
 const mejlen = (jobb: UnderlagsJobb) => new Set([jobb.messageId, ...(jobb.meddelanden ?? [])]);

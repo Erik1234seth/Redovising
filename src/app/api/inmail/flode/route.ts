@@ -4,8 +4,11 @@ import { korUnderlagsomgang, type UnderlagsJobb } from '@/lib/underlag-kontroll'
 
 /**
  * En omgång av underlagsflödet (se korUnderlagsomgang). Svarar direkt och gör
- * jobbet efteråt, så att omgången innan inte behöver vänta. Varje omgång får
- * egna 300 sekunder och postar själv nästa hit.
+ * jobbet efteråt, så att omgången innan inte behöver vänta.
+ *
+ * Reservväg: omgångarna går numera via kön (/api/queues/underlagsflode). Hit
+ * kommer de bara när kön inte går att nå, och då gäller Vercels gräns på
+ * ungefär fem led i kedja.
  */
 export const maxDuration = 300;
 
