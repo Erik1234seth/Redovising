@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/verifikationer",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/valutakurser",
+      "schedule": "0 16 * * *"
     }
   ]
 }
