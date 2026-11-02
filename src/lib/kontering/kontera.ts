@@ -12,6 +12,7 @@ import { MODELLER, fraga, type Del, type Modell } from './modeller';
 import { momsText, rensaMomsdelar, sammaMoms, slaIhopDelar, type Momsdel } from './momsdelar';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
 import { filensRader, underlagetsDelar, type Filrad } from './underlag';
+import { arUtlandsk, iKronor, omrakningText, raknaOmTillKronor, type Kronor } from './kronor';
 
 /**
  * Konterar utlästa transaktioner enligt K1.
@@ -75,6 +76,8 @@ interface Transaktion {
   dublettkoll: { status: string; motivering: string; avFil: string | null } | null;
   tillrackligt: { antaganden: string } | null;
   kalla: string;
+  /** Omräkningen till kronor när valutan inte är SEK (./kronor). */
+  kronor: Kronor | null;
 }
 
 interface Kandidatsvar {
@@ -288,7 +291,8 @@ function transaktionText(t: Transaktion, betalsatt: Betalsatt): string {
   return [
     `Datum: ${t.datum || 'okänt'}`,
     `Riktning: ${t.riktning === 'in' ? 'pengar IN till företaget' : 'pengar UT från företaget'}`,
-    `Belopp: ${t.belopp} ${t.valuta || 'SEK'}`,
+    // Omräknad har transaktionen redan beloppet i kronor — originalet står inom parentes
+    `Belopp: ${t.belopp} ${t.valuta || 'SEK'}${t.kronor && !arUtlandsk(t) ? ` (${omrakningText(t.kronor)})` : ''}`,
     `Moms enligt underlaget: ${t.moms ? `${t.moms} kr` : 'framgår inte'}`,
     t.motpart ? `Motpart: ${t.motpart}` : '',
     t.vat_nummer ? `Motpartens VAT-nummer: ${t.vat_nummer}` : '',
@@ -514,7 +518,9 @@ function byggKontering(
   if (t.dublettkoll?.status === 'tveksam') {
     flaggor.push({ typ: 'dublett', allvar: 'granskning', text: `Kan vara en dubblett${t.dublettkoll.avFil ? ` av en transaktion i ${t.dublettkoll.avFil}` : ''}: ${t.dublettkoll.motivering}` });
   }
-  if (t.valuta && t.valuta !== 'SEK') flaggor.push({ typ: 'valuta', allvar: 'granskning', text: `Beloppet är i ${t.valuta} och måste räknas om till kronor.` });
+  // Konteringen ser transaktionen i kronor (./kronor). Står den kvar i sin
+  // valuta fanns varken kronbelopp på underlaget eller kurs för datumet.
+  if (arUtlandsk(t)) flaggor.push({ typ: 'valuta', allvar: 'granskning', text: `Beloppet är i ${t.valuta}${t.datum ? ` och det finns ingen kurs för ${t.datum}` : ' och datum saknas'} — räkna om till kronor.` });
   // Medel sparas och visas men skickar inte raden till Granska — bara låg gör det
   if (beslut.sakerhet === 'lag') flaggor.push({ typ: 'osaker', allvar: 'granskning', text: 'Modellens säkerhet: låg.' });
 
@@ -701,7 +707,9 @@ export async function konteraTransaktioner(
     const kontext = kontextFor(instruktioner, t);
     try {
       if (kontext && !torrkorning) t = await rattaEfterKontext(supabase, t, betalsatt, kontext);
-      const fil = t.underlag_id ? await filen(t.underlag_id) : { delat: [], nummer: new Map<string, number>() };
+      // Allt efter det här räknar i kronor: beloppsgränser, moms och verifikationen
+      t = iKronor(await raknaOmTillKronor(supabase, t, { spara: !torrkorning }));
+      const fil =t.underlag_id ? await filen(t.underlag_id) : { delat: [], nummer: new Map<string, number>() };
       const f = fil.nummer.get(t.id);
       const k = arslista.nummer.get(t.id);
       const var_ = [f ? `F${f} i filen` : '', k ? `K${k} i kundens lista` : ''].filter(Boolean).join(', ');
@@ -808,7 +816,7 @@ async function konteraEn(
 }
 
 export const TRANSAKTION_KOLUMNER =
-  'id, user_id, customer_email, underlag_id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, anteckning, detaljer, vat_nummer, uppgifter, komplettering, dublettkoll, tillrackligt, kalla';
+  'id, user_id, customer_email, underlag_id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, anteckning, detaljer, vat_nummer, uppgifter, komplettering, dublettkoll, tillrackligt, kalla, kronor';
 
 /**
  * Erik väljer konto för hand — ett av modellernas förslag eller ett eget.
@@ -982,6 +990,9 @@ export function verifikationsrader(
   motkontoOverride?: string,
   momsdelar?: Momsdel[] | null,
 ): { konto: string; belopp: number }[] {
+  // Verifikationen är alltid i kronor — ett belopp i euro bokfört som kronor är värre än inget
+  t = iKronor(t);
+  if (arUtlandsk(t)) throw new Error(`Beloppet är i ${t.valuta} och har inte räknats om till kronor — kontera om transaktionen`);
   if (!slaUppKonto(konto)) throw new Error(`${konto} finns inte bland K1-kontona`);
   const motkonto = motkontoOverride ?? betalkonto(betalsatt, t.riktning);
   if (!motkonto) throw new Error('Betalkonto saknas');
@@ -1010,6 +1021,8 @@ export async function bokfor(
   momsdelar?: Momsdel[] | null,
 ) {
   if (!t.datum) throw new Error('Transaktionen saknar datum');
+  // Har beloppet ändrats sedan konteringen räknas kronorna om här
+  t = await raknaOmTillKronor(supabase, t);
   const rader = verifikationsrader(t, konto, momssats, betalsatt, motkontoOverride, momsdelar);
 
   const id = crypto.randomUUID();

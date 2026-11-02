@@ -45,7 +45,7 @@ För varje transaktion får du det som lästs ut ur underlaget, en avskrift av u
 
 GRUNDKRAV — av det vi har ska det gå att avgöra:
 1. Datum.
-2. Belopp, och valuta om den inte är SEK.
+2. Belopp, och valuta om den inte är SEK. Ett belopp i utländsk valuta räcker: vi räknar om det till kronor med Riksbankens kurs för datumet. Fråga aldrig efter beloppet i kronor eller efter växelkursen.
 3. Moms: momsbeloppet eller momssatsen, eller att ingen svensk moms ska redovisas (momsfritt, utländsk säljare, privat, inte momsregistrerad kund). Står momsen inte på underlaget får du bedöma den utifrån vad transaktionen gäller och de svenska momssatserna — men en svensk säljares kvitto eller faktura utan momsuppgift ger inte avdrag för ingående moms, och när det spelar roll saknas den.
 4. En tydlig uppfattning om vad transaktionen gäller: vad som köpts eller sålts och att det hör till verksamheten. Räcker motpartens namn, kundens verksamhet eller historiken för att förstå det, är det nog.
 
@@ -57,7 +57,6 @@ EXTRA KRAV — när transaktionen pekar på det. Exempel, inte en fullständig l
 - Representation (måltid, fika, evenemang med kunder eller andra): syftet och vilka som deltog.
 - Inköp av något som kan vara en inventarie (dator, verktyg, möbler, maskiner) för mer än ett halvt prisbasbelopp: vad det är.
 - Drivmedel, bilreparationer, fordonshyra och annat som gäller ett fordon: det avgörande är en uppgift om kunden, inte om transaktionen — har kunden en bil i firman, använder kunden en privat bil i verksamheten (då gäller milavdrag), eller ingen bil alls. Står det i kundens uppgifter, mejlen eller byråns kontext, utgå från det och fråga inte. Annars saknas just den uppgiften, och då skriver du "vad" exakt så här: "om bilen i verksamheten är firmans eller privat". Samma ord för alla fordonstransaktioner, så att kunden får en enda fråga. Fråga inte om varje tankning gällde verksamheten — en tankning för en bil som används i verksamheten antas göra det.
-- Belopp i utländsk valuta: beloppet i kronor, om varken underlaget eller banken visar det.
 - Ett köp eller en insättning som kan vara privat: utgå från att det som rimligen kan höra till verksamheten gör det, och skriv det i "antaganden". Fråga bara när något faktiskt tyder på att det är privat — fakturan är ställd till en privatperson utan firmans namn, varan kan inte rimligen höra till verksamheten, eller kunden har själv sagt det. Att något i teorin skulle kunna vara privat är inte skäl nog att fråga.
 - Försäljning: vem som köpt och vad som sålts, när det inte framgår.
 
