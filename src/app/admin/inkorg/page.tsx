@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { RAKNA_OM } from '../_nav-menu';
 import type {
-  AiAnteckning, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast, MejlBilaga,
+  AiAnteckning, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgSkickat, InkorgTrad, InkorgUtkast, MejlBilaga,
 } from '@/lib/admin-types';
 
 /**
@@ -46,17 +46,26 @@ function KanalMarke({ kanal }: { kanal: 'mejl' | 'sms' }) {
 export default function InkorgPage() {
   const [lista, setLista] = useState<InkorgKonversation[] | null>(null);
   const [fel, setFel] = useState('');
-  const [flik, setFlik] = useState<InkorgKategori>('lead');
+  const [flik, setFlik] = useState<InkorgKategori | 'skickat'>('lead');
   const [bara, setBara] = useState<'alla' | 'olasta' | 'utkast'>('alla');
   const [sok, setSok] = useState('');
   const [vald, setVald] = useState<string | null>(null);
   const [nytt, setNytt] = useState(false);
   const [markerade, setMarkerade] = useState<Set<string>>(new Set());
+  const [skickade, setSkickade] = useState<InkorgSkickat[] | null>(null);
+  const [valtSkickat, setValtSkickat] = useState<string | null>(null);
 
   const ladda = useCallback(() => fetch('/api/admin/inkorg').then((r) => r.json()).then((d) => {
     if (d.error) setFel(d.error); else setLista(d.konversationer);
     return (d.konversationer ?? []) as InkorgKonversation[];
   }).catch(() => { setFel('Kunde inte hämta inkorgen'); return [] as InkorgKonversation[]; }), []);
+
+  const laddaSkickat = useCallback(() => fetch('/api/admin/inkorg?vy=skickat').then((r) => r.json()).then((d) => {
+    if (d.error) setFel(d.error); else setSkickade(d.skickade);
+  }).catch(() => setFel('Kunde inte hämta skickade mejl')), []);
+
+  // Hämtas först när fliken öppnas, och sedan om varje gång man går tillbaka till den
+  useEffect(() => { if (flik === 'skickat') laddaSkickat(); }, [flik, laddaSkickat]);
 
   /** Efter "Nytt mejl": personen finns nu i listan, så tråden öppnas direkt. */
   const nyttSkickat = async (email: string) => {
@@ -90,6 +99,12 @@ export default function InkorgPage() {
       && (!q || [k.namn, k.email, k.phone, k.senaste.text].some((f) => f?.toLowerCase().includes(q))));
   }, [lista, flik, bara, sok]);
 
+  const synligaSkickade = useMemo(() => {
+    const q = sok.trim().toLowerCase();
+    return (skickade ?? []).filter((m) => !q || [m.namn, m.till, m.amne, m.text].some((f) => f?.toLowerCase().includes(q)));
+  }, [skickade, sok]);
+  const skickat = skickade?.find((m) => m.id === valtSkickat) ?? null;
+
   /** Olästa per flik — det som syns som siffra bredvid fliknamnet. */
   const antal = (id: InkorgKategori) => (lista ?? []).filter((k) => k.kategori === id && k.olast).length;
 
@@ -121,6 +136,7 @@ export default function InkorgPage() {
   const oppna = (key: string) => {
     setVald(key);
     setNytt(false);
+    setValtSkickat(null);
     setLista((l) => l?.map((k) => (k.key === key ? { ...k, olast: false } : k)) ?? null);
     fetch('/api/admin/inkorg', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'last', key }) })
       .then(() => window.dispatchEvent(new Event(RAKNA_OM))).catch(() => {});
@@ -145,19 +161,52 @@ export default function InkorgPage() {
                 {antal(f.id) > 0 && <span className={`ml-1 ${flik === f.id ? 'text-white/80' : 'text-blue-700 font-semibold'}`}>{antal(f.id)}</span>}
               </button>
             ))}
+            <button onClick={() => setFlik('skickat')}
+              className={`px-2.5 py-1 text-xs rounded-lg transition ${flik === 'skickat' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+              Skickat
+            </button>
           </div>
           <div className="flex gap-2">
-            <input value={sok} onChange={(e) => setSok(e.target.value)} placeholder="Sök"
+            <input value={sok} onChange={(e) => setSok(e.target.value)} placeholder={flik === 'skickat' ? 'Sök bland skickade' : 'Sök'}
               className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500" />
-            <select value={bara} onChange={(e) => setBara(e.target.value as typeof bara)}
-              className="bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-700">
-              <option value="alla">Alla</option>
-              <option value="olasta">Olästa</option>
-              <option value="utkast">Med utkast</option>
-            </select>
+            {flik !== 'skickat' && (
+              <select value={bara} onChange={(e) => setBara(e.target.value as typeof bara)}
+                className="bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-700">
+                <option value="alla">Alla</option>
+                <option value="olasta">Olästa</option>
+                <option value="utkast">Med utkast</option>
+              </select>
+            )}
           </div>
         </div>
 
+        {flik === 'skickat' ? (
+          <>
+            {!skickade && !fel && <p className="text-slate-500 text-sm p-3">Hämtar…</p>}
+            {skickade && synligaSkickade.length === 0 && <p className="text-slate-500 text-sm p-3">Inget här.</p>}
+            <ul className="divide-y divide-slate-100 lg:max-h-[calc(100vh-14rem)] overflow-y-auto">
+              {synligaSkickade.map((m) => (
+                <li key={m.id}>
+                  <button onClick={() => { setValtSkickat(m.id); setNytt(false); }}
+                    className={`w-full text-left px-3 py-2.5 border-l-4 transition ${
+                      valtSkickat === m.id ? 'bg-blue-50 border-l-blue-600' : 'bg-white border-l-transparent hover:bg-slate-50'}`}>
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm truncate mr-auto text-slate-900">
+                        <span className="text-slate-400">Till: </span>{m.namn ?? m.till}
+                      </span>
+                      {m.bilagor.length > 0 && <span className="text-[11px] text-slate-400 shrink-0">📎</span>}
+                      <span className="text-[11px] text-slate-400 shrink-0">{tidKort(m.at)}</span>
+                    </span>
+                    <span className="block text-xs truncate text-slate-500 mt-0.5">
+                      {m.amne && <span className="font-medium text-slate-700">{m.amne} — </span>}
+                      {m.text.replace(/\s+/g, ' ').slice(0, 160)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : <>
         {synliga.length > 0 && (
           <div className="px-3 py-1.5 border-b border-slate-200 flex items-center gap-3 text-xs bg-slate-50">
             <input type="checkbox" checked={allaMarkerade} aria-label="Markera alla"
@@ -209,11 +258,16 @@ export default function InkorgPage() {
             </li>
           ))}
         </ul>
+        </>}
       </aside>
 
       <section className="flex-1 min-w-0 w-full">
         {nytt
           ? <NyttMejl onSkickat={nyttSkickat} onAvbryt={() => setNytt(false)} />
+          : flik === 'skickat'
+          ? (skickat
+            ? <SkickatMejl m={skickat} onOppna={() => { if (skickat.personKey && skickat.kategori) { setFlik(skickat.kategori); oppna(skickat.personKey); } }} />
+            : <p className="text-slate-500 text-sm mt-16 text-center">Välj ett skickat mejl.</p>)
           : vald
           ? <Trad key={vald} personKey={vald} onAndrat={ladda} />
           : <p className="text-slate-500 text-sm mt-16 text-center">Välj en konversation.</p>}
@@ -329,6 +383,31 @@ function Bubbla({ m }: { m: InkorgMeddelande }) {
         <p className="text-sm text-slate-800 whitespace-pre-wrap break-words">{lang && !hel ? `${m.text.slice(0, 700)}…` : m.text || '(tomt)'}</p>
         {lang && <button onClick={() => setHel(!hel)} className="text-xs text-blue-700 hover:underline mt-1">{hel ? 'Visa mindre' : 'Visa hela'}</button>}
         {!!m.bilagor?.length && <p className="text-[11px] text-slate-500 mt-1">📎 {m.bilagor.join(', ')}</p>}
+      </div>
+    </div>
+  );
+}
+
+/** Ett skickat mejl, som i Gmail. Finns mottagaren hos oss går det att öppna hela konversationen. */
+function SkickatMejl({ m, onOppna }: { m: InkorgSkickat; onOppna: () => void }) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl">
+      <header className="p-4 border-b border-slate-200 flex items-start gap-3 flex-wrap">
+        <div className="mr-auto min-w-0">
+          <h2 className="text-lg font-bold text-slate-900 break-words">{m.amne || '(inget ämne)'}</h2>
+          <p className="text-sm text-slate-500">
+            Till {m.namn ? <>{m.namn} &lt;{m.till}&gt;</> : m.till} · {tidLang(m.at)}
+          </p>
+        </div>
+        {m.personKey && m.kategori && (
+          <button onClick={onOppna} className="text-xs px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">
+            Öppna konversationen
+          </button>
+        )}
+      </header>
+      <div className="p-4">
+        <p className="text-sm text-slate-800 whitespace-pre-wrap break-words">{m.text || '(tomt)'}</p>
+        {m.bilagor.length > 0 && <p className="text-[11px] text-slate-500 mt-3">📎 {m.bilagor.join(', ')}</p>}
       </div>
     </div>
   );

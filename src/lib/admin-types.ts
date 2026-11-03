@@ -503,6 +503,19 @@ export interface InkorgKonversation {
   utkast: number;
 }
 
+/** Ett mejl vi skickat, för fliken Skickat. Personen saknas när mottagaren inte finns hos oss. */
+export interface InkorgSkickat {
+  id: string;
+  till: string;
+  amne: string | null;
+  text: string;
+  at: string;
+  bilagor: string[];
+  personKey: string | null;
+  namn: string | null;
+  kategori: InkorgKategori | null;
+}
+
 export interface InkorgMeddelande {
   id: string;
   kanal: 'mejl' | 'sms';

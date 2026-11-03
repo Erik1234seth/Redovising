@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { build, emailKey, locate, phoneKey, summary, type Built } from '@/lib/personer';
 import type {
-  AiAnteckning, Arende, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgTrad, InkorgUtkast, MejlBilaga,
+  AiAnteckning, Arende, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgSkickat, InkorgTrad, InkorgUtkast, MejlBilaga,
 } from '@/lib/admin-types';
 import { callScript } from '@/lib/emails/send-via-gmail';
 import { UNDERLAG_BUCKET } from '@/lib/inmail/save-attachments';
@@ -19,6 +19,7 @@ import { arUnderlagsmejl, startaUnderlagsflode } from '@/lib/underlag-kontroll';
  *
  * GET              → konversationerna, nyast först
  * GET ?key=        → hela tråden för en person: mejl och SMS i tidsordning
+ * GET ?vy=skickat  → alla mejl vi skickat, nyast först
  * POST { action }  → läst, oläst, ta bort ur inkorgen, skicka/spara/släng
  *                    mejlutkast, nytt mejl, AI-utkast på begäran
  *
@@ -139,6 +140,48 @@ function grupperaPerPerson(people: Map<string, Built>, data: Awaited<ReturnType<
   return per;
 }
 
+const MAX_SKICKADE = 500;
+/** Kroppen kan vara upp till 50 000 tecken. Det räcker att läsa början i listan. */
+const SKICKAT_MAX_TEXT = 20_000;
+
+/**
+ * Fliken Skickat: allt vi mejlat, nyast först, som Gmails Skickat. Synk-scriptet
+ * hämtar in allt från Gmails Skickat, så även mejl som inte gått via inkorgen
+ * finns med. Det vi skickat de senaste minuterna och som ännu inte synkats tas
+ * från utkasten, som i tråden.
+ */
+async function skickatLista(supabase: Supabase, people: Map<string, Built>, klara: Set<string>): Promise<InkorgSkickat[]> {
+  const [mejl, utkast] = await Promise.all([
+    supabase.from('mail_messages')
+      .select('gmail_message_id, customer_email, subject, body, attachment_names, sent_at')
+      .eq('direction', 'out').order('sent_at', { ascending: false }).limit(MAX_SKICKADE),
+    supabase.from('mejl_utkast').select('id, till_email, amne, text, bilagor, sent_at').eq('status', 'sent')
+      .gte('sent_at', new Date(Date.now() - SKICKADE_DAGAR * 86_400_000).toISOString()),
+  ]);
+  const fel = mejl.error ?? utkast.error;
+  if (fel) throw new Error(fel.message);
+
+  const perAlias = new Map<string, Built>();
+  for (const p of people.values()) for (const a of p.aliases) perAlias.set(a, p);
+  const rad = (id: string, till: string, amne: string | null, text: string, at: string, bilagor: string[]): InkorgSkickat => {
+    const p = perAlias.get(emailKey(till) ?? '');
+    return {
+      id, till, amne, text: text.slice(0, SKICKAT_MAX_TEXT), at, bilagor,
+      personKey: p?.key ?? null, namn: p ? visningsnamn(p) : null, kategori: p ? kategori(p, klara) : null,
+    };
+  };
+
+  const lista = (mejl.data ?? []).map((m) => rad(m.gmail_message_id, m.customer_email ?? '', m.subject, m.body ?? '', m.sent_at, m.attachment_names ?? []));
+  for (const u of utkast.data ?? []) {
+    if (!u.sent_at) continue;
+    const fran = new Date(new Date(u.sent_at).getTime() - SKICKAD_MARGINAL_MS).toISOString();
+    const till = (u.till_email ?? '').toLowerCase();
+    if (lista.some((m) => m.till.toLowerCase() === till && m.at >= fran)) continue;
+    lista.push(rad(`skickat-${u.id}`, u.till_email, u.amne, u.text ?? '', u.sent_at, lasBilagor(u.bilagor).map((b) => b.namn)));
+  }
+  return lista.sort((a, b) => b.at.localeCompare(a.at));
+}
+
 /** Senaste tidpunkten över alla personens adresser, t.ex. när konversationen öppnades. Tom sträng = aldrig. */
 function senastLast(p: Built, last: Map<string, string>): string {
   return p.aliases.reduce((max, a) => {
@@ -150,6 +193,13 @@ function senastLast(p: Built, last: Map<string, string>): string {
 export async function GET(request: NextRequest) {
   try {
     const supabase = createServerClient();
+    if (request.nextUrl.searchParams.get('vy') === 'skickat') {
+      const [people, profiler] = await Promise.all([build(), supabase.from('profiles').select('id, start_ar, redovisningsmetod')]);
+      if (profiler.error) throw new Error(profiler.error.message);
+      const klara = new Set((profiler.data ?? []).filter((p) => p.start_ar && p.redovisningsmetod).map((p) => p.id as string));
+      return NextResponse.json({ skickade: await skickatLista(supabase, people, klara) });
+    }
+
     const [people, data] = await Promise.all([build(), lasData(supabase)]);
     const klara = new Set(data.profiler.filter((p) => p.start_ar && p.redovisningsmetod).map((p) => p.id as string));
     const per = grupperaPerPerson(people, data);
