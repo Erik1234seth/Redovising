@@ -250,8 +250,9 @@ I DET HÄR STEGET konterar du. Du har redan analyserat transaktionen och valt ka
 - momssats: svensk moms som ingår i delens belopp (25, 12, 6 eller 0). 0 när ingen avdragsgill eller utgående moms finns. Vid omvänd skattskyldighet är det i stället den svenska sats som hade gällt om köpet gjorts i Sverige — oftast 25 — fast ingen moms ingår i beloppet; 0 bara när köpet hade varit momsfritt i Sverige.
 - moms: delens moms enligt underlaget. Anger underlaget bara momsen per sats och satsen delas på flera konton, räkna ut varje dels andel. null när underlaget inte visar någon moms.
 - En del kan vara negativ, t.ex. returnerad pant på 0 %. Delarna ska tillsammans bli transaktionens belopp.
-- momshantering: "svensk" vid vanlig svensk moms, "ingen" när momsen inte hanteras (momsfritt, privat, lån, överföringar, skatter), "omvand" vid omvänd skattskyldighet, EU-förvärv eller import.
-- omvand_typ: vid "omvand" vilket slags förvärv det är — avgör det av säljarens land och om det är en vara eller en tjänst: "eu-tjanst" (tjänst från ett företag i ett annat EU-land, t.ex. annonser hos Meta Irland), "eu-vara" (vara från ett annat EU-land), "utanfor-eu-tjanst" (tjänst från ett företag utanför EU, t.ex. ett amerikanskt abonnemang), "sverige-tjanst" eller "sverige-vara" (svensk omvänd skattskyldighet, t.ex. byggtjänster eller mobiltelefoner i större partier), "import" (vara från ett land utanför EU). "inte" när momshantering inte är "omvand". Vid omvänd skattskyldighet räknar systemet själv ut momsen och bokför den som utgående och ingående moms — det är inget skäl till granskning.
+- momshantering: "svensk" vid vanlig svensk moms, "ingen" när momsen inte hanteras (momsfritt, privat, lån, överföringar, skatter), "omvand" vid omvänd skattskyldighet, EU-förvärv eller import — och när kunden själv säljer utan svensk moms för att köparen redovisar den eller affären sker utanför Sverige.
+- omvand_typ: vid "omvand" vilket slags affär det är — avgör det av motpartens land och om det är en vara eller en tjänst: "eu-tjanst" (tjänst från ett företag i ett annat EU-land, t.ex. annonser hos Meta Irland), "eu-vara" (vara från ett annat EU-land), "utanfor-eu-tjanst" (tjänst från ett företag utanför EU, t.ex. ett amerikanskt abonnemang), "sverige-tjanst" eller "sverige-vara" (svensk omvänd skattskyldighet, t.ex. byggtjänster eller mobiltelefoner i större partier), "import" (vara från ett land utanför EU). "inte" när momshantering inte är "omvand". Vid omvänd skattskyldighet räknar systemet själv ut momsen och bokför den som utgående och ingående moms — det är inget skäl till granskning. En återbetalning av ett sådant köp får samma sort och kostnadskonto som köpet, så vänder systemet momsraderna.
+- När kunden SÄLJER utan svensk moms anger sorten köparens sida och kontot följer av den: "eu-vara" 3108, "eu-tjanst" 3308, "utanfor-eu-tjanst" 3305, "sverige-tjanst" eller "sverige-vara" 3231 (t.ex. byggtjänster till en byggfirma), "import" 3105 (export av varor ut ur EU). Momssats 0. Ingen moms bokförs; kontot avgör rutan i momsdeklarationen.
 - sakerhet: "hog" bara när underlaget tydligt visar vad det är och reglerna pekar ut kontot. "lag" när du gissar.
 - motivering: två eller tre meningar på svenska om vad affären är och varför kontot är rätt enligt reglerna.
 - regler: id på de KUNDREGLER som gäller transaktionen. Ta bara med en regel när underlaget, uppgifterna, mejlen eller byråns kontext visar att den gäller — tom lista annars. En regel du tar med följer du: dess instruktion är byråns och väger lika tungt som anteckningen. Nämn regeln i motiveringen.
@@ -362,14 +363,21 @@ function raknaMoms(
   }
   const underlag = Number(t.moms) || 0;
   if (momshantering === 'omvand') {
-    // Köparen räknar ut momsen själv — det görs i byggRader. Import räknas på
-    // tullvärdet, och en försäljning eller återbetalning är inget förvärv, så
-    // de bokförs för hand.
-    if (!automatiskOmvand(omvand) || t.riktning !== 'ut') {
-      const text = omvand === 'import'
-        ? 'Import av varor — momsen räknas på tullvärdet och bokförs för hand.'
-        : 'Omvänd skattskyldighet — momsen bokförs för hand.';
-      flaggor.push({ typ: 'omvand-moms', allvar: 'granskning', text });
+    // Köparen räknar ut momsen själv — det görs i byggRader, och en
+    // återbetalning bokförs spegelvänt där. Säljaren tar inte ut någon moms
+    // alls; försäljningskontot avgör rutan i momsdeklarationen.
+    if (!automatiskOmvand(omvand)) {
+      flaggor.push({ typ: 'omvand-moms', allvar: 'granskning', text: 'Omvänd skattskyldighet utan sort — ange om det är EU, utanför EU eller Sverige.' });
+      return { moms: 0, delar: delar.map((d) => ({ konto: konto(d), sats: 0, belopp: d.belopp, moms: 0 })), flaggor };
+    }
+    if (arForsaljning(t, huvudkonto)) {
+      const ratt = FORSALJNINGSKONTO[omvand];
+      if (huvudkonto !== ratt) {
+        flaggor.push({ typ: 'omvand-moms', allvar: 'granskning', text: `Försäljning utan svensk moms av sorten ${omvand} bokförs på ${ratt}, inte ${huvudkonto} — annars hamnar den i fel ruta i momsdeklarationen.` });
+      }
+      if (underlag > 0) {
+        flaggor.push({ typ: 'moms', allvar: 'granskning', text: `Underlaget visar ${underlag} kr i moms, men försäljningen har omvänd skattskyldighet — ska momsen bort från fakturan?` });
+      }
       return { moms: 0, delar: delar.map((d) => ({ konto: konto(d), sats: 0, belopp: d.belopp, moms: 0 })), flaggor };
     }
     if (underlag > 0) {
@@ -404,37 +412,60 @@ function raknaMoms(
 
 const MOMSKONTO_UT: Record<number, string> = { 25: '2611', 12: '2621', 6: '2631' };
 
-/** Omvänd skattskyldighet som bokförs av systemet — allt utom import. */
-const automatiskOmvand = (o: Omvand | null): o is Exclude<Omvand, 'import'> => !!o && o !== 'import';
+/** Omvänd skattskyldighet som bokförs av systemet — alla sorter, även import. */
+const automatiskOmvand = (o: Omvand | null): o is Omvand => !!o;
+
+/**
+ * En inbetalning till ett intäktskonto är en försäljning: säljaren bokför
+ * ingen moms. En inbetalning till ett kostnadskonto är en återbetalning av ett
+ * köp, och då vänds köparens momsrader.
+ */
+const arForsaljning = (t: Transaktion, huvudkonto: string) => t.riktning === 'in' && huvudkonto.startsWith('3');
+
+/**
+ * Försäljningskontot för varje sort när det är vi som säljer. Kontot avgör
+ * rutan i momsdeklarationen (35, 36, 39, 40, 41). Import betyder här export
+ * av varor — en vara över EU:s yttre gräns.
+ */
+const FORSALJNINGSKONTO: Record<Omvand, string> = {
+  'eu-vara': '3108',
+  'eu-tjanst': '3308',
+  'utanfor-eu-tjanst': '3305',
+  'sverige-vara': '3231',
+  'sverige-tjanst': '3231',
+  import: '3105',
+};
 
 /** Satsens plats i BAS-kontonas sista siffror: 25 % först, sedan 12 och 6. */
 const SATSORDNING: Record<number, number> = { 25: 0, 12: 1, 6: 2 };
 
 /**
- * Spegelkontona för underlaget till rutorna 20–24 i momsdeklarationen, för
- * 25 %. De är BAS-konton utanför K1-planen och nollas mot 4598, så de
- * påverkar inte resultatet. Se rutaForKonto i @/lib/moms/eskd.
+ * Spegelkontona för underlaget till rutorna 20–24 och 50 i momsdeklarationen,
+ * för 25 %. De nollas mot 4598, så de påverkar inte resultatet, och
+ * konterings-AI:n får aldrig välja dem själv. Se rutaForKonto i @/lib/moms/eskd.
  */
-const SPEGELKONTO: Record<Exclude<Omvand, 'import'>, number> = {
+const SPEGELKONTO: Record<Omvand, number> = {
   'eu-vara': 4515,
   'eu-tjanst': 4535,
   'utanfor-eu-tjanst': 4531,
   'sverige-vara': 4415,
   'sverige-tjanst': 4425,
+  import: 4545,
 };
-const SPEGELTEXT: Record<Exclude<Omvand, 'import'>, string> = {
+const SPEGELTEXT: Record<Omvand, string> = {
   'eu-vara': 'Inköp av varor från annat EU-land',
   'eu-tjanst': 'Inköp av tjänster från annat EU-land',
   'utanfor-eu-tjanst': 'Inköp av tjänster från land utanför EU',
   'sverige-vara': 'Inköp av varor i Sverige, omvänd skattskyldighet',
   'sverige-tjanst': 'Inköp av tjänster i Sverige, omvänd skattskyldighet',
+  import: 'Import av varor',
 };
 
 /** Namnen på kontona utanför K1-planen som omvänd skattskyldighet bokförs på. */
 export const OMVAND_KONTONAMN: Record<string, string> = Object.fromEntries([
   ['4598', 'Justering, omvänd moms'],
   ...Object.entries(SPEGELKONTO).flatMap(([o, k]) => [25, 12, 6].map((sats) =>
-    [String(k + SATSORDNING[sats]), `${SPEGELTEXT[o as Exclude<Omvand, 'import'>]}, ${sats} %`])),
+    [String(k + SATSORDNING[sats]), `${SPEGELTEXT[o as Omvand]}, ${sats} %`])),
 ]);
 
 /**
@@ -444,9 +475,11 @@ export const OMVAND_KONTONAMN: Record<string, string> = Object.fromEntries([
  * Ingående moms samlas på 2641; utgående får ett konto per sats.
  *
  * Vid omvänd skattskyldighet betalas ingen moms. Köparen räknar ut den på
- * beloppet och bokför den som utgående moms (2614, 2624, 2634) och lika mycket
- * som ingående (2645, eller 2640 för svensk omvänd skattskyldighet) — det tar
- * ut varandra. Underlaget bokförs på ett spegelkonto mot 4598.
+ * beloppet och bokför den som utgående moms (2614, 2624, 2634, vid import
+ * 2615, 2625, 2635) och lika mycket som ingående (2645, eller 2640 för svensk
+ * omvänd skattskyldighet) — det tar ut varandra. Underlaget bokförs på ett
+ * spegelkonto mot 4598. Vid import räknas momsen på beloppet i underlaget,
+ * inte på tullvärdet.
  */
 function byggRader(t: Transaktion, delar: Bokdel[], motkonto: string, omvand: Omvand | null = null) {
   const brutto = ore(t.belopp);
@@ -467,9 +500,11 @@ function byggRader(t: Transaktion, delar: Bokdel[], motkonto: string, omvand: Om
   }
   for (const [k, m] of momskonton) if (m) rader.push({ konto: k, belopp: ut ? m : -m });
 
-  if (automatiskOmvand(omvand) && ut) {
+  if (automatiskOmvand(omvand) && !arForsaljning(t, huvud)) {
     const omvanda = new Map<string, number>();
-    const lagg = (k: string, b: number) => omvanda.set(k, ore((omvanda.get(k) ?? 0) + b));
+    // En återbetalning tar tillbaka köpets rader
+    const tecken = ut ? 1 : -1;
+    const lagg = (k: string, b: number) => omvanda.set(k, ore((omvanda.get(k) ?? 0) + tecken * b));
     const ingaende = omvand.startsWith('sverige') ? '2640' : '2645';
     for (const d of delar) {
       const plats = SATSORDNING[d.sats];
@@ -477,7 +512,7 @@ function byggRader(t: Transaktion, delar: Bokdel[], motkonto: string, omvand: Om
       const moms = ore((d.belopp * d.sats) / 100);
       lagg(String(SPEGELKONTO[omvand] + plats), d.belopp);
       lagg('4598', -d.belopp);
-      lagg(String(2614 + plats * 10), -moms);
+      lagg(String((omvand === 'import' ? 2615 : 2614) + plats * 10), -moms);
       lagg(ingaende, moms);
     }
     for (const [k, b] of omvanda) if (b) rader.push({ konto: k, belopp: b });
@@ -602,7 +637,7 @@ function byggKontering(
 
   const svensk = beslut.momshantering === 'svensk';
   // Vid omvänd skattskyldighet sparas satsen köparen räknar ut momsen med
-  const medSats = svensk || (automatiskOmvand(omvand) && t.riktning === 'ut');
+  const medSats = svensk || (automatiskOmvand(omvand) && !arForsaljning(t, huvudkonto));
   const sparade = slutdelar.map((d) => (svensk ? d : medSats ? { ...d, moms: null } : { ...d, momssats: 0, moms: null }));
   const omdome: Omdome = flaggor.some((f) => f.allvar === 'stopp') ? 'rod' : flaggor.length ? 'gul' : 'gron';
   const konto = slutdelar[0]?.konto ?? null;

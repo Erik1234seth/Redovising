@@ -8,7 +8,8 @@ import k1 from './k1.json';
  * och lämnas aldrig till modellen — den kan inte minnas årets prisbasbelopp
  * och ska inte räkna på beloppsgränser.
  *
- * Bara de 164 K1-kontona får användas (162 ur K1 plus 3108 och 3308 för EU-försäljning). Ett konto som inte finns i listan
+ * Bara kontona i k1.json får användas: K1-planen plus BAS-konton för försäljning
+ * och inköp utan svensk moms (3105, 3108, 3231, 3305, 3308, 4515 …). Ett konto som inte finns i listan
  * stoppas, även om det är ett giltigt BAS-konto.
  */
 

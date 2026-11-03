@@ -10300,6 +10300,280 @@
     "year_end_closing_method"
    ],
    "endastManuellt": false
+  },
+  {
+   "konto": "4515",
+   "namn": "Inköp av varor från annat EU-land, 25 %",
+   "beskrivning": "Underlag för inköp av varor från ett företag i ett annat EU-land med 25 procent svensk moms. Spegelkonto för underlaget i ruta 20 i momsdeklarationen. Systemet bokför kontot automatiskt mot 4598 när konteringen anger eu-vara; konterings-AI:n väljer det aldrig själv.",
+   "anvandNar": [
+    "Systemet bokför underlaget automatiskt när momshantering är omvänd och sorten är eu-vara",
+    "Inköpets belopp exklusive moms ska redovisas i ruta 20"
+   ],
+   "anvandInteNar": [
+    "Inköpet ska bokföras som kostnad eller tillgång; välj då vanligt kostnads- eller tillgångskonto",
+    "Säljaren har debiterat svensk moms",
+    "Företaget är säljare och inte köpare"
+   ],
+   "beslutsregler": [
+    "Konto 4515 får aldrig väljas automatiskt som konto för inköpet; ange i stället momshantering omvänd och rätt sort, så bokför systemet kontot",
+    "Själva inköpet bokförs på vanligt kostnads- eller tillgångskonto",
+    "Systemet bokför samma belopp i debet på 4515 och i kredit på 4598, så att resultatet inte påverkas",
+    "Utgående moms bokförs på 2614 och lika mycket ingående moms på 2645"
+   ],
+   "exempel": [
+    "En maskin köpt från ett tyskt företag utan moms bokförs som inköp, och systemet lägger underlaget på 4515 mot 4598"
+   ],
+   "varningar": [
+    "Kontot är ett spegelkonto för momsdeklarationen och påverkar inte resultatet; det nollas alltid mot 4598",
+    "Väljs kontot som konto för själva inköpet blir underlaget dubbelt"
+   ],
+   "nyckelord": [
+    "EU-förvärv",
+    "vara från EU",
+    "unionsinternt förvärv",
+    "ruta 20"
+   ],
+   "granskningNar": [
+    "Det är oklart om säljaren finns i Sverige, i ett annat EU-land eller utanför EU",
+    "Det är oklart om köpet är en vara eller en tjänst"
+   ],
+   "trosklar": [],
+   "endastManuellt": true
+  },
+  {
+   "konto": "4531",
+   "namn": "Inköp av tjänster från land utanför EU, 25 %",
+   "beskrivning": "Underlag för inköp av tjänster från ett företag utanför EU med 25 procent svensk moms. Spegelkonto för underlaget i ruta 22 i momsdeklarationen. Systemet bokför kontot automatiskt mot 4598 när konteringen anger utanfor-eu-tjanst; konterings-AI:n väljer det aldrig själv.",
+   "anvandNar": [
+    "Systemet bokför underlaget automatiskt när momshantering är omvänd och sorten är utanfor-eu-tjanst",
+    "Inköpets belopp exklusive moms ska redovisas i ruta 22"
+   ],
+   "anvandInteNar": [
+    "Inköpet ska bokföras som kostnad eller tillgång; välj då vanligt kostnads- eller tillgångskonto",
+    "Säljaren har debiterat svensk moms",
+    "Företaget är säljare och inte köpare"
+   ],
+   "beslutsregler": [
+    "Konto 4531 får aldrig väljas automatiskt som konto för inköpet; ange i stället momshantering omvänd och rätt sort, så bokför systemet kontot",
+    "Själva inköpet bokförs på vanligt kostnads- eller tillgångskonto",
+    "Systemet bokför samma belopp i debet på 4531 och i kredit på 4598, så att resultatet inte påverkas",
+    "Utgående moms bokförs på 2614 och lika mycket ingående moms på 2645"
+   ],
+   "exempel": [
+    "Ett programabonnemang från ett amerikanskt företag bokförs som kostnad, och systemet lägger underlaget på 4531 mot 4598"
+   ],
+   "varningar": [
+    "Kontot är ett spegelkonto för momsdeklarationen och påverkar inte resultatet; det nollas alltid mot 4598",
+    "Väljs kontot som konto för själva inköpet blir underlaget dubbelt"
+   ],
+   "nyckelord": [
+    "tjänst utanför EU",
+    "amerikanskt abonnemang",
+    "omvänd skattskyldighet",
+    "ruta 22"
+   ],
+   "granskningNar": [
+    "Det är oklart om säljaren finns i Sverige, i ett annat EU-land eller utanför EU",
+    "Det är oklart om köpet är en vara eller en tjänst"
+   ],
+   "trosklar": [],
+   "endastManuellt": true
+  },
+  {
+   "konto": "4535",
+   "namn": "Inköp av tjänster från annat EU-land, 25 %",
+   "beskrivning": "Underlag för inköp av tjänster från ett företag i ett annat EU-land med 25 procent svensk moms. Spegelkonto för underlaget i ruta 21 i momsdeklarationen. Systemet bokför kontot automatiskt mot 4598 när konteringen anger eu-tjanst; konterings-AI:n väljer det aldrig själv.",
+   "anvandNar": [
+    "Systemet bokför underlaget automatiskt när momshantering är omvänd och sorten är eu-tjanst",
+    "Inköpets belopp exklusive moms ska redovisas i ruta 21"
+   ],
+   "anvandInteNar": [
+    "Inköpet ska bokföras som kostnad eller tillgång; välj då vanligt kostnads- eller tillgångskonto",
+    "Säljaren har debiterat svensk moms",
+    "Företaget är säljare och inte köpare"
+   ],
+   "beslutsregler": [
+    "Konto 4535 får aldrig väljas automatiskt som konto för inköpet; ange i stället momshantering omvänd och rätt sort, så bokför systemet kontot",
+    "Själva inköpet bokförs på vanligt kostnads- eller tillgångskonto",
+    "Systemet bokför samma belopp i debet på 4535 och i kredit på 4598, så att resultatet inte påverkas",
+    "Utgående moms bokförs på 2614 och lika mycket ingående moms på 2645"
+   ],
+   "exempel": [
+    "Annonser hos Meta Irland bokförs som marknadsföring, och systemet lägger underlaget på 4535 mot 4598"
+   ],
+   "varningar": [
+    "Kontot är ett spegelkonto för momsdeklarationen och påverkar inte resultatet; det nollas alltid mot 4598",
+    "Väljs kontot som konto för själva inköpet blir underlaget dubbelt"
+   ],
+   "nyckelord": [
+    "tjänst från EU",
+    "Meta Irland",
+    "omvänd skattskyldighet",
+    "ruta 21"
+   ],
+   "granskningNar": [
+    "Det är oklart om säljaren finns i Sverige, i ett annat EU-land eller utanför EU",
+    "Det är oklart om köpet är en vara eller en tjänst"
+   ],
+   "trosklar": [],
+   "endastManuellt": true
+  },
+  {
+   "konto": "4545",
+   "namn": "Import av varor, 25 %",
+   "beskrivning": "Beskattningsunderlag för import av varor från ett land utanför EU med 25 procent svensk moms. Spegelkonto för underlaget i ruta 50 i momsdeklarationen. Systemet bokför kontot automatiskt mot 4598 när konteringen anger import; konterings-AI:n väljer det aldrig själv.",
+   "anvandNar": [
+    "Systemet bokför underlaget automatiskt när momshantering är omvänd och sorten är import",
+    "Inköpets belopp exklusive moms ska redovisas i ruta 50"
+   ],
+   "anvandInteNar": [
+    "Inköpet ska bokföras som kostnad eller tillgång; välj då vanligt kostnads- eller tillgångskonto",
+    "Säljaren har debiterat svensk moms",
+    "Företaget är säljare och inte köpare"
+   ],
+   "beslutsregler": [
+    "Konto 4545 får aldrig väljas automatiskt som konto för inköpet; ange i stället momshantering omvänd och rätt sort, så bokför systemet kontot",
+    "Själva inköpet bokförs på vanligt kostnads- eller tillgångskonto",
+    "Systemet bokför samma belopp i debet på 4545 och i kredit på 4598, så att resultatet inte påverkas",
+    "Utgående moms bokförs på 2615 och lika mycket ingående moms på 2645"
+   ],
+   "exempel": [
+    "Varor köpta från ett kinesiskt företag bokförs som inköp, och beskattningsunderlaget för importmomsen läggs på 4545 mot 4598"
+   ],
+   "varningar": [
+    "Kontot är ett spegelkonto för momsdeklarationen och påverkar inte resultatet; det nollas alltid mot 4598",
+    "Väljs kontot som konto för själva inköpet blir underlaget dubbelt"
+   ],
+   "nyckelord": [
+    "import",
+    "vara utanför EU",
+    "importmoms",
+    "tullvärde",
+    "ruta 50"
+   ],
+   "granskningNar": [
+    "Det är oklart om säljaren finns i Sverige, i ett annat EU-land eller utanför EU",
+    "Det är oklart om köpet är en vara eller en tjänst"
+   ],
+   "trosklar": [],
+   "endastManuellt": true
+  },
+  {
+   "konto": "3231",
+   "namn": "Försäljning inom byggsektorn, omvänd skattskyldighet",
+   "beskrivning": "Intäktskonto för försäljning av byggtjänster och andra tjänster eller varor där köparen i Sverige är skattskyldig enligt reglerna om omvänd skattskyldighet. Ingen svensk utgående moms. Redovisas i momsdeklarationens ruta 41.",
+   "anvandNar": [
+    "Företaget säljer byggtjänster, byggstädning, uthyrning av personal till byggverksamhet eller liknande till en köpare som själv bedriver byggverksamhet",
+    "Fakturan anger omvänd skattskyldighet och köparens momsregistreringsnummer",
+    "Företaget säljer mobiltelefoner, datorchip, guld, metaller eller utsläppsrätter med svensk omvänd skattskyldighet"
+   ],
+   "anvandInteNar": [
+    "Köparen är privatperson eller inte bedriver byggverksamhet; använd 3000 med vanlig moms",
+    "Köparen finns i ett annat EU-land; använd 3108 eller 3308",
+    "Fakturan tar ut svensk moms"
+   ],
+   "beslutsregler": [
+    "Använd 3231 när fakturan saknar moms och anger omvänd skattskyldighet för en svensk köpare",
+    "Sorten är sverige-tjanst för tjänster och sverige-vara för varor",
+    "Ange momshantering omvänd och rätt sort; ingen svensk utgående moms bokförs",
+    "Intäkten redovisas på R1 i det förenklade årsbokslutet tillsammans med övrig försäljning"
+   ],
+   "exempel": [
+    "En snickare fakturerar en byggfirma för ett badrumsbygge utan moms med texten omvänd skattskyldighet; intäkten bokförs på 3231"
+   ],
+   "varningar": [
+    "Saknas köparens momsregistreringsnummer eller texten om omvänd skattskyldighet kan fakturan vara felaktig",
+    "En privatperson kan aldrig vara skattskyldig enligt omvänd skattskyldighet"
+   ],
+   "nyckelord": [
+    "omvänd skattskyldighet",
+    "byggtjänst",
+    "byggmoms",
+    "ROT till företag",
+    "ruta 41"
+   ],
+   "granskningNar": [
+    "Det är oklart om köparen bedriver byggverksamhet",
+    "Fakturan anger varken moms eller omvänd skattskyldighet"
+   ],
+   "trosklar": [],
+   "endastManuellt": false
+  },
+  {
+   "konto": "3305",
+   "namn": "Försäljning tjänster till land utanför EU",
+   "beskrivning": "Intäktskonto för försäljning av tjänster till en köpare utanför EU där tjänsten är omsatt utomlands. Ingen svensk utgående moms. Redovisas i momsdeklarationens ruta 40.",
+   "anvandNar": [
+    "Företaget säljer en tjänst till ett företag utanför EU",
+    "Företaget säljer en tjänst till en köpare utanför EU där tjänsten enligt huvudregeln är omsatt utomlands"
+   ],
+   "anvandInteNar": [
+    "Köparen finns i Sverige; använd 3000",
+    "Köparen är ett företag i ett annat EU-land; använd 3308",
+    "Det är en vara som skickas ut ur EU; använd 3105"
+   ],
+   "beslutsregler": [
+    "Avgör köparens land av fakturan, adressen eller betalningen",
+    "Sorten är utanfor-eu-tjanst",
+    "Ange momshantering omvänd och rätt sort; ingen svensk utgående moms bokförs",
+    "Intäkten redovisas på R1 i det förenklade årsbokslutet tillsammans med övrig försäljning"
+   ],
+   "exempel": [
+    "En musikproducent fakturerar ett amerikanskt skivbolag för mixning utan moms; intäkten bokförs på 3305"
+   ],
+   "varningar": [
+    "Vissa tjänster, till exempel tjänster på fastighet i Sverige eller entré till evenemang i Sverige, är omsatta i Sverige och ska ha svensk moms"
+   ],
+   "nyckelord": [
+    "export tjänst",
+    "tjänst utanför EU",
+    "amerikansk kund",
+    "ruta 40"
+   ],
+   "granskningNar": [
+    "Det är oklart var köparen finns",
+    "Tjänsten kan vara omsatt i Sverige"
+   ],
+   "trosklar": [],
+   "endastManuellt": false
+  },
+  {
+   "konto": "3105",
+   "namn": "Försäljning varor till land utanför EU",
+   "beskrivning": "Intäktskonto för export, försäljning av varor som skickas till en köpare utanför EU. Ingen svensk utgående moms. Redovisas i momsdeklarationens ruta 36.",
+   "anvandNar": [
+    "Varan transporteras från Sverige till ett land utanför EU",
+    "Det finns underlag som visar att varan lämnat EU, till exempel fraktsedel eller tullhandling"
+   ],
+   "anvandInteNar": [
+    "Varan levereras i Sverige; använd 3000",
+    "Varan skickas till ett annat EU-land; använd 3108 eller vanlig försäljning med moms om köparen är privatperson",
+    "Det är en tjänst; använd 3305"
+   ],
+   "beslutsregler": [
+    "Avgör av fakturan och leveransadressen att varan skickats ut ur EU",
+    "Sorten är import, eftersom det är en vara över EU:s yttre gräns",
+    "Ange momshantering omvänd och rätt sort; ingen svensk utgående moms bokförs",
+    "Intäkten redovisas på R1 i det förenklade årsbokslutet tillsammans med övrig försäljning"
+   ],
+   "exempel": [
+    "En webbutik säljer en tavla till en kund i Norge och skickar den dit; intäkten bokförs på 3105"
+   ],
+   "varningar": [
+    "Utan bevis på att varan lämnat EU ska svensk moms tas ut"
+   ],
+   "nyckelord": [
+    "export",
+    "vara utanför EU",
+    "Norge",
+    "USA",
+    "ruta 36"
+   ],
+   "granskningNar": [
+    "Det saknas underlag för att varan lämnat EU"
+   ],
+   "trosklar": [],
+   "endastManuellt": false
   }
  ],
  "parametrar": [
