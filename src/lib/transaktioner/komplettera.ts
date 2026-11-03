@@ -10,8 +10,8 @@ import { iKo, openaiFetch } from '@/lib/ai-anrop';
  * Varje transaktion på ett underlag får med sig det konteringen behöver veta
  * utöver underlaget:
  *
- * - hur kunden själv bokfört liknande saker tidigare,
- * - hur andra kunder bokfört liknande saker,
+ * - hur vi bokfört liknande saker åt kunden tidigare,
+ * - hur vi bokfört liknande saker åt andra kunder,
  * - kundens verksamhetsbeskrivning,
  * - det kunden skrivit i mejl om just den här transaktionen.
  *
@@ -20,6 +20,11 @@ import { iKo, openaiFetch } from '@/lib/ai-anrop';
  * bara ser lika ut, så en AI går igenom kandidaterna och mejlen och behåller
  * det som faktiskt gäller transaktionen. Resultatet sparas på transaktionen i
  * `komplettering` och skickas med till konteringen.
+ *
+ * Bara det vi själva bokfört räknas som historik: verifikationer från en
+ * transaktion här och dagskassor från kassasystemen. Inlästa SIE-filer och
+ * verifikationslistor från kundens Bokio, Fortnox eller liknande är gjorda av
+ * någon annan och kan vara fel, så de följer inte med.
  */
 
 // Luna räcker här och kostar en tjugondel av Sol — provkört på två kunders alla underlag 2026-10-29
@@ -29,6 +34,13 @@ const PER_ANROP = 10;
 const SAMTIDIGA = 3;
 /** Kandidater per transaktion och källa. Samma text räknas en gång, med antal. */
 const KANDIDATER = 12;
+/**
+ * Sökningen ser alla verifikationer, också de inlästa, så den får hämta fler
+ * än vi behåller. De flesta träffarna är inlästa så länge vi bokfört lite själva.
+ */
+const SOK_KANDIDATER = KANDIDATER * 5;
+/** Dagskassorna bokförs av oss från kassasystemet, fast de inte hör till en transaktion. */
+const VARA_KALLOR = ['zettle', 'shopify'];
 
 export interface Konteringsrad { konto: string; kontonamn: string | null; belopp?: number }
 
@@ -78,8 +90,8 @@ interface Kandidat {
 const SYSTEM = `Du kompletterar transaktioner åt en svensk bokföringsbyrå innan de konteras. Du konterar inte själv.
 
 För varje transaktion får du:
-- KUNDENS: verifikationer som kunden själv bokfört tidigare och vars text liknar transaktionen. Hittade med textlikhet, så en del liknar bara till texten.
-- ANDRA: verifikationer från byråns andra kunder som liknar transaktionen, på samma sätt.
+- KUNDENS: verifikationer som byrån bokfört åt kunden tidigare och vars text liknar transaktionen. Hittade med textlikhet, så en del liknar bara till texten.
+- ANDRA: verifikationer som byrån bokfört åt andra kunder och som liknar transaktionen, på samma sätt.
 Du får också kundens mejlväxling med byrån och en beskrivning av kunden.
 
 Gör så här för varje transaktion:
@@ -220,16 +232,47 @@ async function sok(
   const sokText = [t.motpart, t.beskrivning].filter(Boolean).join(' ').slice(0, 300);
   if (sokText.trim().length < 3) return [];
   const { data, error } = await supabase.rpc('liknande_verifikationer', {
-    sok: sokText, fraga: fraga ? JSON.stringify(fraga) : null, agare_user: k.userId, agare_email: k.epost, egna, antal: KANDIDATER,
+    sok: sokText, fraga: fraga ? JSON.stringify(fraga) : null, agare_user: k.userId, agare_email: k.epost, egna, antal: SOK_KANDIDATER,
   });
   if (error) throw new Error(`Kunde inte söka i historiken: ${error.message}`);
-  return ((data ?? []) as { text: string; antal_st: number; senast: string | null; rader: Konteringsrad[] | null }[]).map((r, i) => ({
-    ref: `${egna ? 'K' : 'A'}${i + 1}`,
-    text: r.text,
-    datum: r.senast,
-    antal: r.antal_st,
-    rader: (r.rader ?? []).map((x) => ({ konto: x.konto, kontonamn: x.kontonamn, belopp: Number(x.belopp) })),
+  const texter = ((data ?? []) as { text: string }[]).map((r) => r.text);
+  const vara = await varaVerifikationer(supabase, texter, k, egna);
+  return texter.filter((text) => vara.has(text)).slice(0, KANDIDATER).map((text, i) => ({
+    ref: `${egna ? 'K' : 'A'}${i + 1}`, text, ...vara.get(text)!,
   }));
+}
+
+/**
+ * De av texterna som finns på verifikationer vi bokfört, med antal och
+ * konteringen från den senaste. Räknat om här, så att inlästa verifikationer
+ * med samma text varken räknas med i antalet eller ger konteringen.
+ */
+async function varaVerifikationer(
+  supabase: SupabaseClient,
+  texter: string[],
+  k: { userId: string | null; epost: string | null },
+  egna: boolean,
+): Promise<Map<string, Omit<Kandidat, 'ref' | 'text'>>> {
+  const ut = new Map<string, Omit<Kandidat, 'ref' | 'text'>>();
+  if (!texter.length) return ut;
+  const { data, error } = await supabase.from('verifikationer')
+    .select('text, datum, user_id, customer_email, verifikation_rader(konto, kontonamn, belopp, borttagen)')
+    .in('text', [...new Set(texter)])
+    .or(`transaktion_id.not.is.null,kalla.in.(${VARA_KALLOR.join(',')})`)
+    .order('datum', { ascending: false })
+    .limit(2000);
+  if (error) throw new Error(`Kunde inte läsa historiken: ${error.message}`);
+  const epost = k.epost?.toLowerCase() ?? null;
+  for (const v of data ?? []) {
+    const kundens = (!!k.userId && v.user_id === k.userId) || (!!epost && v.customer_email?.toLowerCase() === epost);
+    if (kundens !== egna || !v.text) continue;
+    const finns = ut.get(v.text);
+    if (finns) { finns.antal++; continue; }
+    const rader = ((v.verifikation_rader ?? []) as (Konteringsrad & { borttagen: boolean })[])
+      .filter((r) => !r.borttagen).map((r) => ({ konto: r.konto, kontonamn: r.kontonamn, belopp: Number(r.belopp) }));
+    ut.set(v.text, { datum: v.datum, antal: 1, rader });
+  }
+  return ut;
 }
 
 const EMBED_MODELL = 'text-embedding-3-small';
