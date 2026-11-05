@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkontext';
+import { BYRANS_PRINCIPER } from '@/lib/kontering/principer';
 import { kompletteringText, type Komplettering } from './komplettera';
 import { hamtaInstruktioner, kontextFor, reglerText } from './instruktioner';
 import { iKo, openaiFetch } from '@/lib/ai-anrop';
@@ -67,6 +68,8 @@ Ett underlag behöver inte uppfylla alla formella krav på en faktura. Visar det
 Fråga inte om moms på en del av underlaget som inte skulle ge mer avdrag. En avgift eller en del utan momsuppgift — till exempel en skadereducering vid sidan av hyran — bokförs utan moms enligt underlaget. Skriv det som ett antagande.
 
 Gör hellre ett rimligt antagande och skriv det i "antaganden" än att fråga om sådant som inte spelar någon roll — fråga bara när ett fel antagande skulle ge fel moms, fel avdrag eller fel skatt. En privat rad är tillräcklig: den blir eget uttag eller egen insättning.
+
+${BYRANS_PRINCIPER}
 
 "vad" är kort och skrivet så att kunden förstår vad vi frågar efter: "momsbeloppet", "köparens VAT-nummer", "vilka som deltog och syftet".
 

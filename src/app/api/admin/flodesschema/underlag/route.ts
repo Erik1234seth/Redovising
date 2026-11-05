@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 }
 
 const STEG = ['definiera', 'plocka-trans', 'plocka-verif', 'komplettera', 'dublett', 'tillrackligt', 'skriv-mejl', 'kundbild', 'konteras', 'helhet', 'skapa-verif'];
-/** Transaktioner per konteringsanrop, alla samtidigt. Båda modellerna, två pass var och en jämkning, ryms inom tidsgränsen. */
+/** Transaktioner per konteringsanrop, alla samtidigt. Konteringen håller själv tidsgränsen, se TID_STOPP i kontera.ts. */
 const KONTERA_PER_ANROP = 4;
 
 export async function POST(request: NextRequest) {

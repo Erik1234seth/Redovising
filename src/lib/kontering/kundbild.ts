@@ -146,6 +146,32 @@ export async function verifikationsSammanfattning(supabase: SupabaseClient, user
   return `REDAN BOKFÖRT — kundens inlästa verifikationer (verifikationslistor, kassarapporter, SIE), ${antal} st, per månad och konto:\n${text}\nDet som står här är bokfört. Det syns inte bland kundens transaktioner ovan, och det ska inte bokföras igen.`;
 }
 
+/**
+ * De enskilda inlästa verifikationerna i månaderna, en rad var. Summorna ovan
+ * räcker inte för att se om en transaktion är samma affär som en verifikation.
+ */
+export async function verifikationerIManader(supabase: SupabaseClient, userId: string, manader: string[]): Promise<string> {
+  if (!manader.length) return '';
+  const valda = new Set(manader);
+  const kr = (n: number) => Math.round(Math.abs(n)).toLocaleString('sv-SE');
+  const rader: string[] = [];
+  for (let fran = 0; ; fran += 1000) {
+    const { data, error } = await supabase.from('verifikationer')
+      .select('serie, nummer, datum, text, verifikation_rader(konto, belopp, borttagen)')
+      .eq('user_id', userId).is('transaktion_id', null).gte('datum', `${[...valda].sort()[0]}-01`).order('datum').range(fran, fran + 999);
+    if (error) throw new Error(`Kunde inte läsa kundens verifikationer: ${error.message}`);
+    for (const v of data ?? []) {
+      if (!valda.has(String(v.datum).slice(0, 7))) continue;
+      const konton = ((v.verifikation_rader ?? []) as { konto: string; belopp: number; borttagen: boolean }[])
+        .filter((r) => !r.borttagen)
+        .map((r) => `${r.konto} ${Number(r.belopp) > 0 ? 'debet' : 'kredit'} ${kr(Number(r.belopp))}`);
+      rader.push(`${v.serie ?? ''}${v.nummer ?? ''} ${v.datum} · ${String(v.text ?? '').slice(0, 100)} · ${konton.join(', ')}`.trim());
+    }
+    if ((data ?? []).length < 1000) break;
+  }
+  return rader.length ? `ENSKILDA INLÄSTA VERIFIKATIONER i månaderna där kunden har obokförda transaktioner (${rader.length} st):\n${rader.join('\n')}` : '';
+}
+
 /** Betalsättet med orden konteringen använder. Betalkontot sätts av systemet, inte av modellen. */
 export function betalsattText(harForetagskonto: string | null | undefined): string {
   if (harForetagskonto === 'privatkonto' || harForetagskonto === 'nej') return 'BETALSÄTT: kunden betalar via privatkonto. Systemet sätter betalkontot: 2017 Egna insättningar vid köp och 2013 Övriga egna uttag vid försäljning.';

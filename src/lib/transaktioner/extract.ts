@@ -97,6 +97,7 @@ Regler för transaktioner:
 ${BESKRIVNINGSREGEL}
 ${DETALJREGEL}
 ${UPPGIFTSREGEL}
+- En faktura får betaldatumet om underlaget visar när den betalades, annars fakturadatumet.
 - Framgår inte datumet lämnar du fältet tomt i stället för att gissa, och skriver varför i "anteckning".
 ${MEJLREGEL}
 

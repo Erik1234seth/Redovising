@@ -1,9 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkontext';
-import { betalsattText, hamtaArslista, hamtaKundbild, verifikationsSammanfattning } from './kundbild';
+import { betalsattText, hamtaArslista, hamtaKundbild, verifikationerIManader, verifikationsSammanfattning } from './kundbild';
 import { fraga } from './modeller';
 import { momsText, rensaMomsdelar, tolkaOmvand } from './momsdelar';
 import { slutligKontering } from './preliminar';
+import { BYRANS_PRINCIPER } from './principer';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
 import { reglerAttValja } from '@/lib/transaktioner/kundregler';
 import { hamtaInstruktioner, reglerFor } from '@/lib/transaktioner/instruktioner';
@@ -24,7 +25,7 @@ import { hamtaInstruktioner, reglerFor } from '@/lib/transaktioner/instruktioner
  *               `flodes_instruktioner` (namn "Helhetskontrollen"), och raden
  *               konteras om av båda modellerna med den. Är de överens blir den
  *               grön — kravet på två modeller ligger kvar.
- *   anteckning  Principfrågor och sådant som gäller kunden i stort. Stoppar inget.
+ *   anteckning  Sådant som gäller kunden i stort. Stoppar inget.
  *
  * Kontrollen har samma regler som konteringen: K1-kontoplanen, hela regeltexten
  * för kontona kunden använder, kundreglerna och byråns kontext för kunden. En
@@ -73,7 +74,9 @@ Varje transaktion har konterats för sig av två modeller. Du ser nu alla kunden
 
 Du har byråns regler — samma som konteringen följer: K1-kontoplanen, hela regeltexten för de konton kunden använder, kundreglerna och byråns kontext. Reglerna går före kundens mönster. Innan du anmärker eller samordnar: pröva både de nuvarande raderna och linjen du vill samordna efter mot kontots regler — "Använd när", "Använd INTE när", beslutsregler och momsregler. Att raderna konterats olika kan ha en förklaring i reglerna (till exempel att pant på engångsförpackningar följer drycken medan returlådor är momsfria) — då är det ingen avvikelse. Strider en rad mot reglerna är det reglerna som är linjen, inte hur de flesta rader ligger.
 
-Betalkontot (1930, 2013, 2017) sätts av systemet utifrån kundens betalsätt och står inte vid raderna — anmärk inte på det. Det som står under REDAN BOKFÖRT är kundens inlästa bokföring, till exempel försäljning från kassarapporter: räkna med den när du bedömer om något saknas, och anmärk på det bara om en transaktion ser ut att bokföra samma sak igen.
+${BYRANS_PRINCIPER}
+
+Betalkontot (1930, 2013, 2017) sätts av systemet utifrån kundens betalsätt och står inte vid raderna — anmärk inte på det. Det som står under REDAN BOKFÖRT är kundens inlästa bokföring, till exempel försäljning från kassarapporter: räkna med den när du bedömer om något saknas. Anmärk på dubbelbokföring mot den bara när samma affär går att peka ut bland de enskilda verifikationerna: liknande datum och belopp, plus motpart, beskrivning eller verifikationsnummer. Att ett belopp liknar en månadssumma räcker inte.
 
 Varje transaktion har konterats med originalunderlaget framför sig — kvittot, fakturan — och momsen på underlaget står vid raden. Anmärk inte på sådant som bara skulle kräva att någon tittar på originalet, till exempel om fakturan verkligen anger moms: det har konteringen redan sett. Anmärk på det som syns när kundens transaktioner läses tillsammans.
 
@@ -86,7 +89,7 @@ atgard avgör vad som händer med raderna:
 En rad där modellerna är oense och den ena följer kundens linje är ett typiskt fall för samordna.
 
 Är något en bedömningsfråga — ett litet köp som kan vara privat eller höra till verksamheten, något som kan konteras på två rimliga sätt — och har kundens liknande köp redan en linje, så samordna efter den linjen. Fråga inte kunden och skicka det inte till granskning: byrån vill att småsaker behandlas konsekvent, inte att varje osäkerhet granskas. Välj den linje de flesta liknande raderna redan följer, och säg i instruktionen att det är därför.
-- "anteckning" för principfrågor där det inte finns någon tydlig linje att följa, och för sådant som gäller kunden i stort — att underlag saknas, att intäkter inte finns. Det stoppar inte bokföringen.
+- "anteckning" för sådant som gäller kunden i stort — att underlag saknas, att intäkter inte finns. Det stoppar inte bokföringen.
 instruktion är en tom sträng utom vid samordna.
 
 sammanfattning: två eller tre meningar om hur kundens bokföring ser ut i stort.`;
@@ -187,6 +190,7 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
       betalsattText((profil as unknown as Kund | null)?.har_foretagskonto),
       `KUNDENS TRANSAKTIONER MED KONTERING (${rader.length} st, äldst först):\n${rader.join('\n')}`,
       await verifikationsSammanfattning(supabase, userId),
+      await verifikationerIManader(supabase, userId, [...new Set(arslista.rader.filter((r) => r.datum && !bokforda.has(r.id)).map((r) => r.datum!.slice(0, 7)))]),
     ].filter(Boolean).join('\n\n'),
     namn: 'helhet',
     schema: SCHEMA,

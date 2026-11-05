@@ -5,15 +5,15 @@ import type { FlodesKund, FlodesUnderlag } from '@/lib/admin-types';
 import { momsText } from '@/lib/kontering/momsdelar';
 
 /**
- * Kör om kundens alla underlag, och resultatet per fil och transaktion.
+ * Kör om de underlag man kryssat i, och resultatet per fil och transaktion.
  *
- * Alla kundens filer med transaktioner körs om — också de bokförda. Ordningen:
+ * De valda filerna med transaktioner körs om — också de bokförda. Ordningen:
  *
  *   0. Filer som aldrig gått igenom flödet börjar från början: Definiera fil
  *      för fil, äldst först — sidor i samma dokument kopplas ihop där — och
  *      sedan Plocka ut, tre åt gången. Verifikationslistor läses in och
  *      övriga filer sorteras undan; resten fortsätter nedan.
- *   1. Kundbilden byggs om, en gång.
+ *   1. Kundbilden byggs om, en gång. Vid ett urval bara om den är inaktuell.
  *   2. Dublettcheck fil för fil, äldst först. Den jämför med tidigare filer,
  *      och två filer som kontrolleras samtidigt kan se varandra i ett mellanläge.
  *   3. Tre filer åt gången: Komplettera, Tillräckligt? och Konteras. En
@@ -85,9 +85,11 @@ export function Resonemang({ g }: { g: Forslag['granskning'] }) {
             : 'stod fast vid sitt förslag efter att ha sett den andra modellens.'}
         </p>
       )}
+      {!!g.sokningar?.length && <p className="text-xs text-slate-500"><span className="text-slate-600">Sökte på webben:</span> {g.sokningar.join(' · ')}</p>}
+      {!!g.filer?.length && <p className="text-xs text-slate-500"><span className="text-slate-600">Öppnade också:</span> {g.filer.join(' · ')}</p>}
       {(g.analys || g.kandidater?.length) && (
         <details className="text-xs">
-          <summary className="text-slate-500 cursor-pointer">Analys och kandidatkonton</summary>
+          <summary className="text-slate-500 cursor-pointer">Analys och lästa konton</summary>
           {g.analys && <p className="mt-1 text-slate-600 leading-relaxed">{g.analys}</p>}
           {!!g.kandidater?.length && (
             <ul className="mt-1 space-y-0.5">
@@ -194,12 +196,22 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
   const [oppenTrans, setOppenTrans] = useState<string | null>(null);
   const [start, setStart] = useState<number | null>(null);
   const [slut, setSlut] = useState<number | null>(null);
+  // Övriga filer går inte att köra om
+  const valbara = kund.underlag.filter((u) => u.sortering !== 'ovrigt');
+  const [valda, setValda] = useState<Set<string>>(new Set());
+  const [bekraftar, setBekraftar] = useState(false);
+  const dagar = [...new Set(valbara.map((u) => u.at.slice(0, 10)))].sort().reverse();
+  const vaxla = (ids: string[], pa: boolean) => setValda((v) => {
+    const ny = new Set(v);
+    for (const id of ids) { if (pa) ny.add(id); else ny.delete(id); }
+    return ny;
+  });
 
   const uppdatera = (id: string, andring: Partial<Fil> | ((f: Fil) => Partial<Fil>)) =>
     setFiler((lista) => lista?.map((f) => (f.id === id ? { ...f, ...(typeof andring === 'function' ? andring(f) : andring) } : f)) ?? null);
 
   const korOm = async () => {
-    if (!window.confirm(`Köra om alla ${kund.namn}s underlag? Alla AI-steg körs från Komplettera, också för bokförda transaktioner — en verifikation som ändrats ersätts, utom i inlämnade perioder. Ett konto du valt i Granska ersätts av den nya konteringen.`)) return;
+    setBekraftar(false);
     setKor(true);
     setFel('');
     setHelhet(null);
@@ -208,10 +220,15 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
     setStart(Date.now());
     setSlut(null);
     try {
-      // Filerna med transaktioner, äldst först. Övriga filer och sidor som läses med en annan hoppas över.
-      setText('Hämtar kundens underlag…');
-      const kandidater = kund.underlag.filter((u) => u.sortering !== 'ovrigt').sort((a, b) => a.at.localeCompare(b.at));
+      // De valda filerna med transaktioner, äldst först. Sidor som läses med en annan körs genom sitt huvudunderlag.
+      setText('Hämtar underlagen…');
+      const kandidater = valbara.filter((u) => valda.has(u.id));
       let hamtade = await Promise.all(kandidater.map(async (k) => ({ k, u: await hamta(k.id) })));
+      const huvuden = new Set(hamtade.map(({ u }) => u?.sidor?.huvudId));
+      const saknade = valbara.filter((k) => huvuden.has(k.id) && !valda.has(k.id));
+      kandidater.push(...saknade);
+      kandidater.sort((a, b) => a.at.localeCompare(b.at));
+      hamtade = [...hamtade, ...await Promise.all(saknade.map(async (k) => ({ k, u: await hamta(k.id) })))].sort((a, b) => a.k.at.localeCompare(b.k.at));
 
       // 0. Filer som aldrig gått igenom flödet: Definiera och Plocka ut först
       const odefinierade = hamtade.filter(({ u }) => u && !u.definition);
@@ -244,7 +261,7 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
           fore: new Map(u!.transaktioner.map((t) => [t.id, lageFor(t)])), u,
         }));
       setFiler(lista);
-      if (!lista.length) { setFel('Kunden har inga underlag med transaktioner att köra om.'); return; }
+      if (!lista.length) { setFel('Urvalet har inga underlag med transaktioner att köra om.'); return; }
 
       const tidta = async <T,>(steg: string, fn: () => Promise<T>, fil?: string) => {
         const t0 = Date.now();
@@ -258,7 +275,7 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
 
       // 1. Kundbilden
       setText('Bygger kundbilden…');
-      await tidta('kundbild', () => post(lista[0].id, 'kundbild', { tvinga: true })).catch((e) => setFel(`Kundbilden: ${e.message} — konteringen körs ändå`));
+      await tidta('kundbild', () => post(lista[0].id, 'kundbild', { tvinga: valda.size === valbara.length })).catch((e) => setFel(`Kundbilden: ${e.message} — konteringen körs ändå`));
 
       // 2. Dublettcheck fil för fil, äldst först
       const trasiga = new Set<string>();
@@ -365,25 +382,72 @@ export function KorOmAlla({ kund, onFolj, onKlar }: {
   return (
     <div className="mb-3 bg-white border border-slate-200 rounded-2xl p-4">
       <div className="flex flex-wrap items-center gap-3 mb-2">
-        <h2 className="text-sm font-semibold text-slate-900 mr-auto">Kör om {kund.namn}s alla underlag</h2>
+        <h2 className="text-sm font-semibold text-slate-900 mr-auto">Kör om {kund.namn}s underlag</h2>
         {start && (
           <span className="text-xs text-slate-500 tabular-nums">
             {kor ? 'Pågår' : 'Tog'} {Math.round(((slut ?? Date.now()) - start) / 1000)} s{kundTider.length ? ` · ${kundTider.map((t) => `${t.steg} ${t.s} s`).join(' · ')}` : ''}
           </span>
         )}
-        <button
-          onClick={korOm}
-          disabled={kor}
-          className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg"
-        >
-          {kor ? `${text || 'Kör'}` : filer ? 'Kör om igen' : 'Kör om alla underlag'}
-        </button>
+        {bekraftar ? (
+          <>
+            <button onClick={() => setBekraftar(false)} className="px-2 py-1.5 text-xs text-slate-600 hover:text-slate-900">Avbryt</button>
+            <button onClick={korOm} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg">
+              Ja, kör om {valda.size}
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setBekraftar(true)}
+            disabled={kor || !valda.size}
+            className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg"
+          >
+            {kor ? `${text || 'Kör'}` : `Kör om ${valda.size} underlag`}
+          </button>
+        )}
       </div>
-      {!filer && (
-        <p className="text-xs text-slate-500">
-          Kör alla AI-steg från Komplettera på kundens alla filer med transaktioner, också de bokförda: kundbild, dublettcheck, komplettering, tillräckligt, kontering med jämkning och helhetskontroll. En bokförd transaktion vars kontering ändrats får sin verifikation ersatt, utom i perioder som redan är inlämnade.
+      {bekraftar && (
+        <p className="text-xs text-red-700 mb-2">
+          Alla AI-steg körs från Komplettera, också för bokförda transaktioner. En verifikation som ändrats ersätts, utom i inlämnade perioder. Ett konto du valt i Granska ersätts av den nya konteringen.
         </p>
       )}
+      {!filer && (
+        <p className="text-xs text-slate-500 mb-2">
+          Kör alla AI-steg från Komplettera på de underlag du kryssar i, också de bokförda: kundbild, dublettcheck, komplettering, tillräckligt, kontering och helhetskontroll. En bokförd transaktion vars kontering ändrats får sin verifikation ersatt, utom i perioder som redan är inlämnade.
+        </p>
+      )}
+      <details className="mb-2" open={!filer}>
+        <summary className="text-xs text-slate-600 cursor-pointer">
+          Välj underlag ({valda.size} av {valbara.length})
+        </summary>
+        <div className="flex gap-3 text-xs my-1">
+          <button onClick={() => vaxla(valbara.map((u) => u.id), true)} disabled={kor} className="text-blue-700 hover:underline disabled:opacity-50">Alla</button>
+          <button onClick={() => setValda(new Set())} disabled={kor} className="text-blue-700 hover:underline disabled:opacity-50">Inga</button>
+        </div>
+        <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg p-2 text-xs space-y-2">
+          {dagar.map((dag) => {
+            const dagens = valbara.filter((u) => u.at.slice(0, 10) === dag);
+            return (
+              <div key={dag}>
+                <label className="flex items-center gap-2 font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    disabled={kor}
+                    checked={dagens.every((u) => valda.has(u.id))}
+                    onChange={(e) => vaxla(dagens.map((u) => u.id), e.target.checked)}
+                  />
+                  {dag} ({dagens.length})
+                </label>
+                {dagens.map((u) => (
+                  <label key={u.id} className="flex items-center gap-2 pl-5 text-slate-700">
+                    <input type="checkbox" disabled={kor} checked={valda.has(u.id)} onChange={(e) => vaxla([u.id], e.target.checked)} />
+                    <span className="truncate">{u.fileName}{u.sidor ? <span className="text-slate-400"> · {u.sidor}</span> : null}</span>
+                  </label>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </details>
       {fel && <p className="text-xs text-red-600 mb-2">{fel}</p>}
 
       {filer && filer.length > 0 && (

@@ -2141,7 +2141,6 @@
     "Den 31 december finns 6 SRS-lådor hos företaget; 6 × 40 kr = 240 kr bokförs i debet på 1600 och kredit på 4000, och bokningen vänds den 1 januari"
    ],
    "varningar": [
-    "1600 får inte användas som restkonto för oidentifierade debetsaldon",
     "Skattekontot och inkomstskatten är privata i en enskild firma",
     "Momsfordran ska hållas separat på 1650",
     "Förskott till leverantörer ska prövas mot 1700 och 5 000-kronorsgränsen",
@@ -2620,7 +2619,6 @@
    ],
    "anvandInteNar": [
     "Beloppet är en vanlig intäkt, kostnad, tillgång eller skuld",
-    "Beloppet är ett specifikt uttag eller en specifik insättning under året och lämpligt underkonto finns",
     "Företaget är ett aktiebolag eller annan juridisk person",
     "Kontot används för att dölja en oförklarad differens i balansräkningen"
    ],
@@ -6103,7 +6101,6 @@
     "Kundförskott 10 000 kr plus 2 500 kr moms betalas i december och leveransen sker i februari: vid bokslutet debet 3000 och kredit 2900 med 10 000 kr; momsen ligger kvar; i februari debet 2900 och kredit 3000 med 10 000 kr"
    ],
    "varningar": [
-    "2900 får inte bli ett ospecificerat restkonto",
     "Kundförskott avgörs av om prestationen har påbörjats, inte av fakturans rubrik",
     "Lån, skatt och leverantörsskulder ska särredovisas",
     "Ägarens privata tillskott är inte en skuld i den enskilda firman",
@@ -6539,8 +6536,7 @@
     "Företaget har bara gjort ett verkligt utlägg för kundens räkning där kunden själv är betalningsskyldig; bokför då inte ersättningen som egen intäkt",
     "Beloppet är den egentliga försäljningen av en vara eller tjänst; använd relevant försäljningskonto",
     "Posten avser EU-land eller export och momshanteringen inte är säker",
-    "Tull- eller speditionskostnaden kan vara ett utlägg eller hör till varuinköpet",
-    "Underlaget är ospecificerat eller kontot används som restkonto"
+    "Tull- eller speditionskostnaden kan vara ett utlägg eller hör till varuinköpet"
    ],
    "beslutsregler": [
     "Kontrollera först i vems namn kostnaden uppkom: företagets eget namn talar för vidarefakturering, kundens namn för verkligt utlägg",
@@ -6567,7 +6563,6 @@
     "Blanda inte ihop vidarefakturering med verkligt utlägg",
     "Att kunden ersätter kostnaden gör inte automatiskt posten till ett utlägg",
     "EU-, export-, tull- och speditionsposter kräver kontroll innan bokföringen godkänns",
-    "3500 får inte användas som ospecificerat restkonto",
     "Spara kostnadsunderlaget och kopplingen till kundfakturan"
    ],
    "nyckelord": [
@@ -6674,7 +6669,6 @@
     "Beloppet är fakturerad kostnad, bil- eller bostadsförmån, anläggningstillgångsvinst eller bidrag",
     "Beloppet är ränteintäkt eller annan finansiell intäkt",
     "Beloppet hör till privatpersonen",
-    "Inkomstens art är okänd och 3900 används som restkonto",
     "Intäkten avser säkringsinstrument eller annan avancerad finansiell transaktion",
     "Intäkten förutsätter anställda, exempelvis sjuklöneersättning"
    ],
@@ -6688,8 +6682,7 @@
     "För försäljning av en tidigare direkt kostnadsförd inventarie: bokför ersättningen på 3900 och redovisa eventuell utgående moms separat",
     "Fördela inkomsten över flera år endast när det är uppenbart att den avser flera år enligt K1",
     "Kontrollera om ersättningen i stället ska påverka en tillgångs anskaffningsvärde, en vinst vid avyttring, ett bidrag eller en kostnad",
-    "Koppla intäkten till dokumenterad kategori och motpart och stäm av fordran, bankbetalning och efterföljande reglering",
-    "Blockera ospecificerade bokningar och använd aldrig 3900 som restkonto för okända insättningar"
+    "Koppla intäkten till dokumenterad kategori och motpart och stäm av fordran, bankbetalning och efterföljande reglering"
    ],
    "exempel": [
     "En dokumenterad sekundär provisions- eller licensintäkt kan bokföras på 3900 med rätt momsbehandling",
@@ -6697,7 +6690,6 @@
     "En tidigare kostnadsförd dator säljs och ersättningen bokförs på 3900 med eventuell moms separat"
    ],
    "varningar": [
-    "3900 får inte bli ett restkonto för okända insättningar",
     "R1 eller R2, nettoomsättning och momsbehandling måste fastställas per intäkt",
     "Hyresintäkter, försäkringsersättning, skadestånd, gåvor och skuldackord kräver manuell granskning",
     "Sekundär intäkt kan ändå ingå i nettoomsättningen beroende på verksamheten",
@@ -7588,7 +7580,6 @@
     "Reparation och förbättring måste skiljas åt utifrån åtgärdens ekonomiska innebörd",
     "Fakturans rubrik avgör inte klassificeringen",
     "Större komponentbyten kan behöva delas eller aktiveras",
-    "Fordon och vissa fastighetskostnader har mer specifika konton",
     "Saknad specifikation ska kompletteras innan bokning"
    ],
    "nyckelord": [
@@ -7613,7 +7604,7 @@
   {
    "konto": "5600",
    "namn": "Kostnader för transportmedel",
-   "beskrivning": "Huvud- eller samlingskonto på R6 för kostnader för företagets transportmedel. Mer specifika underkonton bör användas när fordonstyp och kostnadstyp är kända.",
+   "beskrivning": "Huvud- eller samlingskonto på R6 för kostnader för företagets transportmedel.",
    "anvandNar": [
     "Kostnaden hör till ett transportmedel som används i verksamheten",
     "Fordonstypen eller kostnadstypen är ännu inte särredovisad men systemets kontoplan tillåter 5600",
@@ -7623,30 +7614,24 @@
     "Kostnaden avser frakt eller transporttjänst köpt från extern transportör; använd 5700",
     "Beloppet är anskaffning av ett fordon; använd 1240/1241",
     "Kostnaden avser privat bil som ersätts enligt schablon; använd 5618",
-    "Ett mer specifikt underkonto som 5610–5620 ska användas enligt kontoplanen",
     "Privat användning eller fordonstillhörighet är oklar"
    ],
    "beslutsregler": [
     "Identifiera fordon, registreringsnummer, ägande eller leasing och användning",
     "Klassificera kostnaden som drivmedel, försäkring och skatt, reparation, leasing eller övrigt",
-    "Använd specifikt underkonto när uppgifterna finns",
     "Bokför endast företagets andel av kostnaden",
     "Bedöm momsavdragsrätten separat per fordonstyp och användning",
     "Koppla kvitto eller faktura till fordonsregister och period",
     "Stäm av mot 1240, leasingavtal, körjournal och eget uttag",
-    "Blockera 5600 som ospecificerat restkonto vid bokslut",
-    "Använd inte som ospecificerat restkonto",
     "Koppla varje kostnad till fordon och kostnadstyp genom fordonsreskontra",
     "Vid granskningsflagga begär in kvitto eller faktura samt registreringsnummer, ägandeform och kostnadstyp",
     "Sätt ärendet till väntar på underlag tills fordon, verksamhetsandel och momsbehandling är klarlagda",
-    "Godkänn 5600 när kostnaden hör till verksamhetens transportmedel men mer specifikt underkonto inte kan fastställas",
-    "Föreslå specifikt 56-konto, 5700 eller privat kostnad när underlaget visar en tydligare klassificering"
+    "Godkänn 5600 när kostnaden hör till verksamhetens transportmedel"
    ],
    "exempel": [
     "En ospecificerad fordonskostnad kan tillfälligt ligga på 5600 endast om den senare klassificeras till rätt fordons- och kostnadstyp"
    ],
    "varningar": [
-    "5600 bör inte användas när ett mer specifikt konto kan väljas",
     "Företagsägd bil och privat bil har olika kostnadsmodeller",
     "Momsavdrag och privat användning måste bedömas separat",
     "Frakt- och transporttjänster från extern leverantör hör normalt till 5700",
@@ -7674,7 +7659,7 @@
   {
    "konto": "5610",
    "namn": "Personbilskostnader",
-   "beskrivning": "Huvud- eller samlingskonto på R6 för kostnader för en personbil som hör till näringsverksamheten genom ägande eller leasing. Underkonton 5611–5619 bör användas när kostnadstypen är känd.",
+   "beskrivning": "Huvud- eller samlingskonto på R6 för kostnader för en personbil som hör till näringsverksamheten genom ägande eller leasing.",
    "anvandNar": [
     "Kostnaden hör till en personbil som är bokförd som tillgång i verksamheten eller leasas av verksamheten",
     "Fordonet och verksamhetsanvändningen är identifierade",
@@ -7684,13 +7669,11 @@
     "Bilen är privatägd och endast används för resor i verksamheten; använd normalt 5618 enligt aktuell schablonregel",
     "Beloppet är inköp av bilen; använd 1240/1241",
     "Kostnaden avser lastbil eller annat transportmedel",
-    "Ett specifikt underkonto 5611–5619 kan användas och krävs",
     "Privat användning eller bilens tillhörighet är inte utredd"
    ],
    "beslutsregler": [
     "Verifiera registreringsnummer, ägare eller leasingtagare och datum då bilen hör till verksamheten",
     "Koppla kostnaden till bilen och kostnadstyp",
-    "Använd specifikt underkonto för drivmedel, försäkring och skatt, reparation, leasing, privat bil eller övrigt när möjligt",
     "Bokför endast företagets kostnadsandel",
     "Registrera privat användning och hantera eget uttag och förmånsintäkt enligt separat regel",
     "Bedöm momsavdragsrätten per kostnad och biltyp",
@@ -8073,7 +8056,6 @@
    "beskrivning": "Kostnadskonto på R6 för andra verifierade kostnader för en företagsbokförd eller verksamhetsleasad personbil som inte hör till 5611, 5612, 5613 eller 5615.",
    "anvandNar": [
     "Kostnaden kan kopplas till en identifierad företagsbokförd eller leasad personbil",
-    "Utgiften saknar mer specifikt konto",
     "Kostnaden hör till verksamhetsanvändningen"
    ],
    "anvandInteNar": [
@@ -8085,7 +8067,6 @@
    ],
    "beslutsregler": [
     "Identifiera kostnadstyp, registreringsnummer, datum och affärsändamål",
-    "Pröva alltid mer specifikt konto först",
     "Bokför endast verksamhetsandel",
     "Bedöm ingående moms separat",
     "Separera avdragsgilla avgifter från böter och privata utgifter",
@@ -8095,15 +8076,14 @@
     "Specificera parkering, trängselskatt, vägavgift, självrisk, tvätt, besiktning eller övrigt per fordon",
     "Vid granskningsflagga begär in kvitto eller faktura, registreringsnummer och tydlig uppgift om kostnadstyp och affärsändamål",
     "Sätt ärendet till väntar på underlag tills kostnaden och verksamhetsandelen är verifierade",
-    "Godkänn 5619 endast för en verklig personbilskostnad som inte passar på ett mer specifikt 561-konto",
-    "Föreslå specifikt bilkonto eller privat kostnad och avvisa böter och andra ej avdragsgilla sanktioner från automatflödet"
+    "Godkänn 5619 endast för en verklig personbilskostnad",
+    "Avvisa böter och andra ej avdragsgilla sanktioner från automatflödet"
    ],
    "exempel": [
-    "En mindre verifierad fordonsavgift kan bokföras på 5619 när inget mer specifikt konto passar",
+    "En mindre verifierad fordonsavgift kan bokföras på 5619",
     "En parkeringsbot bokförs inte automatiskt som avdragsgill kostnad"
    ],
    "varningar": [
-    "5619 får inte bli restkonto",
     "Böter och sanktionsavgifter kan vara ej avdragsgilla",
     "Privatbilsschablonen täcker normala bilkostnader",
     "Moms och privat användning bedöms per kostnad",
@@ -8122,7 +8102,6 @@
     "Böter, sanktionsavgift eller privat kostnad kan ingå",
     "Fordon eller verksamhetsandel saknas",
     "Momsavdragsrätten är oklar",
-    "Mer specifikt konto kan vara rätt",
     "Kostnadstyp eller avdragsrätt är oklar"
    ],
    "trosklar": [],
@@ -8335,8 +8314,7 @@
    "anvandInteNar": [
     "Utgiften är privat",
     "Utgiften är representation eller en vanlig gåva",
-    "Sponsringen saknar tydlig motprestation eller reklamvärde",
-    "Kostnaden hör tydligare hemma på ett annat konto"
+    "Sponsringen saknar tydlig motprestation eller reklamvärde"
    ],
    "beslutsregler": [
     "Tydligt angivna reklamkanaler och marknadsföringsåtgärder får sammanföras automatiskt till 5900",
@@ -8382,23 +8360,21 @@
   {
    "konto": "6000",
    "namn": "Övriga försäljningskostnader",
-   "beskrivning": "Samlingskonto på R6 för försäljningskostnader som inte passar bättre som reklam och PR, representation, frakt, resa eller annan mer specifik extern kostnad.",
+   "beskrivning": "Samlingskonto på R6 för försäljningskostnader som inte är reklam och PR, representation, frakt eller resa.",
    "anvandNar": [
     "Utgiften har direkt samband med försäljning eller kundanskaffning",
-    "Ingen mer specifik tillåten kontogrupp beskriver kostnaden bättre",
     "Kostnadstyp, motpart, affärsändamål och underlag är dokumenterade",
     "Avgiften avser verifierad kortinlösen eller betalningsförmedling för företagets försäljning"
    ],
    "anvandInteNar": [
     "Utgiften är reklam; använd 5900",
     "Utgiften är representation; använd 6070-gruppen",
-    "Utgiften är frakt, resa, extern konsulttjänst eller annan kostnad med mer specifikt konto",
+    "Utgiften är frakt, resa eller extern konsulttjänst",
     "Beloppet är kundrabatt på 3700",
     "Kostnaden är privat, ej avdragsgill gåva eller okänd banktransaktion"
    ],
    "beslutsregler": [
     "Identifiera obligatorisk underkategori, exempelvis försäljningsmaterial, orderkostnad, kortavgift, kreditkostnad eller provision",
-    "Pröva alltid 3500, 3700, 5700, 5800, 5900, 6070 och 6500 först",
     "Verifiera direkt samband med försäljning",
     "Bokför avdragsgill moms separat",
     "BAS 6040 Kontokortsavgifter får sammanföras automatiskt när kortinlösarens avräkning och utbetalning kan stämmas av",
@@ -8418,7 +8394,6 @@
     "En okänd kortbetalning eller ospecificerad post på 6000 eller 6090 får inte godkännas utan underlag"
    ],
    "varningar": [
-    "6000 får inte bli restkonto",
     "Varje bokning behöver underkategori och affärskoppling",
     "Reklam, representation, resa, frakt och konsulttjänst särredovisas när möjligt",
     "Provision till privatperson kan medföra skyldighet att hantera skatt och avgifter",
@@ -8435,7 +8410,6 @@
     "R6"
    ],
    "granskningNar": [
-    "Mer specifikt konto kan vara rätt",
     "Kostnadstyp eller affärssamband saknas",
     "Gåva, representation eller privat utgift kan ingå",
     "Utland eller omvänd moms förekommer",
@@ -8788,21 +8762,18 @@
    "anvandNar": [
     "Utgiften avser en verifierad riskkostnad i näringsverksamheten",
     "Kostnaden gäller avdragsgillt skadestånd, faktisk garantikostnad, bevakning eller larm",
-    "Risk, händelse, period, motpart och verksamhetsanknytning är dokumenterade",
-    "Ingen mer specifik tillåten kontogrupp beskriver kostnaden bättre"
+    "Risk, händelse, period, motpart och verksamhetsanknytning är dokumenterade"
    ],
    "anvandInteNar": [
     "Utgiften är en vanlig företagsförsäkringspremie; använd normalt 6310",
     "Försäkringen eller risken är privat",
-    "Beloppet avser bil-, fastighets- eller annan kostnad med mer specifikt konto",
+    "Beloppet avser bil- eller fastighetskostnad",
     "Beloppet avser kundförlust, annan fordringsförlust, självrisk, förlust i pågående arbete eller skadestånd utan verifierad klassificering",
-    "Beloppet avser förändring av garantiavsättning; BAS 6361 ligger utanför tjänstens scope",
-    "Kontot används som ospecificerat restkonto"
+    "Beloppet avser förändring av garantiavsättning; BAS 6361 ligger utanför tjänstens scope"
    ],
    "beslutsregler": [
     "Identifiera kostnadstyp, händelse, motpart, period och verksamhetssamband",
     "Pröva 6310 för ordinarie företagsförsäkringspremier",
-    "Pröva mer specifikt fordons-, fastighets-, tillgångs- eller fordringskonto när kostnaden hör dit",
     "BAS 6341 får sammanföras automatiskt endast när skadeståndets avdragsrätt framgår av den valda BAS-underkategorin och underlaget stödjer klassificeringen",
     "BAS 6362 får sammanföras automatiskt när kostnaden är en faktisk, verifierad garantikostnad och inte en avsättning",
     "BAS 6370 får sammanföras automatiskt när kostnaden avser bevakning eller larm i verksamheten",
@@ -8829,14 +8800,12 @@
     "En kundförlust granskas separat och får inte automatiskt döljas som allmän riskkostnad"
    ],
    "varningar": [
-    "6300 får inte bli ett restkonto",
     "Ordinarie företagsförsäkringspremier bör normalt särredovisas på 6310",
     "Privata personförsäkringar är inte automatiskt avdragsgilla i firman",
     "Försäkringsersättning och premie är olika händelser",
     "Självrisk, skadestånd och fordringsförlust kräver dokumenterad klassificering",
     "Ej avdragsgilla skadestånd får inte behandlas som avdragsgill kostnad",
-    "Garantiavsättning får inte sammanblandas med faktisk garantikostnad",
-    "Mer specifika tillgångs-, fordons- och fordringskonton ska användas när möjligt"
+    "Garantiavsättning får inte sammanblandas med faktisk garantikostnad"
    ],
    "nyckelord": [
     "riskkostnad",
@@ -8852,7 +8821,6 @@
     "Självrisk, skadestånd, kundförlust eller annan fordringsförlust kan vara rätt klassificering",
     "Pågående arbete eller värdering av fordran påverkas",
     "Avdragsrätt eller momshantering är oklar",
-    "Mer specifikt konto finns",
     "Periodisering kan vara aktuell"
    ],
    "trosklar": [],
@@ -8898,7 +8866,6 @@
    "varningar": [
     "Försäkringens namn avgör inte ensam avdragsrätten",
     "Personförsäkringar har särskilda regler",
-    "Fordon och fastighet kan kräva mer specifikt konto",
     "Försäkringsersättningar redovisas separat",
     "Privat sjuk-, olycksfalls-, liv- eller pensionsförsäkring är inte vanlig företagsförsäkring"
    ],
@@ -8914,7 +8881,6 @@
     "Försäkringen kan vara privat eller en personförsäkring",
     "Försäkringsobjekt eller period saknas",
     "Återbetalning, självrisk eller ersättning förekommer",
-    "Mer specifikt kostnadskonto kan vara rätt",
     "Avdragsrätten är särskilt reglerad",
     "Försäkringstyp, privat andel eller periodisering är oklar"
    ],
@@ -8924,7 +8890,7 @@
   {
    "konto": "6500",
    "namn": "Övriga externa tjänster",
-   "beskrivning": "Kostnadskonto på R6 för köpta konsult-, redovisnings-, juridik-, IT- och andra externa tjänster som inte är underentreprenad, inhyrd personal eller en tjänst med mer specifikt konto.",
+   "beskrivning": "Kostnadskonto på R6 för köpta konsult-, redovisnings-, juridik-, IT- och andra externa tjänster som inte är underentreprenad eller inhyrd personal.",
    "anvandNar": [
     "En extern leverantör utför en avgränsad administrativ, rådgivande eller specialisttjänst",
     "Tjänsten stödjer verksamheten men är inte direkt del av produktionen på 4600",
@@ -8933,21 +8899,20 @@
    "anvandInteNar": [
     "Tjänsten är underentreprenad direkt i kundens leverans; använd 4600",
     "Personen ställs till företagets förfogande och leds som personal; använd 6800",
-    "Utgiften gäller reklam, tele, försäkring, resa eller annan mer specifik tjänst",
+    "Utgiften gäller reklam, tele, försäkring eller resa",
     "Köpet ger en separat rättighet, programvara, webbplats eller annan tillgång som ska aktiveras",
     "Avgiften är en ren medlemsavgift eller en blandad medlems- och serviceavgift där tjänstedelen inte framgår; skicka till manuell granskning"
    ],
    "beslutsregler": [
     "Identifiera leverantör, avtal, leverans, ansvar för resultat och period",
     "Skilj specialist- och konsulttjänst för den egna verksamheten från underentreprenad på 4600 och inhyrd personal på 6800",
-    "Använd ett mer specifikt kostnadskonto när tjänstens art omfattas av ett sådant konto",
     "Kontrollera F-skatt när ersättningen avser arbete; om F-skatt saknas ska ärendet granskas med avseende på skatteavdrag, arbetsgivaravgifter och eventuell anställningsrelation",
     "För utländsk leverantör: kontrollera beskattningsland, omvänd moms och eventuell skyldighet att göra skatteavdrag för arbete i Sverige",
     "Bokför kostnaden exklusive avdragsgill moms",
     "Pröva om köpet skapar en identifierbar tillgång eller ska ingå i en annan tillgångs anskaffningsvärde",
     "Koppla kostnaden till avtal, projekt och leverans och stäm av förskott, leverantörsskuld och kreditnota",
     "Periodisera tjänsten när betalnings- och leveransperioden inte sammanfaller enligt tillämplig K1-regel",
-    "Bankkostnader kan redovisas på 6500 när ett mer specifikt konto saknas",
+    "Bankkostnader kan redovisas på 6500",
     "För serviceavgift till branschorganisation: verifiera att avgiften avser en identifierbar tjänst; ren medlemsavgift eller oklar blandad avgift kräver manuell granskning"
    ],
    "exempel": [
@@ -9052,24 +9017,21 @@
   {
    "konto": "6900",
    "namn": "Övriga kostnader",
-   "beskrivning": "K1-konto på R6 för verksamhetskostnader som inte passar på ett mer specifikt konto, till exempel vissa licens-, patent-, varumärkes-, kontroll- och tillsynsavgifter. Kontot får inte användas som ospecificerat restkonto.",
+   "beskrivning": "K1-konto på R6 för verksamhetskostnader, till exempel vissa licens-, patent-, varumärkes-, kontroll- och tillsynsavgifter.",
    "anvandNar": [
     "Utgiften har ett tydligt samband med verksamheten och ska redovisas som extern kostnad på R6",
-    "Ingen mer specifik tillåten kontogrupp beskriver kostnaden bättre",
     "Kostnaden avser exempelvis licens eller royalty, eget patent eller varumärke, kontrollavgift eller tillsynsavgift",
     "Underlaget visar vad som köpts, motpart och affärsändamål"
    ],
    "anvandInteNar": [
     "Utgiften är privat eller saknar tydligt samband med verksamheten",
-    "Mer specifikt konto finns, exempelvis 5900, 6100, 6200, 6300, 6500, 6800 eller 6980",
-    "Utgiften är varuinköp, inventarie, ränta, avskrivning eller annan post som hör till en annan kontogrupp",
+    "Utgiften är varuinköp, inventarie, ränta eller avskrivning",
     "Posten är en okänd bank- eller korttransaktion",
     "Posten gäller föreningsavgift; använd 6980",
     "Posten gäller utländsk skatt, utländsk moms eller blandad verksamhet och kräver särskild kontroll"
    ],
    "beslutsregler": [
     "Identifiera alltid kostnadstyp, motpart, belopp, underlag och koppling till verksamheten",
-    "Pröva först om ett mer specifikt K1-konto ska användas",
     "BAS 6910, 6920, 6930, 6940, 6950 och 6991 får sammanföras automatiskt till 6900",
     "BAS 6900 och 6990 kräver specificering eftersom de är generella konton",
     "BAS 6970 kräver kontroll av att litteraturen är fackmässig och har tydlig koppling till verksamheten",
@@ -9080,29 +9042,25 @@
    ],
    "exempel": [
     "En dokumenterad tillsynsavgift från en myndighet bokförs på 6900",
-    "En licens- eller royaltyavgift som hör till verksamheten bokförs på 6900 när inget mer specifikt konto passar",
+    "En licens- eller royaltyavgift som hör till verksamheten bokförs på 6900",
     "En bok som direkt behandlar företagets yrkesområde kan bokföras efter kontroll, medan en allmän tidning kräver annan bedömning",
     "En gåva till en organisation granskas och får inte behandlas som avdragsgill kostnad utan stöd",
     "En okänd korttransaktion bokförs inte på 6900 utan utreds först"
    ],
    "varningar": [
-    "6900 får inte bli ett restkonto för kostnader som inte har utretts",
     "Privat kostnad och ej avdragsgill företagskostnad är inte samma sak",
     "Ej avdragsgilla kostnader måste kunna identifieras vid deklarationen",
-    "Gåvor och allmänna tidningar är normalt inte automatiskt avdragsgilla",
-    "Använd ett mer specifikt konto när det finns"
+    "Gåvor och allmänna tidningar är normalt inte automatiskt avdragsgilla"
    ],
    "nyckelord": [
     "övrig kostnad",
     "skadestånd",
     "avgift",
-    "restkonto",
     "ej avdragsgill kostnad",
     "R6"
    ],
    "granskningNar": [
     "Posten kommer från BAS 6900, 6970, 6990, 6992, 6993 eller 7990",
-    "Mer specifikt konto kan vara rätt",
     "Utgiften kan vara privat eller ej avdragsgill",
     "Litteraturens koppling till verksamheten är oklar",
     "Posten är en gåva, reklamgåva eller representationsgåva",
@@ -9369,7 +9327,6 @@
     "Företagarens eget gymkort är normalt privat och bokförs inte på 7600"
    ],
    "varningar": [
-    "7600 får inte användas som restkonto",
     "Företagarens privata kostnader är inte personalkostnader",
     "Verkliga kostnader för anställda ligger utanför standardtjänsten"
    ],

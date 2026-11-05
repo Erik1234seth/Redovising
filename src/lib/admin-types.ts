@@ -383,9 +383,9 @@ export interface AdminKontering {
   omvand: Omvand | null;
   motivering: string;
   /**
-   * Hur modellen kom fram (se `@/lib/kontering/kontera`): analysen och
-   * kandidaterna ur första passet, reglerna som inte stämde och jämkningen.
-   * Äldre konteringar har bara granskningens fält.
+   * Hur modellen kom fram (se `@/lib/kontering/kontera`): analysen, kontona den
+   * läste och reglerna som inte stämde. `forstaKonto` och `jamkning` finns bara
+   * på äldre konteringar, från när modellerna fick se varandras svar.
    */
   granskning: {
     stammer?: boolean; battre_konto?: string | null; granskning_kravs?: boolean; motivering?: string; forstaKonto?: string; svarade?: string;
@@ -393,6 +393,10 @@ export interface AdminKontering {
     sakerhet?: 'hog' | 'medel' | 'lag';
     analys?: string;
     kandidater?: { konto: string; namn: string; varfor: string }[];
+    /** Vad modellen sökte på webben. */
+    sokningar?: string[];
+    /** Kundens andra filer som modellen öppnade. */
+    filer?: string[];
     jamkning?: {
       fore: { konto: string | null; momssats: number | null; momsdelar: Momsdel[] | null; omvand?: Omvand | null; omdome: string; motivering: string };
       andradeSig: boolean;

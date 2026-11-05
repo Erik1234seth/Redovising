@@ -209,8 +209,8 @@ export function provaKonto({ konto, netto, brutto, datum }: {
 }
 
 /**
- * Den korta kontolistan till första passet: konto, namn, beskrivning och
- * sökord för alla K1-konton. Cirka 48 000 tecken.
+ * Den korta kontolistan i konteringens systemprompt: konto, namn, beskrivning
+ * och sökord för alla K1-konton. Hela regeltexten slår modellen upp själv.
  */
 export function kontolista(): string {
   return allaKonton()
