@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { lasUtTransaktioner } from '@/lib/transaktioner/import';
 import type { Definition } from './definiera';
 
 /**
@@ -14,8 +13,7 @@ import type { Definition } from './definiera';
  * sidan blir huvudunderlaget och de andra får `del_av` satt till den. Bara
  * huvudunderlaget läses ut, och då med alla sidor som ett dokument.
  *
- * Saknas en sida står den i `sidor_saknas` på huvudunderlaget, och då läses
- * ingenting ut förrän den kommit. Frågemejlet kl 18 dagen efter ber kunden om
+ * Saknas en sida står den i `sidor_saknas` på huvudunderlaget. Frågemejlet kl 18 dagen efter ber kunden om
  * den (se `@/lib/transaktioner/fragemejl`).
  *
  * Underlag utan sidnummer berörs inte — de flesta har inget.
@@ -110,17 +108,10 @@ export async function samlaSidor(supabase: SupabaseClient, underlagId: string): 
   }
   if (!andrade.length) return;
 
-  // Det som redan lästs ut ur en sida som nu är del av ett annat underlag tas
-  // bort, och huvudunderlaget läses om med alla sidor. Underlaget som
-  // definieras nu läses av den som anropade.
-  // Blir underlaget självt en sida rensas det här också: flödet fortsätter på
-  // huvudunderlaget, och det som lästs ut ur sidan förut låg annars kvar.
-  for (const s of andrade) {
-    if ((s.id === egen.id && !s.del_av) || !s.transaktioner_utlasta_at) continue;
-    if (s.id === huvud.id || s.del_av) {
-      await lasUtTransaktioner(supabase, s.id).catch((err) =>
-        console.error(`[sidor] kunde inte läsa om ${s.file_name}:`, err instanceof Error ? err.message : err));
-    }
+  // Underlagen läses i Flöde (@/lib/kontering/omgang). Har huvudunderlaget
+  // redan lästs där ska det köras om med alla sidor — Flöde visar det.
+  if (andrade.some((s) => s.transaktioner_utlasta_at)) {
+    await supabase.from('bokforing_underlag').update({ kund_svar_at: new Date().toISOString() }).eq('id', huvud.id);
   }
 }
 

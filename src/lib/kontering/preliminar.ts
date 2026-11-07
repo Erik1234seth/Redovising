@@ -13,8 +13,9 @@ import { rensaMomsdelar, sammaMoms, tolkaOmvand, type Momsdel, type Omvand } fro
  * konteringen ändras: ny AI-kontering, ett konto Erik valt, en ändrad
  * transaktion, en ångrad bokföring.
  *
- * Det som blir verifikation är byråns val om det finns, annars modellernas
- * kontering när båda är gröna och överens. Allt annat väntar på granskning.
+ * Det som blir verifikation är byråns val om det finns, annars AI:ns
+ * kontering när den är grön. Finns flera förslag (från tiden då två modeller
+ * konterade) ska alla vara gröna och överens. Allt annat väntar på granskning.
  *
  * Cron-jobbet /api/cron/verifikationer kör `bokforForfallna` en gång om dygnet.
  */
@@ -55,7 +56,7 @@ export function slutligKontering(vald: ValdKontering | null, konteringar: Konter
   }
   const moms = (k: KonteringRad) => ({ momssats: Number(k.momssats), momsdelar: rensaMomsdelar(k.momsdelar), omvand: tolkaOmvand(k.omvand) });
   const [a] = konteringar;
-  const gron = konteringar.length >= 2 && konteringar.every((k) => k.omdome === 'gron' && k.konto && k.konto === a.konto
+  const gron = konteringar.length >= 1 && konteringar.every((k) => k.omdome === 'gron' && k.konto && k.konto === a.konto
     && sammaMoms(moms(k), moms(a)));
   if (!gron) return null;
   return { konto: a.konto!, ...moms(a), momssats: Number(a.momssats) || 0, motkonto: null, signatur: 'AI' };

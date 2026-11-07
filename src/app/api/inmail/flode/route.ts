@@ -3,12 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 import { korUnderlagsomgang, type UnderlagsJobb } from '@/lib/underlag-kontroll';
 
 /**
- * En omgång av underlagsflödet (se korUnderlagsomgang). Svarar direkt och gör
- * jobbet efteråt, så att omgången innan inte behöver vänta.
+ * Svaret på ett underlagsmejl (se korUnderlagsomgang). Svarar direkt och gör
+ * jobbet efteråt.
  *
- * Reservväg: omgångarna går numera via kön (/api/queues/underlagsflode). Hit
- * kommer de bara när kön inte går att nå, och då gäller Vercels gräns på
- * ungefär fem led i kedja.
+ * Reservväg: jobben går via kön (/api/queues/underlagsflode). Hit kommer de
+ * bara när kön inte går att nå.
  */
 export const maxDuration = 300;
 
@@ -32,5 +31,5 @@ export async function POST(request: Request) {
 
   const bas = new URL(request.url).origin;
   after(() => korUnderlagsomgang(getSupabase(), bas, jobb));
-  return NextResponse.json({ ok: true, steg: jobb.steg ?? 'las', omgang: jobb.omgang ?? 0 });
+  return NextResponse.json({ ok: true });
 }

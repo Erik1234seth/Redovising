@@ -57,9 +57,11 @@ interface UnderlagRad {
   /** Sida i ett dokument som läses ut med huvudunderlaget, se `@/lib/underlag/sidor`. */
   del_av: string | null;
   sidor_saknas: number[] | null;
+  /** När Flöde skrev underlagets transaktioner (@/lib/kontering/omgang/skriv). */
+  flode_at: string | null;
 }
 
-const UNDERLAG_KOLUMNER = 'id, user_id, sender_email, file_name, file_path, mime_type, sortering, sortering_orsak, definition, del_av, sidor_saknas';
+const UNDERLAG_KOLUMNER = 'id, user_id, sender_email, file_name, file_path, mime_type, sortering, sortering_orsak, definition, del_av, sidor_saknas, flode_at';
 
 export async function lasUtTransaktioner(
   supabase: SupabaseClient,
@@ -69,6 +71,9 @@ export async function lasUtTransaktioner(
   let { data: hamtad, error } = await hamta();
   if (error) throw new Error(`Kunde inte läsa underlaget: ${error.message}`);
   if (!hamtad) throw new Error('Underlaget finns inte');
+  // Flöde äger underlaget när det har körts där — en avläsning här skulle
+  // ersätta dess konterade transaktioner med okonterade
+  if (hamtad.flode_at) throw new Error(`${hamtad.file_name} är läst av Flöde — kör om filen i Flöde i personkortet`);
 
   // Definiera känner igen sidor som hör ihop. Har den inte hunnit köras görs
   // det först, annars läses en ensam sida ut som ett eget kvitto.

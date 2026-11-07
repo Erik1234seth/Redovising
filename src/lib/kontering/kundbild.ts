@@ -66,7 +66,12 @@ export interface Arslista {
 export async function hamtaArslista(
   supabase: SupabaseClient,
   userId: string,
-  { medKonton = false, utanKontoFor = new Set<string>() }: { medKonton?: boolean; utanKontoFor?: Set<string> } = {},
+  { medKonton = false, utanKontoFor = new Set<string>(), utanUnderlag = new Set<string>() }: {
+    medKonton?: boolean;
+    utanKontoFor?: Set<string>;
+    /** Underlag vars transaktioner inte ska stå med alls — en provkörning läser dem på nytt. */
+    utanUnderlag?: Set<string>;
+  } = {},
 ): Promise<Arslista> {
   const rader: Arsrad[] = [];
   for (let fran = 0; rader.length < MAX_RADER; fran += 1000) {
@@ -91,7 +96,7 @@ export async function hamtaArslista(
       if (f.del_av) sidor.add(f.id);
     }
   }
-  const lista = rader.filter((r) => !r.underlag_id || !sidor.has(r.underlag_id)).slice(0, MAX_RADER).reverse();
+  const lista = rader.filter((r) => !r.underlag_id || (!sidor.has(r.underlag_id) && !utanUnderlag.has(r.underlag_id))).slice(0, MAX_RADER).reverse();
 
   const konton = medKonton ? await kontonFor(supabase, lista.map((r) => r.id).filter((id) => !utanKontoFor.has(id))) : new Map<string, string>();
   const nummer = new Map(lista.map((r, i) => [r.id, i + 1]));
@@ -185,7 +190,7 @@ const kontonamn = (konton: string[]) => konton.map((k) => `${k} ${slaUppKonto(k)
 /**
  * Kontot varje transaktion fått, med varifrån: bokförd, byrån eller AI. En
  * bokförd rad visar verifikationens konton. Byråns val går före AI:n, och
- * AI:n visas bara när båda modellerna är gröna och överens — oense säger inget.
+ * AI:n visas bara när konteringen är grön (och överens, där två modeller konterade förr).
  */
 async function kontonFor(supabase: SupabaseClient, ids: string[]): Promise<Map<string, string>> {
   const ut = new Map<string, string>();
@@ -211,13 +216,13 @@ async function kontonFor(supabase: SupabaseClient, ids: string[]): Promise<Map<s
     const perTransaktion = new Map<string, { konto: string | null; momssats: number | null; momsdelar: unknown; omdome: string }[]>();
     for (const x of k.data ?? []) perTransaktion.set(x.transaktion_id, [...(perTransaktion.get(x.transaktion_id) ?? []), x]);
     for (const [id, lista] of perTransaktion) {
-      if (ut.has(id) || lista.length < 2) continue;
+      if (ut.has(id) || !lista.length) continue;
       const [a] = lista;
       const overens = lista.every((x) => x.omdome === 'gron' && x.konto && x.konto === a.konto
         && sammaMoms({ momssats: Number(x.momssats), momsdelar: rensaMomsdelar(x.momsdelar) }, { momssats: Number(a.momssats), momsdelar: rensaMomsdelar(a.momsdelar) }));
       if (!overens) continue;
       const delar = rensaMomsdelar(a.momsdelar);
-      ut.set(id, `${kontonamn(delar ? [...new Set(delar.map((d) => d.konto ?? a.konto!))] : [a.konto!])} (AI, båda överens)`);
+      ut.set(id, `${kontonamn(delar ? [...new Set(delar.map((d) => d.konto ?? a.konto!))] : [a.konto!])} (AI, grön)`);
     }
   }
   return ut;

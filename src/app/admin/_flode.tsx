@@ -1,0 +1,575 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { momsText, type Momsdel, type Omvand } from '@/lib/kontering/momsdelar';
+import { kr } from './_verifikationer';
+import { KontoLank } from './_k1-konto';
+
+/**
+ * Flöde — konteringen sedan 2026-11-07: en modell (GPT-6.1 Sol) får alla valda
+ * underlag i ett anrop och sorterar, läser ut, letar dubbletter, säger vad som
+ * saknas och konterar (@/lib/kontering/omgang).
+ *
+ * Svaret skrivs till bokföringen: transaktionerna och konteringarna ersätts,
+ * gröna blir verifikationer efter 14 dagar och gula när byrån godkänt dem här
+ * eller valt konto i Kontering. Resultatet visas rad för rad, med det som fanns
+ * förut bredvid.
+ */
+
+interface Underlag {
+  id: string;
+  file_name: string;
+  mime_type: string | null;
+  created_at: string;
+  sortering: string | null;
+  sortering_orsak: string | null;
+  del_av: string | null;
+  transaktioner: number;
+  flode_at: string | null;
+  /** Kunden har mejlat om filen, eller skickat en sida till den. */
+  kund_svar_at: string | null;
+}
+
+/** Kunden har skickat något nytt om filen sedan den lästes i Flöde. */
+const nyttFranKunden = (u: Underlag) => !!u.kund_svar_at && (!u.flode_at || u.kund_svar_at > u.flode_at);
+
+interface Flagga { typ: string; allvar: 'stopp' | 'granskning'; text: string }
+
+interface Tx {
+  nr: number;
+  datum: string | null;
+  beskrivning: string;
+  motpart: string;
+  belopp: number;
+  moms: number;
+  valuta: string;
+  riktning: 'in' | 'ut';
+  vat_nummer: string;
+  anteckning: string;
+  uppgifter: Record<string, unknown>;
+  kronor: { belopp: number; moms: number | null; kurs: number } | null;
+  dublett: { status: 'unik' | 'tveksam' | 'dublett'; ref: string; refText?: string; motivering: string };
+  saknas: { vad: string; varfor: string }[];
+  antaganden: string;
+  kontering: {
+    konto: string | null;
+    kontonamn: string;
+    momssats: number | null;
+    momsdelar: Momsdel[] | null;
+    omvand: Omvand | null;
+    motivering: string;
+    regler: string[];
+    flaggor: Flagga[];
+    omdome: 'gron' | 'gul' | 'rod';
+    sakerhet: 'hog' | 'medel' | 'lag';
+    momshantering: string;
+  } | null;
+  verifikation: { konto: string; kontonamn: string; belopp: number }[] | null;
+  fel: string | null;
+  godkand?: { at: string } | null;
+  transaktionId?: string;
+}
+
+interface Gammal {
+  id: string;
+  datum: string | null;
+  belopp: number;
+  valuta: string | null;
+  riktning: 'in' | 'ut';
+  motpart: string | null;
+  beskrivning: string | null;
+  dublett: boolean;
+  forslag: { modell: string; konto: string | null; momssats: number | null; omdome: string }[];
+  vald: string | null;
+  bokfort: string[];
+}
+
+interface Fil {
+  fil: string;
+  underlagId: string;
+  namn: string;
+  sort: string | null;
+  vad: string;
+  delAv: string;
+  transaktioner: Tx[];
+  gammalt: Gammal[];
+  skrivet?: string;
+}
+
+interface Hoppad { underlagId: string; namn: string; orsak: string; varning: boolean }
+
+interface Resultat {
+  filer: Fil[];
+  anteckningar: string[];
+  kontroller: string[];
+  hoppade: Hoppad[];
+}
+
+interface Provrad {
+  id: string;
+  created_at: string;
+  korning: string;
+  del: number;
+  delar: number;
+  status: 'forbereder' | 'skickad' | 'tar-emot' | 'klar' | 'fel';
+  underlag_ids: string[];
+  varningar: Hoppad[];
+  resultat: Resultat | null;
+  usage: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number }; output_tokens_details?: { reasoning_tokens?: number } } | null;
+  kostnad_usd: number | null;
+  uppskattade_tokens: number | null;
+  fel: string | null;
+  klar_at: string | null;
+}
+
+/** Ungefärlig kurs för att visa kostnaden i kronor. */
+const USD_SEK = 9.88;
+/** Fullpris per underlag, ungefär — visas innan körningen startar. */
+const KR_PER_UNDERLAG = 0.25;
+type Godkann = (radId: string, fil: string, nr: number, godkand: boolean) => Promise<void>;
+
+const VANTANDE = new Set(['forbereder', 'skickad', 'tar-emot']);
+
+const TID = new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+const SORT: Record<string, string> = { underlag: 'Underlag', kontoutdrag: 'Kontoutdrag', verifikationer: 'Redan bokfört', ovrigt: 'Övrigt' };
+const SAKERHET: Record<string, string> = { hog: 'hög', medel: 'medel', lag: 'låg' };
+const OMDOME: Record<string, { prick: string; text: string }> = {
+  gron: { prick: 'bg-emerald-400', text: 'Grön' },
+  gul: { prick: 'bg-amber-400', text: 'Granska' },
+  rod: { prick: 'bg-red-500', text: 'Stopp' },
+};
+const MODELL: Record<string, string> = { 'gpt-6.1-sol': 'Sol', 'claude-opus-5-5': 'Opus', 'gpt-6-astra': 'Astra', 'gpt-5.5': 'GPT-5.5' };
+
+function filLank(id: string) {
+  return `/api/admin/underlag/${id}/ladda-ner?visa`;
+}
+
+/** Den gamla transaktionen som är samma affär: samma riktning och nästan samma belopp. */
+function sammaGamla(t: Tx, gamla: Gammal[]): Gammal | null {
+  const belopp = t.belopp;
+  return gamla.find((g) => g.riktning === t.riktning && Math.abs(Number(g.belopp) - belopp) <= 1) ?? null;
+}
+
+/** Kontona den gamla konteringen landade på: bokfört, byråns val, annars förslagen. */
+function gamlaKonton(g: Gammal): string[] {
+  if (g.bokfort.length) return g.bokfort;
+  if (g.vald) return [g.vald];
+  return [...new Set(g.forslag.map((f) => f.konto).filter((k): k is string => !!k))];
+}
+
+export function Flode({ userId }: { userId: string }) {
+  const [underlag, setUnderlag] = useState<Underlag[] | null>(null);
+  const [rader, setRader] = useState<Provrad[]>([]);
+  const [laddfel, setLaddfel] = useState('');
+  const [valda, setValda] = useState<string[]>([]);
+  const [query, setQuery] = useState('');
+  const [baraUnderlag, setBaraUnderlag] = useState(true);
+  const [startar, setStartar] = useState(false);
+  const [startfel, setStartfel] = useState('');
+
+  const ladda = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/kontering-prov?userId=${encodeURIComponent(userId)}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setUnderlag(data.underlag);
+      setRader(data.korningar);
+      setLaddfel('');
+    } catch (err) {
+      setLaddfel(err instanceof Error ? err.message : String(err));
+    }
+  }, [userId]);
+
+  useEffect(() => { ladda(); }, [ladda]);
+
+  // Så länge något väntar frågar sidan efter svaret
+  const vantar = rader.some((r) => VANTANDE.has(r.status));
+  useEffect(() => {
+    if (!vantar) return;
+    const t = setInterval(ladda, 15000);
+    return () => clearInterval(t);
+  }, [vantar, ladda]);
+
+  const synliga = useMemo(() => (underlag ?? []).filter((u) => {
+    if (baraUnderlag && u.sortering === 'ovrigt') return false;
+    if (!query) return true;
+    return u.file_name.toLowerCase().includes(query.toLowerCase());
+  }), [underlag, query, baraUnderlag]);
+
+  const korningar = useMemo(() => {
+    const m = new Map<string, Provrad[]>();
+    for (const r of rader) m.set(r.korning, [...(m.get(r.korning) ?? []), r]);
+    return [...m.values()].map((d) => d.sort((a, b) => a.del - b.del));
+  }, [rader]);
+
+  async function starta() {
+    setStartar(true);
+    setStartfel('');
+    try {
+      const res = await fetch('/api/admin/kontering-prov', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, underlagIds: valda }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setValda([]);
+      await ladda();
+    } catch (err) {
+      setStartfel(err instanceof Error ? err.message : String(err));
+    } finally {
+      setStartar(false);
+    }
+  }
+
+  /** Godkänn en gul kontering, eller ångra. Felet visas vid raden. */
+  const godkann: Godkann = async (radId, fil, nr, godkand) => {
+    const res = await fetch('/api/admin/kontering-prov', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, id: radId, fil, nr, godkand }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    await ladda();
+  };
+
+  async function taBort(korning: string) {
+    await fetch(`/api/admin/kontering-prov?userId=${encodeURIComponent(userId)}&korning=${korning}`, { method: 'DELETE' });
+    await ladda();
+  }
+
+  if (laddfel && !underlag) return <p className="text-red-600 text-sm">{laddfel}</p>;
+  if (!underlag) return <p className="text-slate-500 text-sm">Laddar…</p>;
+
+  const allaValda = synliga.length > 0 && synliga.every((u) => valda.includes(u.id));
+
+  return (
+    <div className="space-y-6">
+      <div className="text-sm text-slate-600 max-w-3xl">
+        GPT-6.1 Sol får alla valda underlag i ett anrop och sorterar, läser ut, letar dubbletter, säger vad som saknas och konterar.
+        Svaret ersätter underlagens transaktioner och konteringar. Gröna blir verifikationer efter 14 dagar, gula när du godkänt dem eller valt konto i Kontering.
+        Det som saknas frågas efter i kl 18-mejlet. Filer med något bokfört rörs inte.
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-lg">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-slate-200">
+          <h3 className="font-semibold text-slate-800 text-sm">Välj underlag</h3>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Sök filnamn"
+            className="border border-slate-300 rounded px-2 py-1 text-sm w-48 text-slate-900 bg-white"
+          />
+          <label className="text-sm text-slate-600 flex items-center gap-1.5">
+            <input type="checkbox" checked={baraUnderlag} onChange={(e) => setBaraUnderlag(e.target.checked)} className="accent-blue-600" />
+            Dölj övriga filer
+          </label>
+          <span className="ml-auto text-sm text-slate-600">
+            {valda.length} valda{valda.length ? ` · ca ${Math.max(1, Math.round(valda.length * KR_PER_UNDERLAG))} kr` : ''}
+          </span>
+          <button
+            onClick={starta}
+            disabled={!valda.length || startar}
+            className="bg-blue-600 text-white text-sm font-medium px-3 py-1.5 rounded disabled:opacity-40"
+          >
+            {startar ? 'Förbereder och skickar…' : `Kör ${valda.length || ''} underlag`.replace('  ', ' ')}
+          </button>
+        </div>
+        {startfel && <p className="px-4 py-2 text-sm text-red-600 border-b border-slate-200">{startfel}</p>}
+        <div className="max-h-80 overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600 sticky top-0">
+              <tr>
+                <th className="px-4 py-2 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allaValda}
+                    onChange={(e) => setValda(e.target.checked ? [...new Set([...valda, ...synliga.map((u) => u.id)])] : valda.filter((id) => !synliga.some((u) => u.id === id)))}
+                    className="accent-blue-600"
+                  />
+                </th>
+                <th className="text-left font-semibold px-2 py-2">Fil</th>
+                <th className="text-left font-semibold px-2 py-2">Inkom</th>
+                <th className="text-left font-semibold px-2 py-2">Sortering</th>
+                <th className="text-right font-semibold px-4 py-2">Transaktioner</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {synliga.map((u) => (
+                <tr key={u.id} className={valda.includes(u.id) ? 'bg-blue-50' : 'hover:bg-slate-50'}>
+                  <td className="px-4 py-1.5">
+                    <input
+                      type="checkbox"
+                      checked={valda.includes(u.id)}
+                      onChange={(e) => setValda((l) => (e.target.checked ? [...l, u.id] : l.filter((id) => id !== u.id)))}
+                      className="accent-blue-600"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <a href={filLank(u.id)} target="_blank" rel="noreferrer" className="text-blue-700 hover:underline">{u.file_name}</a>
+                    {u.del_av && <span className="text-slate-400 text-xs"> · sida i annat underlag</span>}
+                    {nyttFranKunden(u) && (
+                      <span className="ml-2 text-xs font-medium text-amber-800 bg-amber-100 rounded px-1.5 py-0.5" title="Kunden har mejlat om filen eller skickat en sida till den sedan den lästes — kör om den">
+                        Nytt från kunden {TID.format(new Date(u.kund_svar_at!))}
+                      </span>
+                    )}
+                    {!u.flode_at && u.sortering !== 'ovrigt' && !u.del_av && <span className="ml-2 text-xs text-blue-700">Inte körd</span>}
+                  </td>
+                  <td className="px-2 py-1.5 text-slate-600 whitespace-nowrap">{TID.format(new Date(u.created_at))}</td>
+                  <td className="px-2 py-1.5 text-slate-600">{u.sortering === 'ovrigt' ? `Övrigt${u.sortering_orsak ? ` — ${u.sortering_orsak}` : ''}` : u.sortering === 'underlag' ? 'Underlag' : '—'}</td>
+                  <td className="px-4 py-1.5 text-right tabular-nums text-slate-600">{u.transaktioner || ''}</td>
+                </tr>
+              ))}
+              {!synliga.length && <tr><td colSpan={5} className="px-4 py-4 text-slate-500">Inga underlag.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {laddfel && <p className="text-red-600 text-sm">{laddfel}</p>}
+      {korningar.map((delar) => <Korning key={delar[0].korning} delar={delar} onTaBort={() => taBort(delar[0].korning)} onGodkann={godkann} />)}
+    </div>
+  );
+}
+
+function Korning({ delar, onTaBort, onGodkann }: { delar: Provrad[]; onTaBort: () => void; onGodkann: Godkann }) {
+  const [bekrafta, setBekrafta] = useState(false);
+  const forsta = delar[0];
+  const klara = delar.filter((d) => d.status === 'klar' || d.status === 'fel').length;
+  const usd = delar.reduce((s, d) => s + (Number(d.kostnad_usd) || 0), 0);
+  const underlag = delar.reduce((s, d) => s + d.underlag_ids.length, 0);
+  const tx = delar.flatMap((d) => d.resultat?.filer ?? []).flatMap((f) => f.transaktioner);
+  const grona = tx.filter((t) => t.kontering?.omdome === 'gron').length;
+  const godkanda = tx.filter((t) => t.godkand).length;
+  const minuter = delar.every((d) => d.klar_at)
+    ? Math.round((Math.max(...delar.map((d) => new Date(d.klar_at!).getTime())) - new Date(forsta.created_at).getTime()) / 60000)
+    : null;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 border-b border-slate-200 text-sm">
+        <h3 className="font-semibold text-slate-800">Körning {TID.format(new Date(forsta.created_at))}</h3>
+        <span className="text-slate-600">{underlag} underlag{delar.length > 1 ? ` i ${delar.length} anrop` : ''}</span>
+        {klara < delar.length
+          ? <span className="text-blue-700">Väntar på svar ({klara} av {delar.length} klara) — sidan frågar var 15:e sekund</span>
+          : <span className="text-slate-600">{tx.length} transaktioner · {grona} gröna{godkanda ? ` · ${godkanda} ${godkanda === 1 ? 'godkänd' : 'godkända'}` : ''} · {tx.length - grona - godkanda} till Granska{minuter !== null ? ` · ${minuter} min` : ''}</span>}
+        {usd > 0 && <span className="text-slate-600">{kr.format(usd * USD_SEK)} ({usd.toFixed(2)} USD)</span>}
+        <span className="ml-auto">
+          {bekrafta ? (
+            <>
+              <span className="text-slate-500 text-xs mr-3">Det bokförda ligger kvar.</span>
+              <button onClick={onTaBort} className="text-red-600 text-sm font-medium mr-3">Ja, ta bort ur listan</button>
+              <button onClick={() => setBekrafta(false)} className="text-slate-500 text-sm">Avbryt</button>
+            </>
+          ) : (
+            <button onClick={() => setBekrafta(true)} className="text-slate-500 hover:text-red-600 text-sm">Ta bort ur listan</button>
+          )}
+        </span>
+      </div>
+      <div className="divide-y divide-slate-200">
+        {delar.map((d) => <Del key={d.id} rad={d} visaNummer={delar.length > 1} onGodkann={(fil, nr, val) => onGodkann(d.id, fil, nr, val)} />)}
+      </div>
+    </div>
+  );
+}
+
+function Del({ rad: d, visaNummer, onGodkann }: { rad: Provrad; visaNummer: boolean; onGodkann: (fil: string, nr: number, val: boolean) => Promise<void> }) {
+  const r = d.resultat;
+  const hoppade = r?.hoppade ?? d.varningar ?? [];
+  const tokens = d.usage ? `${(d.usage.input_tokens ?? 0).toLocaleString('sv-SE')} in (${(d.usage.input_tokens_details?.cached_tokens ?? 0).toLocaleString('sv-SE')} cachade) · ${(d.usage.output_tokens ?? 0).toLocaleString('sv-SE')} ut, varav ${(d.usage.output_tokens_details?.reasoning_tokens ?? 0).toLocaleString('sv-SE')} tänkande` : '';
+  return (
+    <div className="px-4 py-3 space-y-3">
+      {(visaNummer || tokens) && (
+        <div className="text-xs text-slate-500">
+          {visaNummer && <span className="font-semibold text-slate-700 mr-2">Anrop {d.del} av {d.delar}</span>}
+          {tokens}
+          {d.uppskattade_tokens ? ` · uppskattat ${d.uppskattade_tokens.toLocaleString('sv-SE')} in` : ''}
+        </div>
+      )}
+      {VANTANDE.has(d.status) && <p className="text-sm text-blue-700">{d.status === 'forbereder' ? 'Förbereder…' : d.status === 'tar-emot' ? 'Tar emot svaret…' : 'Skickad — modellen arbetar.'}</p>}
+      {d.status === 'fel' && <p className="text-sm text-red-600">{d.fel}</p>}
+
+      {hoppade.length > 0 && (
+        <div className="text-sm">
+          <div className="font-medium text-slate-700">Skickades inte</div>
+          <ul className="mt-1 space-y-0.5">
+            {hoppade.map((h) => (
+              <li key={h.underlagId} className={h.varning ? 'text-amber-700' : 'text-slate-500'}>
+                {h.varning ? '⚠ ' : ''}<a href={filLank(h.underlagId)} target="_blank" rel="noreferrer" className="hover:underline">{h.namn}</a> — {h.orsak}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {r && r.kontroller.length > 0 && (
+        <div className="text-sm">
+          <div className="font-medium text-slate-700">Kontroller av svaret</div>
+          <ul className="mt-1 space-y-0.5 text-amber-700">{r.kontroller.map((k, i) => <li key={i}>⚠ {k}</li>)}</ul>
+        </div>
+      )}
+      {r && r.anteckningar.length > 0 && (
+        <div className="text-sm">
+          <div className="font-medium text-slate-700">Modellens anteckningar</div>
+          <ul className="mt-1 space-y-0.5 text-slate-700 list-disc pl-5">{r.anteckningar.map((a, i) => <li key={i}>{a}</li>)}</ul>
+        </div>
+      )}
+      {r?.filer.map((f) => <FilVy key={f.fil} fil={f} onGodkann={(nr, val) => onGodkann(f.fil, nr, val)} />)}
+    </div>
+  );
+}
+
+function FilVy({ fil: f, onGodkann }: { fil: Fil; onGodkann: (nr: number, val: boolean) => Promise<void> }) {
+  // Gamla transaktioner som ingen ny motsvarar visas sist
+  const matchade = new Set(f.transaktioner.map((t) => sammaGamla(t, f.gammalt)?.id).filter(Boolean));
+  const overblivna = f.gammalt.filter((g) => !matchade.has(g.id) && !g.dublett);
+  return (
+    <div className="border border-slate-200 rounded">
+      <div className="flex flex-wrap items-baseline gap-x-3 px-3 py-2 bg-slate-50 border-b border-slate-200 text-sm">
+        <span className="font-semibold text-slate-700">{f.fil}</span>
+        <a href={filLank(f.underlagId)} target="_blank" rel="noreferrer" className="text-blue-700 hover:underline">{f.namn}</a>
+        <span className="text-slate-600">{f.sort ? SORT[f.sort] ?? f.sort : <span className="text-red-600">Inget svar</span>}{f.vad ? ` — ${f.vad}` : ''}</span>
+        {f.delAv && <span className="text-slate-600">Sida i {f.delAv}</span>}
+        {!f.transaktioner.length && f.gammalt.length > 0 && (
+          <span className="text-amber-700 text-xs">Förut: {f.gammalt.length} transaktioner ur filen</span>
+        )}
+      </div>
+      {f.skrivet && (
+        <div className={`px-3 py-1.5 text-xs border-b border-slate-100 ${/^Fel|rördes inte|inget skrevs|Plocka verif/.test(f.skrivet) ? 'text-amber-800 bg-amber-50' : 'text-slate-600'}`}>
+          {f.skrivet}
+        </div>
+      )}
+      {f.transaktioner.length > 0 && (
+        <div className="divide-y divide-slate-100">
+          {f.transaktioner.map((t) => <TxVy key={t.nr} t={t} gammal={sammaGamla(t, f.gammalt)} onGodkann={(val) => onGodkann(t.nr, val)} />)}
+        </div>
+      )}
+      {overblivna.length > 0 && (
+        <div className="px-3 py-2 text-xs text-amber-700 border-t border-slate-100">
+          Förut fanns också: {overblivna.map((g) => `${g.datum ?? '—'} ${g.riktning === 'in' ? '+' : '−'}${kr.format(g.belopp)} ${g.motpart ?? ''} → ${gamlaKonton(g).join('/') || 'okonterad'}`).join(' · ')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TxVy({ t, gammal, onGodkann }: { t: Tx; gammal: Gammal | null; onGodkann: (val: boolean) => Promise<void> }) {
+  const [sparar, setSparar] = useState(false);
+  const [godkannFel, setGodkannFel] = useState('');
+  async function satt(val: boolean) {
+    setSparar(true);
+    setGodkannFel('');
+    try { await onGodkann(val); } catch (err) { setGodkannFel(err instanceof Error ? err.message : String(err)); } finally { setSparar(false); }
+  }
+  const k = t.kontering;
+  const o = k ? OMDOME[k.omdome] : null;
+  const gamla = gammal ? gamlaKonton(gammal) : [];
+  const nyaKonton = k ? [...new Set([k.konto, ...(k.momsdelar ?? []).map((d) => d.konto)].filter((x): x is string => !!x))] : [];
+  const skiljer = gammal && gamla.length > 0 && k?.konto && !nyaKonton.some((n) => gamla.includes(n));
+
+  return (
+    <div className={`px-3 py-2.5 text-sm grid gap-x-6 gap-y-2 md:grid-cols-[1fr_1fr] ${skiljer ? 'bg-amber-50' : ''}`}>
+      {/* Vänster: transaktionen och den nya konteringen */}
+      <div className="space-y-1.5 min-w-0">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-slate-500 tabular-nums">{t.datum ?? <span className="text-blue-700">utan datum</span>}</span>
+          <span className="text-slate-900 font-medium">{t.beskrivning || '—'}</span>
+          {t.motpart && <span className="text-slate-500">· {t.motpart}</span>}
+          <span className={`ml-auto tabular-nums font-medium ${t.riktning === 'in' ? 'text-emerald-700' : 'text-slate-800'}`}>
+            {t.riktning === 'in' ? '+' : '−'}{kr.format(t.belopp)}{t.valuta !== 'SEK' ? ` ${t.valuta}` : ''}
+            {t.kronor && t.valuta !== 'SEK' && <span className="text-slate-500 font-normal"> = {kr.format(t.kronor.belopp)} kr</span>}
+            {t.moms ? <span className="block text-right text-slate-400 text-[11px] font-normal">moms {kr.format(t.moms)}</span> : null}
+          </span>
+        </div>
+        {k ? (
+          <div>
+            <div className="flex flex-wrap items-center gap-x-2">
+              {o && <span className={`inline-block w-2 h-2 rounded-full ${o.prick}`} title={o.text} />}
+              {k.konto ? (
+                <KontoLank konto={k.konto} className="font-semibold text-slate-800">{k.konto} {k.kontonamn}</KontoLank>
+              ) : <span className="font-semibold text-red-600">Inget konto</span>}
+              <span className="text-slate-600">{momsText(k.momssats, k.momsdelar, k.omvand)}</span>
+              {(k.momsdelar ?? []).filter((d) => d.konto && d.konto !== k.konto).map((d) => (
+                <KontoLank key={d.konto} konto={d.konto!} className="text-slate-700 text-xs">{d.konto}</KontoLank>
+              ))}
+              <span className="text-slate-500 text-xs">säkerhet {SAKERHET[k.sakerhet] ?? k.sakerhet}</span>
+              {o && !t.godkand && <span className={`text-xs ${k.omdome === 'gron' ? 'text-emerald-700' : k.omdome === 'rod' ? 'text-red-600' : 'text-amber-700'}`}>{o.text}</span>}
+              {t.godkand && <span className="text-xs text-emerald-700 font-medium" title="Blir verifikation 14 dagar efter godkännandet">✓ Godkänd av byrån</span>}
+              {k.omdome === 'gul' && !t.godkand && (
+                <button onClick={() => satt(true)} disabled={sparar} className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-2 py-0.5 disabled:opacity-40">
+                  {sparar ? 'Sparar…' : 'Godkänn'}
+                </button>
+              )}
+              {t.godkand && (
+                <button onClick={() => satt(false)} disabled={sparar} className="text-xs text-slate-500 hover:text-slate-800 disabled:opacity-40">Ångra</button>
+              )}
+              {godkannFel && <span className="text-xs text-red-600">{godkannFel}</span>}
+            </div>
+            <p className="text-slate-600 mt-0.5">{k.motivering}</p>
+            {k.regler.length > 0 && <p className="text-slate-500 text-xs mt-0.5">Kundregler: {k.regler.join(', ')}</p>}
+            {k.flaggor.length > 0 && (
+              <ul className="mt-1 space-y-0.5">
+                {/* Det som saknas står i en egen rad nedan */}
+                {k.flaggor.filter((f) => f.typ !== 'saknas').map((f, i) => <li key={i} className={`text-xs ${f.allvar === 'stopp' ? 'text-red-600' : 'text-amber-700'}`}>{f.text}</li>)}
+              </ul>
+            )}
+          </div>
+        ) : null}
+        {t.fel && <p className="text-red-600 text-xs">{t.fel}</p>}
+        {t.dublett.status !== 'unik' && (
+          <p className={`text-xs ${t.dublett.status === 'dublett' ? 'text-red-600' : 'text-amber-700'}`}>
+            {t.dublett.status === 'dublett' ? 'Dubblett' : 'Kanske dubblett'} av {t.dublett.refText || 'okänd rad'}: {t.dublett.motivering}
+          </p>
+        )}
+        {t.saknas.length > 0 && (
+          <div className="text-xs text-amber-700">
+            Saknas: {t.saknas.map((s) => `${s.vad} (${s.varfor})`).join(' · ')}
+          </div>
+        )}
+        {t.antaganden && <p className="text-xs text-slate-500">Antaganden: {t.antaganden}</p>}
+        {t.anteckning && <p className="text-xs text-slate-500">Anteckning: {t.anteckning}</p>}
+        <details className="text-xs text-slate-500">
+          <summary className="cursor-pointer select-none">Verifikation och uppgifter</summary>
+          {t.verifikation && (
+            <table className="mt-1 tabular-nums">
+              <tbody>
+                {t.verifikation.map((r, i) => (
+                  <tr key={i}>
+                    <td className="pr-3">{r.konto}</td>
+                    <td className="pr-3">{r.kontonamn}</td>
+                    <td className="pr-3 text-right">{r.belopp > 0 ? kr.format(r.belopp) : ''}</td>
+                    <td className="text-right">{r.belopp < 0 ? kr.format(-r.belopp) : ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {t.vat_nummer && <div className="mt-1">VAT: {t.vat_nummer}</div>}
+          {Object.keys(t.uppgifter ?? {}).length > 0 && <pre className="mt-1 whitespace-pre-wrap break-all">{JSON.stringify(t.uppgifter, null, 1)}</pre>}
+        </details>
+      </div>
+
+      {/* Höger: hur samma affär konterades förut */}
+      <div className="text-xs text-slate-600 min-w-0 md:border-l md:border-slate-200 md:pl-4">
+        {gammal ? (
+          <>
+            <div className="font-medium text-slate-700 mb-0.5">
+              Förut{skiljer && <span className="ml-2 text-amber-700 font-semibold">Skiljer sig</span>}
+            </div>
+            <div>{gammal.datum ?? '—'} · {gammal.motpart ?? gammal.beskrivning ?? '—'} · {gammal.riktning === 'in' ? '+' : '−'}{kr.format(gammal.belopp)}{gammal.valuta && gammal.valuta !== 'SEK' ? ` ${gammal.valuta}` : ''}</div>
+            {gammal.dublett && <div className="text-slate-500">Markerad som dubblett</div>}
+            {gammal.bokfort.length > 0 && <div>Bokförd på {gammal.bokfort.join(', ')}</div>}
+            {gammal.vald && <div>Byrån valde {gammal.vald}</div>}
+            {gammal.forslag.map((f, i) => (
+              <div key={i}>{MODELL[f.modell] ?? f.modell}: {f.konto ?? '—'}{f.momssats !== null ? ` ${f.momssats} %` : ''} <span className="text-slate-400">({OMDOME[f.omdome]?.text ?? f.omdome})</span></div>
+            ))}
+            {!gammal.bokfort.length && !gammal.vald && !gammal.forslag.length && <div className="text-slate-400">Inte konterad</div>}
+          </>
+        ) : (
+          <div className="text-slate-400">Ingen motsvarande transaktion förut</div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -15,6 +15,7 @@ import { TransaktionsLista } from '../../_transaktioner';
 import { kanLasasAvAi } from '@/lib/underlag/filtyp';
 import { BokslutChecklista, bokslutPunkter, type UppladdningsPunkt } from '../../_bokslut';
 import { KonteringsVy } from '../../_kontering';
+import { Flode } from '../../_flode';
 import { MomsFil } from '../../_momsfil';
 import { Varningar } from '../../_varningar';
 import { NeBilaga } from '../../_ne';
@@ -43,6 +44,7 @@ const TABS = [
   { id: 'underlag', label: 'Underlag' },
   { id: 'transaktioner', label: 'Transaktioner' },
   { id: 'kontering', label: 'Kontering' },
+  { id: 'flode', label: 'Flöde' },
   { id: 'verifikationer', label: 'Verifikationer' },
   { id: 'huvudbok', label: 'Huvudbok' },
   { id: 'rapporter', label: 'Rapporter' },
@@ -52,7 +54,7 @@ const TABS = [
 type Tab = (typeof TABS)[number]['id'];
 
 /** Flikarna som ligger i Bokföring-menyn i stället för på raden. */
-const BOKFORING: Tab[] = ['underlag', 'transaktioner', 'kontering', 'verifikationer', 'huvudbok', 'rapporter', 'inlamning'];
+const BOKFORING: Tab[] = ['underlag', 'transaktioner', 'kontering', 'flode', 'verifikationer', 'huvudbok', 'rapporter', 'inlamning'];
 
 export default function PersonPage() {
   const params = useParams<{ key: string }>();
@@ -1598,6 +1600,15 @@ export default function PersonPage() {
               <KonteringsVy userId={person.profileId} betalsatt={person.betalsatt} />
             ) : (
               <p className="text-slate-500 text-sm">Personen har inget konto än, så det finns inget att kontera.</p>
+            )
+          )}
+
+          {/* Den nya konteringen, provkörd utan att något bokförs */}
+          {tab === 'flode' && (
+            person.profileId ? (
+              <Flode userId={person.profileId} />
+            ) : (
+              <p className="text-slate-500 text-sm">Personen har inget konto än, så det finns inget att provköra.</p>
             )
           )}
 

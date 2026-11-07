@@ -79,15 +79,13 @@ async function spara(anrop: Anropsinfo, modell: string, t: Tokens): Promise<void
 
 const tal = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : 0);
 
-/** Svaret från OpenAI. Chat Completions och Responses kallar fälten olika, och båda räknar cachen som del av indata. */
-export async function loggaOpenAI(
-  anrop: Anropsinfo,
-  modell: string,
+/** Chat Completions och Responses kallar fälten olika, och båda räknar cachen som del av indata. */
+function openaiTokens(
   usage: Record<string, any> | null | undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
-  extra: { webbsokningar?: number; kodmiljoer?: number } = {},
-): Promise<void> {
+  extra: { webbsokningar?: number; kodmiljoer?: number },
+): Tokens {
   const cacheLast = tal(usage?.prompt_tokens_details?.cached_tokens ?? usage?.input_tokens_details?.cached_tokens);
-  await spara(anrop, modell, {
+  return {
     indata: Math.max(0, tal(usage?.prompt_tokens ?? usage?.input_tokens) - cacheLast),
     cacheLast,
     cacheSkrivet: 0,
@@ -95,7 +93,25 @@ export async function loggaOpenAI(
     tankande: tal(usage?.completion_tokens_details?.reasoning_tokens ?? usage?.output_tokens_details?.reasoning_tokens),
     webbsokningar: extra.webbsokningar ?? 0,
     kodmiljoer: extra.kodmiljoer ?? 0,
-  });
+  };
+}
+
+/** Svaret från OpenAI. */
+export async function loggaOpenAI(
+  anrop: Anropsinfo,
+  modell: string,
+  usage: Record<string, any> | null | undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
+  extra: { webbsokningar?: number; kodmiljoer?: number } = {},
+): Promise<void> {
+  await spara(anrop, modell, openaiTokens(usage, extra));
+}
+
+/** Vad ett OpenAI-anrop kostade i dollar, till listpris. Null för en modell utan pris. */
+export function kostnadOpenAI(
+  modell: string,
+  usage: Record<string, any> | null | undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
+): number | null {
+  return kostnad(modell, openaiTokens(usage, {}));
 }
 
 /** Svaret från Claude. Här ligger cachen utanför input_tokens, och tänkandet ingår i output_tokens utan egen siffra. */

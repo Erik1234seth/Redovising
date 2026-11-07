@@ -12,6 +12,7 @@ import { MODELLER, fraga, samtalMedUppslag, type Del, type Modell, type Prova, t
 import { momsText, rensaMomsdelar, slaIhopDelar, tolkaOmvand, type Momsdel, type Omvand } from './momsdelar';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
 import { BYRANS_PRINCIPER } from './principer';
+import { laddaK1Andringar } from './k1-andringar';
 import { filensRader, underlagetsDelar, type Filrad } from './underlag';
 import { arUtlandsk, iKronor, omrakningText, raknaOmTillKronor, type Kronor } from './kronor';
 
@@ -59,7 +60,7 @@ import { arUtlandsk, iKronor, omrakningText, raknaOmTillKronor, type Kronor } fr
 export type Omdome = 'gron' | 'gul' | 'rod';
 type Momshantering = 'svensk' | 'ingen' | 'omvand';
 
-interface Transaktion {
+export interface Transaktion {
   id: string;
   user_id: string;
   customer_email: string | null;
@@ -90,7 +91,7 @@ export interface Kandidat {
   varfor: string;
 }
 
-interface Beslut {
+export interface Beslut {
   analys: string;
   /** En del per konto och momssats — en enda när hela beloppet har samma konto och sats. */
   delar: { konto: string; momssats: 0 | 6 | 12 | 25; belopp: number; moms: number | null }[];
@@ -186,7 +187,7 @@ const GEMENSAMT = `Du konterar transaktioner åt en svensk enskild näringsidkar
 
 Du får, i den här ordningen:
 - KUNDBILDEN: en kollegas sammanställning av kunden.
-- KUNDENS TRANSAKTIONER: alla kundens transaktioner, en rad var (K1, K2 …), med kontot de redan fått när det finns: "(bokförd)", "(byrån valde)" eller "(AI, båda överens)". Rader utan konto är inte konterade än, modellerna var oense, eller så konteras de just nu.
+- KUNDENS TRANSAKTIONER: alla kundens transaktioner, en rad var (K1, K2 …), med kontot de redan fått när det finns: "(bokförd)", "(byrån valde)" eller "(AI, grön)". Rader utan konto är inte konterade än, väntar på granskning, eller så konteras de just nu.
 - Kundens mejl till byrån och kundreglerna.
 - ORIGINALUNDERLAGET som transaktionen kommer ifrån — kvittot, fakturan eller kontoutdraget som det ser ut — och alla transaktioner som lästs ut ur filen (F1, F2 …).
 - Sist EN transaktion att kontera, med var den står i filen och i kundens lista.
@@ -612,6 +613,17 @@ function byggKontering(
   };
 }
 
+/**
+ * Konteringen ur ett beslut som kom utan samtal — från omgången där en modell
+ * konterar alla kundens underlag i ett anrop (@/lib/kontering/omgang). Samma
+ * moms, gränsprövningar och flaggor som i samtalet.
+ */
+export function konteringUrBeslut(t: Transaktion, betalsatt: Betalsatt, beslut: Beslut, regelIdn: string[]): Kontering {
+  return byggKontering('gpt-6.1-sol', t, betalsatt, beslut, regelIdn, new Set(['gpt-6.1-sol']), {
+    analys: String(beslut.analys ?? ''), lasta: [], sokningar: new Set(), filer: new Set(), tidSlut: false,
+  });
+}
+
 /** Kontona modellen har läst, som de sparas och visas. */
 function lastaKonton(samtal: Samtal<Beslut>): Kandidat[] {
   return [...samtal.lasta].map((konto) => ({ konto, namn: slaUppKonto(konto)?.namn ?? '', varfor: '' }));
@@ -700,6 +712,8 @@ export async function konteraTransaktioner(
     medBokforda?: boolean;
   } = {},
 ): Promise<Utfall[]> {
+  // Byråns ändringar i kontobeskrivningarna gäller också här
+  await laddaK1Andringar(supabase);
   const { data: profil, error: profilFel } = await supabase
     .from('profiles').select(KUND_KOLUMNER).eq('id', userId).maybeSingle();
   if (profilFel) throw new Error(`Kunde inte läsa kunden: ${profilFel.message}`);

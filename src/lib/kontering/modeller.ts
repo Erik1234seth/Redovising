@@ -16,9 +16,14 @@ import { loggaClaude, loggaOpenAI, type Anropsinfo } from '@/lib/ai-logg';
  * minuter, och den måste hinna klart inom Vercels fem minuter.
  */
 
-export const MODELLER = ['gpt-6.1-sol', 'claude-opus-5-5'] as const;
+/**
+ * Bara GPT-6.1 Sol sedan 2026-11-07: Claude Opus 5.5 är avstängd, och
+ * konteringen görs i Flöde (@/lib/kontering/omgang). Den här listan används
+ * när byrån konterar om en enstaka transaktion.
+ */
+export const MODELLER = ['gpt-6.1-sol'] as const;
 /** Konteringens modeller, och de andra som går genom samma anrop (kundbilden och helhetskontrollen). */
-export type Modell = (typeof MODELLER)[number] | 'claude-sonnet-5-5';
+export type Modell = (typeof MODELLER)[number] | 'claude-opus-5-5' | 'claude-sonnet-5-5';
 
 export interface Svar<T> {
   data: T;

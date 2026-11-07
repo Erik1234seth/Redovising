@@ -55,6 +55,12 @@ export async function GET(request: NextRequest) {
 }
 
 const STEG = ['definiera', 'plocka-trans', 'plocka-verif', 'komplettera', 'dublett', 'tillrackligt', 'skriv-mejl', 'kundbild', 'konteras', 'helhet', 'skapa-verif'];
+/**
+ * Stegen som Flöde i personkortet ersatte 2026-11-07 (@/lib/kontering/omgang).
+ * De körs inte längre härifrån. Plocka verif (kassarapporter, SIE), Skriv
+ * mail, kundbilden och bokföringen finns kvar.
+ */
+const ERSATTA = new Set(['definiera', 'plocka-trans', 'komplettera', 'dublett', 'tillrackligt', 'konteras', 'helhet']);
 /** Transaktioner per konteringsanrop, alla samtidigt. Konteringen håller själv tidsgränsen, se TID_STOPP i kontera.ts. */
 const KONTERA_PER_ANROP = 4;
 
@@ -62,6 +68,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   if (typeof body.id !== 'string' || !body.id) return NextResponse.json({ error: 'Underlag saknas' }, { status: 400 });
   if (!STEG.includes(body.steg)) return NextResponse.json({ error: 'Okänt steg' }, { status: 400 });
+  if (ERSATTA.has(body.steg)) return NextResponse.json({ error: 'Steget är ersatt av Flöde — kör underlaget i fliken Flöde i personkortet.' }, { status: 410 });
   const supabase = createServerClient();
   const extra: Record<string, unknown> = {};
   try {
