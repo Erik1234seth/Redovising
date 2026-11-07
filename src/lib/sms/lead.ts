@@ -32,7 +32,7 @@ const WELCOME_KIND = 'lead_welcome';
 const BOOKING_SMS_KIND = 'lead_booking';
 
 /** Motsvarande märkning för mejlet, i email_log. */
-const WELCOME_EMAIL_KIND = 'lead_valkomst';
+export const WELCOME_EMAIL_KIND = 'lead_valkomst';
 
 /**
  * Har personen bokat en tid i snabbformuläret får hen bekräftelsen i stället

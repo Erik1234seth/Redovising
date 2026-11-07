@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { INTERNAL_NOTICE_TO } from '@/lib/email-log';
 import { sendViaGmail } from '@/lib/emails/send-via-gmail';
-import { createClient } from '@supabase/supabase-js';
+import { websiteWelcomeEmail } from '@/lib/emails/lead-welcome';
+import { WELCOME_EMAIL_KIND } from '@/lib/sms/lead';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { questions } from '@/data/kvalificera-questions';
 import { meetingConfirmationEmail, formatMeetingSlot } from '@/lib/emails/meeting-confirmation';
 import { createMeetingEvent } from '@/lib/googleCalendar';
@@ -16,6 +18,29 @@ const NAV_BG = '#173b57';
 
 function escapeHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Välkomstmejlet går bara till den som är ny för oss: det presenterar tjänsten
+// och priset, vilket blir fel för den som redan läst det eller redan är kund.
+async function shouldGetWelcomeEmail(supabase: SupabaseClient, email: string) {
+  const address = email.trim().toLowerCase();
+
+  const [{ count: welcomed }, { count: customers }] = await Promise.all([
+    supabase
+      .from('email_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('to_email', address)
+      .eq('kind', WELCOME_EMAIL_KIND)
+      .eq('status', 'sent'),
+    supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      // Understreck och procent är jokertecken i ilike, och understreck är
+      // vanligt i mejladresser.
+      .ilike('email', address.replace(/[\\%_]/g, '\\$&')),
+  ]);
+
+  return !welcomed && !customers;
 }
 
 // Leads from the ad/brev funnel (/valkommen, and the popups on the landing
@@ -158,11 +183,19 @@ export async function POST(request: NextRequest) {
       ? meetingConfirmationEmail({ name, phone, date: meetingDate, time: meetingTime })
       : null;
 
+    // Nya leads får välkomstmejlet i stället för Tack-mailet, så att det första
+    // de får faktiskt innehåller något. Samma märkning som Facebook-leads, så
+    // att påminnelsen efter 14 dagar gäller även de här. Tack-mailet finns kvar
+    // för den som redan läst välkomstmejlet eller redan är kund.
+    const welcome = !booking && (await shouldGetWelcomeEmail(supabase, email))
+      ? websiteWelcomeEmail({ firstName, answeredQuestions: hasAnswers })
+      : null;
+
     await sendViaGmail({
       to: email,
-      subject: booking ? booking.subject : 'Tack — vi hör av oss inom kort',
-      kind: booking ? 'motebokning' : 'lead_bekraftelse',
-      html: booking ? booking.html : `
+      subject: welcome ? welcome.subject : booking ? booking.subject : 'Tack — vi hör av oss inom kort',
+      kind: welcome ? WELCOME_EMAIL_KIND : booking ? 'motebokning' : 'lead_bekraftelse',
+      html: welcome ? welcome.html : booking ? booking.html : `
         <!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"></head>
         <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
           <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:40px 16px;">

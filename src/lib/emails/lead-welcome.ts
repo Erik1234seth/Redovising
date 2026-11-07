@@ -72,6 +72,31 @@ export function leadWelcomeEmail(): { subject: string; html: string } {
   return { subject: 'Lite kort om hur EnklaBokslut funkar', html };
 }
 
+function escapeHtml(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * Samma mejl till den som skickat in formuläret på hemsidan. Bara inledningen
+ * skiljer: de har redan visat intresse och ofta svarat på våra frågor, så det
+ * första de läser ska vara att vi tagit emot det.
+ */
+export function websiteWelcomeEmail(params: {
+  firstName?: string;
+  answeredQuestions: boolean;
+}): { subject: string; html: string } {
+  const greeting = params.firstName ? `Hej ${escapeHtml(params.firstName)},` : 'Hej,';
+  const opening = params.answeredQuestions
+    ? 'Tack för dina svar! Utifrån dem passar EnklaBokslut din verksamhet.'
+    : 'Tack för att du hörde av dig!';
+
+  const html = [greeting, opening, ...PARAGRAPHS.slice(2)]
+    .map((p) => `<p>${p}</p>`)
+    .join('\n') + '\n' + SIGNATURE_HTML;
+
+  return { subject: 'Lite kort om hur EnklaBokslut funkar', html };
+}
+
 /**
  * Samma mejl till dem på ringlistan som sagt ja i telefon. De har pratat med
  * oss men inte sett sajten, så här får hemsidan vara med som länk.
