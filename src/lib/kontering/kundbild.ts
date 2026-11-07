@@ -177,6 +177,48 @@ export async function verifikationerIManader(supabase: SupabaseClient, userId: s
   return rader.length ? `ENSKILDA INLÄSTA VERIFIKATIONER i månaderna där kunden har obokförda transaktioner (${rader.length} st):\n${rader.join('\n')}` : '';
 }
 
+/**
+ * De inlästa verifikationerna (SIE, verifikationslistor, kassarapporter) en
+ * rad var, från och med förra året — så att Flöde ser om ett underlag redan
+ * är bokfört, t.ex. en faktura vars nummer står i verifikationstexten.
+ * Raderna numreras V1, V2 … och kan pekas på som dubblett.
+ */
+export async function bokfordaVerifikationer(
+  supabase: SupabaseClient, userId: string, max = 1000,
+): Promise<{ text: string; vNummer: Record<string, string> }> {
+  const fran = `${new Date().getFullYear() - 1}-01-01`;
+  const kr = (n: number) => Math.round(Math.abs(n)).toLocaleString('sv-SE');
+  const lista: { namn: string; rad: string }[] = [];
+  for (let start = 0; ; start += 1000) {
+    const { data, error } = await supabase.from('verifikationer')
+      .select('serie, nummer, datum, text, verifikation_rader(konto, belopp, borttagen)')
+      .eq('user_id', userId).is('transaktion_id', null).gte('datum', fran)
+      .order('datum').order('nummer').range(start, start + 999);
+    if (error) throw new Error(`Kunde inte läsa kundens verifikationer: ${error.message}`);
+    for (const v of data ?? []) {
+      const konton = ((v.verifikation_rader ?? []) as { konto: string; belopp: number; borttagen: boolean }[])
+        .filter((r) => !r.borttagen && Number(r.belopp))
+        .map((r) => `${r.konto} ${Number(r.belopp) > 0 ? 'debet' : 'kredit'} ${kr(Number(r.belopp))}`);
+      const namn = `${v.serie ?? ''}${v.nummer ?? ''} ${v.datum} ${String(v.text ?? '').slice(0, 60)}`.replace(/\s+/g, ' ').trim();
+      lista.push({ namn, rad: `${v.datum} ${v.serie ?? ''}${v.nummer ?? ''} · ${String(v.text ?? '').slice(0, 100)} · ${konton.join(', ')}`.replace(/\s+/g, ' ') });
+    }
+    if ((data ?? []).length < 1000) break;
+  }
+  if (!lista.length) return { text: '', vNummer: {} };
+  // De senaste räcker när listan är lång — äldre underlag är oftast redan körda
+  const visas = lista.slice(-max);
+  const borta = lista.length - visas.length;
+  const vNummer: Record<string, string> = {};
+  const rader = visas.map((v, i) => {
+    vNummer[`V${i + 1}`] = v.namn;
+    return `V${i + 1} ${v.rad}`;
+  });
+  return {
+    text: `BOKFÖRDA VERIFIKATIONER — kundens inlästa verifikationer från ${fran}, en rad var (${visas.length} st${borta ? `, de ${borta} äldsta utelämnade` : ''}):\n${rader.join('\n')}\nDet som står här är bokfört och ska inte bokföras igen.`,
+    vNummer,
+  };
+}
+
 /** Betalsättet med orden konteringen använder. Betalkontot sätts av systemet, inte av modellen. */
 export function betalsattText(harForetagskonto: string | null | undefined): string {
   if (harForetagskonto === 'privatkonto' || harForetagskonto === 'nej') return 'BETALSÄTT: kunden betalar via privatkonto. Systemet sätter betalkontot: 2017 Egna insättningar vid köp och 2013 Övriga egna uttag vid försäljning.';

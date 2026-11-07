@@ -72,7 +72,7 @@ TRANSAKTIONER
 - Varje affär i underlaget blir exakt en transaktion. Ett kvitto eller en faktura är oftast EN transaktion: totalbeloppet. Artikelraderna är inte egna transaktioner. Flera transaktioner blir det bara när underlaget är en lista med flera köp, försäljningar eller betalningar — då ska varje rad med, uppifrån och ner, utan att något slås ihop eller hoppas över.
 - "belopp" är alltid positivt, totalbeloppet inklusive moms, i underlagets valuta. "riktning" är "in" när pengar kommer in till företaget och "ut" när de går ut.
 - "moms" är momsbeloppet som det står på underlaget, 0 när det inte framgår.
-- "valuta" är "SEK" eller valutan på underlaget. Räkna aldrig om till kronor själv — det gör systemet med kursen på underlaget eller Riksbankens dagskurs. Ange belopp, moms och konteringens delar i underlagets valuta.
+- "valuta" är underlagets valuta som tre bokstäver (SEK, EUR, USD, AUD …), aldrig ett tecken. Står bara "$" är det USD, även när säljaren finns i Australien, Kanada eller ett annat dollarland — utländska nätbutiker tar nästan alltid betalt i USD. Ange annan dollar bara när underlaget skriver den (AUD, A$, CAD …). Räkna aldrig om till kronor själv — det gör systemet med kursen på underlaget eller Riksbankens dagskurs. Ange belopp, moms och konteringens delar i underlagets valuta.
 - "datum": betaldatumet om underlaget visar när det betalades, annars fakturadatumet eller kvittots datum. "ÅÅÅÅ-MM-DD", tom sträng om det inte framgår — gissa inte, skriv varför i "anteckning".
 ${BESKRIVNINGSREGEL}
 - "motpart": säljaren, leverantören eller kunden, tom sträng om det inte framgår.
@@ -82,11 +82,12 @@ ${BESKRIVNINGSREGEL}
 ${MEJLREGEL}
 
 DUBBLETTER
-En affär får bara bokföras en gång. Jämför varje transaktion med KUNDENS TRANSAKTIONER och med de andra filerna i omgången.
+En affär får bara bokföras en gång. Jämför varje transaktion med KUNDENS TRANSAKTIONER, med BOKFÖRDA VERIFIKATIONER och med de andra filerna i omgången.
+- En bokförd verifikation vars text har samma faktura-, kvitto- eller ordernummer, eller samma motpart, belopp och period, är samma affär — då är transaktionen en dubblett med V-numret i "ref". En verifikation som sammanfattar en period (kassarapport, dagskassa, månadens försäljning) kan innehålla affären: "tveksam" när beloppen talar för det, annars "unik".
 - Samma affär kan synas på flera sätt: samma underlag inskickat två gånger, eller samma köp på olika papper — orderbekräftelse och kvitto, faktura och betalningskvitto, kvitto och kortslip. Då kan datumet skilja några dagar och beloppet skilja på frakt, avgifter, öresavrundning eller valuta.
 - Talar för samma affär: samma order-, faktura-, kvitto- eller OCR-nummer (starkast), samma motpart, samma varor, belopp och datum nära varandra. Talar emot: olika nummer av samma sort, olika varor, ett köp som återkommer — en prenumeration, hyra eller månadsavgift är en ny affär varje period.
 - "status": "dublett" bara när du är säker — samma nummer, eller samma underlag inskickat igen. En dubblett bokförs inte, så ett misstag gör att en riktig affär försvinner. "tveksam" när det kan vara samma affär men beviset inte är starkt; då tittar en människa på den. "unik" annars.
-- "ref": raden eller filen det är en dubblett av, t.ex. "K120" eller "F3". Vid två filer i omgången som är samma affär är den senare dubbletten. Tom sträng vid "unik".
+- "ref": raden, verifikationen eller filen det är en dubblett av, t.ex. "K120", "V12" eller "F3". Vid två filer i omgången som är samma affär är den senare dubbletten. Tom sträng vid "unik".
 
 SAKNAS
 Av det vi har ska det gå att avgöra datum, belopp, moms (beloppet, satsen eller att ingen svensk moms ska redovisas) och vad affären gäller. Ett belopp i utländsk valuta räcker — fråga aldrig efter kronor eller kurs.

@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { godkannProv, raderaProv, startaProv, uppdateraProv, type Provrad } from '@/lib/kontering/omgang/prov';
+import { godkannProv, raderaProv, startaProv, underlagAttKora, uppdateraProv, type Provrad } from '@/lib/kontering/omgang/prov';
 
 /**
  * Flöde i personkortet — konteringen (@/lib/kontering/omgang). Körningarna
  * sparas i kontering_prov, och svaren skrivs till transaktioner och konteringar.
  *
- *   GET     kundens underlag att välja bland och kundens körningar. Delar som
- *           är skickade frågas efter hos OpenAI, och klara svar prövas och skrivs.
- *   POST    starta en körning på valda underlag
+ *   GET     kundens underlag att välja bland, de som Kör Flöde tar (attKora) och
+ *           kundens körningar. Delar som är skickade frågas efter hos OpenAI,
+ *           och klara svar prövas och skrivs.
+ *   POST    starta en körning: { nya: true } tar allt som inte körts, annars underlagIds
  *   PATCH   godkänn en gul kontering, eller ångra
  *   DELETE  ta bort en körning ur listan (det bokförda ligger kvar)
  */
@@ -41,10 +42,11 @@ export async function GET(request: NextRequest) {
     await Promise.all(((vantande ?? []) as Provrad[]).map((r) => uppdateraProv(supabase, r).catch((err) =>
       console.error(`[admin/kontering-prov] ${r.id}:`, err instanceof Error ? err.message : err))));
 
-    const [{ data: rader, error }, { data: underlag, error: uFel }] = await Promise.all([
+    const [{ data: rader, error }, { data: underlag, error: uFel }, attKora] = await Promise.all([
       supabase.from('kontering_prov').select(RAD_KOLUMNER).eq('user_id', userId).order('created_at', { ascending: false }).order('del').limit(100),
       supabase.from('bokforing_underlag').select('id, file_name, mime_type, created_at, sortering, sortering_orsak, del_av, flode_at, kund_svar_at')
         .eq('user_id', userId).order('created_at', { ascending: false }).limit(2000),
+      underlagAttKora(supabase, userId),
     ]);
     if (error) throw new Error(error.message);
     if (uFel) throw new Error(uFel.message);
@@ -60,6 +62,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       korningar: ((rader ?? []) as Provrad[]).map(({ kontext: _k, ...r }) => r),
       underlag: (underlag ?? []).map((u) => ({ ...u, transaktioner: antal.get(u.id) ?? 0 })),
+      attKora,
     });
   } catch (err) {
     return fel(err);
@@ -67,17 +70,21 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { userId?: string; underlagIds?: string[] };
+  let body: { userId?: string; underlagIds?: string[]; nya?: boolean };
   try {
     body = await request.json();
   } catch {
     return fel('Ogiltig JSON', 400);
   }
   if (!body.userId) return fel('userId saknas', 400);
-  const ids = [...new Set((body.underlagIds ?? []).filter((x) => typeof x === 'string'))];
-  if (!ids.length) return fel('Välj minst ett underlag', 400);
+  const supabase = getSupabase();
   try {
-    const korning = await startaProv(getSupabase(), body.userId, ids);
+    // Kör Flöde: allt som inte körts, eller där kunden skickat något nytt
+    const ids = body.nya
+      ? await underlagAttKora(supabase, body.userId)
+      : [...new Set((body.underlagIds ?? []).filter((x) => typeof x === 'string'))];
+    if (!ids.length) return fel(body.nya ? 'Inget nytt att köra' : 'Välj minst ett underlag', 400);
+    const korning = await startaProv(supabase, body.userId, ids);
     return NextResponse.json({ ok: true, korning });
   } catch (err) {
     return fel(err);

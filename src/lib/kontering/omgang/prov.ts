@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { kostnadOpenAI, loggaOpenAI } from '@/lib/ai-logg';
 import { MODELL, type Svar } from './anrop';
+import { kanSkickas } from './filer';
 import { forberedOmgang, type Filpost, type Hoppad, type Kontext } from './forbered';
 import { avbryt, hamtaSvar, raderaFil, skickaIBakgrunden } from './openai';
 import { skrivResultat, godkannTransaktion } from './skriv';
@@ -42,6 +43,45 @@ const STEG = 'flode';
 async function raderaFiler(filer: Filpost[]) {
   await Promise.all(filer.filter((f) => f.fileId).map((f) => raderaFil(f.fileId!).catch((err) =>
     console.error(`[kontering-prov] kunde inte radera ${f.fileId}:`, err instanceof Error ? err.message : err))));
+}
+
+/**
+ * Underlagen som Kör Flöde tar: de som inte lästs i Flöde, eller där kunden
+ * skickat något nytt sedan dess. Inte övriga filer, sidor av ett annat
+ * underlag, filer vars verifikationer redan lästs in (SIE, verifikationslistor),
+ * filer med något bokfört, eller filtyper AI:n inte läser.
+ */
+export async function underlagAttKora(supabase: SupabaseClient, userId: string): Promise<string[]> {
+  const { data, error } = await supabase.from('bokforing_underlag')
+    .select('id, file_name, mime_type, sortering, del_av, flode_at, kund_svar_at, verifikationer_inlagda_at')
+    .eq('user_id', userId).limit(5000);
+  if (error) throw new Error(`Kunde inte läsa underlagen: ${error.message}`);
+  const kandidater = (data ?? []).filter((u) =>
+    (!u.sortering || u.sortering === 'underlag')
+    && !u.del_av
+    && !u.verifikationer_inlagda_at
+    && kanSkickas(u)
+    && (!u.flode_at || (!!u.kund_svar_at && u.kund_svar_at > u.flode_at)));
+  if (!kandidater.length) return [];
+
+  // Något bokfört från filen: en verifikation på filen eller på en transaktion ur den
+  const ids = kandidater.map((u) => u.id);
+  const bokforda = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const del = ids.slice(i, i + 200);
+    const [{ data: ver }, { data: tx }] = await Promise.all([
+      supabase.from('verifikationer').select('underlag_id').in('underlag_id', del),
+      supabase.from('transaktioner').select('id, underlag_id').in('underlag_id', del),
+    ]);
+    for (const v of ver ?? []) bokforda.add(v.underlag_id as string);
+    const txIds = (tx ?? []).map((t) => t.id as string);
+    for (let j = 0; j < txIds.length; j += 200) {
+      const { data: vt } = await supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', txIds.slice(j, j + 200));
+      const med = new Set((vt ?? []).map((v) => v.transaktion_id as string));
+      for (const t of tx ?? []) if (med.has(t.id as string)) bokforda.add(t.underlag_id as string);
+    }
+  }
+  return ids.filter((id) => !bokforda.has(id));
 }
 
 /** Startar en provkörning. Svarar med körningens id när alla delar är skickade. */

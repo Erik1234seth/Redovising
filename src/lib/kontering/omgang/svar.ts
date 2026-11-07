@@ -97,6 +97,15 @@ function rensaUppgifter(u: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(u ?? {}).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length)));
 }
 
+/**
+ * Kursen slås upp på valutakoden, så ett tecken som "$" eller "€" blir en kod.
+ * Ett ensamt dollartecken tolkas som USD — det vanligaste.
+ */
+function valutakod(v: string | null | undefined): string {
+  const s = (v || 'SEK').trim().toUpperCase();
+  return ({ $: 'USD', 'US$': 'USD', '€': 'EUR', '£': 'GBP', KR: 'SEK', 'KR.': 'SEK' } as Record<string, string>)[s] ?? s;
+}
+
 /** Betal- och momskonton säger inget om vad affären är. */
 const BETAL_OCH_MOMS = /^(1930|2013|2017|26\d\d)$/;
 
@@ -155,7 +164,7 @@ async function provaTransaktion(
     motpart: s.motpart,
     belopp: Math.abs(Number(s.belopp) || 0),
     moms: Math.abs(Number(s.moms) || 0),
-    valuta: (s.valuta || 'SEK').trim().toUpperCase(),
+    valuta: valutakod(s.valuta),
     riktning: s.riktning,
     vat_nummer: s.vat_nummer,
     anteckning: s.anteckning,
@@ -283,6 +292,7 @@ export async function provaSvar(
   const finns = (ref: string) => {
     if (/^K\d+$/.test(ref)) return { ok: ref in kontext.kNummer, transaktionId: kontext.kNummer[ref] ?? null };
     if (/^[FG]\d+$/.test(ref)) return { ok: perFil.has(ref), transaktionId: null };
+    if (/^V\d+$/.test(ref)) return { ok: ref in (kontext.vNummer ?? {}), transaktionId: null };
     return { ok: false, transaktionId: null };
   };
 
@@ -318,10 +328,12 @@ export async function provaSvar(
   for (const t of resultat.flatMap((f) => f.transaktioner)) {
     if (t.dublett.status === 'unik') continue;
     const r = t.dublett.transaktionId ? refPer.get(t.dublett.transaktionId) : null;
-    const fil = perFil.get(t.dublett.ref.trim().toUpperCase());
+    const ref = t.dublett.ref.trim().toUpperCase();
+    const fil = perFil.get(ref);
+    const verifikation = kontext.vNummer?.[ref];
     t.dublett.refText = r
       ? `${r.datum ?? 'okänt datum'} ${Number(r.belopp)} ${r.valuta || 'SEK'} ${r.motpart || r.beskrivning || ''}`.trim()
-      : fil ? `filen ${fil.namn}` : 'okänd rad';
+      : fil ? `filen ${fil.namn}` : verifikation ? `verifikation ${verifikation}` : 'okänd rad';
   }
 
   return { filer: resultat, anteckningar: (svar.anteckningar ?? []).filter((a) => String(a).trim()), kontroller, hoppade };

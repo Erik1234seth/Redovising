@@ -160,6 +160,7 @@ function gamlaKonton(g: Gammal): string[] {
 
 export function Flode({ userId }: { userId: string }) {
   const [underlag, setUnderlag] = useState<Underlag[] | null>(null);
+  const [attKora, setAttKora] = useState<string[]>([]);
   const [rader, setRader] = useState<Provrad[]>([]);
   const [laddfel, setLaddfel] = useState('');
   const [valda, setValda] = useState<string[]>([]);
@@ -174,6 +175,7 @@ export function Flode({ userId }: { userId: string }) {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setUnderlag(data.underlag);
+      setAttKora(data.attKora ?? []);
       setRader(data.korningar);
       setLaddfel('');
     } catch (err) {
@@ -203,14 +205,15 @@ export function Flode({ userId }: { userId: string }) {
     return [...m.values()].map((d) => d.sort((a, b) => a.del - b.del));
   }, [rader]);
 
-  async function starta() {
+  /** Kör Flöde (nya) tar allt som inte körts; annars de valda. */
+  async function starta(nya: boolean) {
     setStartar(true);
     setStartfel('');
     try {
       const res = await fetch('/api/admin/kontering-prov', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, underlagIds: valda }),
+        body: JSON.stringify(nya ? { userId, nya: true } : { userId, underlagIds: valda }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -244,17 +247,31 @@ export function Flode({ userId }: { userId: string }) {
   if (!underlag) return <p className="text-slate-500 text-sm">Laddar…</p>;
 
   const allaValda = synliga.length > 0 && synliga.every((u) => valda.includes(u.id));
+  const nyaSet = new Set(attKora);
 
   return (
     <div className="space-y-6">
       <div className="text-sm text-slate-600 max-w-3xl">
-        GPT-6.1 Sol får alla valda underlag i ett anrop och sorterar, läser ut, letar dubbletter, säger vad som saknas och konterar.
-        Svaret ersätter underlagens transaktioner och konteringar. Gröna blir verifikationer efter 14 dagar, gula när du godkänt dem eller valt konto i Kontering.
-        Det som saknas frågas efter i kl 18-mejlet. Filer med något bokfört rörs inte.
+        Kör Flöde skickar allt som inte körts — och filer kunden skickat något nytt om — till GPT-6.1 Sol, som sorterar, läser ut, letar dubbletter mot det bokförda, säger vad som saknas och konterar.
+        Övriga filer, SIE-filer och filer med något bokfört tas inte med. Gröna blir verifikationer efter 14 dagar, gula när du godkänt dem eller valt konto i Kontering.
+        Det som saknas frågas efter i kl 18-mejlet.
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-lg">
-        <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-slate-200">
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => starta(true)}
+          disabled={!attKora.length || startar}
+          className="bg-blue-600 text-white font-medium px-4 py-2 rounded disabled:opacity-40"
+        >
+          {startar ? 'Förbereder och skickar…' : attKora.length ? `Kör Flöde · ${attKora.length} underlag` : 'Inget nytt att köra'}
+        </button>
+        {attKora.length > 0 && !startar && <span className="text-sm text-slate-500">ca {Math.max(1, Math.round(attKora.length * KR_PER_UNDERLAG))} kr</span>}
+        {startfel && <span className="text-sm text-red-600">{startfel}</span>}
+      </div>
+
+      <details className="bg-white border border-slate-200 rounded-lg">
+        <summary className="px-4 py-3 text-sm font-semibold text-slate-800 cursor-pointer select-none">Välj själv — kör om enskilda filer</summary>
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-y border-slate-200">
           <h3 className="font-semibold text-slate-800 text-sm">Välj underlag</h3>
           <input
             value={query}
@@ -270,14 +287,13 @@ export function Flode({ userId }: { userId: string }) {
             {valda.length} valda{valda.length ? ` · ca ${Math.max(1, Math.round(valda.length * KR_PER_UNDERLAG))} kr` : ''}
           </span>
           <button
-            onClick={starta}
+            onClick={() => starta(false)}
             disabled={!valda.length || startar}
-            className="bg-blue-600 text-white text-sm font-medium px-3 py-1.5 rounded disabled:opacity-40"
+            className="border border-blue-600 text-blue-700 text-sm font-medium px-3 py-1.5 rounded disabled:opacity-40"
           >
-            {startar ? 'Förbereder och skickar…' : `Kör ${valda.length || ''} underlag`.replace('  ', ' ')}
+            {startar ? 'Förbereder och skickar…' : `Kör ${valda.length || ''} valda`.replace('  ', ' ')}
           </button>
         </div>
-        {startfel && <p className="px-4 py-2 text-sm text-red-600 border-b border-slate-200">{startfel}</p>}
         <div className="max-h-80 overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-600 sticky top-0">
@@ -315,7 +331,7 @@ export function Flode({ userId }: { userId: string }) {
                         Nytt från kunden {TID.format(new Date(u.kund_svar_at!))}
                       </span>
                     )}
-                    {!u.flode_at && u.sortering !== 'ovrigt' && !u.del_av && <span className="ml-2 text-xs text-blue-700">Inte körd</span>}
+                    {nyaSet.has(u.id) && !nyttFranKunden(u) && <span className="ml-2 text-xs text-blue-700">Inte körd</span>}
                   </td>
                   <td className="px-2 py-1.5 text-slate-600 whitespace-nowrap">{TID.format(new Date(u.created_at))}</td>
                   <td className="px-2 py-1.5 text-slate-600">{u.sortering === 'ovrigt' ? `Övrigt${u.sortering_orsak ? ` — ${u.sortering_orsak}` : ''}` : u.sortering === 'underlag' ? 'Underlag' : '—'}</td>
@@ -326,7 +342,7 @@ export function Flode({ userId }: { userId: string }) {
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
 
       {laddfel && <p className="text-red-600 text-sm">{laddfel}</p>}
       {korningar.map((delar) => <Korning key={delar[0].korning} delar={delar} onTaBort={() => taBort(delar[0].korning)} onGodkann={godkann} />)}

@@ -5,7 +5,7 @@ import { byggMejlkontext } from '@/lib/mejlkontext';
 import { reglerAttValja } from '@/lib/transaktioner/kundregler';
 import { hamtaInstruktioner, kontextFor, reglerFor, type Instruktion } from '@/lib/transaktioner/instruktioner';
 import { tolkaBetalsatt, type Betalsatt } from '../betalsatt';
-import { hamtaArslista, hamtaKundbild, verifikationsSammanfattning } from '../kundbild';
+import { bokfordaVerifikationer, hamtaArslista, hamtaKundbild, verifikationsSammanfattning } from '../kundbild';
 import { laddaK1Andringar } from '../k1-andringar';
 import { instruktionensTokens, byggKropp, type Indatafil } from './anrop';
 import { kontrolleraFil, uppskattadeTokens, type Forberedd, type Underlagsrad } from './filer';
@@ -66,6 +66,8 @@ export interface Kontext {
   regelIdn: string[];
   /** K-nummer i kundens lista → transaktionens id. */
   kNummer: Record<string, string>;
+  /** V-nummer i listan över bokförda verifikationer → verifikationen i text ("A55 2026-07-31 0060"). */
+  vNummer?: Record<string, string>;
 }
 
 export interface Hoppad {
@@ -158,13 +160,14 @@ export function utanRadnummer(text: string): string {
 async function kunddel(
   supabase: SupabaseClient, userId: string, kund: Kund | null, betalsatt: Betalsatt,
   instruktioner: Instruktion[], utanUnderlag: Set<string>,
-): Promise<{ text: string; regelIdn: string[]; kNummer: Record<string, string> }> {
+): Promise<{ text: string; regelIdn: string[]; kNummer: Record<string, string>; vNummer: Record<string, string> }> {
   const regler = reglerFor(instruktioner, userId);
-  const [kundbild, arslista, mejl, bokfort] = await Promise.all([
+  const [kundbild, arslista, mejl, bokfort, verifikationer] = await Promise.all([
     hamtaKundbild(supabase, userId),
     hamtaArslista(supabase, userId, { medKonton: true, utanUnderlag }),
     byggMejlkontext(supabase, { userId, emails: [kund?.email] }),
     verifikationsSammanfattning(supabase, userId),
+    bokfordaVerifikationer(supabase, userId),
   ]);
   const kontext = kontextFor(instruktioner, { id: '', underlag_id: null, user_id: userId });
   const text = [
@@ -173,11 +176,12 @@ async function kunddel(
     kontext,
     `KUNDREGLER:\n${reglerAttValja(regler)}`,
     bokfort,
+    verifikationer.text,
     mejl,
     `KUNDENS TRANSAKTIONER (${arslista.rader.length} st, äldst först):\n${arslista.text || '(inga)'}`,
   ].filter(Boolean).join('\n\n');
   const kNummer = Object.fromEntries([...arslista.nummer].map(([id, nr]) => [`K${nr}`, id]));
-  return { text, regelIdn: regler.map((r) => r.id), kNummer };
+  return { text, regelIdn: regler.map((r) => r.id), kNummer, vNummer: verifikationer.vNummer };
 }
 
 /**
@@ -309,5 +313,5 @@ export async function forberedOmgang(
     });
   }
 
-  return { delar, hoppade, kontext: { betalsatt, regelIdn: kunden.regelIdn, kNummer: kunden.kNummer } };
+  return { delar, hoppade, kontext: { betalsatt, regelIdn: kunden.regelIdn, kNummer: kunden.kNummer, vNummer: kunden.vNummer } };
 }

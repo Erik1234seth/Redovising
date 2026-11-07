@@ -112,7 +112,8 @@ async function avkryptera(bytes: Buffer): Promise<{ ok: true; bytes: Buffer; sid
     return { ok: false, orsak: `Den krypterade PDF:en går inte att öppna: ${err instanceof Error ? err.message : err}` };
   }
   try {
-    const { createCanvas } = await import('@napi-rs/canvas');
+    // Duken måste komma från pdfjs egen fabrik: pdfjs har en egen version av
+    // @napi-rs/canvas, och dess Path2D går inte att rita på en duk från vår.
     const { PDFDocument } = await import('pdf-lib');
     const ny = await PDFDocument.create();
     const sidor = Math.min(Number(doc.numPages), KRYPTERAD_MAX_SIDOR);
@@ -122,8 +123,7 @@ async function avkryptera(bytes: Buffer): Promise<{ ok: true; bytes: Buffer; sid
       // Längsta sidan som en bild vi skickar annars
       const skala = Math.min(BILD_MAX_PX / Math.max(bas.width, bas.height), 3);
       const vy = sida.getViewport({ scale: skala });
-      const canvas = createCanvas(Math.ceil(vy.width), Math.ceil(vy.height));
-      const ctx = canvas.getContext('2d');
+      const { canvas, context: ctx } = doc.canvasFactory.create(Math.ceil(vy.width), Math.ceil(vy.height));
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       await sida.render({ canvasContext: ctx as any, viewport: vy }).promise; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -159,6 +159,12 @@ async function skalaNer(bytes: Buffer, mime: string): Promise<{ bytes: Buffer; m
     console.warn('[omgang] kunde inte skala ner bilden, skickar originalet:', err instanceof Error ? err.message : err);
     return { bytes, mime };
   }
+}
+
+/** Filtyper AI:n kan läsa. SIE-filer, mejl och zip-arkiv skickas aldrig. */
+export function kanSkickas(u: Pick<Underlagsrad, 'file_name' | 'mime_type'>): boolean {
+  const typ = filtyp(u as Underlagsrad);
+  return typ in BILD || typ in DOKUMENT || TEXT.includes(typ);
 }
 
 /** Laddar ner och prövar ett underlag. */

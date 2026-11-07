@@ -68,7 +68,12 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
       if (u.user_id !== userId) { f.skrivet = 'Underlaget hör till en annan kund — inget skrevs.'; continue; }
       if (bokfordaUnderlag.has(f.underlagId)) { f.skrivet = 'Något är redan bokfört från filen — den rördes inte. Ångra bokföringen i Kontering om den ska göras om.'; continue; }
       if (!f.sort) { f.skrivet = 'Inget svar — filen rördes inte. Kör den igen.'; continue; }
-      if (f.sort === 'verifikationer') { f.skrivet = 'Redan bokfört underlag — läs in verifikationerna med Plocka verif i flödesschemat.'; continue; }
+      if (f.sort === 'verifikationer') {
+        // Lästs i Flöde, så att Kör Flöde inte skickar den igen
+        await supabase.from('bokforing_underlag').update({ flode_at: DAGS() }).eq('id', f.underlagId);
+        f.skrivet = 'Redan bokfört underlag — läs in verifikationerna med Plocka verif i flödesschemat.';
+        continue;
+      }
       const deras = (gamla ?? []).filter((t) => t.underlag_id === f.underlagId);
       await sparaInstruktioner(supabase, f.underlagId, deras);
       const { error: dFel } = await supabase.from('transaktioner').delete().eq('underlag_id', f.underlagId);
