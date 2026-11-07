@@ -208,6 +208,7 @@ async function kollaPerson(supabase: SupabaseClient, p: Built, arenden: Rad[], s
   ].filter(Boolean).join('\n\n');
 
   const svar = parseJSON<Svar>(await callOpenAI({
+    anrop: { steg: 'arende-koll' },
     model: MODELL,
     effort: 'low',
     messages: [{ role: 'system', content: PROMPT(idag) }, { role: 'user', content: fraga }],

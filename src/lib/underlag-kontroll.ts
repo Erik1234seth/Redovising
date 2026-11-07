@@ -126,6 +126,7 @@ export async function arUnderlagsmejl(opts: {
     const raw = await callOpenAI({
       model: MODELL,
       effort: 'low',
+      anrop: { steg: 'underlag-sortering', userId: opts.profil.id },
       responseFormat: { type: 'json_object' },
       maxTokens: 4000,
       messages: [
@@ -334,6 +335,7 @@ async function kontrollera(
   const raw = await callOpenAI({
     model: MODELL,
     effort: 'medium',
+    anrop: { steg: 'underlag-kontroll', userId },
     responseFormat: { type: 'json_object' },
     maxTokens: 30000,
     messages: [

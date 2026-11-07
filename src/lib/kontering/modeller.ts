@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { openaiFetch } from '@/lib/ai-anrop';
+import { loggaClaude, loggaOpenAI, type Anropsinfo } from '@/lib/ai-logg';
 
 /**
  * De två modellerna som konterar, bakom samma anrop.
@@ -65,7 +66,7 @@ function claudeDel(d: Del): Anthropic.Beta.Messages.BetaContentBlockParam {
   return { type: 'image', source: { type: 'base64', media_type: d.mime, data: d.data } };
 }
 
-async function fragaGpt<T>(modell: string, system: System, delat: Del[], user: string, namn: string, schema: object): Promise<Svar<T>> {
+async function fragaGpt<T>(modell: string, system: System, delat: Del[], user: string, namn: string, schema: object, anrop: Anropsinfo): Promise<Svar<T>> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
 
@@ -86,13 +87,14 @@ async function fragaGpt<T>(modell: string, system: System, delat: Del[], user: s
   if (!res.ok) throw new Error(`${modell} svarade ${res.status}: ${(await res.text()).slice(0, 300)}`);
 
   const json = await res.json();
+  await loggaOpenAI(anrop, modell, json.usage);
   const choice = json.choices?.[0];
   if (choice?.message?.refusal) throw new Error(`${modell} vägrade: ${choice.message.refusal}`);
   if (choice?.finish_reason === 'length') throw new Error(`${modell} hann inte svara klart`);
   return { data: JSON.parse(choice?.message?.content ?? '') as T, modell: json.model ?? modell };
 }
 
-async function fragaClaude<T>(modell: string, system: System, delat: Del[], user: string, schema: object): Promise<Svar<T>> {
+async function fragaClaude<T>(modell: string, system: System, delat: Del[], user: string, schema: object, anrop: Anropsinfo): Promise<Svar<T>> {
   // Tre cachepunkter: den fasta instruktionen, kunden och det delade
   // underlaget. Allt före en punkt läses ur cachen när nästa anrop börjar likadant.
   const cache = { type: 'ephemeral' as const, ttl: '1h' as const };
@@ -115,6 +117,7 @@ async function fragaClaude<T>(modell: string, system: System, delat: Del[], user
     messages: [{ role: 'user', content: [...delar, { type: 'text', text: user }] }],
   } as Anthropic.Beta.Messages.MessageCreateParamsStreaming);
   const msg = await stream.finalMessage();
+  await loggaClaude(anrop, msg.model, msg.usage);
 
   if (msg.stop_reason === 'refusal') throw new Error(`${modell} vägrade svara`);
   if (msg.stop_reason === 'max_tokens') throw new Error(`${modell} hann inte svara klart`);
@@ -123,10 +126,10 @@ async function fragaClaude<T>(modell: string, system: System, delat: Del[], user
   return { data: JSON.parse(text.text) as T, modell: msg.model };
 }
 
-export function fraga<T>(modell: Modell, o: { system: System; delat?: Del[]; user: string; namn: string; schema: object }): Promise<Svar<T>> {
+export function fraga<T>(modell: Modell, o: { system: System; delat?: Del[]; user: string; namn: string; schema: object; anrop: Anropsinfo }): Promise<Svar<T>> {
   return modell.startsWith('gpt-')
-    ? fragaGpt<T>(modell, o.system, o.delat ?? [], o.user, o.namn, o.schema)
-    : fragaClaude<T>(modell, o.system, o.delat ?? [], o.user, o.schema);
+    ? fragaGpt<T>(modell, o.system, o.delat ?? [], o.user, o.namn, o.schema, o.anrop)
+    : fragaClaude<T>(modell, o.system, o.delat ?? [], o.user, o.schema, o.anrop);
 }
 
 // ---------- samtal med uppslag ----------
@@ -167,6 +170,7 @@ interface Uppslag<T> {
   user: string;
   namn: string;
   schema: object;
+  anrop: Anropsinfo;
   /** Regeltexten för ett konto, eller varför det inte finns. */
   lasKonto: (konto: string) => string;
   /** Originalfilerna bakom rader i kundens lista (K12). */
@@ -275,9 +279,10 @@ function gptPart(modell: string, o: Uppslag<unknown>, apiKey: string): Part {
       });
       if (!res.ok) throw new Error(`${modell} svarade ${res.status}: ${(await res.text()).slice(0, 300)}`);
       const json = await res.json();
-      if (json.status === 'incomplete') throw new Error(`${modell} hann inte svara klart`);
       const utdata: { type: string; call_id?: string; name?: string; arguments?: string; action?: { query?: string }; content?: { type: string; text?: string; refusal?: string }[] }[] = json.output ?? [];
       input.push(...utdata);
+      await loggaOpenAI(o.anrop, modell, json.usage, { webbsokningar: utdata.filter((u) => u.type === 'web_search_call').length });
+      if (json.status === 'incomplete') throw new Error(`${modell} hann inte svara klart`);
       const delar = utdata.filter((u) => u.type === 'message').flatMap((u) => u.content ?? []);
       const vagran = delar.find((d) => d.type === 'refusal');
       if (vagran) throw new Error(`${modell} vägrade: ${vagran.refusal}`);
@@ -330,6 +335,7 @@ function claudePart(modell: string, o: Uppslag<unknown>): Part {
         messages,
       } as unknown as Anthropic.Beta.Messages.MessageCreateParamsStreaming, { signal });
       const msg = await stream.finalMessage();
+      await loggaClaude(o.anrop, msg.model, msg.usage);
 
       if (msg.stop_reason === 'refusal') throw new Error(`${modell} vägrade svara`);
       if (msg.stop_reason === 'max_tokens') throw new Error(`${modell} hann inte svara klart`);

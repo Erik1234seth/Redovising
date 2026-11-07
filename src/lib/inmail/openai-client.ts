@@ -1,3 +1,5 @@
+import { loggaOpenAI, type Anropsinfo } from '@/lib/ai-logg';
+
 const OPENAI_API_KEY = () => process.env.OPENAI_API_KEY!;
 
 export async function callOpenAI(options: {
@@ -7,6 +9,8 @@ export async function callOpenAI(options: {
   maxTokens?: number;
   /** Anges alltid — utan den tänker gpt-6.1-sol inte alls, inte ens på svåra frågor. */
   effort: 'low' | 'medium' | 'high';
+  /** Vilket steg anropet hör till, för kostnadsloggen. */
+  anrop: Anropsinfo;
 }): Promise<string> {
   // Modellen räknar sitt eget tänkande i den här budgeten, inte bara svaret. En
   // snål siffra ger 400 ("Could not finish the message...") i stället för ett
@@ -36,6 +40,7 @@ export async function callOpenAI(options: {
   }
 
   const data = await res.json();
+  await loggaOpenAI(options.anrop, options.model, data.usage);
   return data.choices?.[0]?.message?.content ?? '';
 }
 

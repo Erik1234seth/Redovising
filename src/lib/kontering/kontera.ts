@@ -626,6 +626,7 @@ async function konteraMedModell(modell: Modell, t: Transaktion, betalsatt: Betal
     user: f.user,
     namn: 'kontering',
     schema: beslutSchema(f.regelIdn),
+    anrop: { steg: 'konteras', userId: t.user_id, underlagId: t.underlag_id },
     // Gränsprövningarna räknas ut på hela beloppet
     lasKonto: (konto) => kontoBlock(provaKonto({ konto, netto, brutto, datum: t.datum })),
     lasUnderlag: f.nyLasare(),
@@ -803,6 +804,7 @@ async function rattaEfterKontext(supabase: SupabaseClient, t: Transaktion, betal
     user: `TRANSAKTIONEN:\n${transaktionText(t, betalsatt)}\n\nBYRÅNS INSTRUKTION:\n${kontext}`,
     namn: 'rattelse',
     schema: RATTELSE_SCHEMA,
+    anrop: { steg: 'konteras-rattelse', userId: t.user_id, underlagId: t.underlag_id },
   });
   const fore: Record<string, unknown> = { ...t, valuta: t.valuta || 'SEK' };
   const andringar: Andringar = Object.fromEntries(
@@ -1020,6 +1022,7 @@ export async function konteraMedInstruktion(
     user: `TRANSAKTIONEN:\n${transaktionText(t, betalsatt)}\n\nBYRÅNS INSTRUKTION:\n${instruktion}`,
     namn: 'rattelse',
     schema: RATTELSE_SCHEMA,
+    anrop: { steg: 'konteras-rattelse', userId: t.user_id, underlagId: t.underlag_id },
   });
 
   const andringar: Andringar = {

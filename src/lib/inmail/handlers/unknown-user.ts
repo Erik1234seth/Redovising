@@ -65,6 +65,7 @@ Returnera JSON:
   ].join('\n');
 
   const raw = await callOpenAI({
+    anrop: { steg: 'mejl-okand-avsandare' },
     model: 'gpt-6.1-sol',
     effort: 'low',
     messages: [

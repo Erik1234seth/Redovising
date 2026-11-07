@@ -194,6 +194,7 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
     ].filter(Boolean).join('\n\n'),
     namn: 'helhet',
     schema: SCHEMA,
+    anrop: { steg: 'helhet', userId },
   });
   const anmarkningar = (Array.isArray(data.anmarkningar) ? data.anmarkningar : [])
     .map((a) => {

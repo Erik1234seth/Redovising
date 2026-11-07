@@ -284,6 +284,7 @@ export async function byggKundbild(supabase: SupabaseClient, userId: string, { t
       ].filter(Boolean).join('\n\n'),
       namn: 'kundbild',
       schema: SCHEMA,
+      anrop: { steg: 'kundbild', userId },
     });
     const { error: sFel } = await supabase.from('kundbilder').upsert({
       user_id: userId, text: data.kundbild.trim(), modell, byggd_at: new Date().toISOString(),

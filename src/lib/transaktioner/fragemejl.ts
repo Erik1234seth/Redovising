@@ -212,6 +212,7 @@ export async function skrivFragemejl(
     messageId: mejl?.gmail_message_id ?? undefined,
     smsKontext: await smsKontextForMejl(supabase, till),
     underlagKontext,
+    steg: 'skriv-mejl',
   });
   const text = svar.replyBody?.trim();
   if (!text) throw new Error('AI:n skrev inget');

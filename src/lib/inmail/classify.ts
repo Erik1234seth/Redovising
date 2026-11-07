@@ -60,6 +60,7 @@ ${body.slice(0, MEJL_MAX_TECKEN)}`;
 
   try {
     const raw = await callOpenAI({
+      anrop: { steg: 'mejl-klassning' },
       model: 'gpt-6.1-sol',
       effort: 'low',
       messages: [

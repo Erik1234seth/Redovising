@@ -1,3 +1,4 @@
+import { loggaOpenAI, type Anropsinfo } from '@/lib/ai-logg';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkontext';
 import { BYRANS_PRINCIPER } from '@/lib/kontering/principer';
@@ -144,7 +145,7 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
       regler,
       ...grupp.map((t, j) => [`TRANSAKTION ${j + 1}\n${radText(t)}`, kontextFor(instruktioner, { ...t, underlag_id: underlagId, user_id: u.user_id })].filter(Boolean).join('\n')),
     ].filter(Boolean).join('\n\n');
-    const svar = await fraga(user);
+    const svar = await fraga(user, { steg: 'tillrackligt', userId: u.user_id, underlagId });
     grupp.forEach((t, j) => {
       const s = svar.find((x) => Number(x.nr) === j + 1);
       if (!s) {
@@ -216,7 +217,7 @@ function radText(t: Rad): string {
   ].filter(Boolean).join('\n');
 }
 
-async function fraga(user: string): Promise<{ nr?: unknown; status?: unknown; saknas?: { vad?: unknown; varfor?: unknown }[]; antaganden?: unknown }[]> {
+async function fraga(user: string, anrop: Anropsinfo): Promise<{ nr?: unknown; status?: unknown; saknas?: { vad?: unknown; varfor?: unknown }[]; antaganden?: unknown }[]> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
   const res = await openaiFetch('https://api.openai.com/v1/chat/completions', {
@@ -235,6 +236,7 @@ async function fraga(user: string): Promise<{ nr?: unknown; status?: unknown; sa
     throw new Error('AI-tjänsten svarade inte');
   }
   const data = await res.json();
+  await loggaOpenAI(anrop, MODELL, data.usage);
   const choice = data.choices?.[0];
   if (choice?.finish_reason === 'length') throw new Error('AI:ns svar kapades');
   try {

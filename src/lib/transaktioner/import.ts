@@ -243,6 +243,8 @@ async function lasRad(supabase: SupabaseClient, row: UnderlagRad): Promise<Trans
     mejl: mejl || undefined,
     definition: definitionen(row.definition),
     sidor,
+    userId: row.user_id,
+    underlagId: row.id,
   });
   // Samma ägarskap som SIE-verifikationerna: kontot när det finns, adressen
   // när filen bara hör ihop med en mejladress

@@ -106,6 +106,8 @@ export async function handleGeneralQuestion(params: {
   underlagKontext?: string;
   /** Gmail-id för mejlet som besvaras, så att det inte står två gånger i historiken. */
   messageId?: string;
+  /** Steget i kostnadsloggen, när svaret skrivs åt ett annat steg än mejlflödet. */
+  steg?: string;
 }): Promise<{ action: string; replyBody: string }> {
   const { supabase, profile, subject, body, smsKontext, underlagKontext, messageId } = params;
 
@@ -153,6 +155,7 @@ export async function handleGeneralQuestion(params: {
   const answer = await callOpenAI({
     model: 'gpt-6.1-sol',
     effort: 'medium',
+    anrop: { steg: params.steg ?? 'mejl-svar', userId: profile.id },
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },

@@ -1,3 +1,4 @@
+import { loggaOpenAI, type Anropsinfo } from '@/lib/ai-logg';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { hamtaInstruktioner, kontextFor } from './instruktioner';
 import { iKo, openaiFetch } from '@/lib/ai-anrop';
@@ -200,7 +201,7 @@ async function kolla(supabase: SupabaseClient, underlagId: string) {
         : `[${j + 1}${String.fromCharCode(65 + m)}] ur ${k.underlag_id ? `"${filer.get(k.underlag_id)?.namn ?? 'okänd fil'}", inkommen ${(filer.get(k.underlag_id)?.at ?? '').slice(0, 10)}` : 'en källa utan fil'}\n${radText(k)}`),
     ].filter(Boolean).join('\n')).join('\n\n');
 
-    const svar = await fraga(user);
+    const svar = await fraga(user, { steg: 'dublettcheck', userId: u.user_id, underlagId });
     grupp.forEach((n, j) => {
       const s = svar.find((x) => Number(x.nr) === j + 1);
       const ref = typeof s?.ref === 'string' ? s.ref.trim().replace(/[[\]]/g, '') : '';
@@ -288,7 +289,7 @@ function radText(t: Rad): string {
   ].filter(Boolean).join('\n');
 }
 
-async function fraga(user: string): Promise<{ nr?: unknown; status?: unknown; ref?: unknown; motivering?: unknown }[]> {
+async function fraga(user: string, anrop: Anropsinfo): Promise<{ nr?: unknown; status?: unknown; ref?: unknown; motivering?: unknown }[]> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
   const res = await openaiFetch('https://api.openai.com/v1/chat/completions', {
@@ -307,6 +308,7 @@ async function fraga(user: string): Promise<{ nr?: unknown; status?: unknown; re
     throw new Error('AI-tjänsten svarade inte');
   }
   const data = await res.json();
+  await loggaOpenAI(anrop, MODELL, data.usage);
   const choice = data.choices?.[0];
   if (choice?.finish_reason === 'length') throw new Error('AI:ns svar kapades');
   try {

@@ -1,3 +1,4 @@
+import { loggaOpenAI, type Anropsinfo } from '@/lib/ai-logg';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkontext';
 import { byggMejlkontext } from '@/lib/mejlkontext';
@@ -164,7 +165,7 @@ async function kompletteraGrupp(
   grupp: Transaktion[],
   k: { userId: string | null; epost: string | null; kundtext: string; mejl: string; verksamhet: string | null },
 ): Promise<Komplettering[]> {
-  const fragor = await embed(grupp.map((t) => [t.motpart, t.beskrivning].filter(Boolean).join(' — ') || '—'));
+  const fragor = await embed(grupp.map((t) => [t.motpart, t.beskrivning].filter(Boolean).join(' — ') || '—'), { steg: 'komplettera', userId: k.userId });
   const kandidater = await Promise.all(grupp.map(async (t, i) => ({
     kundens: await sok(supabase, t, k, true, fragor[i]),
     andra: await sok(supabase, t, k, false, fragor[i]),
@@ -185,7 +186,7 @@ async function kompletteraGrupp(
     `ANDRA:\n${kandidater[i].andra.map(kandidatText).join('\n') || '(inga)'}`,
   ].filter(Boolean).join('\n')).join('\n\n');
 
-  const svar = await fraga([k.kundtext, k.mejl ? `KUNDENS MEJLVÄXLING MED BYRÅN:\n${k.mejl}` : 'Det finns inga mejl från kunden.', block].filter(Boolean).join('\n\n'));
+  const svar = await fraga([k.kundtext, k.mejl ? `KUNDENS MEJLVÄXLING MED BYRÅN:\n${k.mejl}` : 'Det finns inga mejl från kunden.', block].filter(Boolean).join('\n\n'), { steg: 'komplettera', userId: k.userId });
   const perNr = new Map(svar.map((s) => [Number(s.nr), s]));
 
   return grupp.map((_, i) => {
@@ -277,7 +278,7 @@ async function varaVerifikationer(
 
 const EMBED_MODELL = 'text-embedding-3-small';
 
-async function embed(texter: string[]): Promise<number[][]> {
+async function embed(texter: string[], anrop: Anropsinfo): Promise<number[][]> {
   const res = await openaiFetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
@@ -285,6 +286,7 @@ async function embed(texter: string[]): Promise<number[][]> {
   });
   if (!res.ok) throw new Error(`Embeddings svarade ${res.status}`);
   const data = await res.json();
+  await loggaOpenAI(anrop, EMBED_MODELL, data.usage);
   return (data.data as { index: number; embedding: number[] }[]).sort((a, b) => a.index - b.index).map((d) => d.embedding);
 }
 
@@ -298,7 +300,7 @@ async function indexeraVerifikationstexter(supabase: SupabaseClient): Promise<vo
     if (error) throw new Error(`Kunde inte läsa verifikationstexterna: ${error.message}`);
     const texter = ((data ?? []) as { text: string }[]).map((r) => r.text);
     if (!texter.length) return;
-    const vektorer = await embed(texter);
+    const vektorer = await embed(texter, { steg: 'komplettera' });
     const { error: sparFel } = await supabase.from('verifikationstext_vektorer')
       .upsert(texter.map((text, i) => ({ text, embedding: JSON.stringify(vektorer[i]) })), { onConflict: 'text' });
     if (sparFel) throw new Error(`Kunde inte spara verifikationstexternas embeddings: ${sparFel.message}`);
@@ -310,7 +312,7 @@ function kandidatText(c: Kandidat): string {
   return `${c.ref}: "${c.text}"${c.ref.startsWith('K') && c.datum ? `, senast ${c.datum}` : ''}, ${c.antal} st — ${konton}`;
 }
 
-async function fraga(user: string): Promise<{ nr?: unknown; kundens?: { ref?: unknown; varfor?: unknown }[]; andra?: { ref?: unknown; varfor?: unknown }[]; mejl?: unknown; sammanfattning?: unknown }[]> {
+async function fraga(user: string, anrop: Anropsinfo): Promise<{ nr?: unknown; kundens?: { ref?: unknown; varfor?: unknown }[]; andra?: { ref?: unknown; varfor?: unknown }[]; mejl?: unknown; sammanfattning?: unknown }[]> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
   const res = await openaiFetch('https://api.openai.com/v1/chat/completions', {
@@ -329,6 +331,7 @@ async function fraga(user: string): Promise<{ nr?: unknown; kundens?: { ref?: un
     throw new Error('AI-tjänsten svarade inte');
   }
   const data = await res.json();
+  await loggaOpenAI(anrop, MODELL, data.usage);
   const choice = data.choices?.[0];
   if (choice?.finish_reason === 'length') throw new Error('AI:ns svar kapades');
   let parsed: { transaktioner?: unknown };

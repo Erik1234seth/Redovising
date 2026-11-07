@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { loggaOpenAI } from '@/lib/ai-logg';
 import { buildImageParts, spreadsheetToText } from './fil-delar';
 import { arBildEllerPdf, arTabellfil } from './filtyp';
 import { FLYTTAD_FOR_HAND, sorteraEfterRegler } from './sortering';
@@ -222,6 +223,7 @@ async function fragaAi(supabase: SupabaseClient, row: UnderlagRad): Promise<Defi
   }
 
   const data = await res.json();
+  await loggaOpenAI({ steg: 'definiera', userId: row.user_id, underlagId: row.id }, MODELL, data.usage);
   const choice = data.choices?.[0];
   if (choice?.message?.refusal) throw new Error(`AI:n kunde inte läsa ${row.file_name}`);
   const raw = (choice?.message?.content ?? '').trim();

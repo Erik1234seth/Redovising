@@ -5,6 +5,7 @@ import {
   type ExtraheradTransaktion, type ExtraheradVerifikation, type TolkatSvar, type Underlagstyp,
 } from './normalisera';
 import { lasMedSandlada } from './sandlada';
+import { loggaOpenAI, type Anropsinfo } from '@/lib/ai-logg';
 
 export { kanLasasAvAi };
 export type { ExtraheradTransaktion, ExtraheradVerifikation };
@@ -126,7 +127,7 @@ function pdfDel(buffer: Buffer, fileName: string): unknown[] {
   ];
 }
 
-async function las(content: unknown, apiKey: string, fileName: string): Promise<TolkatSvar> {
+async function las(content: unknown, apiKey: string, fileName: string, anrop: Anropsinfo): Promise<TolkatSvar> {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
@@ -149,6 +150,7 @@ async function las(content: unknown, apiKey: string, fileName: string): Promise<
   }
 
   const data = await res.json();
+  await loggaOpenAI(anrop, MODELL, data.usage);
   const choice = data.choices?.[0];
 
   if (choice?.message?.refusal) throw new Error(`AI:n kunde inte läsa ${fileName}`);
@@ -192,6 +194,9 @@ export async function extraheraTransaktioner(file: {
   definition?: { kategori: Underlagstyp; dokumenttyp: string } | null;
   /** Dokumentets andra sidor, när det skannats sida för sida (se `@/lib/underlag/sidor`). */
   sidor?: { buffer: Buffer; fileName: string; mimeType: string | null }[];
+  /** Vems underlag det är, för kostnadsloggen. */
+  userId?: string | null;
+  underlagId?: string | null;
 }): Promise<ExtraktionsResultat> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
@@ -233,7 +238,7 @@ export async function extraheraTransaktioner(file: {
   }
 
   const definition = definitionsDel(file.definition);
-  const svar = await las([...del, ...(definition ? [{ type: 'text', text: definition }] : []), ...mejlDel(file)], apiKey, file.fileName);
+  const svar = await las([...del, ...(definition ? [{ type: 'text', text: definition }] : []), ...mejlDel(file)], apiKey, file.fileName, { steg: 'plocka-trans', userId: file.userId, underlagId: file.underlagId });
 
   // En PDF med verifikationer är en export ur ett system och har text. Ordnad
   // per konto ligger ett kvittos rader utspridda över många sidor, och synen

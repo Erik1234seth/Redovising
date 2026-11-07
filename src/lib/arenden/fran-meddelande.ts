@@ -58,6 +58,7 @@ export async function skapaArendenFranMeddelande(opts: {
     ].filter(Boolean).join('\n\n');
 
     const raw = await callOpenAI({
+      anrop: { steg: 'arende-fran-meddelande' },
       model: MODELL,
       effort: 'low',
       messages: [

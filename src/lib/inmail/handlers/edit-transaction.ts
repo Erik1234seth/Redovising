@@ -95,6 +95,7 @@ Om du är osäker på vad som ska ändras: sätt edits: [] och förklara i reply
     : `Ändringsbegäran:\n${body}`;
 
   const raw = await callOpenAI({
+    anrop: { steg: 'mejl-andra-transaktion', userId: profile.id },
     model: 'gpt-6.1-sol',
     effort: 'medium',
     messages: [

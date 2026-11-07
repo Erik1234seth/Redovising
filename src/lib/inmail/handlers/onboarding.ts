@@ -41,6 +41,7 @@ Returnera JSON:
 }`;
 
   const raw = await callOpenAI({
+    anrop: { steg: 'mejl-onboarding' },
     model: 'gpt-6.1-sol',
     effort: 'low',
     messages: [

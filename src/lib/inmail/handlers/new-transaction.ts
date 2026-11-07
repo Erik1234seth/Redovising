@@ -75,6 +75,7 @@ async function analyzeReceipt(fileBase64: string, mimeType: string): Promise<Rec
   }
 
   const raw = await callOpenAI({
+    anrop: { steg: 'mejl-ny-transaktion' },
     model: 'gpt-6.1-sol',
     effort: 'medium',
     messages: [

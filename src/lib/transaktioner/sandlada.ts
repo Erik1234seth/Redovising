@@ -1,3 +1,4 @@
+import { loggaOpenAI } from '@/lib/ai-logg';
 import {
   BESKRIVNINGSREGEL, DETALJREGEL, GRUPPERINGSREGEL, MEJLREGEL, OVRIGTREGEL, UPPGIFTSREGEL, definitionsDel, tolkaSvar,
   type TolkatSvar, type Underlagstyp,
@@ -109,6 +110,8 @@ export async function lasMedSandlada(file: {
   lagradSom?: string;
   mejl?: string;
   definition?: { kategori: Underlagstyp; dokumenttyp: string } | null;
+  userId?: string | null;
+  underlagId?: string | null;
 }): Promise<SandladaResultat> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY saknas');
@@ -143,6 +146,7 @@ export async function lasMedSandlada(file: {
     if (!res.ok) throw new Error(`AI-tjänsten svarade inte: ${await felText(res)}`);
 
     const data = await res.json();
+    await loggaOpenAI({ steg: 'plocka-verif', userId: file.userId, underlagId: file.underlagId }, MODELL, data.usage, { kodmiljoer: 1 });
     const output = (data.output ?? []) as { type: string; container_id?: string; content?: { type: string; text?: string }[] }[];
 
     const notering = output
