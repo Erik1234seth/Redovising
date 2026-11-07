@@ -83,10 +83,59 @@ function bildtypUrInnehall(bytes: Buffer): string | null {
   return Object.keys(BILD).find((t) => arBild(bytes, t)) ?? null;
 }
 
-async function pdfSidor(bytes: Buffer): Promise<number> {
+async function pdfInfo(bytes: Buffer): Promise<{ sidor: number; krypterad: boolean }> {
   const { PDFDocument } = await import('pdf-lib');
   const pdf = await PDFDocument.load(new Uint8Array(bytes), { ignoreEncryption: true });
-  return pdf.getPageCount();
+  return { sidor: pdf.getPageCount(), krypterad: pdf.isEncrypted };
+}
+
+/** Så många sidor av en krypterad PDF görs om. Längre än så är sällan ett underlag. */
+const KRYPTERAD_MAX_SIDOR = 30;
+
+/**
+ * En krypterad PDF — oftast låst mot ändringar och utskrift men öppen att
+ * läsa, som många bankers och myndigheters — kan OpenAI inte läsa, och då
+ * misslyckas hela anropet med alla filer i det. Sidorna ritas därför om till
+ * bilder och läggs i en ny PDF utan kryptering. Kräver filen ett lösenord för
+ * att öppnas går det inte, och då skickas den inte.
+ */
+async function avkryptera(bytes: Buffer): Promise<{ ok: true; bytes: Buffer; sidor: number } | { ok: false; orsak: string }> {
+  const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.mjs'); // eslint-disable-line @typescript-eslint/no-explicit-any
+  // Samma arbetare som avläsningen av inmejlade PDF:er (@/lib/inmail/handlers/new-transaction)
+  const { resolve } = await import('path');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${resolve(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs')}`;
+  let doc;
+  try {
+    doc = await pdfjsLib.getDocument({ data: new Uint8Array(bytes), password: '' }).promise;
+  } catch (err) {
+    if ((err as { name?: string })?.name === 'PasswordException') return { ok: false, orsak: 'PDF:en är lösenordsskyddad — be kunden skicka den utan lösenord' };
+    return { ok: false, orsak: `Den krypterade PDF:en går inte att öppna: ${err instanceof Error ? err.message : err}` };
+  }
+  try {
+    const { createCanvas } = await import('@napi-rs/canvas');
+    const { PDFDocument } = await import('pdf-lib');
+    const ny = await PDFDocument.create();
+    const sidor = Math.min(Number(doc.numPages), KRYPTERAD_MAX_SIDOR);
+    for (let i = 1; i <= sidor; i++) {
+      const sida = await doc.getPage(i);
+      const bas = sida.getViewport({ scale: 1 });
+      // Längsta sidan som en bild vi skickar annars
+      const skala = Math.min(BILD_MAX_PX / Math.max(bas.width, bas.height), 3);
+      const vy = sida.getViewport({ scale: skala });
+      const canvas = createCanvas(Math.ceil(vy.width), Math.ceil(vy.height));
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await sida.render({ canvasContext: ctx as any, viewport: vy }).promise; // eslint-disable-line @typescript-eslint/no-explicit-any
+      const jpg = await ny.embedJpg(canvas.toBuffer('image/jpeg', 85));
+      ny.addPage([bas.width, bas.height]).drawImage(jpg, { x: 0, y: 0, width: bas.width, height: bas.height });
+    }
+    return { ok: true, bytes: Buffer.from(await ny.save()), sidor };
+  } catch (err) {
+    return { ok: false, orsak: `Den krypterade PDF:en gick inte att göra om: ${err instanceof Error ? err.message : err}` };
+  } finally {
+    await doc.destroy?.();
+  }
 }
 
 /** Längsta sidan på en bild som skickas. OpenAI skalar ändå ner till 2048 px vid detail high. */
@@ -135,8 +184,13 @@ export async function kontrolleraFil(supabase: SupabaseClient, u: Underlagsrad):
   if (typ === 'pdf') {
     if (!bytes.subarray(0, 1024).toString('latin1').includes('%PDF')) return { ok: false, tyst: false, orsak: 'PDF:en går inte att öppna — filen är inte en PDF' };
     try {
-      const sidor = await pdfSidor(bytes);
+      const { sidor, krypterad } = await pdfInfo(bytes);
       if (!sidor) return { ok: false, tyst: false, orsak: 'PDF:en har inga sidor' };
+      if (krypterad) {
+        const ny = await avkryptera(bytes);
+        if (!ny.ok) return { ok: false, tyst: false, orsak: ny.orsak };
+        return { ok: true, fil: { typ: 'dokument', mime: DOKUMENT.pdf, bytes: ny.bytes, sidor: ny.sidor } };
+      }
       return { ok: true, fil: { typ: 'dokument', mime: DOKUMENT.pdf, bytes, sidor } };
     } catch (err) {
       return { ok: false, tyst: false, orsak: `PDF:en går inte att öppna: ${err instanceof Error ? err.message : err}` };
