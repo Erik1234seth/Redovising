@@ -34,7 +34,7 @@
 
 import { SIGNATURE_HTML } from './signature';
 
-const PARAGRAPHS = [
+export const WELCOME_PARAGRAPHS = [
   'Hej,',
 
   'Kul att du är intresserad av EnklaBokslut.',
@@ -65,6 +65,7 @@ const PARAGRAPHS = [
 
   'Har du någon annan fundering?',
 ];
+const PARAGRAPHS = WELCOME_PARAGRAPHS;
 
 export function leadWelcomeEmail(): { subject: string; html: string } {
   const html = PARAGRAPHS.map((p) => `<p>${p}</p>`).join('\n') + '\n' + SIGNATURE_HTML;
@@ -80,17 +81,32 @@ function escapeHtml(s: string) {
  * Samma mejl till den som skickat in formuläret på hemsidan. Bara inledningen
  * skiljer: de har redan visat intresse och ofta svarat på våra frågor, så det
  * första de läser ska vara att vi tagit emot det.
+ *
+ * Har de skrivit något i anteckningsfältet läggs AI:ns svar (anteckning-svar.ts)
+ * in efter inledningen. Passar verksamheten inte tjänsten går bara svaret ut,
+ * utan presentationen och priset.
  */
 export function websiteWelcomeEmail(params: {
   firstName?: string;
   answeredQuestions: boolean;
+  /** AI:ns svar på anteckningen, ren text. */
+  svar?: string;
+  passar?: boolean;
 }): { subject: string; html: string } {
   const greeting = params.firstName ? `Hej ${escapeHtml(params.firstName)},` : 'Hej,';
   const opening = params.answeredQuestions
     ? 'Tack för dina svar! Utifrån dem passar EnklaBokslut din verksamhet.'
     : 'Tack för att du hörde av dig!';
+  // Ren text från AI:n: tomrad blir nytt stycke, radbrytning blir <br>
+  const svar = (params.svar ?? '').trim()
+    ? params.svar!.trim().split(/\n\s*\n/).map((s) => escapeHtml(s.trim()).replace(/\n/g, '<br>'))
+    : [];
 
-  const html = [greeting, opening, ...PARAGRAPHS.slice(2)]
+  const stycken = svar.length && params.passar === false
+    ? [greeting, ...svar]
+    : [greeting, opening, ...svar, ...PARAGRAPHS.slice(2)];
+
+  const html = stycken
     .map((p) => `<p>${p}</p>`)
     .join('\n') + '\n' + SIGNATURE_HTML;
 

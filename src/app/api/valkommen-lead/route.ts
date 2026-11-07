@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
+import { svaraPaAnteckning } from '@/lib/emails/anteckning-svar';
 import { Resend } from 'resend';
 import { INTERNAL_NOTICE_TO } from '@/lib/email-log';
 import { sendViaGmail } from '@/lib/emails/send-via-gmail';
 import { websiteWelcomeEmail } from '@/lib/emails/lead-welcome';
-import { WELCOME_EMAIL_KIND } from '@/lib/sms/lead';
+import { WELCOME_EMAIL_KIND, WELCOME_SMS, sendLeadSms } from '@/lib/sms/lead';
+import { normalizePhone } from '@/lib/sms/phone';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { questions } from '@/data/kvalificera-questions';
 import { meetingConfirmationEmail, formatMeetingSlot } from '@/lib/emails/meeting-confirmation';
@@ -41,6 +43,41 @@ async function shouldGetWelcomeEmail(supabase: SupabaseClient, email: string) {
   ]);
 
   return !welcomed && !customers;
+}
+
+// Välkomstmejlet, med AI:ns svar på anteckningen om personen skrivit något.
+// Körs efter att formuläret fått sitt svar, så att besökaren inte väntar på
+// AI:n. Går AI-anropet inte skickas mejlet utan svaret.
+//
+// Efter mejlet går samma SMS som Facebook-leads får ("vi har precis skickat
+// ett mejl till dig"), men bara om mejlet faktiskt gick iväg.
+async function sendWelcomeEmail(params: {
+  supabase: SupabaseClient;
+  email: string;
+  phone: unknown;
+  firstName: string;
+  answeredQuestions: boolean;
+  notes: unknown;
+}) {
+  try {
+    const anteckning = typeof params.notes === 'string' ? params.notes.trim() : '';
+    const svar = anteckning
+      ? await svaraPaAnteckning({ supabase: params.supabase, email: params.email, anteckning })
+      : null;
+    const welcome = websiteWelcomeEmail({
+      firstName: params.firstName,
+      answeredQuestions: params.answeredQuestions,
+      svar: svar?.svar,
+      passar: svar?.passar,
+    });
+    const emailed = await sendViaGmail({ to: params.email, subject: welcome.subject, html: welcome.html, kind: WELCOME_EMAIL_KIND });
+    if (emailed) {
+      const phone = normalizePhone(typeof params.phone === 'string' ? params.phone : null);
+      await sendLeadSms(params.supabase, phone, WELCOME_SMS);
+    }
+  } catch (err) {
+    console.error('[valkommen-lead] välkomstmejlet kunde inte skickas:', err instanceof Error ? err.message : err);
+  }
 }
 
 // Leads from the ad/brev funnel (/valkommen, and the popups on the landing
@@ -187,15 +224,16 @@ export async function POST(request: NextRequest) {
     // de får faktiskt innehåller något. Samma märkning som Facebook-leads, så
     // att påminnelsen efter 14 dagar gäller även de här. Tack-mailet finns kvar
     // för den som redan läst välkomstmejlet eller redan är kund.
-    const welcome = !booking && (await shouldGetWelcomeEmail(supabase, email))
-      ? websiteWelcomeEmail({ firstName, answeredQuestions: hasAnswers })
-      : null;
+    const newLead = !booking && (await shouldGetWelcomeEmail(supabase, email));
+    if (newLead) {
+      after(() => sendWelcomeEmail({ supabase, email, phone, firstName, answeredQuestions: hasAnswers, notes }));
+    }
 
-    await sendViaGmail({
+    if (!newLead) await sendViaGmail({
       to: email,
-      subject: welcome ? welcome.subject : booking ? booking.subject : 'Tack — vi hör av oss inom kort',
-      kind: welcome ? WELCOME_EMAIL_KIND : booking ? 'motebokning' : 'lead_bekraftelse',
-      html: welcome ? welcome.html : booking ? booking.html : `
+      subject: booking ? booking.subject : 'Tack — vi hör av oss inom kort',
+      kind: booking ? 'motebokning' : 'lead_bekraftelse',
+      html: booking ? booking.html : `
         <!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"></head>
         <body style="margin:0;padding:0;background-color:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
           <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:40px 16px;">

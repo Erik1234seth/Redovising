@@ -252,9 +252,31 @@ export async function handleNewLead(
     });
   }
 
+  const sms = await sendLeadSms(
+    supabase,
+    phone,
+    booking ? bookingSms(booking.date, booking.time) : WELCOME_SMS,
+    booking ? BOOKING_SMS_KIND : WELCOME_KIND,
+  );
+  return { ...sms, phone, emailed };
+}
+
+/**
+ * Skickar ett lead-SMS och loggar det i sms_messages. Inget går ut till ett
+ * nummer som saknas, inte går att tolka eller har avregistrerat sig.
+ *
+ * Används både av handleNewLead och av välkomstmejlet från hemsidans formulär
+ * (/api/valkommen-lead), så att båda vägarna följer samma spärrar.
+ */
+export async function sendLeadSms(
+  supabase: SupabaseClient,
+  phone: string | null,
+  body: string,
+  kind: string = WELCOME_KIND,
+): Promise<{ outcome: Exclude<LeadOutcome, 'duplicate'>; error?: string }> {
   if (!phone) {
     console.warn('[lead] lead utan användbart telefonnummer, inget SMS skickas');
-    return { outcome: 'no_phone', phone: null, emailed };
+    return { outcome: 'no_phone' };
   }
 
   const { data: optout } = await supabase
@@ -265,11 +287,8 @@ export async function handleNewLead(
 
   if (optout) {
     console.log(`[lead] ${phone} är avregistrerad, inget SMS skickas`);
-    return { outcome: 'optout', phone, emailed };
+    return { outcome: 'optout' };
   }
-
-  const body = booking ? bookingSms(booking.date, booking.time) : WELCOME_SMS;
-  const smsKind = booking ? BOOKING_SMS_KIND : WELCOME_KIND;
 
   try {
     const sid = await sendSms({ to: phone, body });
@@ -277,12 +296,12 @@ export async function handleNewLead(
       phone,
       direction: 'out',
       body,
-      kind: smsKind,
+      kind,
       twilio_sid: sid,
       status: 'sent',
     });
     console.log(`[lead] välkomst-SMS skickat till ${phone}`);
-    return { outcome: 'sent', phone, emailed };
+    return { outcome: 'sent' };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[lead] kunde inte skicka till ${phone}:`, message);
@@ -290,10 +309,10 @@ export async function handleNewLead(
       phone,
       direction: 'out',
       body,
-      kind: smsKind,
+      kind,
       status: 'failed',
       error: message,
     });
-    return { outcome: 'failed', phone, emailed, error: message };
+    return { outcome: 'failed', error: message };
   }
 }
