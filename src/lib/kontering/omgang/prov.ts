@@ -67,7 +67,8 @@ export async function startaProv(supabase: SupabaseClient, userId: string, under
       del: i + 1,
       delar,
       status: 'forbereder',
-      underlag_ids: d.filer.map((f) => f.underlagId),
+      // Grannsidorna läses i sina egna delar; filerna står ändå med så att de raderas med delen
+      underlag_ids: d.filer.filter((f) => !f.granne).map((f) => f.underlagId),
       filer: d.filer,
       // Filerna som inte skickades står på första delen
       varningar: i === 0 ? forb.hoppade : [],

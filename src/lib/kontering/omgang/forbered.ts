@@ -9,7 +9,7 @@ import { hamtaArslista, hamtaKundbild, verifikationsSammanfattning } from '../ku
 import { laddaK1Andringar } from '../k1-andringar';
 import { instruktionensTokens, byggKropp, type Indatafil } from './anrop';
 import { kontrolleraFil, uppskattadeTokens, type Forberedd, type Underlagsrad } from './filer';
-import { laddaUpp } from './openai';
+import { laddaUpp, raderaFil } from './openai';
 
 /**
  * Förbereder en omgång för en kund: kontrollerar filerna, bygger kunddelen,
@@ -18,13 +18,27 @@ import { laddaUpp } from './openai';
  * Ett anrop får inte bli för stort. Över 272 000 tokens in tar OpenAI dubbelt
  * betalt, och svaret har ett tak på 128 000 tokens med tänkandet. Därför
  * delas underlagen i delar med högst MAX_FILER filer och en tokenbudget.
- * Underlagen tas i den ordning de kom in, så att sidor som kom i samma mejl
- * hamnar i samma del.
+ *
+ * Ingen sida får tappa sitt dokument för att omgången delas:
+ * - Ordningen (iOrdning): filerna i samma mejl eller samma uppladdning hålls
+ *   ihop och sorteras på namnet, så att "Skanning (33)" och "Skanning (34)"
+ *   ligger bredvid varandra. Uppladdningstiden duger inte — filerna laddas upp
+ *   parallellt och kommer in huller om buller.
+ * - Grannsidorna: varje del får också de GRANNAR filerna närmast före och
+ *   efter sig ur samma mejl eller uppladdning, som sammanhang. Ett dokument
+ *   som delas av gränsen läses i delen där det börjar, med sidorna efter, och
+ *   delen efter sätter sin sida som del_av dokumentets första sida.
  */
 
 /** Under OpenAIs gräns på 272 000, med marginal för att uppskattningen är grov. */
 const TOKENTAK = 255_000;
 const MAX_FILER = 30;
+/** Så många filer på var sida om en del följer med som grannsidor. Ett dokument på upp till fyra sidor klarar gränsen. */
+const GRANNAR = 3;
+/** Plats som hålls för grannsidorna: sex bilder. */
+const GRANNRESERV = 2 * GRANNAR * 3_000;
+/** Filer som laddats upp med mindre mellanrum än så räknas som samma uppladdning. */
+const SAMMA_UPPLADDNING_MS = 10 * 60 * 1000;
 /** OpenAIs gräns är 50 MB filer per anrop. Bilder räknas inte in, men vi räknar allt för säkerhets skull. */
 const MAX_BYTE_PER_ANROP = 45 * 1024 * 1024;
 /** Så här många tokens får filerna minst, även när kunddelen är stor. */
@@ -36,6 +50,8 @@ export interface Filpost {
   underlagId: string;
   namn: string;
   fileId: string | null;
+  /** En grannsida (G1, G2 …): läses i en annan del, med här som sammanhang. Får inget svar. */
+  granne?: boolean;
 }
 
 export interface Anropsdel {
@@ -74,6 +90,55 @@ function kallaText(u: Underlagsrad): string {
   if (u.source === 'mejl') return 'via mejl';
   if (u.source === 'admin') return 'uppladdad av byrån';
   return u.source ? `via ${u.source}` : '';
+}
+
+const SORTERA = new Intl.Collator('sv', { numeric: true, sensitivity: 'base' });
+
+/**
+ * "Skanning (12).jpg" → ["Skanning", 12]. Utan nummer är filen den första —
+ * så namnger Windows och skannrar en serie: "Skanning", "Skanning (2)" …
+ */
+function namnnyckel(namn: string): [string, number] {
+  const bas = namn.replace(/\.[^.]+$/, '');
+  const m = bas.match(/^(.*?)\s*\((\d+)\)$/);
+  return m ? [m[1], Number(m[2])] : [bas, 1];
+}
+
+/**
+ * Underlagen i den ordning sidorna hör ihop: samlade per mejl eller per
+ * uppladdning, samlingarna i den ordning de kom in, och filerna i varje
+ * samling efter namnet. `samling` säger vilken samling filen hör till.
+ */
+export function iOrdning<T extends Pick<Underlagsrad, 'file_name' | 'created_at' | 'source' | 'gmail_message_id'>>(rader: T[]): { rad: T; samling: number }[] {
+  const tid = (r: T) => new Date(r.created_at).getTime();
+  const samlingar: T[][] = [];
+  const perMejl = new Map<string, T[]>();
+  let uppladdning: { lista: T[]; tid: number; kalla: string } | null = null;
+  for (const r of [...rader].sort((a, b) => tid(a) - tid(b))) {
+    if (r.gmail_message_id) {
+      let lista = perMejl.get(r.gmail_message_id);
+      if (!lista) { lista = []; perMejl.set(r.gmail_message_id, lista); samlingar.push(lista); }
+      lista.push(r);
+      continue;
+    }
+    const kalla = r.source ?? '';
+    if (uppladdning && uppladdning.kalla === kalla && tid(r) - uppladdning.tid < SAMMA_UPPLADDNING_MS) {
+      uppladdning.lista.push(r);
+      uppladdning.tid = tid(r);
+    } else {
+      uppladdning = { lista: [r], tid: tid(r), kalla };
+      samlingar.push(uppladdning.lista);
+    }
+  }
+  return samlingar.flatMap((lista, samling) => lista
+    .map((rad) => ({ rad, nyckel: namnnyckel(rad.file_name) }))
+    .sort((a, b) => SORTERA.compare(a.nyckel[0], b.nyckel[0]) || a.nyckel[1] - b.nyckel[1])
+    .map(({ rad }) => ({ rad, samling })));
+}
+
+/** Bilder och korta PDF:er kan vara en sida av ett dokument i en annan fil. Längre dokument följer inte med som grannar. */
+function kanVaraSida(f: Forberedd): boolean {
+  return f.typ === 'bild' || (f.typ === 'dokument' && (f.sidor ?? 99) <= 2 && f.bytes.length < 5 * 1024 * 1024);
 }
 
 /**
@@ -155,57 +220,83 @@ export async function forberedOmgang(
 
   // Kontrollen: varje fil laddas ner och prövas
   const hoppade: Hoppad[] = [];
-  const godkanda: { u: Underlagsrad; fil: Forberedd }[] = [];
-  const kontroller = await iKo(underlag, SAMTIDIGA_UPPLADDNINGAR, (u) => kontrolleraFil(supabase, u));
-  underlag.forEach((u, i) => {
+  type Godkand = { u: Underlagsrad; fil: Forberedd; samling: number; tokens: number; byte: number };
+  const godkanda: Godkand[] = [];
+  const ordnade = iOrdning(underlag);
+  const kontroller = await iKo(ordnade, SAMTIDIGA_UPPLADDNINGAR, ({ rad }) => kontrolleraFil(supabase, rad));
+  ordnade.forEach(({ rad: u, samling }, i) => {
     const k = kontroller[i];
-    if (k.ok) godkanda.push({ u, fil: k.fil });
+    if (k.ok) godkanda.push({ u, fil: k.fil, samling, tokens: uppskattadeTokens(k.fil), byte: k.fil.typ === 'text' ? 0 : k.fil.bytes.length });
     else hoppade.push({ underlagId: u.id, namn: u.file_name, orsak: k.orsak, varning: !k.tyst });
   });
 
-  // Delarna: filbudgeten är det som blir kvar efter instruktionen och kunden
+  // Delarna: filbudgeten är det som blir kvar efter instruktionen, kunden och grannsidorna
   const fast = instruktionensTokens() + Math.ceil(kunden.text.length / 3.5);
-  const budget = Math.max(MIN_FILBUDGET, TOKENTAK - fast);
-  const grupper: { u: Underlagsrad; fil: Forberedd }[][] = [];
+  const budget = Math.max(MIN_FILBUDGET, TOKENTAK - fast - GRANNRESERV);
+  const grupper: Godkand[][] = [];
   let tokens = 0, byte = 0;
   for (const g of godkanda) {
-    const t = uppskattadeTokens(g.fil);
-    const b = g.fil.typ === 'text' ? 0 : g.fil.bytes.length;
     const sista = grupper[grupper.length - 1];
-    if (!sista || sista.length >= MAX_FILER || tokens + t > budget || byte + b > MAX_BYTE_PER_ANROP) {
+    if (!sista || sista.length >= MAX_FILER || tokens + g.tokens > budget || byte + g.byte > MAX_BYTE_PER_ANROP) {
       grupper.push([g]);
-      tokens = t; byte = b;
+      tokens = g.tokens; byte = g.byte;
     } else {
       sista.push(g);
-      tokens += t; byte += b;
+      tokens += g.tokens; byte += g.byte;
     }
   }
 
   const delar: Anropsdel[] = [];
-  for (const grupp of grupper) {
-    const uppladdade = await iKo(grupp, SAMTIDIGA_UPPLADDNINGAR, async ({ u, fil }) => {
+  for (const [gi, grupp] of grupper.entries()) {
+    // Grannsidorna: närmast gränsen först, bara ur samma samling och bara så länge de ryms
+    let gTokens = fast + grupp.reduce((s, g) => s + g.tokens, 0);
+    let gByte = grupp.reduce((s, g) => s + g.byte, 0);
+    const grannar = (kandidater: Godkand[], samling: number | undefined): Godkand[] => {
+      const ut: Godkand[] = [];
+      for (const g of kandidater.slice(0, GRANNAR)) {
+        if (g.samling !== samling || !kanVaraSida(g.fil) || gTokens + g.tokens > TOKENTAK || gByte + g.byte > MAX_BYTE_PER_ANROP) break;
+        ut.push(g);
+        gTokens += g.tokens; gByte += g.byte;
+      }
+      return ut;
+    };
+    const fore = grannar([...(grupper[gi - 1] ?? [])].reverse(), grupp[0].samling).reverse();
+    const efter = grannar(grupper[gi + 1] ?? [], grupp[grupp.length - 1].samling);
+
+    const poster = [
+      ...fore.map((g) => ({ ...g, granne: 'fore' as const })),
+      ...grupp.map((g) => ({ ...g, granne: undefined })),
+      ...efter.map((g) => ({ ...g, granne: 'efter' as const })),
+    ];
+    const uppladdade = await iKo(poster, SAMTIDIGA_UPPLADDNINGAR, async (p) => {
       try {
-        if (fil.typ === 'text') return { u, fil, fileId: null as string | null };
-        const fileId = await laddaUpp(u.file_name, fil.bytes, fil.mime, fil.typ === 'bild' ? 'vision' : 'user_data');
-        return { u, fil, fileId };
+        if (p.fil.typ === 'text') return { ...p, fileId: null as string | null };
+        const fileId = await laddaUpp(p.u.file_name, p.fil.bytes, p.fil.mime, p.fil.typ === 'bild' ? 'vision' : 'user_data');
+        return { ...p, fileId };
       } catch (err) {
-        hoppade.push({ underlagId: u.id, namn: u.file_name, orsak: err instanceof Error ? err.message : String(err), varning: true });
+        // En grannsida som inte gick upp är bara mindre sammanhang
+        if (!p.granne) hoppade.push({ underlagId: p.u.id, namn: p.u.file_name, orsak: err instanceof Error ? err.message : String(err), varning: true });
         return null;
       }
     });
     const klara = uppladdade.filter((x): x is NonNullable<typeof x> => !!x);
-    if (!klara.length) continue;
+    if (!klara.some((k) => !k.granne)) {
+      await Promise.all(klara.filter((k) => k.fileId).map((k) => raderaFil(k.fileId!).catch(() => {})));
+      continue;
+    }
 
     const filer: Filpost[] = [];
-    const indata: Indatafil[] = klara.map(({ u, fil, fileId }, i) => {
-      const nr = `F${i + 1}`;
-      filer.push({ fil: nr, underlagId: u.id, namn: u.file_name, fileId });
+    let f = 0, g = 0;
+    const indata: Indatafil[] = klara.map(({ u, fil, fileId, granne }) => {
+      const nr = granne ? `G${++g}` : `F${++f}`;
+      filer.push({ fil: nr, underlagId: u.id, namn: u.file_name, fileId, ...(granne ? { granne: true } : {}) });
       const sidor = fil.typ === 'dokument' && fil.sidor && fil.sidor > 1 ? `, ${fil.sidor} sidor` : '';
-      const kontext = underlagetsKontext(instruktioner, u.id, gamlaPer.get(u.id) ?? []);
+      const kontext = granne ? '' : underlagetsKontext(instruktioner, u.id, gamlaPer.get(u.id) ?? []);
       const rubrik = [`${nr}: ${u.file_name} — inkom ${DAG.format(new Date(u.created_at))} ${kallaText(u)}${sidor}`.trim(), kontext].filter(Boolean).join('\n');
       return {
         fil: nr,
         rubrik,
+        granne,
         innehall: fil.typ === 'text' ? { typ: 'text', text: fil.text }
           : fil.typ === 'bild' ? { typ: 'bild', fileId: fileId! }
           : { typ: 'dokument', fileId: fileId!, namn: u.file_name },
@@ -214,7 +305,7 @@ export async function forberedOmgang(
     delar.push({
       filer,
       kropp: byggKropp(kunden.text, indata, kunden.regelIdn),
-      tokens: fast + klara.reduce((s, k) => s + uppskattadeTokens(k.fil), 0),
+      tokens: fast + klara.reduce((s, k) => s + k.tokens, 0),
     });
   }
 

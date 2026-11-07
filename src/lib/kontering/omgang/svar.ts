@@ -18,7 +18,9 @@ import type { Filpost, Hoppad, Kontext } from './forbered';
  * Granska.
  *
  * Kontrollerna över hela svaret: varje fil som skickades ska ha fått svar,
- * och hänvisningar till rader och filer ska finnas.
+ * och hänvisningar till rader och filer ska finnas. Grannsidorna (G1, G2 …)
+ * är sammanhang ur delarna bredvid: de får inget svar här, men en sida kan
+ * vara del_av en av dem (./forbered).
  */
 
 export interface ResultatTransaktion {
@@ -266,10 +268,13 @@ export async function provaSvar(
   // Spärrarna i kontoreglerna prövas med byråns ändringar
   await laddK1Andringar(supabase);
   const kontroller: string[] = [];
+  // Grannsidorna (G1, G2 …) kan pekas på som sida eller dubblett men får inget eget svar — de läses i sin egen del
   const perFil = new Map(filer.map((f) => [f.fil.toUpperCase(), f]));
+  const egna = filer.filter((f) => !f.granne);
   const svarPerFil = new Map<string, Svar['filer'][number]>();
   for (const f of svar.filer ?? []) {
     const nr = String(f.fil ?? '').trim().toUpperCase();
+    if (perFil.get(nr)?.granne) continue;
     if (!perFil.has(nr)) { kontroller.push(`Svaret har en fil ${f.fil} som inte skickades.`); continue; }
     if (svarPerFil.has(nr)) { kontroller.push(`${nr} finns två gånger i svaret — den första gäller.`); continue; }
     svarPerFil.set(nr, f);
@@ -277,13 +282,13 @@ export async function provaSvar(
 
   const finns = (ref: string) => {
     if (/^K\d+$/.test(ref)) return { ok: ref in kontext.kNummer, transaktionId: kontext.kNummer[ref] ?? null };
-    if (/^F\d+$/.test(ref)) return { ok: perFil.has(ref), transaktionId: null };
+    if (/^[FG]\d+$/.test(ref)) return { ok: perFil.has(ref), transaktionId: null };
     return { ok: false, transaktionId: null };
   };
 
-  const gammalt = await gamlaKonteringar(supabase, filer.map((f) => f.underlagId));
+  const gammalt = await gamlaKonteringar(supabase, egna.map((f) => f.underlagId));
   const resultat: ResultatFil[] = [];
-  for (const f of filer) {
+  for (const f of egna) {
     const s = svarPerFil.get(f.fil.toUpperCase());
     if (!s) kontroller.push(`${f.fil} (${f.namn}) fick inget svar — skickas med nästa gång.`);
     const delAv = (s?.del_av ?? '').trim().toUpperCase();
