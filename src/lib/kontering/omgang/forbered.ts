@@ -66,7 +66,7 @@ export interface Kontext {
   regelIdn: string[];
   /** K-nummer i kundens lista → transaktionens id. */
   kNummer: Record<string, string>;
-  /** V-nummer i listan över bokförda verifikationer → verifikationen i text ("A55 2026-07-31 0060"). */
+  /** BOK-nummer i listan över bokförda verifikationer → verifikationen i text ("A55 2026-07-31 0060"). */
   vNummer?: Record<string, string>;
 }
 
@@ -208,16 +208,22 @@ export async function forberedOmgang(
   const betalsatt = tolkaBetalsatt(kund?.har_foretagskonto ?? null);
   if (!betalsatt) throw new Error('Välj först om kunden betalar via företagskonto eller privatkonto (Kundkontext).');
 
-  const { data: rader, error } = await supabase.from('bokforing_underlag').select(UNDERLAG_KOLUMNER)
-    .eq('user_id', userId).in('id', underlagIds).order('created_at');
-  if (error) throw new Error(`Kunde inte läsa underlagen: ${error.message}`);
-  const underlag = (rader ?? []) as Underlagsrad[];
-  if (!underlag.length) throw new Error('Inga underlag valda');
-
-  // Transaktioner som lästs ut ur underlagen förut: deras kontext följer med filen
-  const { data: gamla } = await supabase.from('transaktioner').select('id, underlag_id').in('underlag_id', underlag.map((u) => u.id));
+  // I omgångar om 100 — hundratals id i en fråga blir en för lång adress
+  const underlag: Underlagsrad[] = [];
   const gamlaPer = new Map<string, string[]>();
-  for (const g of gamla ?? []) gamlaPer.set(g.underlag_id, [...(gamlaPer.get(g.underlag_id) ?? []), g.id]);
+  for (let i = 0; i < underlagIds.length; i += 100) {
+    const ids = underlagIds.slice(i, i + 100);
+    const [{ data: rader, error }, { data: gamla }] = await Promise.all([
+      supabase.from('bokforing_underlag').select(UNDERLAG_KOLUMNER).eq('user_id', userId).in('id', ids),
+      // Transaktioner som lästs ut ur underlagen förut: deras kontext följer med filen
+      supabase.from('transaktioner').select('id, underlag_id').in('underlag_id', ids),
+    ]);
+    if (error) throw new Error(`Kunde inte läsa underlagen: ${error.message}`);
+    underlag.push(...((rader ?? []) as Underlagsrad[]));
+    for (const g of gamla ?? []) gamlaPer.set(g.underlag_id, [...(gamlaPer.get(g.underlag_id) ?? []), g.id]);
+  }
+  underlag.sort((a, b) => a.created_at.localeCompare(b.created_at));
+  if (!underlag.length) throw new Error('Inga underlag valda');
 
   const instruktioner = await hamtaInstruktioner(supabase, { userId, underlagIds: underlag.map((u) => u.id) });
   const kunden = await kunddel(supabase, userId, kund, betalsatt, instruktioner, new Set(underlag.map((u) => u.id)));

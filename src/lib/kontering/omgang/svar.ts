@@ -292,7 +292,7 @@ export async function provaSvar(
   const finns = (ref: string) => {
     if (/^K\d+$/.test(ref)) return { ok: ref in kontext.kNummer, transaktionId: kontext.kNummer[ref] ?? null };
     if (/^[FG]\d+$/.test(ref)) return { ok: perFil.has(ref), transaktionId: null };
-    if (/^V\d+$/.test(ref)) return { ok: ref in (kontext.vNummer ?? {}), transaktionId: null };
+    if (/^BOK\d+$/.test(ref)) return { ok: ref in (kontext.vNummer ?? {}), transaktionId: null };
     return { ok: false, transaktionId: null };
   };
 

@@ -181,7 +181,7 @@ export async function verifikationerIManader(supabase: SupabaseClient, userId: s
  * De inlästa verifikationerna (SIE, verifikationslistor, kassarapporter) en
  * rad var, från och med förra året — så att Flöde ser om ett underlag redan
  * är bokfört, t.ex. en faktura vars nummer står i verifikationstexten.
- * Raderna numreras V1, V2 … och kan pekas på som dubblett.
+ * Raderna numreras BOK1, BOK2 … och kan pekas på som dubblett.
  */
 export async function bokfordaVerifikationer(
   supabase: SupabaseClient, userId: string, max = 1000,
@@ -209,9 +209,10 @@ export async function bokfordaVerifikationer(
   const visas = lista.slice(-max);
   const borta = lista.length - visas.length;
   const vNummer: Record<string, string> = {};
+  // BOK, inte V: många kunder har verifikationsserien V, och då blandas "V17" ihop
   const rader = visas.map((v, i) => {
-    vNummer[`V${i + 1}`] = v.namn;
-    return `V${i + 1} ${v.rad}`;
+    vNummer[`BOK${i + 1}`] = v.namn;
+    return `BOK${i + 1} ${v.rad}`;
   });
   return {
     text: `BOKFÖRDA VERIFIKATIONER — kundens inlästa verifikationer från ${fran}, en rad var (${visas.length} st${borta ? `, de ${borta} äldsta utelämnade` : ''}):\n${rader.join('\n')}\nDet som står här är bokfört och ska inte bokföras igen.`,

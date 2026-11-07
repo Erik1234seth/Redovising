@@ -42,10 +42,19 @@ export async function hamtaInstruktioner(
   supabase: SupabaseClient,
   { userId, underlagIds = [] }: { userId: string | null; underlagIds?: string[] },
 ): Promise<Instruktion[]> {
-  const villkor = ['omfang.eq.alla', userId ? `user_id.eq.${userId}` : '', ...underlagIds.map((id) => `underlag_id.eq.${id}`)].filter(Boolean);
-  const { data, error } = await supabase.from('flodes_instruktioner').select(KOLUMNER).or(villkor.join(',')).order('created_at');
-  if (error) throw new Error(`Kunde inte läsa byråns instruktioner: ${error.message}`);
-  return (data ?? []) as Instruktion[];
+  // Underlagen frågas efter i omgångar — hundratals id i en fråga blir en för lång adress
+  const fragor = [
+    supabase.from('flodes_instruktioner').select(KOLUMNER).or(['omfang.eq.alla', userId ? `user_id.eq.${userId}` : ''].filter(Boolean).join(',')),
+  ];
+  for (let i = 0; i < underlagIds.length; i += 100) {
+    fragor.push(supabase.from('flodes_instruktioner').select(KOLUMNER).in('underlag_id', underlagIds.slice(i, i + 100)));
+  }
+  const svar = await Promise.all(fragor);
+  const fel = svar.find((s) => s.error)?.error;
+  if (fel) throw new Error(`Kunde inte läsa byråns instruktioner: ${fel.message}`);
+  const perId = new Map<string, Instruktion>();
+  for (const s of svar) for (const i of (s.data ?? []) as unknown as Instruktion[]) perId.set(i.id, i);
+  return [...perId.values()].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
 }
 
 const galler = (i: Instruktion, t: { id: string; underlag_id: string | null; user_id?: string | null }) =>

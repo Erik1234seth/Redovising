@@ -83,11 +83,11 @@ ${MEJLREGEL}
 
 DUBBLETTER
 En affär får bara bokföras en gång. Jämför varje transaktion med KUNDENS TRANSAKTIONER, med BOKFÖRDA VERIFIKATIONER och med de andra filerna i omgången.
-- En bokförd verifikation vars text har samma faktura-, kvitto- eller ordernummer, eller samma motpart, belopp och period, är samma affär — då är transaktionen en dubblett med V-numret i "ref". En verifikation som sammanfattar en period (kassarapport, dagskassa, månadens försäljning) kan innehålla affären: "tveksam" när beloppen talar för det, annars "unik".
+- En bokförd verifikation vars text har samma faktura-, kvitto- eller ordernummer, eller samma motpart, belopp och period, är samma affär — då är transaktionen en dubblett med BOK-numret i "ref" (inte verifikationens eget nummer). En verifikation som sammanfattar en period (kassarapport, dagskassa, månadens försäljning) kan innehålla affären: "tveksam" när beloppen talar för det, annars "unik".
 - Samma affär kan synas på flera sätt: samma underlag inskickat två gånger, eller samma köp på olika papper — orderbekräftelse och kvitto, faktura och betalningskvitto, kvitto och kortslip. Då kan datumet skilja några dagar och beloppet skilja på frakt, avgifter, öresavrundning eller valuta.
 - Talar för samma affär: samma order-, faktura-, kvitto- eller OCR-nummer (starkast), samma motpart, samma varor, belopp och datum nära varandra. Talar emot: olika nummer av samma sort, olika varor, ett köp som återkommer — en prenumeration, hyra eller månadsavgift är en ny affär varje period.
 - "status": "dublett" bara när du är säker — samma nummer, eller samma underlag inskickat igen. En dubblett bokförs inte, så ett misstag gör att en riktig affär försvinner. "tveksam" när det kan vara samma affär men beviset inte är starkt; då tittar en människa på den. "unik" annars.
-- "ref": raden, verifikationen eller filen det är en dubblett av, t.ex. "K120", "V12" eller "F3". Vid två filer i omgången som är samma affär är den senare dubbletten. Tom sträng vid "unik".
+- "ref": raden, verifikationen eller filen det är en dubblett av, t.ex. "K120", "BOK12" eller "F3". Vid två filer i omgången som är samma affär är den senare dubbletten. Tom sträng vid "unik".
 
 SAKNAS
 Av det vi har ska det gå att avgöra datum, belopp, moms (beloppet, satsen eller att ingen svensk moms ska redovisas) och vad affären gäller. Ett belopp i utländsk valuta räcker — fråga aldrig efter kronor eller kurs.
