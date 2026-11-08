@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { anvandAndringar, anvandRegelmaster, medAndring, originalNummer, type K1Andring, type K1Konto } from './regelverk';
-import { hamtaRegelmaster } from './regelmaster';
+import { hamtaAiRegler, hamtaRegelmaster } from './regelmaster';
 import { anvandPrinciper, PRINCIPER } from './principer';
+import { anvandAiRegler } from './airegler';
 
 /**
  * Byråns kontoplaner, gjorda i adminpanelen. Det finns två: löpande bokföring
@@ -66,10 +67,12 @@ export function synligaKonton(sparade: Map<string, SparadAndring>): string[] {
  * konteringen använda dem. Anropas när en kontering börjar.
  */
 export async function laddaK1Andringar(supabase: SupabaseClient): Promise<void> {
-  const [alla, principer, rm] = await Promise.all([
+  const [alla, principer, rm, ai] = await Promise.all([
     hamtaK1Andringar(supabase, 'lopande'), hamtaPrinciper(supabase, 'lopande'), hamtaRegelmaster(supabase, 'lopande'),
+    hamtaAiRegler(supabase, 'lopande'),
   ]);
   anvandRegelmaster(rm);
+  anvandAiRegler(ai.regler);
   const andringar = new Map([...alla].map(([k, v]) => [k, v.andring]));
   anvandAndringar(andringar, new Set([...alla].filter(([, v]) => v.borttagenAt).map(([k]) => k)));
   anvandPrinciper(principer.lista);

@@ -1,5 +1,6 @@
 import { BESKRIVNINGSREGEL, MEJLREGEL } from '@/lib/transaktioner/normalisera';
 import { byransPrinciper } from '../principer';
+import { byransAiRegler } from '../airegler';
 import { allaKonton, kontoBlock } from '../regelverk';
 
 /**
@@ -126,6 +127,8 @@ ANTECKNINGAR
 Det du ser när du har alla underlag framför dig och som byrån bör veta — t.ex. att två filer verkar höra ihop utan att vara dubbletter, ett mönster i kundens köp, något som verkar fel. Tom lista när inget.
 
 ${byransPrinciper()}
+
+${byransAiRegler()}
 
 K1-KONTOPLAN MED REGLER:
 ${helK1()}`;

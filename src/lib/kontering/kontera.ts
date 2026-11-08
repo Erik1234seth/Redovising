@@ -12,6 +12,7 @@ import { MODELLER, fraga, samtalMedUppslag, type Del, type Modell, type Prova, t
 import { momsText, rensaMomsdelar, slaIhopDelar, tolkaOmvand, type Momsdel, type Omvand } from './momsdelar';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
 import { byransPrinciper } from './principer';
+import { byransAiRegler } from './airegler';
 import { laddaK1Andringar } from './k1-andringar';
 import { filensRader, underlagetsDelar, type Filrad } from './underlag';
 import { arUtlandsk, iKronor, omrakningText, raknaOmTillKronor, type Kronor } from './kronor';
@@ -203,7 +204,9 @@ Allmänna regler:
 - Står det en instruktion från byrån i anteckningen följer du den. Den väger tyngst av allt. Står det BYRÅNS KONTEXT vid transaktionen följer du den på samma sätt.
 - Bokföringen sker i kronor. Är underlaget i en annan valuta har vi redan räknat om transaktionen: beloppet och momsen står i kronor, och inom parentes står originalbeloppet och kursen — kronbeloppet eller kursen på underlaget när de finns, annars Riksbankens dagskurs. Kontera på kronbeloppet och ange delarnas belopp och moms i kronor. Räkna inte om transaktionen själv, och se inte omräkningen som ett problem eller som skäl till granskning. Originalet, avskriften och filens rader (F1, F2 …) står kvar i originalvalutan — tar du belopp ur underlagets rader räknar du om dem med samma kurs. Momsen på ett utländskt underlag är oftast utländsk moms, och den ger aldrig avdrag för svensk ingående moms — bara svensk moms från en svensk säljare gör det.
 
-${byransPrinciper()}`;
+${byransPrinciper()}
+
+${byransAiRegler()}`;
 
 const KONTERA_FAST = () => `${GEMENSAMT()}
 

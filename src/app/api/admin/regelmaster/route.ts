@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { tolkaVariant } from '@/lib/kontering/k1-andringar';
-import { hamtaRegelmaster, importeraRegler, lasReglerFil } from '@/lib/kontering/regelmaster';
-import { reglerXlsx } from '@/lib/kontering/k1-xlsx';
+import { hamtaAiRegler, importeraAiRegler, lasAiReglerFil } from '@/lib/kontering/regelmaster';
+import { aiReglerXlsx } from '@/lib/kontering/k1-xlsx';
 
 /**
- * Regelmasterns regler i en kontoplan (@/lib/kontering/regelmaster). Gränsvärdena
+ * Regelmasterns AI-regler i en kontoplan (@/lib/kontering/regelmaster). Gränsvärdena
  * är gemensamma och har en egen route, /api/admin/gransvarden.
  *
  *   GET ?variant=&fil=json|xlsx  ladda ner reglerna
@@ -37,17 +37,17 @@ export async function GET(request: NextRequest) {
   const fil = sp.get('fil');
   if (fil !== 'json' && fil !== 'xlsx') return fel('fil ska vara json eller xlsx', 400);
   try {
-    const rm = await hamtaRegelmaster(getSupabase(), variant);
-    const namn = `Regelmaster_regler_${variant}_${new Date().toLocaleDateString('sv-SE')}`;
+    const ai = await hamtaAiRegler(getSupabase(), variant);
+    const namn = `Regelmaster_${variant === 'lopande' ? 'Lopande' : 'Bokslut'}_${new Date().toLocaleDateString('sv-SE')}`;
     if (fil === 'json') {
-      return new NextResponse(JSON.stringify({ kalla: rm.kalla, regler: rm.regler }, null, 1) + '\n', {
+      return new NextResponse(JSON.stringify({ kalla: ai.kalla, regler: ai.regler }, null, 1) + '\n', {
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
           'Content-Disposition': `attachment; filename="${namn}.json"`,
         },
       });
     }
-    return new NextResponse(new Uint8Array(reglerXlsx(rm.regler)), {
+    return new NextResponse(new Uint8Array(aiReglerXlsx(ai.regler, `AI-regler ${variant === 'lopande' ? 'löpande' : 'bokslut'}`)), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${namn}.xlsx"`,
@@ -72,13 +72,13 @@ export async function POST(request: NextRequest) {
   if (!/\.(xlsx|json)$/i.test(fil.name)) return fel('Filen ska vara .xlsx eller .json', 400);
   let regler;
   try {
-    regler = lasReglerFil(Buffer.from(await fil.arrayBuffer()), fil.name);
+    regler = lasAiReglerFil(Buffer.from(await fil.arrayBuffer()), fil.name);
   } catch (err) {
     return fel(err, 400);
   }
   if (!regler.length) return fel('Hittade inga regler i filen', 400);
   try {
-    const plan = await importeraRegler(getSupabase(), variant, regler, form.get('spara') === '1', fil.name);
+    const plan = await importeraAiRegler(getSupabase(), variant, regler, form.get('spara') === '1', fil.name);
     return NextResponse.json({ ...plan, iFilen: regler.length });
   } catch (err) {
     return fel(err);

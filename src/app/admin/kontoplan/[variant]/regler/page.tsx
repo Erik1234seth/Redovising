@@ -3,18 +3,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import type { Parameter, RegelmasterRad } from '@/lib/kontering/regelverk';
+import type { AiRegel } from '@/lib/kontering/airegler';
 
 /**
  * De generella reglerna i en kontoplan (/api/admin/regler): byråns principer
  * (var kontoplan har sina, går att ändra här), gränsvärdena (gemensamma för
- * löpande och bokslut), regelmasterns regler (var kontoplan har sina) — båda
- * laddas ner och importeras här, se @/lib/kontering/regelmaster — och det som
- * skrivits i flödesschemat för alla kunder (bara löpande).
+ * löpande och bokslut), regelmasterns AI-regler (var kontoplan har sina) —
+ * båda laddas ner och importeras här, se @/lib/kontering/regelmaster — de
+ * gamla beloppskontrollerna i kod (bara visning) och det som skrivits i
+ * flödesschemat för alla kunder (bara löpande).
  * Kundspecifika regler hör inte hit.
  */
 
+const AI_RUBRIKER: [keyof AiRegel, string][] = [
+  ['omrade', 'Område'], ['galler', 'När gäller regeln?'], ['gor', 'Vad ska AI göra?'], ['kontroll', 'Kontroll och undantag'],
+];
+
 interface Data {
   principer: { inledning: string; lista: string[]; updatedAt: string | null };
+  airegler: { kalla: string | null; updatedAt: string | null; regler: AiRegel[] };
   regelmaster: { kalla: string; updatedAt: string | null; regler: RegelmasterRad[] };
   gransvarden: { kalla: string; updatedAt: string | null; parametrar: Parameter[] };
   flodesschema: { id: string; typ: 'kontext' | 'regel'; steg: string; namn: string | null; galler: string | null; text: string; created_at: string }[];
@@ -71,6 +78,7 @@ export default function Regler() {
   const [fel, setFel] = useState('');
   const [sok, setSok] = useState('');
   const [sokVarde, setSokVarde] = useState('');
+  const [sokAi, setSokAi] = useState('');
   const [importFil, setImportFil] = useState<{ slag: Slag; fil: File } | null>(null);
 
   const ladda = useCallback(() => {
@@ -88,6 +96,11 @@ export default function Regler() {
       || r.konton.some((k) => k.startsWith(q))
       || r.anteckning.toLowerCase().includes(q));
   }, [data, sok]);
+
+  const aiRegler = useMemo(() => {
+    const q = sokAi.trim().toLowerCase();
+    return (data?.airegler.regler ?? []).filter((r) => !q || AI_RUBRIKER.some(([f]) => r[f].toLowerCase().includes(q)));
+  }, [data, sokAi]);
 
   const parametrar = useMemo(() => new Map((data?.gransvarden.parametrar ?? []).map((p) => [p.id, p])), [data]);
   const varden = useMemo(() => {
@@ -139,7 +152,7 @@ export default function Regler() {
             <p className="text-xs text-slate-500 mt-0.5">
               {data.gransvarden.parametrar.length} värden ur {data.gransvarden.kalla}
               {data.gransvarden.updatedAt ? `, importerade ${DATUM.format(new Date(data.gransvarden.updatedAt))}` : ' (k1.json, utgångsläget)'}.
-              En import här gäller båda kontoplanerna. Reglerna nedan räknar med värdena.
+              En import här gäller båda kontoplanerna. Beloppskontrollerna i kod räknar med värdena.
             </p>
           </div>
           <Filknappar href="/api/admin/gransvarden?" onFil={(fil) => setImportFil({ slag: 'gransvarden', fil })} />
@@ -165,18 +178,52 @@ export default function Regler() {
       <section>
         <div className="flex flex-wrap items-end gap-3 mb-3">
           <div className="mr-auto">
-            <h2 className="font-semibold text-slate-900">Regelmastern: regler</h2>
+            <h2 className="font-semibold text-slate-900">Regelmastern</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              {data.regelmaster.regler.length} regler ur {data.regelmaster.kalla}
-              {data.regelmaster.updatedAt ? `, importerade ${DATUM.format(new Date(data.regelmaster.updatedAt))}` : ' (k1.json, utgångsläget)'}.
+              {data.airegler.kalla
+                ? `${data.airegler.regler.length} regler ur ${data.airegler.kalla}${data.airegler.updatedAt ? `, importerade ${DATUM.format(new Date(data.airegler.updatedAt))}` : ''}. `
+                : 'Inga regler importerade än. '}
               Gäller bara {variant === 'lopande' ? 'löpande bokföring' : 'bokslut'}.
-              &quot;Prövas i kod&quot; betyder att beloppet jämförs med gränsen innan AI:n svarar. De andra står i kontotexten som AI:n läser.
+              {variant === 'lopande' ? ' Konterings-AI:n får alla reglerna varje gång, från nästa kontering.' : ''}
             </p>
           </div>
           <Filknappar href={`/api/admin/regelmaster?variant=${variant}&`} onFil={(fil) => setImportFil({ slag: 'regler', fil })} />
         </div>
-        <input value={sok} onChange={(e) => setSok(e.target.value)} placeholder="Sök regel eller konto…"
+        <input value={sokAi} onChange={(e) => setSokAi(e.target.value)} placeholder="Sök regel…"
           className="w-full sm:w-64 mb-3 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500" />
+        {data.airegler.regler.length > 0 && !aiRegler.length && <p className="text-sm text-slate-500">Inga regler matchar.</p>}
+        <ul className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+          {aiRegler.map((r) => (
+            <li key={r.id}>
+              <details>
+                <summary className="px-4 py-2.5 cursor-pointer hover:bg-slate-50 flex flex-wrap gap-x-3 gap-y-0.5 items-baseline list-none">
+                  <span className="font-mono text-xs text-slate-400 w-24 shrink-0">{r.id}</span>
+                  <span className="text-sm font-medium text-slate-900">{r.omrade}</span>
+                  <span className="text-sm text-slate-600 min-w-0 flex-1 truncate">{r.galler}</span>
+                </summary>
+                <dl className="px-4 pb-3 pt-1 grid grid-cols-[10rem_1fr] gap-x-3 gap-y-1 text-sm">
+                  {AI_RUBRIKER.map(([f, namn]) => r[f] ? [
+                    <dt key={`${f}-t`} className="text-slate-500">{namn}</dt>,
+                    <dd key={f} className="text-slate-800">{r[f]}</dd>,
+                  ] : null)}
+                </dl>
+              </details>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <details className="group">
+        <summary className="cursor-pointer list-none">
+          <span className="font-semibold text-slate-900">Beloppskontroller i kod</span>
+          <span className="text-xs text-slate-500"> · {data.regelmaster.regler.length} regler ur {data.regelmaster.kalla} · visa</span>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Den gamla regeltabellen (rule_id). Den importeras inte längre, men &quot;prövas i kod&quot; betyder att systemet
+            fortfarande jämför beloppet med gränsen. Värdena kommer från gränsvärdena ovan.
+          </p>
+        </summary>
+        <input value={sok} onChange={(e) => setSok(e.target.value)} placeholder="Sök regel eller konto…"
+          className="w-full sm:w-64 my-3 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500" />
         {!regler.length && <p className="text-sm text-slate-500">Inga regler matchar.</p>}
         <ul className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
           {regler.map((r) => (
@@ -202,7 +249,7 @@ export default function Regler() {
             </li>
           ))}
         </ul>
-      </section>
+      </details>
     </div>
   );
 }
@@ -392,7 +439,7 @@ function ImportFil({ variant, slag, fil, onStang, onKlar }: {
               {plan.regler && grupp('Regler', plan.regler)}
               {!!plan.reglerUtanVarde?.length && (
                 <div>
-                  <p className="font-medium text-amber-700">Regler som pekar på ett värde som saknas i filen ({plan.reglerUtanVarde.length})</p>
+                  <p className="font-medium text-amber-700">Beloppskontroller som pekar på ett värde som saknas i filen ({plan.reglerUtanVarde.length})</p>
                   <p className="text-xs text-slate-500">De prövas inte längre i kod förrän värdet finns igen eller reglerna importeras utan det.</p>
                   <ul className="mt-0.5 space-y-0.5 text-slate-900">
                     {plan.reglerUtanVarde.map((x) => (

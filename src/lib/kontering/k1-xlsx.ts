@@ -1,12 +1,14 @@
 import * as XLSX from 'xlsx';
-import type { k1Fil, Parameter, Regel } from './regelverk';
+import type { k1Fil, Parameter } from './regelverk';
+import type { AiRegel } from './airegler';
+import { AI_KOLUMNER } from './regelmaster';
 
 /**
  * Nedladdningarna som xlsx, med de engelska kolumnnamnen och listor
  * separerade med |:
  *   - kontobeskrivningarna: fliken Kontobeskrivningar (gränsvärdena ligger i en egen fil)
  *   - gränsvärdena: fliken Gränsvärden, bara parametertabellen (value_id)
- *   - regelmasterns regler: fliken Regler (rule_id)
+ *   - regelmasterns AI-regler: fliken "AI-regler löpande"/"AI-regler bokslut" med byråns svenska rubriker
  */
 
 const lista = (v: string[] | undefined) => (v ?? []).join('|');
@@ -47,22 +49,14 @@ export function gransvardenXlsx(parametrar: Parameter[]): Buffer {
   return bok(granser, 'Gränsvärden', [{ wch: 44 }, { wch: 50 }, { wch: 10 }, { wch: 16 }]);
 }
 
-/** Fliken Regler: regelmasterns regler i en kontoplan, med rubrikraden rule_id. */
-export function reglerXlsx(regler: Regel[]): Buffer {
-  const rader: (string | number)[][] = [[
-    'rule_id', 'rule_name', 'value_id', 'comparison_operator', 'aggregation_scope', 'vat_treatment',
-    'valid_from', 'valid_to', 'applies_to_accounts', 'rule_notes', 'status', 'version',
-  ]];
-  for (const r of regler) {
-    rader.push([
-      r.id, r.namn, r.parameterId, r.operator, r.omfattning, r.moms, r.gallerFran ?? '', r.gallerTill ?? '',
-      lista(r.konton), r.anteckning, 'active', r.version ?? '',
-    ]);
-  }
-  return bok(rader, 'Regler', [{ wch: 44 }, { wch: 50 }, { wch: 40 }]);
+/** Regelmasterns AI-regler i en kontoplan, med samma kolumner som byråns regelmasterfil. */
+export function aiReglerXlsx(regler: AiRegel[], flik: string): Buffer {
+  const rader: string[][] = [AI_KOLUMNER.map(([, rubrik]) => rubrik)];
+  for (const r of regler) rader.push(AI_KOLUMNER.map(([f]) => r[f]));
+  return bok(rader, flik, [{ wch: 14 }, { wch: 28 }, { wch: 50 }, { wch: 70 }, { wch: 50 }]);
 }
 
-function bok(rader: (string | number)[][], flik: string, cols: XLSX.ColInfo[]): Buffer {
+function bok(rader: (string | number)[][] | string[][],flik: string, cols: XLSX.ColInfo[]): Buffer {
   const wb = XLSX.utils.book_new();
   const ark = XLSX.utils.aoa_to_sheet(rader);
   ark['!cols'] = cols;

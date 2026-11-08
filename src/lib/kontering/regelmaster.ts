@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { K1_REGELMASTER, type Parameter, type Regel, type Regelmaster } from './regelverk';
 import { loggaHistorik, type Variant } from './k1-andringar';
+import type { AiRegel } from './airegler';
 
 /**
  * Regelmastern består av två delar som laddas ner och importeras var för sig
@@ -11,14 +12,18 @@ import { loggaHistorik, type Variant } from './k1-andringar';
  *     GEMENSAMMA för löpande bokföring och bokslut. En rad i `gransvarden`;
  *     utan rad gäller k1.json. Filen är xlsx med fliken Gränsvärden (kolumnen
  *     value_id först) eller JSON med listan `parametrar`.
- *   - Reglerna (rule_id: vilket värde, vilken jämförelse, vilka konton) är per
- *     kontoplan, i `kontoplan_regelmaster` (kolumnen parametrar används inte
- *     längre). Utan rad gäller k1.json. Filen är xlsx med en tabell som börjar
- *     med rule_id eller JSON med listan `regler`.
+ *   - AI-reglerna (./airegler: Regel-ID, Område, När gäller regeln?, Vad ska
+ *     AI göra?, Kontroll och undantag) är per kontoplan, i `kontoplan_ai_regler`.
+ *     Utan rad finns inga. Filen är xlsx med rubrikraden Regel-ID eller JSON med
+ *     listan `regler`. Övriga kolumner i filen (Källa, Typ) läses inte.
+ *
+ * Beloppskontrollerna i kod (regeltabellen med rule_id, som provaKonto prövar)
+ * importeras inte längre. De står kvar som de är i `kontoplan_regelmaster`
+ * eller k1.json och visas på fliken Regler.
  *
  * En import ersätter allt i sin del: det som saknas i filen slutar gälla. Varje
  * ändrad, ny och borttagen regel och parameter skrivs till `kontoplan_historik`
- * (konto null, data.slag 'regel' eller 'parameter' — parametrar har ett eget
+ * (konto null, data.slag 'ai-regel' eller 'parameter' — parametrar har ett eget
  * fält typ). Gränsvärdena loggas i båda kontoplanernas historik.
  */
 
@@ -33,6 +38,7 @@ export async function hamtaGransvarden(supabase: SupabaseClient): Promise<Gransv
   return { kalla: data.kalla, parametrar: data.parametrar as Parameter[], updatedAt: data.updated_at };
 }
 
+/** Beloppskontrollernas regler (rule_id). Importeras inte längre — ligger kvar som de är. */
 async function hamtaRegler(supabase: SupabaseClient, variant: Variant): Promise<{ kalla: string; regler: Regel[]; updatedAt: string | null }> {
   const { data, error } = await supabase.from('kontoplan_regelmaster')
     .select('kalla, regler, updated_at').eq('variant', variant).maybeSingle();
@@ -42,12 +48,12 @@ async function hamtaRegler(supabase: SupabaseClient, variant: Variant): Promise<
 }
 
 export interface SparadRegelmaster extends Regelmaster {
-  /** När reglerna importerades — `kalla` är reglernas fil. */
+  /** När beloppskontrollernas regler senast ändrades — `kalla` är deras fil. */
   updatedAt: string | null;
   gransvarden: { kalla: string; updatedAt: string | null };
 }
 
-/** Kontoplanens regler med de gemensamma gränsvärdena — det konteringen och fliken Regler använder. */
+/** Kontoplanens beloppskontroller med de gemensamma gränsvärdena — det provaKonto och fliken Regler använder. */
 export async function hamtaRegelmaster(supabase: SupabaseClient, variant: Variant): Promise<SparadRegelmaster> {
   const [gv, r] = await Promise.all([hamtaGransvarden(supabase), hamtaRegler(supabase, variant)]);
   return {
@@ -56,8 +62,14 @@ export async function hamtaRegelmaster(supabase: SupabaseClient, variant: Varian
   };
 }
 
+export async function hamtaAiRegler(supabase: SupabaseClient, variant: Variant): Promise<{ kalla: string | null; regler: AiRegel[]; updatedAt: string | null }> {
+  const { data, error } = await supabase.from('kontoplan_ai_regler').select('kalla, regler, updated_at').eq('variant', variant).maybeSingle();
+  if (error) throw new Error(`Kunde inte läsa AI-reglerna: ${error.message}`);
+  if (!data) return { kalla: null, regler: [], updatedAt: null };
+  return { kalla: data.kalla, regler: data.regler as AiRegel[], updatedAt: data.updated_at };
+}
+
 const text = (v: unknown) => String(v ?? '').trim();
-const lista = (v: unknown) => (Array.isArray(v) ? v : String(v ?? '').split('|')).map(text).filter(Boolean);
 const tal = (v: unknown) => {
   if (v === '' || v == null) return null;
   const n = Number(v);
@@ -80,12 +92,8 @@ function parameter(p: Record<string, unknown>): Parameter {
   };
 }
 
-function regel(r: Record<string, unknown>): Regel {
-  return {
-    id: text(r.id), namn: text(r.namn), parameterId: text(r.parameterId), operator: text(r.operator),
-    omfattning: text(r.omfattning), moms: text(r.moms), gallerFran: datum(r.gallerFran), gallerTill: datum(r.gallerTill),
-    konton: lista(r.konton), anteckning: text(r.anteckning), version: text(r.version),
-  };
+function aiRegel(r: Record<string, unknown>): AiRegel {
+  return { id: text(r.id), omrade: text(r.omrade), galler: text(r.galler), gor: text(r.gor), kontroll: text(r.kontroll) };
 }
 
 function lasJson(data: Buffer): Record<string, unknown> {
@@ -134,35 +142,45 @@ export function lasGransvardenFil(data: Buffer, filnamn: string): Parameter[] {
   }));
 }
 
-/** Läser regelmasterns regler ur filen: xlsx med en tabell som börjar med rule_id, eller JSON med listan `regler`. */
-export function lasReglerFil(data: Buffer, filnamn: string): Regel[] {
+/** Rubrikerna i byråns regelmasterfil, jämförda utan skiftläge och avslutande frågetecken. */
+export const AI_KOLUMNER: [keyof AiRegel, string][] = [
+  ['id', 'Regel-ID'], ['omrade', 'Område'], ['galler', 'När gäller regeln?'], ['gor', 'Vad ska AI göra?'], ['kontroll', 'Kontroll och undantag'],
+];
+const rubrik = (v: unknown) => text(v).toLowerCase().replace(/\?$/, '').trim();
+
+/**
+ * Läser AI-reglerna ur filen: xlsx med en rubrikrad som börjar med Regel-ID
+ * (fliken "AI-regler löpande" i byråns fil), eller JSON med listan `regler`.
+ */
+export function lasAiReglerFil(data: Buffer, filnamn: string): AiRegel[] {
   if (/\.json$/i.test(filnamn)) {
     const json = lasJson(data);
     const r = Array.isArray(json) ? json : json.regler;
     if (!Array.isArray(r)) throw new Error('JSON-filen saknar listan "regler" (samma form som nedladdningen)');
-    return r.map(regel);
+    return r.map(aiRegel);
   }
   const wb = XLSX.read(data, { type: 'buffer' });
+  const falt = new Map(AI_KOLUMNER.map(([f, k]) => [rubrik(k), f]));
   for (const namn of wb.SheetNames) {
-    const g = tabell(rader(wb.Sheets[namn]), 'rule_id', 'value_id');
-    if (g) {
-      return g.map((x) => regel({
-        id: x.rule_id, namn: x.rule_name, parameterId: x.value_id, operator: x.comparison_operator,
-        omfattning: x.aggregation_scope, moms: x.vat_treatment, gallerFran: x.valid_from, gallerTill: x.valid_to,
-        konton: x.applies_to_accounts, anteckning: x.rule_notes, version: x.version,
-      }));
-    }
+    const gv = rader(wb.Sheets[namn]);
+    const start = gv.findIndex((r) => rubrik(r[0]) === 'regel-id');
+    if (start === -1) continue;
+    const kolumner = gv[start].map((k) => falt.get(rubrik(k)));
+    const saknas = AI_KOLUMNER.filter(([f]) => !kolumner.includes(f)).map(([, k]) => k);
+    if (saknas.length) throw new Error(`Fliken ${namn} saknar kolumnerna ${saknas.join(', ')}`);
+    return gv.slice(start + 1).filter((r) => text(r[0])).map((r) => aiRegel(Object.fromEntries(
+      kolumner.flatMap((f, i) => (f ? [[f, r[i]]] : [])),
+    )));
   }
-  throw new Error('Hittar inga regler: filen ska ha en tabell som börjar med kolumnen rule_id');
+  throw new Error('Hittar inga regler: filen ska ha en rubrikrad som börjar med Regel-ID');
 }
 
 const PARAMETERFALT: Record<string, string> = {
   namn: 'Namn', varde: 'Värde', enhet: 'Enhet', basParameter: 'Baseras på', multiplikator: 'Multiplikator',
   gallerFran: 'Gäller från', gallerTill: 'Gäller till', typ: 'Typ', senastKontrollerad: 'Kontrollerat', version: 'Version',
 };
-const REGELFALT: Record<string, string> = {
-  namn: 'Namn', parameterId: 'Värde', operator: 'Jämförelse', omfattning: 'Omfattning', moms: 'Moms',
-  gallerFran: 'Gäller från', gallerTill: 'Gäller till', konton: 'Konton', anteckning: 'Anteckning', version: 'Version',
+const AIFALT: Record<string, string> = {
+  omrade: 'Område', galler: 'När gäller regeln', gor: 'Vad AI:n ska göra', kontroll: 'Kontroll och undantag',
 };
 
 export interface Jamforelse {
@@ -172,18 +190,18 @@ export interface Jamforelse {
   oforandrade: number;
 }
 
-function jamfor<T extends { id: string; namn: string }>(nu: T[], fil: T[], falt: Record<string, string>): Jamforelse {
+function jamfor<T extends { id: string }>(nu: T[], fil: T[], falt: Record<string, string>, namnPa: (x: T) => string): Jamforelse {
   const forut = new Map(nu.map((x) => [x.id, x]));
   const iFilen = new Set(fil.map((x) => x.id));
   const j: Jamforelse = { andrade: [], nya: [], borttagna: [], oforandrade: 0 };
   for (const x of fil) {
     const f = forut.get(x.id);
-    if (!f) { j.nya.push({ id: x.id, namn: x.namn }); continue; }
+    if (!f) { j.nya.push({ id: x.id, namn: namnPa(x) }); continue; }
     const andrat = Object.keys(falt).filter((k) => JSON.stringify(x[k as keyof T] ?? null) !== JSON.stringify(f[k as keyof T] ?? null));
-    if (andrat.length) j.andrade.push({ id: x.id, namn: x.namn, falt: andrat.map((k) => falt[k]) });
+    if (andrat.length) j.andrade.push({ id: x.id, namn: namnPa(x), falt: andrat.map((k) => falt[k]) });
     else j.oforandrade++;
   }
-  for (const f of nu) if (!iFilen.has(f.id)) j.borttagna.push({ id: f.id, namn: f.namn });
+  for (const f of nu) if (!iFilen.has(f.id)) j.borttagna.push({ id: f.id, namn: namnPa(f) });
   return j;
 }
 
@@ -191,21 +209,9 @@ const antal = (j: Jamforelse) => j.andrade.length + j.nya.length + j.borttagna.l
 
 type Ogiltiga = { id: string; fel: string }[];
 
-/** Rader som saknar id eller namn, eller finns två gånger, hoppas över. */
-function giltiga<T extends { id: string; namn: string }>(rader: T[], slag: string, ogiltiga: Ogiltiga): T[] {
-  const sedda = new Set<string>();
-  return rader.filter((r) => {
-    if (!r.id) { ogiltiga.push({ id: r.namn || '(tom rad)', fel: `${slag} utan id` }); return false; }
-    if (sedda.has(r.id)) { ogiltiga.push({ id: r.id, fel: `${slag}en finns två gånger i filen` }); return false; }
-    if (!r.namn) { ogiltiga.push({ id: r.id, fel: `${slag}en saknar namn` }); return false; }
-    sedda.add(r.id);
-    return true;
-  });
-}
-
 /** Historikrader för det som ändrats, kommit till och försvunnit. */
 function historikrader<T extends { id: string }>(
-  variant: Variant, slag: 'regel' | 'parameter', j: Jamforelse, efter: T[], forut: T[], kalla: string,
+  variant: Variant, slag: 'ai-regel' | 'parameter', j: Jamforelse, efter: T[], forut: T[], kalla: string,
 ): Parameters<typeof loggaHistorik>[1] {
   const ny = new Map(efter.map((x) => [x.id, x]));
   const gammal = new Map(forut.map((x) => [x.id, x]));
@@ -221,7 +227,7 @@ export interface GransvardenPlan {
   ogiltiga: Ogiltiga;
   /** Inget har importerats förut (k1.json gäller): filen sparas även om värdena är desamma, så att den står som källa. */
   forstaImport: boolean;
-  /** Regler i någon kontoplan som pekar på ett värde som inte finns i filen — de prövas inte längre i kod. */
+  /** Beloppskontroller i någon kontoplan som pekar på ett värde som inte finns i filen — de prövas inte längre i kod. */
   reglerUtanVarde: { variant: Variant; id: string; namn: string; parameterId: string }[];
 }
 
@@ -231,17 +237,23 @@ export async function importeraGransvarden(
 ): Promise<GransvardenPlan> {
   const [nu, ...regler] = await Promise.all([hamtaGransvarden(supabase), ...VARIANTER.map((v) => hamtaRegler(supabase, v))]);
   const ogiltiga: Ogiltiga = [];
-  const parametrar = giltiga(fil, 'Parameter', ogiltiga);
-  const ids = new Set(parametrar.map((p) => p.id));
+  const sedda = new Set<string>();
+  const parametrar = fil.filter((p) => {
+    if (!p.id) { ogiltiga.push({ id: p.namn || '(tom rad)', fel: 'Värde utan value_id' }); return false; }
+    if (sedda.has(p.id)) { ogiltiga.push({ id: p.id, fel: 'Värdet finns två gånger i filen' }); return false; }
+    if (!p.namn) { ogiltiga.push({ id: p.id, fel: 'Värdet saknar namn' }); return false; }
+    sedda.add(p.id);
+    return true;
+  });
   for (const p of parametrar) {
-    if (p.basParameter && !ids.has(p.basParameter)) ogiltiga.push({ id: p.id, fel: `Baseras på ${p.basParameter}, som inte finns i filen` });
+    if (p.basParameter && !sedda.has(p.basParameter)) ogiltiga.push({ id: p.id, fel: `Baseras på ${p.basParameter}, som inte finns i filen` });
   }
   const plan: GransvardenPlan = {
-    parametrar: jamfor(nu.parametrar, parametrar, PARAMETERFALT),
+    parametrar: jamfor(nu.parametrar, parametrar, PARAMETERFALT, (p) => p.namn),
     ogiltiga,
     forstaImport: !nu.updatedAt,
     reglerUtanVarde: VARIANTER.flatMap((variant, i) => regler[i].regler
-      .filter((r) => r.parameterId && !ids.has(r.parameterId))
+      .filter((r) => r.parameterId && !sedda.has(r.parameterId))
       .map((r) => ({ variant, id: r.id, namn: r.namn, parameterId: r.parameterId }))),
   };
 
@@ -257,28 +269,31 @@ export async function importeraGransvarden(
 
 export interface ReglerPlan { regler: Jamforelse; ogiltiga: Ogiltiga; forstaImport: boolean }
 
-/** Jämför filen med kontoplanens regler och ersätter dem om `spara` är satt. */
-export async function importeraRegler(
-  supabase: SupabaseClient, variant: Variant, fil: Regel[], spara: boolean, filnamn: string,
+/** Jämför filen med kontoplanens AI-regler och ersätter dem om `spara` är satt. */
+export async function importeraAiRegler(
+  supabase: SupabaseClient, variant: Variant, fil: AiRegel[], spara: boolean, filnamn: string,
 ): Promise<ReglerPlan> {
-  const [nu, gv] = await Promise.all([hamtaRegler(supabase, variant), hamtaGransvarden(supabase)]);
+  const nu = await hamtaAiRegler(supabase, variant);
   const ogiltiga: Ogiltiga = [];
-  const ids = new Set(gv.parametrar.map((p) => p.id));
-  const regler = giltiga(fil, 'Regel', ogiltiga).filter((r) => {
-    // En regel utan värde är tillåten (t.ex. kundens val av bokslutsmetod), men ett värde som saknas är ett fel
-    if (r.parameterId && !ids.has(r.parameterId)) {
-      ogiltiga.push({ id: r.id, fel: `Värdet ${r.parameterId} finns inte bland gränsvärdena` });
-      return false;
-    }
+  const sedda = new Set<string>();
+  const regler = fil.filter((r) => {
+    if (!r.id) { ogiltiga.push({ id: r.omrade || '(tom rad)', fel: 'Regel utan Regel-ID' }); return false; }
+    if (sedda.has(r.id)) { ogiltiga.push({ id: r.id, fel: 'Regel-ID:t finns två gånger i filen' }); return false; }
+    if (!r.gor) { ogiltiga.push({ id: r.id, fel: 'Regeln saknar "Vad ska AI göra?"' }); return false; }
+    sedda.add(r.id);
     return true;
   });
-  const plan: ReglerPlan = { regler: jamfor(nu.regler, regler, REGELFALT), ogiltiga, forstaImport: !nu.updatedAt };
+  const plan: ReglerPlan = {
+    regler: jamfor(nu.regler, regler, AIFALT, (r) => r.omrade || r.id),
+    ogiltiga,
+    forstaImport: !nu.updatedAt,
+  };
 
   if (spara && (antal(plan.regler) || plan.forstaImport)) {
-    const { error } = await supabase.from('kontoplan_regelmaster').upsert(
+    const { error } = await supabase.from('kontoplan_ai_regler').upsert(
       { variant, kalla: filnamn, regler, updated_at: new Date().toISOString() }, { onConflict: 'variant' });
-    if (error) throw new Error(`Kunde inte spara reglerna: ${error.message}`);
-    await loggaHistorik(supabase, historikrader(variant, 'regel', plan.regler, regler, nu.regler, filnamn));
+    if (error) throw new Error(`Kunde inte spara AI-reglerna: ${error.message}`);
+    await loggaHistorik(supabase, historikrader(variant, 'ai-regel', plan.regler, regler, nu.regler, filnamn));
   }
   return plan;
 }

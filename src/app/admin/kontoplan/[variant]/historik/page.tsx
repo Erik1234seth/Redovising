@@ -40,6 +40,9 @@ const REGELFALT: [string, string][] = [
   ['parameterId', 'Värde'], ['operator', 'Jämförelse'], ['omfattning', 'Omfattning'], ['moms', 'Moms'],
   ['gallerFran', 'Gäller från'], ['gallerTill', 'Gäller till'], ['konton', 'Konton'], ['anteckning', 'Anteckning'], ['version', 'Version'],
 ];
+const AIFALT: [string, string][] = [
+  ['id', 'Regel-ID'], ['omrade', 'Område'], ['galler', 'När gäller regeln?'], ['gor', 'Vad ska AI göra?'], ['kontroll', 'Kontroll och undantag'],
+];
 const PARAMETERFALT: [string, string][] = [
   ['varde', 'Värde'], ['enhet', 'Enhet'], ['basParameter', 'Baseras på'], ['multiplikator', 'Multiplikator'],
   ['gallerFran', 'Gäller från'], ['gallerTill', 'Gäller till'], ['typ', 'Typ'], ['senastKontrollerad', 'Kontrollerat'], ['version', 'Version'],
@@ -48,7 +51,8 @@ const PARAMETERFALT: [string, string][] = [
 /** Vad raden gäller: ett konto, en regel, ett värde eller principerna. */
 function rubrik(h: Handelse): string {
   if (h.konto) return `${h.konto} ${String(h.data.namn ?? '')}`;
-  if (h.data.slag === 'regel') return `Regel: ${String(h.data.namn ?? h.data.id ?? '')}`;
+  if (h.data.slag === 'ai-regel') return `Regel ${String(h.data.id ?? '')}: ${String(h.data.omrade ?? '')}`;
+  if (h.data.slag === 'regel') return `Beloppskontroll: ${String(h.data.namn ?? h.data.id ?? '')}`;
   if (h.data.slag === 'parameter') return `Värde: ${String(h.data.namn ?? h.data.id ?? '')}`;
   return 'Byråns principer';
 }
@@ -161,7 +165,13 @@ function Visa({ h, borttagenNu, onTillbaka, onStang }: {
           {Array.isArray(h.data.falt) && h.data.falt.length > 0 && (
             <p className="text-xs text-blue-700">Ändrat: {(h.data.falt as string[]).join(', ')}</p>
           )}
-          {!h.konto && (h.data.slag === 'regel' || h.data.slag === 'parameter') ? (
+          {!h.konto && h.data.slag === 'ai-regel' ? (
+            <dl className="grid grid-cols-[10rem_1fr] gap-x-3 gap-y-1">
+              {AIFALT.map(([f, namn]) => h.data[f] ? [
+                <dt key={`${f}-t`} className="text-slate-500">{namn}</dt>, <dd key={f}>{String(h.data[f])}</dd>,
+              ] : null)}
+            </dl>
+          ) : !h.konto && (h.data.slag === 'regel' || h.data.slag === 'parameter') ? (
             <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1">
               <dt className="text-slate-500">Id</dt><dd className="font-mono text-xs pt-0.5">{String(h.data.id ?? '')}</dd>
               {(h.data.slag === 'regel' ? REGELFALT : PARAMETERFALT).map(([f, namn]) => {

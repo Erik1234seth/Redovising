@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { PRINCIPER_INLEDNING } from '@/lib/kontering/principer';
 import { regelmaster } from '@/lib/kontering/regelverk';
-import { hamtaRegelmaster } from '@/lib/kontering/regelmaster';
+import { hamtaAiRegler, hamtaRegelmaster } from '@/lib/kontering/regelmaster';
 import { hamtaPrinciper, sparaPrinciper, tolkaVariant } from '@/lib/kontering/k1-andringar';
 
 /**
@@ -38,7 +38,9 @@ export async function GET(request: NextRequest) {
   if (!variant) return fel('variant ska vara lopande eller bokslut', 400);
   try {
     const supabase = getSupabase();
-    const [principer, rm] = await Promise.all([hamtaPrinciper(supabase, variant), hamtaRegelmaster(supabase, variant)]);
+    const [principer, rm, ai] = await Promise.all([
+      hamtaPrinciper(supabase, variant), hamtaRegelmaster(supabase, variant), hamtaAiRegler(supabase, variant),
+    ]);
     let flodesschema: unknown[] = [];
     if (variant === 'lopande') {
       const { data, error } = await supabase
@@ -51,6 +53,7 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({
       principer: { inledning: PRINCIPER_INLEDNING, lista: principer.lista, updatedAt: principer.updatedAt },
+      airegler: ai,
       regelmaster: { kalla: rm.kalla, updatedAt: rm.updatedAt, regler: regelmaster(rm) },
       gransvarden: { kalla: rm.gransvarden.kalla, updatedAt: rm.gransvarden.updatedAt, parametrar: rm.parametrar },
       flodesschema,
