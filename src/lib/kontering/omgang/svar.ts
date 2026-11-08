@@ -316,10 +316,12 @@ export async function provaSvar(
     if (!s) kontroller.push(`${f.fil} (${f.namn}) fick inget svar — skickas med nästa gång.`);
     const delAv = (s?.del_av ?? '').trim().toUpperCase();
     if (delAv && (!perFil.has(delAv) || delAv === f.fil.toUpperCase())) kontroller.push(`${f.fil} sägs vara en sida av ${s?.del_av}, som inte finns i omgången.`);
-    if (s && s.sort !== 'underlag' && s.transaktioner.length) kontroller.push(`${f.fil} är sorterad som ${s.sort} men har transaktioner — de räknas inte.`);
+    // Ett kontoutdrag kan ge enstaka transaktioner när kundens mejl förklarar raderna
+    const medTx = s?.sort === 'underlag' || s?.sort === 'kontoutdrag';
+    if (s && !medTx && s.transaktioner.length) kontroller.push(`${f.fil} är sorterad som ${s.sort} men har transaktioner — de räknas inte.`);
     if (s && delAv && s.transaktioner.length) kontroller.push(`${f.fil} är en sida av ${delAv} men har egna transaktioner — de räknas inte.`);
 
-    const tx = s && s.sort === 'underlag' && !delAv ? s.transaktioner : [];
+    const tx = s && medTx && !delAv ? s.transaktioner : [];
     const transaktioner = await Promise.all(tx.map((t, i) => provaTransaktion(supabase, userId, f.underlagId, `${f.fil}-${i + 1}`, i + 1, t, kontext, finns)));
     resultat.push({
       fil: f.fil,

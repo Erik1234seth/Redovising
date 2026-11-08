@@ -127,7 +127,8 @@ async function skrivFil(
     return `Sida i ${huvud.namn}.`;
   }
 
-  if (f.sort !== 'underlag') {
+  // Ett kontoutdrag med transaktioner skrivs som ett underlag; utan går det till övriga filer
+  if (f.sort !== 'underlag' && !(f.sort === 'kontoutdrag' && f.transaktioner.length)) {
     const vad = f.vad || (f.sort === 'kontoutdrag' ? 'Kontoutdrag' : 'Inget underlag för bokföringen');
     if (handsorterad) {
       await uppdatera(supabase, u.id, { ...tom, del_av: null, transaktioner_notering: vad, transaktioner_fel: `AI:n hittade inga transaktioner — den tror att filen är ${vad}` });
