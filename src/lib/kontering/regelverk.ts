@@ -27,6 +27,11 @@ export interface K1Konto {
   trosklar: string[];
   /** "Konto X får aldrig väljas automatiskt" står i beskrivningen. */
   endastManuellt: boolean;
+  // Följer bara med till nedladdningen (k1Fil) — konteringen läser dem inte
+  motkonton?: string[];
+  relateradeKonton?: string[];
+  version?: string;
+  utkastOrsak?: string;
 }
 
 interface Parameter {
@@ -38,6 +43,9 @@ interface Parameter {
   multiplikator: number | null;
   gallerFran: string | null;
   gallerTill: string | null;
+  typ?: string;
+  senastKontrollerad?: string | null;
+  version?: string;
 }
 
 interface Regel {
@@ -51,6 +59,7 @@ interface Regel {
   gallerTill: string | null;
   konton: string[];
   anteckning: string;
+  version?: string;
 }
 
 export type Allvar = 'stopp' | 'granskning';
@@ -83,22 +92,45 @@ const ORIGINAL = new Map((k1.konton as K1Konto[]).map((k) => [k.konto, k]));
 /** Kontona som de gäller: k1.json med byråns ändringar ovanpå (se ./k1-andringar). */
 let KONTON = new Map(ORIGINAL);
 
-/** Texten byrån kan ändra för ett konto. Ett fält som saknas har originalets text. */
-export type K1Andring = Partial<Pick<K1Konto, 'beskrivning' | 'anvandNar' | 'anvandInteNar' | 'beslutsregler' | 'varningar' | 'exempel' | 'granskningNar' | 'nyckelord'>>;
+/**
+ * Texten byrån kan ändra för ett konto. Ett fält som saknas har originalets text.
+ * Ett konto som inte finns i k1.json har byrån lagt till — då är det hela kontot.
+ */
+export type K1Andring = Partial<Pick<K1Konto, 'namn' | 'beskrivning' | 'anvandNar' | 'anvandInteNar' | 'beslutsregler' | 'varningar' | 'exempel' | 'granskningNar' | 'nyckelord'>>;
 
 /** Samma spärr som i scripts/k1-till-json.mjs: meningen om kontot självt. */
 function arEndastManuellt(k: K1Konto): boolean {
   return new RegExp(`Konto ${k.konto} får aldrig väljas automatiskt`, 'i').test([k.beskrivning, ...k.beslutsregler, ...k.varningar].join(' '));
 }
 
+const TOMT: Omit<K1Konto, 'konto'> = {
+  namn: '', beskrivning: '', anvandNar: [], anvandInteNar: [], beslutsregler: [], exempel: [],
+  varningar: [], nyckelord: [], granskningNar: [], trosklar: [], endastManuellt: false,
+};
+
+/** Kontot med byråns ändring ovanpå. Utan original är det ett konto byrån lagt till. */
+export function medAndring(nr: string, a: K1Andring | undefined): K1Konto {
+  const k = ORIGINAL.get(nr) ?? { konto: nr, ...TOMT };
+  if (!a) return k;
+  const ny: K1Konto = { ...k, ...Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined && v !== null)) };
+  return { ...ny, endastManuellt: arEndastManuellt(ny) };
+}
+
 /** Lägger byråns ändringar ovanpå k1.json. Anropas med alla ändringar, så att en borttagen ändring försvinner. */
 export function anvandAndringar(andringar: Map<string, K1Andring>): void {
-  KONTON = new Map([...ORIGINAL].map(([nr, k]) => {
-    const a = andringar.get(nr);
-    if (!a) return [nr, k];
-    const ny: K1Konto = { ...k, ...Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined && v !== null)) };
-    return [nr, { ...ny, endastManuellt: arEndastManuellt(ny) }];
-  }));
+  const nummer = [...new Set([...ORIGINAL.keys(), ...andringar.keys()])].sort();
+  KONTON = new Map(nummer.map((nr) => [nr, medAndring(nr, andringar.get(nr))]));
+}
+
+/** Hela k1.json som den gäller med byråns ändringar och tillagda konton — det som laddas ner. */
+export function k1Fil(andringar: Map<string, K1Andring>) {
+  const nummer = [...new Set([...ORIGINAL.keys(), ...andringar.keys()])].sort();
+  return {
+    kalla: KALLA,
+    konton: nummer.map((nr) => medAndring(nr, andringar.get(nr))),
+    parametrar: k1.parametrar as Parameter[],
+    regler: k1.regler as Regel[],
+  };
 }
 
 /** Kontot som det står i k1.json, utan byråns ändringar. */

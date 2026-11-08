@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { aterstallK1Konto, hamtaK1Andringar, sparaK1Andring } from '@/lib/kontering/k1-andringar';
-import { originalKonto, type K1Andring } from '@/lib/kontering/regelverk';
+import { k1Fil, medAndring, originalKonto, type K1Andring } from '@/lib/kontering/regelverk';
+import { k1Xlsx } from '@/lib/kontering/k1-xlsx';
 
 /**
- * Byrån ändrar kontobeskrivningen för ett K1-konto (@/lib/kontering/k1-andringar).
+ * Byrån ändrar och lägger till K1-konton (@/lib/kontering/k1-andringar).
  *
- *   GET     originalet, byråns ändring och texten som gäller
- *   PUT     spara kontots text — fält som är lika med originalet sparas som original
- *   DELETE  återställ kontot till originalet
+ *   GET ?konto=5800    originalet, byråns ändring och texten som gäller
+ *   GET                alla konton som de gäller, för kontoplanen
+ *   GET ?fil=json|xlsx hela kontobeskrivningarna med ändringar och nya konton
+ *   PUT                spara kontots text — fält som är lika med originalet sparas som original.
+ *                      `ny: true` lägger till ett konto som inte finns i k1.json.
+ *   DELETE ?konto=     återställ kontot till originalet, eller ta bort ett tillagt konto
  */
 
 function getSupabase() {
@@ -27,17 +31,61 @@ function fel(err: unknown, status = 500) {
 
 const LISTOR = ['anvandNar', 'anvandInteNar', 'beslutsregler', 'varningar', 'exempel', 'granskningNar', 'nyckelord'] as const;
 
+function andringar(sparade: Awaited<ReturnType<typeof hamtaK1Andringar>>) {
+  return new Map([...sparade].map(([k, v]) => [k, v.andring]));
+}
+
 export async function GET(request: NextRequest) {
-  const konto = request.nextUrl.searchParams.get('konto') ?? '';
-  const original = originalKonto(konto);
-  if (!original) return fel(`${konto} finns inte bland K1-kontona`, 404);
+  const sp = request.nextUrl.searchParams;
   try {
-    const sparad = (await hamtaK1Andringar(getSupabase())).get(original.konto) ?? null;
+    const sparade = await hamtaK1Andringar(getSupabase());
+
+    const fil = sp.get('fil');
+    if (fil) {
+      const data = k1Fil(andringar(sparade));
+      const datum = new Date().toLocaleDateString('sv-SE');
+      if (fil === 'json') {
+        return new NextResponse(JSON.stringify(data, null, 1) + '\n', {
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Disposition': `attachment; filename="K1_kontobeskrivningar_${datum}.json"`,
+          },
+        });
+      }
+      if (fil === 'xlsx') {
+        return new NextResponse(new Uint8Array(k1Xlsx(data)), {
+          headers: {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': `attachment; filename="K1_kontobeskrivningar_${datum}.xlsx"`,
+          },
+        });
+      }
+      return fel('fil ska vara json eller xlsx', 400);
+    }
+
+    const konto = sp.get('konto');
+    if (konto === null) {
+      const konton = k1Fil(andringar(sparade)).konton.map((k) => {
+        const s = sparade.get(k.konto);
+        return {
+          konto: k.konto,
+          namn: k.namn,
+          beskrivning: k.beskrivning,
+          status: !originalKonto(k.konto) ? 'ny' : s ? 'andrad' : 'original',
+          andradAt: s?.updatedAt ?? null,
+        };
+      });
+      return NextResponse.json({ konton });
+    }
+
+    const original = originalKonto(konto);
+    const sparad = sparade.get(konto.trim()) ?? null;
+    if (!original && !sparad) return fel(`${konto} finns inte bland K1-kontona`, 404);
     return NextResponse.json({
       original,
       andring: sparad?.andring ?? null,
       andradAt: sparad?.updatedAt ?? null,
-      aktuell: { ...original, ...(sparad?.andring ?? {}) },
+      aktuell: medAndring(konto.trim(), sparad?.andring),
     });
   } catch (err) {
     return fel(err);
@@ -45,32 +93,54 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  let body: { konto?: string } & K1Andring;
+  let body: { konto?: string; ny?: boolean } & K1Andring;
   try {
     body = await request.json();
   } catch {
     return fel('Ogiltig JSON', 400);
   }
-  const original = originalKonto(body.konto ?? '');
-  if (!original) return fel(`${body.konto} finns inte bland K1-kontona`, 404);
-
-  // Bara det som skiljer från originalet sparas, så att en senare ny k1.json syns i resten
-  const andring: { [K in keyof K1Andring]: K1Andring[K] | null } = {};
-  const beskrivning = typeof body.beskrivning === 'string' ? body.beskrivning.trim() : undefined;
-  if (beskrivning !== undefined) {
-    if (!beskrivning) return fel('Beskrivningen kan inte vara tom', 400);
-    andring.beskrivning = beskrivning === original.beskrivning ? null : beskrivning;
-  }
-  for (const falt of LISTOR) {
-    const v = body[falt];
-    if (v === undefined) continue;
-    if (!Array.isArray(v)) return fel(`${falt} ska vara en lista`, 400);
-    const rader = v.map((x) => String(x ?? '').trim()).filter(Boolean);
-    andring[falt] = JSON.stringify(rader) === JSON.stringify(original[falt]) ? null : rader;
-  }
+  const konto = String(body.konto ?? '').trim();
+  const original = originalKonto(konto);
+  const supabase = getSupabase();
 
   try {
-    const supabase = getSupabase();
+    if (!original) {
+      // Ett konto byrån lagt till: hela texten sparas, det finns inget original att jämföra med
+      const finns = (await hamtaK1Andringar(supabase)).has(konto);
+      if (!finns && !body.ny) return fel(`${konto} finns inte bland K1-kontona`, 404);
+      if (!/^\d{4}$/.test(konto)) return fel('Kontonumret ska vara fyra siffror', 400);
+      const namn = String(body.namn ?? '').trim();
+      const beskrivning = String(body.beskrivning ?? '').trim();
+      if (!namn) return fel('Kontot behöver ett namn', 400);
+      if (!beskrivning) return fel('Beskrivningen kan inte vara tom', 400);
+      const rad: Record<string, unknown> = { namn, beskrivning };
+      for (const falt of LISTOR) {
+        const v = body[falt] ?? [];
+        if (!Array.isArray(v)) return fel(`${falt} ska vara en lista`, 400);
+        rad[falt] = v.map((x) => String(x ?? '').trim()).filter(Boolean);
+      }
+      await sparaK1Andring(supabase, konto, rad);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.ny) return fel(`${konto} ${original.namn} finns redan`, 409);
+
+    // Bara det som skiljer från originalet sparas, så att en senare ny k1.json syns i resten
+    const andring: { [K in keyof K1Andring]: K1Andring[K] | null } = {};
+    for (const falt of ['namn', 'beskrivning'] as const) {
+      const v = typeof body[falt] === 'string' ? body[falt].trim() : undefined;
+      if (v === undefined) continue;
+      if (!v) return fel(falt === 'namn' ? 'Kontot behöver ett namn' : 'Beskrivningen kan inte vara tom', 400);
+      andring[falt] = v === original[falt] ? null : v;
+    }
+    for (const falt of LISTOR) {
+      const v = body[falt];
+      if (v === undefined) continue;
+      if (!Array.isArray(v)) return fel(`${falt} ska vara en lista`, 400);
+      const rader = v.map((x) => String(x ?? '').trim()).filter(Boolean);
+      andring[falt] = JSON.stringify(rader) === JSON.stringify(original[falt]) ? null : rader;
+    }
+
     if (Object.values(andring).every((v) => v === null)) await aterstallK1Konto(supabase, original.konto);
     else await sparaK1Andring(supabase, original.konto, andring);
     return NextResponse.json({ ok: true });
@@ -80,10 +150,13 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const konto = request.nextUrl.searchParams.get('konto') ?? '';
-  if (!originalKonto(konto)) return fel(`${konto} finns inte bland K1-kontona`, 404);
+  const konto = (request.nextUrl.searchParams.get('konto') ?? '').trim();
   try {
-    await aterstallK1Konto(getSupabase(), konto);
+    const supabase = getSupabase();
+    if (!originalKonto(konto) && !(await hamtaK1Andringar(supabase)).has(konto)) {
+      return fel(`${konto} finns inte bland K1-kontona`, 404);
+    }
+    await aterstallK1Konto(supabase, konto);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return fel(err);

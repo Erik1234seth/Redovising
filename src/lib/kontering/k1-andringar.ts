@@ -12,6 +12,7 @@ import { anvandAndringar, type K1Andring } from './regelverk';
  */
 
 const FALT = {
+  namn: 'namn',
   beskrivning: 'beskrivning',
   anvandNar: 'anvand_nar',
   anvandInteNar: 'anvand_inte_nar',

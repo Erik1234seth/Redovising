@@ -39,8 +39,9 @@ function text(v) {
   return String(v ?? '').trim();
 }
 
-/** Excel lagrar datum som serienummer; 25569 är 1970-01-01. */
+/** Excel lagrar datum som serienummer; 25569 är 1970-01-01. Adminpanelens nedladdning skriver 2026-01-01. */
 function datum(v) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text(v))) return text(v);
   const n = Number(v);
   if (v === '' || !Number.isFinite(n) || n < 1000) return null;
   return new Date(Math.round((n - 25569) * 86400000)).toISOString().slice(0, 10);
@@ -77,6 +78,11 @@ for (const r of XLSX.utils.sheet_to_json(wb.Sheets.Kontobeskrivningar, { defval:
     nyckelord: lista(r.keywords),
     granskningNar: lista(r.needs_human_review),
     trosklar: lista(r.threshold_references),
+    // Följer bara med för att xlsx-filen ska kunna byggas tillbaka (adminpanelens nedladdning)
+    motkonton: lista(r.common_counter_accounts),
+    relateradeKonton: lista(r.related_accounts),
+    version: text(r.version),
+    utkastOrsak: text(r.draft_reason),
     // Spärren står i klartext ("Konto 1110 får aldrig väljas automatiskt").
     // Bara meningen om kontot självt räknas — andra "aldrig automatiskt" i
     // texten handlar om undantag eller andra konton.
@@ -104,6 +110,9 @@ const parametrar = gv.slice(1, brytpunkt)
     multiplikator: tal(p.multiplier),
     gallerFran: datum(p.valid_from),
     gallerTill: datum(p.valid_to),
+    typ: text(p.parameter_type),
+    senastKontrollerad: datum(p.last_verified_at),
+    version: text(p.version),
   }));
 
 const regler = gv.slice(brytpunkt + 1)
@@ -121,6 +130,7 @@ const regler = gv.slice(brytpunkt + 1)
     gallerTill: datum(g.valid_to),
     konton: lista(g.applies_to_accounts),
     anteckning: text(g.rule_notes),
+    version: text(g.version),
   }));
 
 writeFileSync(UT, JSON.stringify({ kalla: path.basename(fil), konton, parametrar, regler }, null, 1) + '\n');

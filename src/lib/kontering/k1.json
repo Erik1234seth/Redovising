@@ -75,7 +75,22 @@
    "trosklar": [
     "software_intangible_review_over_5000"
    ],
-   "endastManuellt": true
+   "endastManuellt": true,
+   "motkonton": [
+    "1930",
+    "2017",
+    "2440",
+    "2641",
+    "6500"
+   ],
+   "relateradeKonton": [
+    "1009",
+    "2641",
+    "6500",
+    "7810"
+   ],
+   "version": "6",
+   "utkastOrsak": ""
   },
   {
    "konto": "1009",
@@ -162,7 +177,17 @@
     "full_writeoff_remaining_basis_half_pbb",
     "impairment_review_threshold_10_percent"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "7810"
+   ],
+   "relateradeKonton": [
+    "1000",
+    "7700",
+    "7810"
+   ],
+   "version": "6",
+   "utkastOrsak": ""
   },
   {
    "konto": "1110",
@@ -279,7 +304,29 @@
     "Objektet påstås vara en tillfällig byggnad med kort användningstid"
    ],
    "trosklar": [],
-   "endastManuellt": true
+   "endastManuellt": true,
+   "motkonton": [
+    "1119",
+    "1130",
+    "1180",
+    "1230",
+    "1930",
+    "2017",
+    "2350",
+    "2390",
+    "2440"
+   ],
+   "relateradeKonton": [
+    "1119",
+    "1130",
+    "1150",
+    "1180",
+    "1230",
+    "7700",
+    "7820"
+   ],
+   "version": "9",
+   "utkastOrsak": ""
   },
   {
    "konto": "1119",
@@ -357,7 +404,20 @@
     "Ny, ombyggd eller historiskt oklar byggnad förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "7820"
+   ],
+   "relateradeKonton": [
+    "1110",
+    "1130",
+    "1159",
+    "1230",
+    "7700",
+    "7820"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "1130",
@@ -446,7 +506,31 @@
     "Delavyttring, reglering eller nedskrivningsindikator förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1110",
+    "1150",
+    "1180",
+    "1230",
+    "1930",
+    "2017",
+    "2350",
+    "2390",
+    "2440",
+    "3970",
+    "7970"
+   ],
+   "relateradeKonton": [
+    "1110",
+    "1150",
+    "1180",
+    "1230",
+    "3970",
+    "7700",
+    "7970"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "1150",
@@ -526,7 +610,27 @@
     "Ny, blandad eller tekniskt oklar markanläggning förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1159",
+    "1180",
+    "1930",
+    "2017",
+    "2440",
+    "3970",
+    "7970"
+   ],
+   "relateradeKonton": [
+    "1110",
+    "1130",
+    "1159",
+    "1180",
+    "1230",
+    "7700",
+    "7820"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "1159",
@@ -598,7 +702,19 @@
     "Delavyttring, utrangering eller differens i objektregistret förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "7820"
+   ],
+   "relateradeKonton": [
+    "1150",
+    "1180",
+    "1230",
+    "7700",
+    "7820"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "1180",
@@ -648,7 +764,28 @@
     "Projekt, färdigställandegrad, kostnadsinnehåll eller moms är inte verifierat"
    ],
    "trosklar": [],
-   "endastManuellt": true
+   "endastManuellt": true,
+   "motkonton": [
+    "1110",
+    "1130",
+    "1150",
+    "1700",
+    "1930",
+    "2017",
+    "2440"
+   ],
+   "relateradeKonton": [
+    "1110",
+    "1130",
+    "1150",
+    "1700",
+    "1220",
+    "1230",
+    "1240",
+    "1280"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "1220",
@@ -766,7 +903,31 @@
     "economic_life_max_3_years",
     "full_writeoff_remaining_basis_half_pbb"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1221",
+    "1222",
+    "1229",
+    "1930",
+    "2017",
+    "2350",
+    "2390",
+    "2440",
+    "2641"
+   ],
+   "relateradeKonton": [
+    "1221",
+    "1222",
+    "1229",
+    "1230",
+    "1240",
+    "5400",
+    "7700",
+    "7830",
+    "1280"
+   ],
+   "version": "8",
+   "utkastOrsak": ""
   },
   {
    "konto": "1221",
@@ -864,7 +1025,25 @@
     "external_direct_costs_over_5000",
     "economic_life_max_3_years"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "2017",
+    "2440",
+    "2641"
+   ],
+   "relateradeKonton": [
+    "1220",
+    "1222",
+    "1229",
+    "1231",
+    "1241",
+    "5400",
+    "7830",
+    "1280"
+   ],
+   "version": "6",
+   "utkastOrsak": ""
   },
   {
    "konto": "1222",
@@ -954,7 +1133,25 @@
     "Tillgången var tidigare direkt kostnadsförd"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1910",
+    "1930",
+    "2611"
+   ],
+   "relateradeKonton": [
+    "1220",
+    "1221",
+    "1229",
+    "1232",
+    "1242",
+    "2611",
+    "3970",
+    "7970"
+   ],
+   "version": "6",
+   "utkastOrsak": ""
   },
   {
    "konto": "1229",
@@ -1046,7 +1243,22 @@
    "trosklar": [
     "full_writeoff_remaining_basis_half_pbb"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "7830"
+   ],
+   "relateradeKonton": [
+    "1220",
+    "1221",
+    "1222",
+    "1239",
+    "1249",
+    "7700",
+    "7830",
+    "1280"
+   ],
+   "version": "7",
+   "utkastOrsak": ""
   },
   {
    "konto": "1230",
@@ -1152,7 +1364,32 @@
     "economic_life_max_3_years",
     "full_writeoff_remaining_basis_half_pbb"
    ],
-   "endastManuellt": true
+   "endastManuellt": true,
+   "motkonton": [
+    "1231",
+    "1232",
+    "1239",
+    "1930",
+    "2017",
+    "2350",
+    "2390",
+    "2440",
+    "2641"
+   ],
+   "relateradeKonton": [
+    "1110",
+    "1150",
+    "1220",
+    "1231",
+    "1232",
+    "1239",
+    "1240",
+    "5400",
+    "7700",
+    "7830"
+   ],
+   "version": "7",
+   "utkastOrsak": ""
   },
   {
    "konto": "1231",
@@ -1232,7 +1469,27 @@
     "external_direct_costs_over_5000",
     "economic_life_max_3_years"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "2017",
+    "2350",
+    "2390",
+    "2440",
+    "2641"
+   ],
+   "relateradeKonton": [
+    "1110",
+    "1150",
+    "1221",
+    "1230",
+    "1232",
+    "1239",
+    "5400",
+    "7830"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "1232",
@@ -1300,7 +1557,25 @@
     "Försäljning, inbyte, uttag, ändrad användning eller möjlig jämkning förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1910",
+    "1930",
+    "2611"
+   ],
+   "relateradeKonton": [
+    "1230",
+    "1231",
+    "1239",
+    "1222",
+    "1242",
+    "2611",
+    "3970",
+    "7970"
+   ],
+   "version": "6",
+   "utkastOrsak": ""
   },
   {
    "konto": "1239",
@@ -1365,7 +1640,21 @@
    "trosklar": [
     "full_writeoff_remaining_basis_half_pbb"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "7830"
+   ],
+   "relateradeKonton": [
+    "1229",
+    "1230",
+    "1231",
+    "1232",
+    "1249",
+    "7700",
+    "7830"
+   ],
+   "version": "7",
+   "utkastOrsak": ""
   },
   {
    "konto": "1240",
@@ -1459,7 +1748,31 @@
     "economic_life_max_3_years",
     "full_writeoff_remaining_basis_half_pbb"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1241",
+    "1242",
+    "1249",
+    "1930",
+    "2017",
+    "2350",
+    "2390",
+    "2440",
+    "2641"
+   ],
+   "relateradeKonton": [
+    "1220",
+    "1230",
+    "1241",
+    "1242",
+    "1249",
+    "5200",
+    "5600",
+    "7700",
+    "7830"
+   ],
+   "version": "7",
+   "utkastOrsak": ""
   },
   {
    "konto": "1241",
@@ -1534,7 +1847,27 @@
     "external_direct_costs_over_5000",
     "economic_life_max_3_years"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "2017",
+    "2350",
+    "2390",
+    "2440",
+    "2641"
+   ],
+   "relateradeKonton": [
+    "1240",
+    "1242",
+    "1249",
+    "1221",
+    "2350",
+    "2390",
+    "5200",
+    "7830"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "1242",
@@ -1604,7 +1937,25 @@
     "Privat uttag, totalskada, försäkringsersättning eller oklar moms förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1910",
+    "1930",
+    "2611"
+   ],
+   "relateradeKonton": [
+    "1240",
+    "1241",
+    "1249",
+    "1222",
+    "1232",
+    "2611",
+    "3970",
+    "7970"
+   ],
+   "version": "6",
+   "utkastOrsak": ""
   },
   {
    "konto": "1249",
@@ -1676,7 +2027,21 @@
    "trosklar": [
     "full_writeoff_remaining_basis_half_pbb"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "7830"
+   ],
+   "relateradeKonton": [
+    "1229",
+    "1239",
+    "1240",
+    "1241",
+    "1242",
+    "7700",
+    "7830"
+   ],
+   "version": "6",
+   "utkastOrsak": ""
   },
   {
    "konto": "1280",
@@ -1727,7 +2092,21 @@
     "Utgifterna innehåller eget arbete eller ej verifierade poster"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "1221"
+   ],
+   "relateradeKonton": [
+    "1180",
+    "1220",
+    "1221",
+    "1700",
+    "7830"
+   ],
+   "version": "1",
+   "utkastOrsak": ""
   },
   {
    "konto": "1300",
@@ -1795,7 +2174,22 @@
     "Insatsemission, nedskrivning eller återföring förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "2017",
+    "1600",
+    "3970",
+    "7970"
+   ],
+   "relateradeKonton": [
+    "1600",
+    "2070",
+    "3970",
+    "7970"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "1400",
@@ -1881,7 +2275,20 @@
     "inventory_optional_expensing_half_pbb",
     "inventory_standard_reduction_3_percent"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "4900",
+    "4000",
+    "2017",
+    "2440"
+   ],
+   "relateradeKonton": [
+    "1300",
+    "4000",
+    "4900"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "1465",
@@ -1932,7 +2339,26 @@
     "Varan kan vara anläggningstillgång eller privat"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "2440",
+    "4211",
+    "4212"
+   ],
+   "relateradeKonton": [
+    "1466",
+    "1467",
+    "2616",
+    "2626",
+    "2636",
+    "3211",
+    "3212",
+    "4211",
+    "4212"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "1466",
@@ -1977,7 +2403,21 @@
     "Förenklad och normal VMB blandas i samma lager"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "4900",
+    "1400",
+    "1465",
+    "1467"
+   ],
+   "relateradeKonton": [
+    "1400",
+    "1465",
+    "1467",
+    "4900"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "1467",
@@ -2021,7 +2461,28 @@
     "Varugrupper eller momssatser blandas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "2440",
+    "4200",
+    "4211",
+    "4212"
+   ],
+   "relateradeKonton": [
+    "1465",
+    "1466",
+    "2616",
+    "2626",
+    "2636",
+    "3211",
+    "3212",
+    "4200",
+    "4211",
+    "4212"
+   ],
+   "version": "2",
+   "utkastOrsak": ""
   },
   {
    "konto": "1500",
@@ -2093,7 +2554,24 @@
     "Kortinlösarens avräkning, avgift eller bankinsättning kan inte stämmas av"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "3000",
+    "3100",
+    "2610",
+    "1910",
+    "1920",
+    "1930"
+   ],
+   "relateradeKonton": [
+    "1600",
+    "2610",
+    "2650",
+    "3000",
+    "3100"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "1600",
@@ -2176,7 +2654,29 @@
     "prepaid_interest_expense_over_5000",
     "return_packaging_deposit_year_end"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "3900",
+    "3980",
+    "8310",
+    "8410",
+    "2017",
+    "4000"
+   ],
+   "relateradeKonton": [
+    "1500",
+    "1650",
+    "1700",
+    "1930",
+    "3900",
+    "3980",
+    "8310",
+    "8410",
+    "4000"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "1650",
@@ -2236,7 +2736,24 @@
     "Momsrapport, momsdeklaration eller avstämning saknas eller skiljer sig åt"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2610",
+    "2620",
+    "2630",
+    "2640",
+    "2650",
+    "1930"
+   ],
+   "relateradeKonton": [
+    "1600",
+    "2610",
+    "2640",
+    "2650",
+    "1930"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "1700",
@@ -2310,7 +2827,23 @@
     "supplier_advance_over_5000",
     "first_increased_lease_fee_over_5000"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "2440",
+    "2641",
+    "1180"
+   ],
+   "relateradeKonton": [
+    "1180",
+    "1600",
+    "2440",
+    "2641",
+    "5200",
+    "1280"
+   ],
+   "version": "7",
+   "utkastOrsak": ""
   },
   {
    "konto": "1910",
@@ -2371,7 +2904,23 @@
     "Kassainventering, kassajournal eller förklaring till kassadifferens saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "3000",
+    "2610",
+    "1930",
+    "2013",
+    "2017"
+   ],
+   "relateradeKonton": [
+    "1920",
+    "1930",
+    "2013",
+    "2017",
+    "3000"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "1920",
@@ -2425,7 +2974,22 @@
     "PlusGiro-kontoutdrag eller förklaring till avstämningsdifferens saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1600",
+    "2440",
+    "3000",
+    "4000"
+   ],
+   "relateradeKonton": [
+    "1910",
+    "1930",
+    "1940",
+    "1970"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "1930",
@@ -2489,7 +3053,28 @@
     "Bankkontoutdrag eller förklaring till avstämningsdifferens saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1600",
+    "1650",
+    "2013",
+    "2017",
+    "2440",
+    "3000",
+    "4000"
+   ],
+   "relateradeKonton": [
+    "1910",
+    "1920",
+    "1940",
+    "1970",
+    "2013",
+    "2017",
+    "2330"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "1940",
@@ -2542,7 +3127,22 @@
     "Kontoutdrag, kontohavare, valuta eller kontots användning är inte verifierad"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "2013",
+    "2017",
+    "8310",
+    "8410"
+   ],
+   "relateradeKonton": [
+    "1920",
+    "1930",
+    "1970",
+    "8310"
+   ],
+   "version": "2",
+   "utkastOrsak": ""
   },
   {
    "konto": "1970",
@@ -2605,7 +3205,22 @@
     "Varje nytt eller importerat särskilt bankkonto innan avtal och begränsningar har verifierats"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "1940",
+    "2017",
+    "2013",
+    "8310"
+   ],
+   "relateradeKonton": [
+    "1920",
+    "1930",
+    "1940",
+    "2012"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2010",
@@ -2671,7 +3286,28 @@
     "2010 efter omföringen avviker från föregående års utgående eget kapital på B10"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2011",
+    "2012",
+    "2013",
+    "2014",
+    "2017",
+    "2019"
+   ],
+   "relateradeKonton": [
+    "2011",
+    "2012",
+    "2013",
+    "2014",
+    "2017",
+    "2019",
+    "2020",
+    "2030",
+    "2040"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2011",
@@ -2735,7 +3371,26 @@
     "Orsak eller värde för lagerbortfall är oklart"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1400",
+    "3200",
+    "2612",
+    "2622",
+    "2632"
+   ],
+   "relateradeKonton": [
+    "1400",
+    "2013",
+    "2014",
+    "2612",
+    "2622",
+    "2632",
+    "3200",
+    "4000"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2012",
@@ -2806,7 +3461,24 @@
     "self_employment_standard_deduction_2026",
     "self_employment_general_reduction_2026"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "1650",
+    "2650",
+    "2710",
+    "2730"
+   ],
+   "relateradeKonton": [
+    "1650",
+    "2013",
+    "2650",
+    "2710",
+    "2730",
+    "1930"
+   ],
+   "version": "6",
+   "utkastOrsak": ""
   },
   {
    "konto": "2013",
@@ -2869,7 +3541,24 @@
     "Privat eller företagsmässigt syfte är oklart"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1910",
+    "1920",
+    "1930",
+    "1940",
+    "2440"
+   ],
+   "relateradeKonton": [
+    "2011",
+    "2012",
+    "2014",
+    "2017",
+    "1910",
+    "1930"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2014",
@@ -2933,7 +3622,25 @@
     "Privat användning av bil, bostad, lokal, tillgång eller tjänst förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "3200",
+    "2612",
+    "2622",
+    "2632",
+    "1240",
+    "5000"
+   ],
+   "relateradeKonton": [
+    "2011",
+    "2013",
+    "2017",
+    "2612",
+    "3200",
+    "1240"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2017",
@@ -2997,7 +3704,24 @@
     "Bil, maskin, större inventarie eller fastighet tillskjuts"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1910",
+    "1930",
+    "4000",
+    "5000",
+    "1220",
+    "2440"
+   ],
+   "relateradeKonton": [
+    "2010",
+    "2013",
+    "1930",
+    "2440",
+    "1220"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2019",
@@ -3057,7 +3781,20 @@
    "trosklar": [
     "year_end_closing_method"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2010",
+    "8999"
+   ],
+   "relateradeKonton": [
+    "2010",
+    "2020",
+    "2030",
+    "2040",
+    "8999"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2020",
@@ -3099,7 +3836,15 @@
     "Företagsform, motpart eller kapitalrörelse är inte verifierad"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2010",
+    "2030",
+    "2040"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2030",
@@ -3140,7 +3885,15 @@
     "Företagsform, motpart eller kapitalrörelse är inte verifierad"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2010",
+    "2020",
+    "2040"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2040",
@@ -3181,7 +3934,15 @@
     "Företagsform, motpart eller kapitalrörelse är inte verifierad"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2010",
+    "2020",
+    "2030"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2050",
@@ -3224,7 +3985,17 @@
     "Tidigare fond, beräkning eller deklarationsunderlag saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2010",
+    "2080",
+    "2060",
+    "2070",
+    "2090"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2060",
@@ -3272,7 +4043,18 @@
     "Fondtyp, beskattningsår, belopp eller återföringsfrist saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2050",
+    "2080",
+    "2070",
+    "2090",
+    "3970",
+    "3980"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2070",
@@ -3316,7 +4098,19 @@
     "Posttyp, beskattningsår eller underlag saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "1300",
+    "1600",
+    "1970",
+    "2050",
+    "2060",
+    "2080",
+    "2090"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2080",
@@ -3369,7 +4163,19 @@
    "trosklar": [
     "periodisation_fund_mandatory_reversal_sixth_tax_year"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2083",
+    "2084",
+    "2085",
+    "2086",
+    "2087",
+    "2088",
+    "2089"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2083",
@@ -3427,7 +4233,19 @@
    "trosklar": [
     "periodisation_fund_mandatory_reversal_sixth_tax_year"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2080",
+    "2084",
+    "2085",
+    "2086",
+    "2087",
+    "2088",
+    "2089"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2084",
@@ -3485,7 +4303,19 @@
    "trosklar": [
     "periodisation_fund_mandatory_reversal_sixth_tax_year"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2080",
+    "2083",
+    "2085",
+    "2086",
+    "2087",
+    "2088",
+    "2089"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2085",
@@ -3543,7 +4373,19 @@
    "trosklar": [
     "periodisation_fund_mandatory_reversal_sixth_tax_year"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2080",
+    "2083",
+    "2084",
+    "2086",
+    "2087",
+    "2088",
+    "2089"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2086",
@@ -3601,7 +4443,19 @@
    "trosklar": [
     "periodisation_fund_mandatory_reversal_sixth_tax_year"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2080",
+    "2083",
+    "2084",
+    "2085",
+    "2087",
+    "2088",
+    "2089"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2087",
@@ -3659,7 +4513,19 @@
    "trosklar": [
     "periodisation_fund_mandatory_reversal_sixth_tax_year"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2080",
+    "2083",
+    "2084",
+    "2085",
+    "2086",
+    "2088",
+    "2089"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2088",
@@ -3717,7 +4583,19 @@
    "trosklar": [
     "periodisation_fund_mandatory_reversal_sixth_tax_year"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2080",
+    "2083",
+    "2084",
+    "2085",
+    "2086",
+    "2087",
+    "2089"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2089",
@@ -3772,7 +4650,19 @@
    "trosklar": [
     "periodisation_fund_mandatory_reversal_sixth_tax_year"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2080",
+    "2083",
+    "2084",
+    "2085",
+    "2086",
+    "2087",
+    "2088"
+   ],
+   "version": "6",
+   "utkastOrsak": ""
   },
   {
    "konto": "2090",
@@ -3817,7 +4707,23 @@
     "U1–U4-fördelning eller migreringsverifikation saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [],
+   "relateradeKonton": [
+    "2050",
+    "2060",
+    "2070",
+    "2080",
+    "2083",
+    "2084",
+    "2085",
+    "2086",
+    "2087",
+    "2088",
+    "2089"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2330",
@@ -3880,7 +4786,20 @@
     "Kreditavtal, kontoutdrag eller uppdelning mellan skuld, ränta och avgifter saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "8410",
+    "6500"
+   ],
+   "relateradeKonton": [
+    "1930",
+    "2350",
+    "2390",
+    "8410"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2350",
@@ -3934,7 +4853,25 @@
     "Skulden stämmer inte med långivarens besked"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "1110",
+    "1220",
+    "1240",
+    "8410"
+   ],
+   "relateradeKonton": [
+    "2330",
+    "2390",
+    "1930",
+    "8410",
+    "1110",
+    "1220",
+    "1240"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2390",
@@ -3995,7 +4932,24 @@
     "Kapital, ränta, avgift och amortering är sammanblandade"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "2017",
+    "8410",
+    "1110",
+    "1220",
+    "1240"
+   ],
+   "relateradeKonton": [
+    "2330",
+    "2350",
+    "2017",
+    "2900",
+    "8410"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2440",
@@ -4057,7 +5011,24 @@
     "Det är oklart om inköpet hör till verksamheten eller är privat"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "4000",
+    "4600",
+    "5000",
+    "5400",
+    "2641",
+    "1930"
+   ],
+   "relateradeKonton": [
+    "1700",
+    "2641",
+    "2900",
+    "1930",
+    "4000"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2610",
@@ -4114,7 +5085,23 @@
    "trosklar": [
     "outgoing_vat_standard_rate_25"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "3000",
+    "2611",
+    "2650",
+    "1930"
+   ],
+   "relateradeKonton": [
+    "2611",
+    "2620",
+    "2630",
+    "2640",
+    "2650",
+    "3000"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2611",
@@ -4170,7 +5157,25 @@
    "trosklar": [
     "outgoing_vat_standard_rate_25"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1910",
+    "1930",
+    "3000",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2610",
+    "2612",
+    "2620",
+    "2630",
+    "2650",
+    "3000",
+    "2618"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2612",
@@ -4230,7 +5235,25 @@
    "trosklar": [
     "outgoing_vat_standard_rate_25"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2011",
+    "2014",
+    "3200",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2011",
+    "2013",
+    "2014",
+    "2611",
+    "2622",
+    "2632",
+    "2650",
+    "3200"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2613",
@@ -4290,7 +5313,23 @@
    "trosklar": [
     "outgoing_vat_standard_rate_25"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1910",
+    "1930",
+    "3900",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2610",
+    "2611",
+    "2618",
+    "2650",
+    "3900"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2614",
@@ -4356,7 +5395,23 @@
    "trosklar": [
     "outgoing_vat_standard_rate_25"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2645",
+    "4000",
+    "5000",
+    "6500",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2615",
+    "2624",
+    "2634",
+    "2645",
+    "2650"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2615",
@@ -4418,7 +5473,23 @@
    "trosklar": [
     "outgoing_vat_standard_rate_25"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2645",
+    "4000",
+    "5700",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2614",
+    "2625",
+    "2635",
+    "2645",
+    "2650",
+    "4000"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2616",
@@ -4482,7 +5553,25 @@
     "Förenklad VMB, periodöverförd negativ marginal eller flera momssatser förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "3211",
+    "3212",
+    "4211",
+    "4212",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2626",
+    "2636",
+    "3211",
+    "3212",
+    "4211",
+    "4212",
+    "2650"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2618",
@@ -4539,7 +5628,21 @@
     "Förskottet avser fastighet, bygg, import eller annan särskild momsregel"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "2900",
+    "3000",
+    "2611"
+   ],
+   "relateradeKonton": [
+    "1500",
+    "2900",
+    "2611",
+    "2650"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2620",
@@ -4602,7 +5705,27 @@
    "trosklar": [
     "outgoing_vat_reduced_rate_12"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "3000",
+    "2621",
+    "2650",
+    "1930"
+   ],
+   "relateradeKonton": [
+    "2621",
+    "2622",
+    "2623",
+    "2624",
+    "2625",
+    "2628",
+    "2610",
+    "2630",
+    "2650",
+    "3000"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2621",
@@ -4669,7 +5792,26 @@
    "trosklar": [
     "outgoing_vat_reduced_rate_12"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1910",
+    "1930",
+    "3000",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2620",
+    "2622",
+    "2623",
+    "2624",
+    "2625",
+    "2628",
+    "2631",
+    "2650",
+    "3000"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2622",
@@ -4733,7 +5875,24 @@
    "trosklar": [
     "outgoing_vat_reduced_rate_12"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2011",
+    "2013",
+    "3200",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2011",
+    "2013",
+    "2612",
+    "2621",
+    "2632",
+    "2650",
+    "3200"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2623",
@@ -4800,7 +5959,27 @@
    "trosklar": [
     "outgoing_vat_reduced_rate_12"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1910",
+    "1930",
+    "3000",
+    "3900",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2613",
+    "2620",
+    "2621",
+    "2628",
+    "2633",
+    "2650",
+    "3000",
+    "3900"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2624",
@@ -4855,7 +6034,24 @@
    "trosklar": [
     "outgoing_vat_reduced_rate_12"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2645",
+    "4000",
+    "5000",
+    "6500",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2614",
+    "2620",
+    "2625",
+    "2634",
+    "2645",
+    "2650"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2625",
@@ -4914,7 +6110,23 @@
    "trosklar": [
     "outgoing_vat_reduced_rate_12"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2645",
+    "4000",
+    "5700",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2615",
+    "2620",
+    "2624",
+    "2635",
+    "2645",
+    "2650"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2626",
@@ -4960,7 +6172,23 @@
     "Varutypen kräver särskild VMB-bedömning"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "3211",
+    "4211",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2616",
+    "2636",
+    "3211",
+    "3212",
+    "4211",
+    "4212",
+    "2650"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2628",
@@ -5016,7 +6244,27 @@
     "Förskottet avser fastighet, bygg, import eller annan särskild momsregel"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "2900",
+    "3000",
+    "2621"
+   ],
+   "relateradeKonton": [
+    "2618",
+    "2620",
+    "2621",
+    "2622",
+    "2623",
+    "2624",
+    "2625",
+    "2638",
+    "2648",
+    "2650"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2630",
@@ -5076,7 +6324,30 @@
    "trosklar": [
     "outgoing_vat_reduced_rate_6"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "3000",
+    "3200",
+    "2631",
+    "2632",
+    "2633",
+    "2634",
+    "2635",
+    "2638",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2631",
+    "2632",
+    "2633",
+    "2634",
+    "2635",
+    "2638",
+    "2620",
+    "2650"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2631",
@@ -5142,7 +6413,29 @@
     "outgoing_vat_reduced_rate_6",
     "food_vat_rate_6_2026_04_01_to_2027_12_31"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1910",
+    "1930",
+    "3000",
+    "3500",
+    "3700",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2630",
+    "2632",
+    "2633",
+    "2634",
+    "2635",
+    "2638",
+    "2621",
+    "2650",
+    "3000"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2632",
@@ -5203,7 +6496,25 @@
     "outgoing_vat_reduced_rate_6",
     "food_vat_rate_6_2026_04_01_to_2027_12_31"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2011",
+    "2014",
+    "3200",
+    "2630",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2011",
+    "2014",
+    "2630",
+    "2631",
+    "2622",
+    "2650",
+    "3200"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2633",
@@ -5262,7 +6573,26 @@
    "trosklar": [
     "outgoing_vat_reduced_rate_6"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1910",
+    "1930",
+    "3000",
+    "3900",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2613",
+    "2623",
+    "2630",
+    "2631",
+    "2638",
+    "2646",
+    "2650"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2634",
@@ -5322,7 +6652,24 @@
     "outgoing_vat_reduced_rate_6",
     "food_vat_rate_6_2026_04_01_to_2027_12_31"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2645",
+    "4000",
+    "5000",
+    "6500",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2614",
+    "2624",
+    "2630",
+    "2635",
+    "2645",
+    "2650"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2635",
@@ -5383,7 +6730,23 @@
     "outgoing_vat_reduced_rate_6",
     "food_vat_rate_6_2026_04_01_to_2027_12_31"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2645",
+    "4000",
+    "5700",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2615",
+    "2625",
+    "2630",
+    "2634",
+    "2645",
+    "2650"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2636",
@@ -5429,7 +6792,23 @@
     "Varutypen kräver särskild VMB-bedömning"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "3211",
+    "4211",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2616",
+    "2626",
+    "3211",
+    "3212",
+    "4211",
+    "4212",
+    "2650"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2638",
@@ -5485,7 +6864,27 @@
     "Förskottet avser fastighet, bygg, import eller annan särskild momsregel"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "2900",
+    "3000",
+    "2631"
+   ],
+   "relateradeKonton": [
+    "2618",
+    "2628",
+    "2630",
+    "2631",
+    "2632",
+    "2633",
+    "2634",
+    "2635",
+    "2648",
+    "2650"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2640",
@@ -5543,7 +6942,30 @@
     "Löpande bokning eller kvarstående saldo finns"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "4000",
+    "5000",
+    "5400",
+    "2610",
+    "2620",
+    "2630",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2641",
+    "2642",
+    "2645",
+    "2646",
+    "2648",
+    "2649",
+    "2650",
+    "2440"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2641",
@@ -5618,7 +7040,29 @@
     "Period, leverantörsland, beskattningsland eller rättelsekoppling är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "4000",
+    "5000",
+    "5400",
+    "1220",
+    "1240",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2640",
+    "2642",
+    "2645",
+    "2646",
+    "2648",
+    "2649",
+    "2440",
+    "2650"
+   ],
+   "version": "6",
+   "utkastOrsak": ""
   },
   {
    "konto": "2642",
@@ -5658,7 +7102,24 @@
     "Avdragsrätt, fastighet, hyresavtal eller beslut saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2641",
+    "2646",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2640",
+    "2641",
+    "2646",
+    "2649",
+    "2650",
+    "1110",
+    "1150",
+    "1230"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2645",
@@ -5719,7 +7180,31 @@
     "Transaktionstyp, momsnummer, land eller fördelningsgrund är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2614",
+    "2624",
+    "2634",
+    "2615",
+    "2625",
+    "2635",
+    "4000",
+    "5000",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2614",
+    "2624",
+    "2634",
+    "2615",
+    "2625",
+    "2635",
+    "2641",
+    "2649",
+    "2650"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2646",
@@ -5758,7 +7243,24 @@
     "Hyresavtal, användning eller avdragsrätt saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2641",
+    "2642",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2640",
+    "2641",
+    "2642",
+    "2649",
+    "2613",
+    "2623",
+    "2633",
+    "2650"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "2648",
@@ -5814,7 +7316,27 @@
     "Förskottet avser fastighet, bygg, import eller annan särskild momsregel"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1700",
+    "4000",
+    "2641"
+   ],
+   "relateradeKonton": [
+    "2618",
+    "2628",
+    "2638",
+    "2640",
+    "2641",
+    "2642",
+    "2645",
+    "2646",
+    "2649",
+    "2650"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2649",
@@ -5857,7 +7379,23 @@
     "Blandad verksamhet är löpande eller komplex"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2641",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "2640",
+    "2641",
+    "2642",
+    "2645",
+    "2646",
+    "2648",
+    "2650",
+    "2013"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2650",
@@ -5932,7 +7470,35 @@
    "trosklar": [
     "vat_rounding_difference"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1650",
+    "2012",
+    "2610",
+    "2620",
+    "2630",
+    "2640",
+    "1930",
+    "3700"
+   ],
+   "relateradeKonton": [
+    "1650",
+    "2012",
+    "2610",
+    "2620",
+    "2630",
+    "2640",
+    "2710",
+    "2730",
+    "1930",
+    "3700",
+    "2618",
+    "2628",
+    "2638",
+    "2648"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "2660",
@@ -5974,7 +7540,23 @@
     "Skattetyp, registrering eller deklarationsunderlag saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2012",
+    "1930",
+    "3000",
+    "4000",
+    "6900"
+   ],
+   "relateradeKonton": [
+    "2650",
+    "2710",
+    "2730",
+    "2012",
+    "2900"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2710",
@@ -6015,7 +7597,22 @@
     "Löneunderlag, AGI eller skattekontoutdrag saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "7000",
+    "1930",
+    "2012",
+    "2730"
+   ],
+   "relateradeKonton": [
+    "2012",
+    "2730",
+    "2650",
+    "7000",
+    "1930"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2730",
@@ -6056,7 +7653,23 @@
     "Löneunderlag, AGI eller skattekontoutdrag saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "7500",
+    "7000",
+    "1930",
+    "2012",
+    "2710"
+   ],
+   "relateradeKonton": [
+    "2710",
+    "2012",
+    "7500",
+    "1930",
+    "2900"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "2900",
@@ -6129,7 +7742,28 @@
     "accrued_interest_expense_over_5000",
     "prepaid_interest_income_over_5000"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "3000",
+    "8310",
+    "8410",
+    "2440",
+    "2350",
+    "2390"
+   ],
+   "relateradeKonton": [
+    "2440",
+    "2350",
+    "2390",
+    "2650",
+    "2017",
+    "3000",
+    "8310",
+    "8410"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "3000",
@@ -6203,7 +7837,31 @@
    "trosklar": [
     "customer_advance_over_5000"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1910",
+    "1920",
+    "1930",
+    "2610",
+    "2620",
+    "2630",
+    "2900",
+    "3700"
+   ],
+   "relateradeKonton": [
+    "1500",
+    "2900",
+    "3100",
+    "3500",
+    "3700",
+    "3900",
+    "2610",
+    "2620",
+    "2630"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "3100",
@@ -6269,7 +7927,27 @@
    "trosklar": [
     "customer_advance_over_5000"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1910",
+    "1920",
+    "1930",
+    "2900",
+    "3700"
+   ],
+   "relateradeKonton": [
+    "3000",
+    "3500",
+    "3700",
+    "3900",
+    "3970",
+    "3980",
+    "1500",
+    "2900"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "3108",
@@ -6320,7 +7998,19 @@
     "Varan har inte lämnat Sverige"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "2013",
+    "1500"
+   ],
+   "relateradeKonton": [
+    "3000",
+    "3100",
+    "3308"
+   ],
+   "version": "2",
+   "utkastOrsak": ""
   },
   {
    "konto": "3308",
@@ -6372,7 +8062,19 @@
     "Tjänsten kan omfattas av ett undantag från huvudregeln"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "2013",
+    "1500"
+   ],
+   "relateradeKonton": [
+    "3000",
+    "3100",
+    "3108"
+   ],
+   "version": "2",
+   "utkastOrsak": ""
   },
   {
    "konto": "3200",
@@ -6435,7 +8137,25 @@
     "Bil-, bostads- eller annan förmån förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2014",
+    "2612",
+    "2622",
+    "2632",
+    "1240",
+    "5000"
+   ],
+   "relateradeKonton": [
+    "2014",
+    "1240",
+    "2612",
+    "2622",
+    "2632",
+    "3000"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "3211",
@@ -6478,7 +8198,26 @@
     "Det är oklart om normal eller förenklad VMB används"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "1500",
+    "2616",
+    "2626",
+    "2636",
+    "4211"
+   ],
+   "relateradeKonton": [
+    "3212",
+    "2616",
+    "2626",
+    "2636",
+    "4211",
+    "1465",
+    "1467"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "3212",
@@ -6521,7 +8260,23 @@
     "Kvittning mot positiva marginaler övervägs"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "1500",
+    "4212"
+   ],
+   "relateradeKonton": [
+    "3211",
+    "4212",
+    "1465",
+    "1467",
+    "2616",
+    "2626",
+    "2636"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "3500",
@@ -6583,7 +8338,24 @@
    "trosklar": [
     "customer_advance_over_5000"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1930",
+    "3000",
+    "4000",
+    "5700",
+    "5800"
+   ],
+   "relateradeKonton": [
+    "3000",
+    "1500",
+    "4000",
+    "5700",
+    "5800"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "3700",
@@ -6652,7 +8424,30 @@
    "trosklar": [
     "vat_rounding_difference"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1910",
+    "1930",
+    "2610",
+    "2620",
+    "2630",
+    "3000",
+    "3100",
+    "2650"
+   ],
+   "relateradeKonton": [
+    "3000",
+    "3100",
+    "3500",
+    "4700",
+    "1500",
+    "2610",
+    "2620",
+    "2630"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "3900",
@@ -6713,7 +8508,27 @@
     "Intäkten kan påverka en tillgång, kostnad eller skuld på annat sätt än som vanlig rörelseintäkt"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1600",
+    "1500",
+    "1910",
+    "1930",
+    "2610",
+    "2620",
+    "2630"
+   ],
+   "relateradeKonton": [
+    "3000",
+    "3100",
+    "3500",
+    "3970",
+    "3980",
+    "1600",
+    "8310"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "3970",
@@ -6778,7 +8593,33 @@
     "Tillgångsslag eller redovisningsmodell är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1000",
+    "1009",
+    "1110",
+    "1119",
+    "1130",
+    "1150",
+    "1159",
+    "1500",
+    "1930",
+    "2610",
+    "1229"
+   ],
+   "relateradeKonton": [
+    "7970",
+    "1000",
+    "1110",
+    "1130",
+    "1150",
+    "1222",
+    "1232",
+    "1242",
+    "2610"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "3980",
@@ -6842,7 +8683,28 @@
     "Stödvillkor, periodisering eller koppling till tillgång är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1600",
+    "1930",
+    "1110",
+    "1150",
+    "1220",
+    "1230",
+    "1240"
+   ],
+   "relateradeKonton": [
+    "1600",
+    "3900",
+    "3970",
+    "1110",
+    "1150",
+    "1220",
+    "1230",
+    "1240"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "4000",
@@ -6941,7 +8803,29 @@
     "minor_line_merge_share_limit",
     "minor_line_recurring_annual_limit"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "1700",
+    "1400",
+    "4700",
+    "4900"
+   ],
+   "relateradeKonton": [
+    "1400",
+    "1700",
+    "2440",
+    "4600",
+    "4700",
+    "4900",
+    "5400",
+    "2641",
+    "1600"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "4200",
@@ -6985,7 +8869,23 @@
     "Momsberäkningen saknar uppdelning"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1465",
+    "1467",
+    "3211",
+    "3212"
+   ],
+   "relateradeKonton": [
+    "4211",
+    "4212",
+    "1465",
+    "1467",
+    "3211",
+    "3212"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "4211",
@@ -7027,7 +8927,27 @@
     "Förenklad VMB används och periodens beräkning är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1465",
+    "1467",
+    "3211",
+    "2616",
+    "2626",
+    "2636"
+   ],
+   "relateradeKonton": [
+    "4200",
+    "4212",
+    "1465",
+    "1467",
+    "3211",
+    "2616",
+    "2626",
+    "2636"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "4212",
@@ -7070,7 +8990,24 @@
     "Kvittning eller framåtföring av negativ marginal övervägs"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1465",
+    "1467",
+    "3212"
+   ],
+   "relateradeKonton": [
+    "4200",
+    "4211",
+    "1465",
+    "1467",
+    "3212",
+    "2616",
+    "2626",
+    "2636"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "4600",
@@ -7136,7 +9073,29 @@
    "trosklar": [
     "supplier_advance_over_5000"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "2645",
+    "1700",
+    "3000",
+    "1220",
+    "1110"
+   ],
+   "relateradeKonton": [
+    "4000",
+    "1700",
+    "2440",
+    "6500",
+    "6800",
+    "2641",
+    "2645",
+    "3000"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "4700",
@@ -7198,7 +9157,29 @@
     "Årsbonus kräver fördelning eller ursprungsfakturor saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "4000",
+    "4600",
+    "5000",
+    "5400"
+   ],
+   "relateradeKonton": [
+    "3700",
+    "4000",
+    "4600",
+    "4900",
+    "1220",
+    "1230",
+    "1240",
+    "2440",
+    "2641"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "4900",
@@ -7267,7 +9248,18 @@
     "inventory_optional_expensing_half_pbb",
     "inventory_standard_reduction_3_percent"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1400",
+    "4000"
+   ],
+   "relateradeKonton": [
+    "1400",
+    "4000",
+    "4700"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "5000",
@@ -7328,7 +9320,27 @@
     "Kostnaden kan höra till ägd fastighet eller en annan tillgång"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "2642",
+    "1700",
+    "1600"
+   ],
+   "relateradeKonton": [
+    "5100",
+    "5200",
+    "5500",
+    "1700",
+    "1600",
+    "2440",
+    "2641",
+    "2642"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "5100",
@@ -7394,7 +9406,28 @@
     "Posten avser tillfällig byggnad, bod eller container och klassificeringen är inte manuellt fastställd"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "2642",
+    "1110",
+    "1130",
+    "1150",
+    "1230"
+   ],
+   "relateradeKonton": [
+    "5000",
+    "5500",
+    "1110",
+    "1130",
+    "1150",
+    "1230",
+    "2642"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "5200",
@@ -7465,7 +9498,25 @@
    "trosklar": [
     "first_increased_lease_fee_over_5000"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "1700",
+    "1600"
+   ],
+   "relateradeKonton": [
+    "5000",
+    "5600",
+    "1700",
+    "1220",
+    "1240",
+    "2440",
+    "2641"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "5400",
@@ -7537,7 +9588,25 @@
     "minor_line_merge_share_limit",
     "minor_line_recurring_annual_limit"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "1220",
+    "4000"
+   ],
+   "relateradeKonton": [
+    "1220",
+    "4000",
+    "5500",
+    "6100",
+    "6500",
+    "2440",
+    "2641"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "5500",
@@ -7599,7 +9668,28 @@
     "Reparation och investering kan inte skiljas åt"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "1220",
+    "1110",
+    "1150",
+    "1230"
+   ],
+   "relateradeKonton": [
+    "5100",
+    "5400",
+    "5613",
+    "1220",
+    "1110",
+    "1150",
+    "1230",
+    "2440"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "5600",
@@ -7654,7 +9744,29 @@
     "Fordon eller kostnadstyp saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "1240",
+    "2014",
+    "3200"
+   ],
+   "relateradeKonton": [
+    "1240",
+    "5610",
+    "5611",
+    "5612",
+    "5613",
+    "5615",
+    "5618",
+    "5619",
+    "5620",
+    "5700"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "5610",
@@ -7713,7 +9825,28 @@
     "Ägande, leasingform eller användning är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "1240",
+    "2014",
+    "3200"
+   ],
+   "relateradeKonton": [
+    "1240",
+    "5611",
+    "5612",
+    "5613",
+    "5615",
+    "5618",
+    "5619",
+    "2014",
+    "3200"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "5611",
@@ -7777,7 +9910,28 @@
     "Privat körning, personbilsmoms eller laddunderlag är oklart"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "2014",
+    "3200"
+   ],
+   "relateradeKonton": [
+    "5610",
+    "5612",
+    "5613",
+    "5615",
+    "5618",
+    "5619",
+    "1240",
+    "2014",
+    "3200",
+    "2641"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "5612",
@@ -7839,7 +9993,25 @@
     "Periodisering, återbetalning eller försäkringsfall är oklart"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "1700",
+    "1240"
+   ],
+   "relateradeKonton": [
+    "5610",
+    "5611",
+    "5613",
+    "5615",
+    "5618",
+    "5619",
+    "1240",
+    "1700"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "5613",
@@ -7900,7 +10072,27 @@
     "Större motor-, batteri- eller ombyggnadsarbete förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "1240",
+    "3900"
+   ],
+   "relateradeKonton": [
+    "5500",
+    "5610",
+    "5611",
+    "5612",
+    "5615",
+    "5618",
+    "5619",
+    "1240",
+    "2641"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "5615",
@@ -7973,7 +10165,28 @@
     "first_increased_lease_fee_over_5000",
     "passenger_car_lease_vat_deduction_50"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "1700",
+    "1240"
+   ],
+   "relateradeKonton": [
+    "5200",
+    "5610",
+    "5611",
+    "5612",
+    "5613",
+    "5618",
+    "5619",
+    "1240",
+    "1700",
+    "2641"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "5618",
@@ -8048,7 +10261,22 @@
     "private_car_mileage_rate_2026",
     "commute_business_premises_deduction"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2017"
+   ],
+   "relateradeKonton": [
+    "5610",
+    "5611",
+    "5612",
+    "5613",
+    "5615",
+    "5619",
+    "2017",
+    "1240"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "5619",
@@ -8105,7 +10333,27 @@
     "Kostnadstyp eller avdragsrätt är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "2014",
+    "3200"
+   ],
+   "relateradeKonton": [
+    "5610",
+    "5611",
+    "5612",
+    "5613",
+    "5615",
+    "5618",
+    "1240",
+    "2014",
+    "3200"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "5620",
@@ -8165,7 +10413,26 @@
     "Lätt lastbil, specialfordon eller momsprofil är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "1240",
+    "2014",
+    "3200"
+   ],
+   "relateradeKonton": [
+    "5600",
+    "5610",
+    "5700",
+    "1240",
+    "2641",
+    "2014",
+    "3200"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "5700",
@@ -8229,7 +10496,28 @@
     "Import-, export- eller projektkoppling är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "2645",
+    "3500",
+    "4000",
+    "1220"
+   ],
+   "relateradeKonton": [
+    "3500",
+    "4000",
+    "4600",
+    "5600",
+    "5800",
+    "1220",
+    "2641",
+    "2645"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "5800",
@@ -8300,7 +10588,26 @@
     "domestic_night_allowance_2026",
     "owner_travel_allowance_after_three_months_2026"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "5618",
+    "6070",
+    "2013",
+    "2017"
+   ],
+   "relateradeKonton": [
+    "5618",
+    "5700",
+    "6070",
+    "7300",
+    "2440",
+    "2641"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "5900",
@@ -8355,7 +10662,23 @@
     "Kostnadens affärsmässiga samband med verksamheten är oklart"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "2645",
+    "1700"
+   ],
+   "relateradeKonton": [
+    "6070",
+    "6900",
+    "2440",
+    "2641",
+    "2645"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "6000",
@@ -8420,7 +10743,29 @@
     "Bankgaranti eller annan avgift kan behöva periodiseras"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "2645",
+    "5900",
+    "6070",
+    "6500"
+   ],
+   "relateradeKonton": [
+    "3500",
+    "3700",
+    "5700",
+    "5800",
+    "5900",
+    "6070",
+    "6500",
+    "2440",
+    "2641"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "6070",
@@ -8488,7 +10833,24 @@
     "representation_meal_vat_base_2026",
     "representation_gift_limit_2026"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "6071",
+    "6072"
+   ],
+   "relateradeKonton": [
+    "6071",
+    "6072",
+    "5900",
+    "7631",
+    "7632",
+    "2641"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "6071",
@@ -8556,7 +10918,22 @@
     "representation_gift_limit_2026",
     "representation_meal_vat_base_2026"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "6072"
+   ],
+   "relateradeKonton": [
+    "6070",
+    "6072",
+    "2641",
+    "5900",
+    "7631"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "6072",
@@ -8623,7 +11000,23 @@
     "representation_meal_income_deduction_zero_2026",
     "representation_meal_vat_base_2026"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "6071",
+    "2013"
+   ],
+   "relateradeKonton": [
+    "6070",
+    "6071",
+    "2641",
+    "2013",
+    "7632"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "6100",
@@ -8689,7 +11082,24 @@
     "low_value_inventory_half_pbb",
     "economic_life_max_3_years"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "5400",
+    "1220"
+   ],
+   "relateradeKonton": [
+    "5400",
+    "1220",
+    "4000",
+    "5900",
+    "2440",
+    "2641"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "6200",
@@ -8753,7 +11163,28 @@
     "Fördelningsgrund, utrustningsdel eller utlandstjänst är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "2013",
+    "2017",
+    "5400",
+    "1220"
+   ],
+   "relateradeKonton": [
+    "5400",
+    "1220",
+    "5700",
+    "6500",
+    "2013",
+    "2017",
+    "2440",
+    "2641"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "6300",
@@ -8824,7 +11255,24 @@
     "Periodisering kan vara aktuell"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "1700",
+    "6310",
+    "6900"
+   ],
+   "relateradeKonton": [
+    "6310",
+    "5612",
+    "5100",
+    "6900",
+    "3900",
+    "1700"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "6310",
@@ -8885,7 +11333,23 @@
     "Försäkringstyp, privat andel eller periodisering är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "1700",
+    "6300"
+   ],
+   "relateradeKonton": [
+    "6300",
+    "5612",
+    "5100",
+    "6900",
+    "3900",
+    "1700"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "6500",
@@ -8947,7 +11411,30 @@
     "Fakturan innehåller medlemsavgift eller en blandad medlems- och serviceavgift som inte är uppdelad"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "2645",
+    "1700",
+    "4600",
+    "6800",
+    "1000"
+   ],
+   "relateradeKonton": [
+    "4600",
+    "6800",
+    "6100",
+    "6200",
+    "5900",
+    "1000",
+    "2440",
+    "2641",
+    "2645"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "6800",
@@ -9012,7 +11499,27 @@
     "Anställningsliknande upplägg eller utländsk arbetskraft förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "2645",
+    "2710",
+    "2730"
+   ],
+   "relateradeKonton": [
+    "4600",
+    "6500",
+    "7000",
+    "2710",
+    "2730",
+    "2440",
+    "2641",
+    "2645"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "6900",
@@ -9067,7 +11574,24 @@
     "Underlag, motpart eller affärsändamål saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "6980"
+   ],
+   "relateradeKonton": [
+    "5900",
+    "6100",
+    "6200",
+    "6300",
+    "6500",
+    "6800",
+    "6980"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "6980",
@@ -9131,7 +11655,25 @@
     "Fakturan saknar uppdelning eller medlemskapet avser anställd"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2013",
+    "6500",
+    "6900",
+    "2641"
+   ],
+   "relateradeKonton": [
+    "6500",
+    "6900",
+    "7300",
+    "7500",
+    "2641",
+    "2013"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "7000",
@@ -9174,7 +11716,27 @@
     "Mottagare, anställningsförhållande, löneunderlag eller AGI saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2710",
+    "2730",
+    "1930",
+    "2900",
+    "7300",
+    "7500"
+   ],
+   "relateradeKonton": [
+    "2710",
+    "2730",
+    "7300",
+    "7400",
+    "7500",
+    "7600",
+    "1930",
+    "2900"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "7300",
@@ -9217,7 +11779,26 @@
     "Mottagare, reseräkning, förmånsunderlag eller AGI saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "2710",
+    "2730",
+    "7000",
+    "7500",
+    "2013"
+   ],
+   "relateradeKonton": [
+    "7000",
+    "7500",
+    "7600",
+    "5618",
+    "5800",
+    "2710",
+    "2730"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "7400",
@@ -9260,7 +11841,23 @@
     "Det är oklart vem pensionen avser eller pensionsavtal saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "7500",
+    "2730",
+    "2013"
+   ],
+   "relateradeKonton": [
+    "7500",
+    "2730",
+    "2013",
+    "7000",
+    "6310"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "7500",
@@ -9301,7 +11898,25 @@
     "Avgiftstyp, löneunderlag, AGI eller beräkning saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2730",
+    "7000",
+    "7300",
+    "7400",
+    "1930",
+    "2012"
+   ],
+   "relateradeKonton": [
+    "7000",
+    "7300",
+    "7400",
+    "2730",
+    "2710",
+    "2012"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "7600",
@@ -9344,7 +11959,27 @@
     "Mottagare, kostnadstyp eller affärsmässigt syfte saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "7300",
+    "7500",
+    "2730"
+   ],
+   "relateradeKonton": [
+    "7000",
+    "7300",
+    "7400",
+    "7500",
+    "7631",
+    "7632",
+    "2730",
+    "2641"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "7631",
@@ -9386,7 +12021,22 @@
     "Deltagare, anställningsrelation, program eller beräkning saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "7632"
+   ],
+   "relateradeKonton": [
+    "7632",
+    "6071",
+    "6072",
+    "7600",
+    "2641"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "7632",
@@ -9429,7 +12079,25 @@
     "Deltagare, anställningsrelation, program, affärssamband eller momsunderlag saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "1930",
+    "2641",
+    "7631",
+    "2013",
+    "7300"
+   ],
+   "relateradeKonton": [
+    "7631",
+    "6072",
+    "7300",
+    "7500",
+    "2641",
+    "2013"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "7700",
@@ -9503,7 +12171,36 @@
    "trosklar": [
     "impairment_review_threshold_10_percent"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1009",
+    "1119",
+    "1130",
+    "1159",
+    "1229",
+    "1239",
+    "1249"
+   ],
+   "relateradeKonton": [
+    "1009",
+    "1110",
+    "1119",
+    "1130",
+    "1150",
+    "1159",
+    "1220",
+    "1229",
+    "1230",
+    "1239",
+    "1240",
+    "1249",
+    "7810",
+    "7820",
+    "7830",
+    "7970"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "7810",
@@ -9575,7 +12272,18 @@
     "full_writeoff_remaining_basis_half_pbb",
     "impairment_review_threshold_10_percent"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1009"
+   ],
+   "relateradeKonton": [
+    "1000",
+    "1009",
+    "7700",
+    "7970"
+   ],
+   "version": "5",
+   "utkastOrsak": ""
   },
   {
    "konto": "7820",
@@ -9645,7 +12353,27 @@
     "Ny fastighet, oklar historik, blandad klassificering eller delavyttring förekommer"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1119",
+    "1159"
+   ],
+   "relateradeKonton": [
+    "1110",
+    "1119",
+    "1130",
+    "1150",
+    "1159",
+    "1180",
+    "1230",
+    "1239",
+    "5100",
+    "5500",
+    "7700",
+    "7970"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "7830",
@@ -9716,7 +12444,34 @@
     "full_writeoff_remaining_basis_half_pbb",
     "impairment_review_threshold_10_percent"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1229",
+    "1239",
+    "1249"
+   ],
+   "relateradeKonton": [
+    "1220",
+    "1221",
+    "1222",
+    "1229",
+    "1230",
+    "1231",
+    "1232",
+    "1239",
+    "1240",
+    "1241",
+    "1242",
+    "1249",
+    "5400",
+    "7700",
+    "7810",
+    "7820",
+    "7970",
+    "1280"
+   ],
+   "version": "6",
+   "utkastOrsak": ""
   },
   {
    "konto": "7970",
@@ -9779,7 +12534,41 @@
     "Tillgångsslag, inbyte, försäkringsersättning eller beräkning är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1000",
+    "1009",
+    "1110",
+    "1119",
+    "1130",
+    "1150",
+    "1159",
+    "1930",
+    "1500",
+    "2610"
+   ],
+   "relateradeKonton": [
+    "3970",
+    "1000",
+    "1009",
+    "1110",
+    "1119",
+    "1130",
+    "1150",
+    "1159",
+    "1220",
+    "1222",
+    "1230",
+    "1232",
+    "1240",
+    "1242",
+    "7700",
+    "7810",
+    "7820",
+    "7830"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "7980",
@@ -9823,7 +12612,21 @@
     "Specialistbeslut, U3-avstämning, resultatrad eller motkonto saknas"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2060"
+   ],
+   "relateradeKonton": [
+    "2060",
+    "3970",
+    "7970",
+    "7700",
+    "7820",
+    "7830",
+    "8990"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "8310",
@@ -9888,7 +12691,27 @@
     "accrued_interest_income_over_5000",
     "prepaid_interest_income_over_5000"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "1940",
+    "1970",
+    "1600",
+    "2900",
+    "1300"
+   ],
+   "relateradeKonton": [
+    "8314",
+    "8330",
+    "1300",
+    "1600",
+    "1930",
+    "1940",
+    "1970",
+    "2900"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "8314",
@@ -9951,7 +12774,24 @@
     "accrued_interest_income_over_5000",
     "prepaid_interest_income_over_5000"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "1940",
+    "1970",
+    "1600",
+    "2900",
+    "2012"
+   ],
+   "relateradeKonton": [
+    "8310",
+    "8330",
+    "1600",
+    "2012",
+    "2900"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "8330",
@@ -10014,7 +12854,28 @@
     "Kurskälla, realisationsstatus eller säkringsinstrument är oklart"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1500",
+    "1600",
+    "1920",
+    "1930",
+    "1940",
+    "1970",
+    "1300"
+   ],
+   "relateradeKonton": [
+    "8430",
+    "1500",
+    "1600",
+    "1920",
+    "1930",
+    "1940",
+    "1970",
+    "8310"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "8410",
@@ -10083,7 +12944,26 @@
     "accrued_interest_expense_over_5000",
     "prepaid_interest_expense_over_5000"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2330",
+    "2350",
+    "2390",
+    "2900",
+    "1600",
+    "1930"
+   ],
+   "relateradeKonton": [
+    "2330",
+    "2350",
+    "2390",
+    "2900",
+    "1600",
+    "8430",
+    "2013"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "8430",
@@ -10145,7 +13025,26 @@
     "Kurskälla, realisationsstatus eller säkringsinstrument är oklart"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "2440",
+    "2330",
+    "2350",
+    "2390",
+    "2900",
+    "1930"
+   ],
+   "relateradeKonton": [
+    "8330",
+    "2440",
+    "2330",
+    "2350",
+    "2390",
+    "2900",
+    "8410"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "8990",
@@ -10185,7 +13084,18 @@
     "Källsystemets avslutningskedja eller relationen till 8999 är oklar"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "8999",
+    "2019"
+   ],
+   "relateradeKonton": [
+    "8999",
+    "2019",
+    "2010"
+   ],
+   "version": "3",
+   "utkastOrsak": ""
   },
   {
    "konto": "8999",
@@ -10256,7 +13166,22 @@
    "trosklar": [
     "year_end_closing_method"
    ],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "8990",
+    "2019",
+    "2010"
+   ],
+   "relateradeKonton": [
+    "8990",
+    "2019",
+    "2010",
+    "2020",
+    "2030",
+    "2040"
+   ],
+   "version": "4",
+   "utkastOrsak": ""
   },
   {
    "konto": "4515",
@@ -10295,7 +13220,19 @@
     "Det är oklart om köpet är en vara eller en tjänst"
    ],
    "trosklar": [],
-   "endastManuellt": true
+   "endastManuellt": true,
+   "motkonton": [
+    "4598",
+    "2614",
+    "2645"
+   ],
+   "relateradeKonton": [
+    "4598",
+    "2614",
+    "2645"
+   ],
+   "version": "1",
+   "utkastOrsak": ""
   },
   {
    "konto": "4531",
@@ -10334,7 +13271,19 @@
     "Det är oklart om köpet är en vara eller en tjänst"
    ],
    "trosklar": [],
-   "endastManuellt": true
+   "endastManuellt": true,
+   "motkonton": [
+    "4598",
+    "2614",
+    "2645"
+   ],
+   "relateradeKonton": [
+    "4598",
+    "2614",
+    "2645"
+   ],
+   "version": "1",
+   "utkastOrsak": ""
   },
   {
    "konto": "4535",
@@ -10373,7 +13322,19 @@
     "Det är oklart om köpet är en vara eller en tjänst"
    ],
    "trosklar": [],
-   "endastManuellt": true
+   "endastManuellt": true,
+   "motkonton": [
+    "4598",
+    "2614",
+    "2645"
+   ],
+   "relateradeKonton": [
+    "4598",
+    "2614",
+    "2645"
+   ],
+   "version": "1",
+   "utkastOrsak": ""
   },
   {
    "konto": "4545",
@@ -10413,7 +13374,19 @@
     "Det är oklart om köpet är en vara eller en tjänst"
    ],
    "trosklar": [],
-   "endastManuellt": true
+   "endastManuellt": true,
+   "motkonton": [
+    "4598",
+    "2615",
+    "2645"
+   ],
+   "relateradeKonton": [
+    "4598",
+    "2615",
+    "2645"
+   ],
+   "version": "1",
+   "utkastOrsak": ""
   },
   {
    "konto": "3231",
@@ -10454,7 +13427,18 @@
     "Fakturan anger varken moms eller omvänd skattskyldighet"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "1510"
+   ],
+   "relateradeKonton": [
+    "3000",
+    "3108",
+    "3308"
+   ],
+   "version": "1",
+   "utkastOrsak": ""
   },
   {
    "konto": "3305",
@@ -10492,7 +13476,18 @@
     "Tjänsten kan vara omsatt i Sverige"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "1510"
+   ],
+   "relateradeKonton": [
+    "3000",
+    "3308",
+    "3105"
+   ],
+   "version": "1",
+   "utkastOrsak": ""
   },
   {
    "konto": "3105",
@@ -10530,7 +13525,18 @@
     "Det saknas underlag för att varan lämnat EU"
    ],
    "trosklar": [],
-   "endastManuellt": false
+   "endastManuellt": false,
+   "motkonton": [
+    "1930",
+    "1510"
+   ],
+   "relateradeKonton": [
+    "3000",
+    "3108",
+    "3305"
+   ],
+   "version": "1",
+   "utkastOrsak": ""
   }
  ],
  "parametrar": [
@@ -10542,7 +13548,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "half_price_base_amount_2026",
@@ -10552,7 +13561,10 @@
    "basParameter": "price_base_amount_2026",
    "multiplikator": 0.5,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "derived_annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "fixed_amount_5000",
@@ -10562,7 +13574,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2025-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "fixed",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "fixed_years_3",
@@ -10572,7 +13587,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2025-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "fixed",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "k1_turnover_limit",
@@ -10582,7 +13600,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2025-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "fixed",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "fixed_percentage_3",
@@ -10592,7 +13613,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2025-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "fixed",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "vat_standard_rate_25_current",
@@ -10602,7 +13626,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "current_rate",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "vat_reduced_rate_12_current",
@@ -10612,7 +13639,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "current_rate",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "vat_reduced_rate_6_current",
@@ -10622,7 +13652,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "current_rate",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "private_car_mileage_rate_2026",
@@ -10632,7 +13665,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "passenger_car_lease_vat_share_current",
@@ -10642,7 +13678,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "current_rate",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "representation_meal_income_deduction_2026",
@@ -10652,7 +13691,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "representation_simple_refreshment_limit_2026",
@@ -10662,7 +13704,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "representation_other_expense_limit_2026",
@@ -10672,7 +13717,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "representation_meal_vat_base_2026",
@@ -10682,7 +13730,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "representation_gift_limit_2026",
@@ -10692,7 +13743,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "domestic_travel_allowance_full_day_2026",
@@ -10702,7 +13756,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "2"
   },
   {
    "id": "domestic_travel_allowance_half_day_2026",
@@ -10712,7 +13769,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "2"
   },
   {
    "id": "domestic_night_allowance_2026",
@@ -10722,7 +13782,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "2"
   },
   {
    "id": "own_pension_deduction_rate_2026",
@@ -10732,7 +13795,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "own_pension_deduction_cap_2026",
@@ -10742,7 +13808,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "special_payroll_tax_pension_2026",
@@ -10752,7 +13821,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "current_rate",
+   "senastKontrollerad": "2026-07-30",
+   "version": "1"
   },
   {
    "id": "fixed_percentage_10",
@@ -10762,7 +13834,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2025-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "fixed",
+   "senastKontrollerad": "2026-07-31",
+   "version": "1"
   },
   {
    "id": "fixed_years_6",
@@ -10772,7 +13847,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2025-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "fixed",
+   "senastKontrollerad": "2026-09-23",
+   "version": "1"
   },
   {
    "id": "minor_line_merge_amount_1000",
@@ -10782,7 +13860,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "internal_policy",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "return_packaging_deposit_srs_40",
@@ -10792,7 +13873,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "fixed",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "vat_rounding_review_limit_10",
@@ -10802,7 +13886,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "internal_policy",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "commute_business_premises_threshold_2025",
@@ -10812,7 +13899,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2025-01-01",
-   "gallerTill": "2025-12-31"
+   "gallerTill": "2025-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "commute_business_premises_threshold_2026",
@@ -10822,7 +13912,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": null
+   "gallerTill": null,
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "owner_travel_allowance_after_three_months_2026",
@@ -10832,7 +13925,10 @@
    "basParameter": "domestic_travel_allowance_full_day_2026",
    "multiplikator": 0.3,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_contribution_full_7d_2026",
@@ -10842,7 +13938,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_contribution_full_1d_2026",
@@ -10852,7 +13951,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_contribution_full_14d_2026",
@@ -10862,7 +13964,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_contribution_full_30d_2026",
@@ -10872,7 +13977,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_contribution_full_60d_2026",
@@ -10882,7 +13990,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_contribution_full_90d_2026",
@@ -10892,7 +14003,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_contribution_old_age_only_2026",
@@ -10902,7 +14016,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_contribution_none_2026",
@@ -10912,7 +14029,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "special_payroll_tax_passive_business_2026",
@@ -10922,7 +14042,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_standard_deduction_full_2026",
@@ -10932,7 +14055,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_standard_deduction_old_age_only_2026",
@@ -10942,7 +14068,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_standard_deduction_passive_2026",
@@ -10952,7 +14081,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_standard_deduction_none_2026",
@@ -10962,7 +14094,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_general_reduction_rate_2026",
@@ -10972,7 +14107,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_general_reduction_cap_2026",
@@ -10982,7 +14120,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   },
   {
    "id": "self_employment_general_reduction_min_income_2026",
@@ -10992,7 +14133,10 @@
    "basParameter": null,
    "multiplikator": null,
    "gallerFran": "2026-01-01",
-   "gallerTill": "2026-12-31"
+   "gallerTill": "2026-12-31",
+   "typ": "annual",
+   "senastKontrollerad": "2026-10-26",
+   "version": "1"
   }
  ],
  "regler": [
@@ -11014,7 +14158,8 @@
     "1241",
     "5400"
    ],
-   "anteckning": "Möjliggör direkt kostnadsföring när villkoren är uppfyllda. Värdet är under, ..."
+   "anteckning": "Möjliggör direkt kostnadsföring när villkoren är uppfyllda. Värdet är under, ...",
+   "version": "1"
   },
   {
    "id": "full_writeoff_remaining_basis_half_pbb",
@@ -11035,7 +14180,8 @@
     "7810",
     "7830"
    ],
-   "anteckning": "Avser underlaget före årets avskrivning. Regeln är inte samma sak som direkt ..."
+   "anteckning": "Avser underlaget före årets avskrivning. Regeln är inte samma sak som direkt ...",
+   "version": "1"
   },
   {
    "id": "external_direct_costs_over_5000",
@@ -11054,7 +14200,8 @@
     "1240",
     "1241"
    ],
-   "anteckning": "Utgifterna ska räknas in när de sammanlagt överstiger 5 000 kronor; lägre bel..."
+   "anteckning": "Utgifterna ska räknas in när de sammanlagt överstiger 5 000 kronor; lägre bel...",
+   "version": "1"
   },
   {
    "id": "economic_life_max_3_years",
@@ -11074,7 +14221,8 @@
     "1241",
     "5400"
    ],
-   "anteckning": "Möjliggör direkt kostnadsföring när den ekonomiska livslängden vid anskaffnin..."
+   "anteckning": "Möjliggör direkt kostnadsföring när den ekonomiska livslängden vid anskaffnin...",
+   "version": "1"
   },
   {
    "id": "supplier_advance_over_5000",
@@ -11093,7 +14241,8 @@
     "4000",
     "4600"
    ],
-   "anteckning": "Leverantörsförskott över 5 000 kronor där arbete inte påbörjats eller delleverans inte erhållits redovisas på 1700 (B8), även när förskottet avser byggnad, mark, maskin eller inventarie (K1 kommentaren till punkt 3.7). När arbetet har påbörjats redovisas nedlagda utgifter på 1180 respektive 1280 (K1 punkt 6.24)."
+   "anteckning": "Leverantörsförskott över 5 000 kronor där arbete inte påbörjats eller delleverans inte erhållits redovisas på 1700 (B8), även när förskottet avser byggnad, mark, maskin eller inventarie (K1 kommentaren till punkt 3.7). När arbetet har påbörjats redovisas nedlagda utgifter på 1180 respektive 1280 (K1 punkt 6.24).",
+   "version": "2"
   },
   {
    "id": "k1_eligibility_turnover_limit",
@@ -11105,7 +14254,8 @@
    "gallerFran": "2025-01-01",
    "gallerTill": null,
    "konton": [],
-   "anteckning": "Gäller systemets jurisdiktion och kundkvalificering, inte val av ett särskilt..."
+   "anteckning": "Gäller systemets jurisdiktion och kundkvalificering, inte val av ett särskilt...",
+   "version": "1"
   },
   {
    "id": "inventory_optional_expensing_half_pbb",
@@ -11120,7 +14270,8 @@
     "1400",
     "4900"
    ],
-   "anteckning": "Lager på högst gränsen behöver inte tas upp på B6 utan får redovisas som kost..."
+   "anteckning": "Lager på högst gränsen behöver inte tas upp på B6 utan får redovisas som kost...",
+   "version": "1"
   },
   {
    "id": "inventory_standard_reduction_3_percent",
@@ -11135,7 +14286,8 @@
     "1400",
     "4900"
    ],
-   "anteckning": "Gäller inte byggnad och mark som skattemässigt är lagertillgångar. Större ver..."
+   "anteckning": "Gäller inte byggnad och mark som skattemässigt är lagertillgångar. Större ver...",
+   "version": "1"
   },
   {
    "id": "accrued_interest_income_over_5000",
@@ -11151,7 +14303,8 @@
     "8310",
     "8314"
    ],
-   "anteckning": "Ränteinkomst som hör till året men betalas senare tas upp på B8 när den samma..."
+   "anteckning": "Ränteinkomst som hör till året men betalas senare tas upp på B8 när den samma...",
+   "version": "1"
   },
   {
    "id": "prepaid_interest_expense_over_5000",
@@ -11166,7 +14319,8 @@
     "1600",
     "8410"
    ],
-   "anteckning": "Betald ränta som hör till nästa år tas upp på B8 när den sammanlagt överstige..."
+   "anteckning": "Betald ränta som hör till nästa år tas upp på B8 när den sammanlagt överstige...",
+   "version": "1"
   },
   {
    "id": "first_increased_lease_fee_over_5000",
@@ -11183,7 +14337,8 @@
     "5200",
     "5615"
    ],
-   "anteckning": "En första förhöjd leasingavgift över 5 000 kronor exklusive avdragsgill moms bokförs på 1700 (B8) och fördelas linjärt över avtalets månader; vid varje bokslut förs årets andel till 5200 eller 5615. Högst 5 000 kronor kostnadsförs direkt."
+   "anteckning": "En första förhöjd leasingavgift över 5 000 kronor exklusive avdragsgill moms bokförs på 1700 (B8) och fördelas linjärt över avtalets månader; vid varje bokslut förs årets andel till 5200 eller 5615. Högst 5 000 kronor kostnadsförs direkt.",
+   "version": "2"
   },
   {
    "id": "outgoing_vat_standard_rate_25",
@@ -11199,7 +14354,8 @@
     "2611",
     "2612"
    ],
-   "anteckning": "Regeln får användas först efter kontroll av beskattningsland, momsplikt, tran..."
+   "anteckning": "Regeln får användas först efter kontroll av beskattningsland, momsplikt, tran...",
+   "version": "1"
   },
   {
    "id": "outgoing_vat_reduced_rate_12",
@@ -11218,7 +14374,8 @@
     "2624",
     "2625"
    ],
-   "anteckning": "Kontrollera beskattningsland, kategori, transaktionstyp och datum. Livsmedel ..."
+   "anteckning": "Kontrollera beskattningsland, kategori, transaktionstyp och datum. Livsmedel ...",
+   "version": "1"
   },
   {
    "id": "outgoing_vat_reduced_rate_6",
@@ -11237,7 +14394,8 @@
     "2634",
     "2635"
    ],
-   "anteckning": "Kontrollera beskattningsland, kategori, transaktionstyp och datum."
+   "anteckning": "Kontrollera beskattningsland, kategori, transaktionstyp och datum.",
+   "version": "1"
   },
   {
    "id": "food_vat_rate_6_2026_04_01_to_2027_12_31",
@@ -11254,7 +14412,8 @@
     "2634",
     "2635"
    ],
-   "anteckning": "Restaurangtjänster ligger fortsatt på 12 procent. Klassificering och transakt..."
+   "anteckning": "Restaurangtjänster ligger fortsatt på 12 procent. Klassificering och transakt...",
+   "version": "1"
   },
   {
    "id": "customer_advance_over_5000",
@@ -11271,7 +14430,8 @@
     "3100",
     "3500"
    ],
-   "anteckning": "Tas upp när leverans eller arbete inte har påbörjats och beloppet överstiger ..."
+   "anteckning": "Tas upp när leverans eller arbete inte har påbörjats och beloppet överstiger ...",
+   "version": "1"
   },
   {
    "id": "accrued_interest_expense_over_5000",
@@ -11286,7 +14446,8 @@
     "2900",
     "8410"
    ],
-   "anteckning": "Ränteutgifter som hör till året men betalas senare tas upp på B16 när de samm..."
+   "anteckning": "Ränteutgifter som hör till året men betalas senare tas upp på B16 när de samm...",
+   "version": "1"
   },
   {
    "id": "prepaid_interest_income_over_5000",
@@ -11302,7 +14463,8 @@
     "8310",
     "8314"
    ],
-   "anteckning": "Ränteinkomst som betalats i förskott men hör till nästa år tas upp på B16 när..."
+   "anteckning": "Ränteinkomst som betalats i förskott men hör till nästa år tas upp på B16 när...",
+   "version": "2"
   },
   {
    "id": "private_car_mileage_rate_2026",
@@ -11316,7 +14478,8 @@
    "konton": [
     "5618"
    ],
-   "anteckning": "Gäller egen eller privatleasad bil som inte är bokförd i verksamheten. Körjou..."
+   "anteckning": "Gäller egen eller privatleasad bil som inte är bokförd i verksamheten. Körjou...",
+   "version": "1"
   },
   {
    "id": "passenger_car_lease_vat_deduction_50",
@@ -11331,7 +14494,8 @@
     "5615",
     "2641"
    ],
-   "anteckning": "Kontrollera att avtalet avser hyra/leasing, att bilen används mer än 100 mil ..."
+   "anteckning": "Kontrollera att avtalet avser hyra/leasing, att bilen används mer än 100 mil ...",
+   "version": "1"
   },
   {
    "id": "representation_meal_income_deduction_zero_2026",
@@ -11347,7 +14511,8 @@
     "6072",
     "7632"
    ],
-   "anteckning": "Kostnaden redovisas på 6072 och återläggs skattemässigt. Privat kostnad ska i..."
+   "anteckning": "Kostnaden redovisas på 6072 och återläggs skattemässigt. Privat kostnad ska i...",
+   "version": "1"
   },
   {
    "id": "representation_simple_refreshment_limit_2026",
@@ -11365,7 +14530,8 @@
     "7631",
     "7632"
    ],
-   "anteckning": "Gäller förfriskningar och enklare förtäring som inte kan anses som måltid. Om..."
+   "anteckning": "Gäller förfriskningar och enklare förtäring som inte kan anses som måltid. Om...",
+   "version": "1"
   },
   {
    "id": "representation_other_expense_limit_2026",
@@ -11383,7 +14549,8 @@
     "7631",
     "7632"
    ],
-   "anteckning": "Kräver omedelbart samband med verksamheten och fullständig deltagardokumentat..."
+   "anteckning": "Kräver omedelbart samband med verksamheten och fullständig deltagardokumentat...",
+   "version": "1"
   },
   {
    "id": "representation_meal_vat_base_2026",
@@ -11402,7 +14569,8 @@
     "7632",
     "2641"
    ],
-   "anteckning": "Inkomstskattemässigt avdrag för måltiden kan vara 0 kronor trots att ett begr..."
+   "anteckning": "Inkomstskattemässigt avdrag för måltiden kan vara 0 kronor trots att ett begr...",
+   "version": "1"
   },
   {
    "id": "domestic_travel_allowance_full_day_2026",
@@ -11416,7 +14584,8 @@
    "konton": [
     "7300"
    ],
-   "anteckning": "Minska för fria måltider och kontrollera avrese- och hemkomsttider. Beloppet gäller både företagarens avdrag för ökade levnadskostnader vid resor med övernattning i näringsverksamheten och skattefritt traktamente till anställda (Skatteverket 2026)."
+   "anteckning": "Minska för fria måltider och kontrollera avrese- och hemkomsttider. Beloppet gäller både företagarens avdrag för ökade levnadskostnader vid resor med övernattning i näringsverksamheten och skattefritt traktamente till anställda (Skatteverket 2026).",
+   "version": "2"
   },
   {
    "id": "domestic_travel_allowance_half_day_2026",
@@ -11430,7 +14599,8 @@
    "konton": [
     "7300"
    ],
-   "anteckning": "Halvdagsschablon gäller inte efter tre månader på samma ort. Beloppet gäller både företagarens avdrag för ökade levnadskostnader vid resor med övernattning i näringsverksamheten och skattefritt traktamente till anställda (Skatteverket 2026)."
+   "anteckning": "Halvdagsschablon gäller inte efter tre månader på samma ort. Beloppet gäller både företagarens avdrag för ökade levnadskostnader vid resor med övernattning i näringsverksamheten och skattefritt traktamente till anställda (Skatteverket 2026).",
+   "version": "2"
   },
   {
    "id": "domestic_night_allowance_2026",
@@ -11444,7 +14614,8 @@
    "konton": [
     "7300"
    ],
-   "anteckning": "Använd faktisk logikostnad när den styrks; schablon används endast när villkoren är uppfyllda. Beloppet gäller både företagarens avdrag för ökade levnadskostnader vid resor med övernattning i näringsverksamheten och skattefritt traktamente till anställda (Skatteverket 2026)."
+   "anteckning": "Använd faktisk logikostnad när den styrks; schablon används endast när villkoren är uppfyllda. Beloppet gäller både företagarens avdrag för ökade levnadskostnader vid resor med övernattning i näringsverksamheten och skattefritt traktamente till anställda (Skatteverket 2026).",
+   "version": "2"
   },
   {
    "id": "own_pension_deduction_rate_2026",
@@ -11459,7 +14630,8 @@
     "2013",
     "7400"
    ],
-   "anteckning": "Betalningen bokförs mot eget kapital. Avdrag görs i NE R38, inte som vanlig kostnad på 7400."
+   "anteckning": "Betalningen bokförs mot eget kapital. Avdrag görs i NE R38, inte som vanlig kostnad på 7400.",
+   "version": "1"
   },
   {
    "id": "own_pension_deduction_cap_2026",
@@ -11474,7 +14646,8 @@
     "2013",
     "7400"
    ],
-   "anteckning": "Det lägsta av betalt belopp, 35 procent av avdragsgrundande inkomst och beloppstaket kan dras av, med övriga villkor."
+   "anteckning": "Det lägsta av betalt belopp, 35 procent av avdragsgrundande inkomst och beloppstaket kan dras av, med övriga villkor.",
+   "version": "1"
   },
   {
    "id": "special_payroll_tax_pension_2026",
@@ -11491,7 +14664,8 @@
     "2730",
     "2013"
    ],
-   "anteckning": "För eget pensionssparande redovisas avdraget för skatten i NE R39; tjänstepension för anställda följer arbetsgivarens pensionsunderlag."
+   "anteckning": "För eget pensionssparande redovisas avdraget för skatten i NE R39; tjänstepension för anställda följer arbetsgivarens pensionsunderlag.",
+   "version": "1"
   },
   {
    "id": "software_intangible_review_over_5000",
@@ -11506,7 +14680,8 @@
     "1000",
     "6500"
    ],
-   "anteckning": "Konstruktion, design, programmering, anpassning, installation och utveckling av företagets hemsida eller webbutik kostnadsförs normalt och omfattas inte i sig av granskningsgränsen. Tydliga abonnemang, SaaS-, drift- och molntjänster kostnadsförs oavsett belopp. Endast tydligt separata förvärvade licenser, befintliga digitala tillgångar eller överlåtna rättigheter prövas mot 5 000 kronor. Uttryckliga immateriella rättigheter granskas oavsett belopp. Konto 1000 kräver alltid manuell granskning."
+   "anteckning": "Konstruktion, design, programmering, anpassning, installation och utveckling av företagets hemsida eller webbutik kostnadsförs normalt och omfattas inte i sig av granskningsgränsen. Tydliga abonnemang, SaaS-, drift- och molntjänster kostnadsförs oavsett belopp. Endast tydligt separata förvärvade licenser, befintliga digitala tillgångar eller överlåtna rättigheter prövas mot 5 000 kronor. Uttryckliga immateriella rättigheter granskas oavsett belopp. Konto 1000 kräver alltid manuell granskning.",
+   "version": "2"
   },
   {
    "id": "impairment_review_threshold_10_percent",
@@ -11530,7 +14705,8 @@
     "7810",
     "7830"
    ],
-   "anteckning": "Regeln utlöser endast manuell granskning. Nedskrivning får inte bokföras automatiskt. Granskning krävs endast när högsta tillåtna skattemässiga avskrivning inte har gjorts och dokumenterade omständigheter tyder på att gruppens ekonomiska värde understiger bokfört värde med minst 10 procent. En värdenedgång under 10 procent behöver inte beaktas."
+   "anteckning": "Regeln utlöser endast manuell granskning. Nedskrivning får inte bokföras automatiskt. Granskning krävs endast när högsta tillåtna skattemässiga avskrivning inte har gjorts och dokumenterade omständigheter tyder på att gruppens ekonomiska värde understiger bokfört värde med minst 10 procent. En värdenedgång under 10 procent behöver inte beaktas.",
+   "version": "1"
   },
   {
    "id": "periodisation_fund_mandatory_reversal_sixth_tax_year",
@@ -11551,7 +14727,8 @@
     "2088",
     "2089"
    ],
-   "anteckning": "Spara avsättningsår och sista obligatoriska återföringsår. Skapa ingen bokföringsverifikation; återföringen görs i NE-bilagan, ruta R32. Flagga upphörande, överlåtelse, ombildning eller konkurs för särskild kontroll av tvingande återföring."
+   "anteckning": "Spara avsättningsår och sista obligatoriska återföringsår. Skapa ingen bokföringsverifikation; återföringen görs i NE-bilagan, ruta R32. Flagga upphörande, överlåtelse, ombildning eller konkurs för särskild kontroll av tvingande återföring.",
+   "version": "1"
   },
   {
    "id": "representation_gift_limit_2026",
@@ -11566,7 +14743,8 @@
     "6070",
     "6071"
    ],
-   "anteckning": "Gränsen på 300 kronor exklusive moms gäller endast när gåvan uppfyller villkoren för representations- eller reklamgåva. Kontrollera mottagare, affärssamband, syfte och underlag. Privat gåva, oklar mottagare eller överskriden gräns ska granskas manuellt."
+   "anteckning": "Gränsen på 300 kronor exklusive moms gäller endast när gåvan uppfyller villkoren för representations- eller reklamgåva. Kontrollera mottagare, affärssamband, syfte och underlag. Privat gåva, oklar mottagare eller överskriden gräns ska granskas manuellt.",
+   "version": "1"
   },
   {
    "id": "minor_line_merge_amount_limit",
@@ -11594,7 +14772,8 @@
     "6800",
     "6900"
    ],
-   "anteckning": "Gäller endast omklassificering mellan resultatkonton för kostnader. Huvudkonto är det konto som har störst belopp på underlaget. Både beloppsgränsen och andelsgränsen (minor_line_merge_share_limit) ska vara uppfyllda. Får inte tillämpas på representation, privata utgifter, gåvor, anläggningstillgångar, förskott, ej avdragsgilla kostnader, personbilskostnader, resor, VMB-poster, lagerförändring eller poster som enligt K1 ska tas upp i balansräkningen. Frågor som K1 reglerar uttryckligen ska alltid följa K1."
+   "anteckning": "Gäller endast omklassificering mellan resultatkonton för kostnader. Huvudkonto är det konto som har störst belopp på underlaget. Både beloppsgränsen och andelsgränsen (minor_line_merge_share_limit) ska vara uppfyllda. Får inte tillämpas på representation, privata utgifter, gåvor, anläggningstillgångar, förskott, ej avdragsgilla kostnader, personbilskostnader, resor, VMB-poster, lagerförändring eller poster som enligt K1 ska tas upp i balansräkningen. Frågor som K1 reglerar uttryckligen ska alltid följa K1.",
+   "version": "1"
   },
   {
    "id": "minor_line_merge_share_limit",
@@ -11622,7 +14801,8 @@
     "6800",
     "6900"
    ],
-   "anteckning": "Kompletterar beloppsgränsen. Båda gränserna ska vara uppfyllda för att raden ska få bokföras på huvudkontot."
+   "anteckning": "Kompletterar beloppsgränsen. Båda gränserna ska vara uppfyllda för att raden ska få bokföras på huvudkontot.",
+   "version": "1"
   },
   {
    "id": "minor_line_recurring_annual_limit",
@@ -11650,7 +14830,8 @@
     "6800",
     "6900"
    ],
-   "anteckning": "När gränsen överskrids ska posten bokföras på rätt konto framöver. Dela inte upp inköp för att komma under gränserna. Gränsen på 5 000 kronor är här ett internt val och inte K1:s gräns för räntor eller förskott."
+   "anteckning": "När gränsen överskrids ska posten bokföras på rätt konto framöver. Dela inte upp inköp för att komma under gränserna. Gränsen på 5 000 kronor är här ett internt val och inte K1:s gräns för räntor eller förskott.",
+   "version": "1"
   },
   {
    "id": "return_packaging_deposit_year_end",
@@ -11665,7 +14846,8 @@
     "1600",
     "4000"
    ],
-   "anteckning": "Pant för returemballage bokförs löpande på 4000 och krediterad pant vid retur krediteras 4000. På balansdagen räknas utestående emballage och värdet bokförs debet 1600, kredit 4000. Bokningen vänds första dagen nästa räkenskapsår med debet 4000, kredit 1600. Inventeringslista med datum, emballagetyp, antal, pant per enhet och vem som räknat sparas som verifikation. Avstämningen görs varje år oavsett belopp. Andra emballagetyper med pant värderas med sitt eget pantbelopp."
+   "anteckning": "Pant för returemballage bokförs löpande på 4000 och krediterad pant vid retur krediteras 4000. På balansdagen räknas utestående emballage och värdet bokförs debet 1600, kredit 4000. Bokningen vänds första dagen nästa räkenskapsår med debet 4000, kredit 1600. Inventeringslista med datum, emballagetyp, antal, pant per enhet och vem som räknat sparas som verifikation. Avstämningen görs varje år oavsett belopp. Andra emballagetyper med pant värderas med sitt eget pantbelopp.",
+   "version": "1"
   },
   {
    "id": "single_use_packaging_deposit_follows_product",
@@ -11679,7 +14861,8 @@
    "konton": [
     "4000"
    ],
-   "anteckning": "Pant för engångsförpackningar ingår i priset för varan och bokförs på samma konto som drycken. Den räknas inte som avvikande post och inte som fordran."
+   "anteckning": "Pant för engångsförpackningar ingår i priset för varan och bokförs på samma konto som drycken. Den räknas inte som avvikande post och inte som fordran.",
+   "version": "1"
   },
   {
    "id": "year_end_closing_method",
@@ -11696,7 +14879,8 @@
     "2010",
     "8990"
    ],
-   "anteckning": "Kunden anger metod. Saknas uppgift skapas ingen bokslutsverifikation förrän metoden är angiven; ingen standardmetod antas. R11 och NE-bilagan beräknas alltid från R1–R10 utan bokslutsverifikationen. Omföringen första dagen i nästa räkenskapsår är densamma för båda metoderna. Byte av metod mellan år dokumenteras."
+   "anteckning": "Kunden anger metod. Saknas uppgift skapas ingen bokslutsverifikation förrän metoden är angiven; ingen standardmetod antas. R11 och NE-bilagan beräknas alltid från R1–R10 utan bokslutsverifikationen. Omföringen första dagen i nästa räkenskapsår är densamma för båda metoderna. Byte av metod mellan år dokumenteras.",
+   "version": "1"
   },
   {
    "id": "vat_rounding_difference",
@@ -11711,7 +14895,8 @@
     "2650",
     "3700"
    ],
-   "anteckning": "Under gränsen bokförs differensen automatiskt på 3700 i momsredovisningsverifikationen. Lika med eller över gränsen kräver manuell granskning eftersom differensen då sannolikt beror på fel och inte på avrundning."
+   "anteckning": "Under gränsen bokförs differensen automatiskt på 3700 i momsredovisningsverifikationen. Lika med eller över gränsen kräver manuell granskning eftersom differensen då sannolikt beror på fel och inte på avrundning.",
+   "version": "1"
   },
   {
    "id": "commute_business_premises_deduction",
@@ -11725,7 +14910,8 @@
    "konton": [
     "5618"
    ],
-   "anteckning": "Avdrag ges endast för den del som överstiger gränsen och görs i NE-bilagan, R16 eller R22; resorna bokförs inte på 5618. Villkor: minst 2 km, och för bil minst 5 km och 2 timmars tidsvinst per dag jämfört med allmänna kommunikationer, att sådana saknas, eller att bilen använts i näringsverksamheten minst 160 dagar och 300 mil. För inkomståret 2025 gäller commute_business_premises_threshold_2025. Används av NE-funktionen."
+   "anteckning": "Avdrag ges endast för den del som överstiger gränsen och görs i NE-bilagan, R16 eller R22; resorna bokförs inte på 5618. Villkor: minst 2 km, och för bil minst 5 km och 2 timmars tidsvinst per dag jämfört med allmänna kommunikationer, att sådana saknas, eller att bilen använts i näringsverksamheten minst 160 dagar och 300 mil. För inkomståret 2025 gäller commute_business_premises_threshold_2025. Används av NE-funktionen.",
+   "version": "1"
   },
   {
    "id": "owner_travel_allowance_after_three_months_2026",
@@ -11739,7 +14925,8 @@
    "konton": [
     "5800"
    ],
-   "anteckning": "Gäller företagaren själv. Beloppet 210 kronor gäller endast skattefritt traktamente till anställda och får inte användas för företagaren. Avdraget bokförs löpande eller görs i NE-bilagan R16 eller R22 om det inte bokförts."
+   "anteckning": "Gäller företagaren själv. Beloppet 210 kronor gäller endast skattefritt traktamente till anställda och får inte användas för företagaren. Avdraget bokförs löpande eller görs i NE-bilagan R16 eller R22 om det inte bokförts.",
+   "version": "1"
   },
   {
    "id": "self_employment_contribution_rate_2026",
@@ -11753,7 +14940,8 @@
    "konton": [
     "2012"
    ],
-   "anteckning": "Väljs utifrån kunduppgifterna födelseår, hel ålderspension hela året, hel sjuk- eller aktivitetsersättning, aktiv eller passiv verksamhet och vald karenstid: född 1937 eller tidigare 0 procent; född 1938–1958 10,21 procent; född 1959 eller senare med hel ålderspension hela 2026 eller hel sjuk- eller aktivitetsersättning 10,21 procent; övriga med aktiv verksamhet full egenavgift enligt karenstid (standard 7 dagar 28,97 procent); passiv verksamhet särskild löneskatt 24,26 procent. Från 2026 krävs att företagaren fyllt 67 år vid årets början för endast ålderspensionsavgift. Egenavgifter och schablonavdrag bokförs inte i firman; de betalas via skattekontot (2012) och hanteras i NE-bilagan (R40, R41 och R43). Används av NE-funktionen."
+   "anteckning": "Väljs utifrån kunduppgifterna födelseår, hel ålderspension hela året, hel sjuk- eller aktivitetsersättning, aktiv eller passiv verksamhet och vald karenstid: född 1937 eller tidigare 0 procent; född 1938–1958 10,21 procent; född 1959 eller senare med hel ålderspension hela 2026 eller hel sjuk- eller aktivitetsersättning 10,21 procent; övriga med aktiv verksamhet full egenavgift enligt karenstid (standard 7 dagar 28,97 procent); passiv verksamhet särskild löneskatt 24,26 procent. Från 2026 krävs att företagaren fyllt 67 år vid årets början för endast ålderspensionsavgift. Egenavgifter och schablonavdrag bokförs inte i firman; de betalas via skattekontot (2012) och hanteras i NE-bilagan (R40, R41 och R43). Används av NE-funktionen.",
+   "version": "1"
   },
   {
    "id": "self_employment_standard_deduction_2026",
@@ -11767,7 +14955,8 @@
    "konton": [
     "2012"
    ],
-   "anteckning": "Full egenavgift 25 procent, endast ålderspensionsavgift 10 procent, passiv verksamhet 20 procent, ingen egenavgift 0 procent. Schablonavdraget är ingen kostnad i bokföringen. Årets schablonavdrag i R43; föregående års återförs i R40 och faktiska debiterade egenavgifter dras av i R41."
+   "anteckning": "Full egenavgift 25 procent, endast ålderspensionsavgift 10 procent, passiv verksamhet 20 procent, ingen egenavgift 0 procent. Schablonavdraget är ingen kostnad i bokföringen. Årets schablonavdrag i R43; föregående års återförs i R40 och faktiska debiterade egenavgifter dras av i R41.",
+   "version": "1"
   },
   {
    "id": "self_employment_general_reduction_2026",
@@ -11781,7 +14970,8 @@
    "konton": [
     "2012"
    ],
-   "anteckning": "Gäller endast vid full egenavgift och överskott över 40 000 kronor (self_employment_general_reduction_min_income_2026); högst 15 000 kronor (self_employment_general_reduction_cap_2026). Gäller inte den som betalar endast ålderspensionsavgift. Skatteverket tillämpar avdraget automatiskt."
+   "anteckning": "Gäller endast vid full egenavgift och överskott över 40 000 kronor (self_employment_general_reduction_min_income_2026); högst 15 000 kronor (self_employment_general_reduction_cap_2026). Gäller inte den som betalar endast ålderspensionsavgift. Skatteverket tillämpar avdraget automatiskt.",
+   "version": "1"
   }
  ]
 }
