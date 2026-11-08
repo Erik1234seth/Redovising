@@ -34,7 +34,7 @@ export interface K1Konto {
   utkastOrsak?: string;
 }
 
-interface Parameter {
+export interface Parameter {
   id: string;
   namn: string;
   varde: number | string;
@@ -48,7 +48,7 @@ interface Parameter {
   version?: string;
 }
 
-interface Regel {
+export interface Regel {
   id: string;
   namn: string;
   parameterId: string;
@@ -130,14 +130,17 @@ export function anvandAndringar(andringar: Map<string, K1Andring>, borttagna: Se
   KONTON = new Map(nummer.map((nr) => [nr, medAndring(nr, andringar.get(nr))]));
 }
 
-/** Hela k1.json som den gäller med byråns ändringar och tillagda konton, utan borttagna — det som laddas ner. */
-export function k1Fil(andringar: Map<string, K1Andring>, borttagna: Set<string> = new Set()) {
+/**
+ * Hela k1.json som den gäller med byråns ändringar och tillagda konton, utan
+ * borttagna — det som laddas ner. Gränsvärdena är kontoplanens regelmaster.
+ */
+export function k1Fil(andringar: Map<string, K1Andring>, borttagna: Set<string> = new Set(), rm: Regelmaster = K1_REGELMASTER) {
   const nummer = [...new Set([...ORIGINAL.keys(), ...andringar.keys()])].filter((nr) => !borttagna.has(nr)).sort();
   return {
     kalla: KALLA,
     konton: nummer.map((nr) => medAndring(nr, andringar.get(nr))),
-    parametrar: k1.parametrar as Parameter[],
-    regler: k1.regler as Regel[],
+    parametrar: rm.parametrar,
+    regler: rm.regler,
   };
 }
 
@@ -145,8 +148,24 @@ export function k1Fil(andringar: Map<string, K1Andring>, borttagna: Set<string> 
 export function originalKonto(konto: string): K1Konto | null {
   return ORIGINAL.get(String(konto ?? '').trim()) ?? null;
 }
-const PARAMETRAR = new Map((k1.parametrar as Parameter[]).map((p) => [p.id, p]));
-const REGLER = k1.regler as Regel[];
+/**
+ * Regelmasterns gränsvärden (parametrar) och regler. k1.json är utgångsläget;
+ * byrån importerar nya per kontoplan (./regelmaster), och konteringen använder
+ * den löpande — laddaK1Andringar lägger in den med anvandRegelmaster.
+ */
+export interface Regelmaster { kalla: string; parametrar: Parameter[]; regler: Regel[] }
+export const K1_REGELMASTER: Regelmaster = { kalla: KALLA, parametrar: k1.parametrar as Parameter[], regler: k1.regler as Regel[] };
+
+const karta = (rm: Regelmaster) => new Map(rm.parametrar.map((p) => [p.id, p]));
+let PARAMETRAR = karta(K1_REGELMASTER);
+let REGLER = K1_REGELMASTER.regler;
+let REGELMASTER = K1_REGELMASTER;
+
+export function anvandRegelmaster(rm: Regelmaster): void {
+  REGELMASTER = rm;
+  PARAMETRAR = karta(rm);
+  REGLER = rm.regler;
+}
 
 export function slaUppKonto(konto: string): K1Konto | null {
   return KONTON.get(String(konto ?? '').trim()) ?? null;
@@ -157,13 +176,13 @@ export function allaKonton(): K1Konto[] {
 }
 
 /** Löser upp en parameter till ett tal, även när den är härledd ur en annan. */
-function losVarde(id: string, djup = 0): { varde: number; parameter: Parameter } | null {
-  const p = PARAMETRAR.get(id);
+function losVarde(id: string, djup = 0, parametrar = PARAMETRAR): { varde: number; parameter: Parameter } | null {
+  const p = parametrar.get(id);
   if (!p || djup > 5) return null;
   if (typeof p.varde === 'number') return { varde: p.varde, parameter: p };
-  const bas = p.basParameter ?? (PARAMETRAR.has(p.varde) ? p.varde : null);
+  const bas = p.basParameter ?? (parametrar.has(p.varde) ? p.varde : null);
   if (!bas) return null;
-  const under = losVarde(bas, djup + 1);
+  const under = losVarde(bas, djup + 1, parametrar);
   if (!under) return null;
   return { varde: under.varde * (p.multiplikator ?? 1), parameter: p };
 }
@@ -199,13 +218,14 @@ export interface RegelmasterRad extends Regel {
   provasIKod: boolean;
 }
 
-/** Hela gränsvärdestabellen ur k1.json — det provaKonto och kontotexterna bygger på. */
-export function regelmaster(): RegelmasterRad[] {
+/** Regelmasterns regler med uträknade värden — det provaKonto bygger på. Utan argument den konteringen använder. */
+export function regelmaster(rm: Regelmaster = REGELMASTER): RegelmasterRad[] {
   // provaKonto prövar bara regler som ett konto pekar på
   const iTrosklar = new Set([...KONTON.values()].flatMap((k) => k.trosklar));
-  return REGLER.map((regel) => {
-    const p = PARAMETRAR.get(regel.parameterId);
-    const lost = losVarde(regel.parameterId);
+  const parametrar = karta(rm);
+  return rm.regler.map((regel) => {
+    const p = parametrar.get(regel.parameterId);
+    const lost = losVarde(regel.parameterId, 0, parametrar);
     return {
       ...regel,
       parameter: p ? {

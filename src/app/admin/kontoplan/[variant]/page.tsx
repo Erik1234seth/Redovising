@@ -244,7 +244,7 @@ function Import({ variant, fil, onStang, onKlar }: { variant: Variant; fil: File
               {!antal && !klar && <p className="text-slate-500">Filen ändrar inget.</p>}
               <p className="text-xs text-slate-400">
                 Namn, beskrivning och listorna importeras. Konton som saknas i filen tas bort ur vyn men finns kvar under Historik.
-                Gränsvärdena följer inte med.
+                Gränsvärdena följer inte med — de importeras under Regler.
               </p>
             </>
           )}

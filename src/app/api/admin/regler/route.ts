@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { PRINCIPER_INLEDNING } from '@/lib/kontering/principer';
-import { KALLA, regelmaster } from '@/lib/kontering/regelverk';
+import { regelmaster } from '@/lib/kontering/regelverk';
+import { hamtaRegelmaster } from '@/lib/kontering/regelmaster';
 import { hamtaPrinciper, sparaPrinciper, tolkaVariant } from '@/lib/kontering/k1-andringar';
 
 /**
  * De generella reglerna i en kontoplan (variant lopande eller bokslut), för fliken Regler:
  *   - byråns principer — gäller alltid, alla kunder. Var kontoplan har sina.
- *   - regelmastern: gränsvärdena och reglerna i k1.json, samma för båda
+ *   - regelmastern: gränsvärdena och reglerna, var kontoplan har sina (@/lib/kontering/regelmaster)
  *   - regler och kontext som byrån skrivit i flödesschemat för alla kunder (bara löpande)
  *
  *   GET ?variant=      allt ovan
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
   if (!variant) return fel('variant ska vara lopande eller bokslut', 400);
   try {
     const supabase = getSupabase();
-    const principer = await hamtaPrinciper(supabase, variant);
+    const [principer, rm] = await Promise.all([hamtaPrinciper(supabase, variant), hamtaRegelmaster(supabase, variant)]);
     let flodesschema: unknown[] = [];
     if (variant === 'lopande') {
       const { data, error } = await supabase
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({
       principer: { inledning: PRINCIPER_INLEDNING, lista: principer.lista, updatedAt: principer.updatedAt },
-      regelmaster: { kalla: KALLA, regler: regelmaster() },
+      regelmaster: { kalla: rm.kalla, updatedAt: rm.updatedAt, antalParametrar: rm.parametrar.length, regler: regelmaster(rm) },
       flodesschema,
     });
   } catch (err) {

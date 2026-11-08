@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import type { k1Fil } from './regelverk';
+import type { k1Fil, Regelmaster } from './regelverk';
 
 /**
  * Kontobeskrivningarna som xlsx, i samma form som filen k1.json byggs från:
@@ -27,6 +27,18 @@ export function k1Xlsx(fil: ReturnType<typeof k1Fil>): Buffer {
     ]);
   }
 
+  const granser = granserRader(fil);
+
+  const wb = XLSX.utils.book_new();
+  const ark1 = XLSX.utils.aoa_to_sheet(konton);
+  ark1['!cols'] = [{ wch: 8 }, { wch: 32 }, { wch: 60 }];
+  XLSX.utils.book_append_sheet(wb, ark1, 'Kontobeskrivningar');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(granser), 'Gränsvärden');
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+}
+
+/** Fliken Gränsvärden: parametrarna, en tom rad och sedan reglerna med en egen rubrikrad (rule_id). */
+function granserRader(fil: Pick<Regelmaster, 'parametrar' | 'regler'>): (string | number)[][] {
   const granser: (string | number)[][] = [[
     'value_id', 'parameter_name', 'value', 'unit', 'valid_from', 'valid_to', 'parameter_type',
     'base_parameter_id', 'multiplier', 'last_verified_at', 'status', 'version',
@@ -48,11 +60,12 @@ export function k1Xlsx(fil: ReturnType<typeof k1Fil>): Buffer {
       lista(r.konton), r.anteckning, 'active', r.version ?? '',
     ]);
   }
+  return granser;
+}
 
+/** Bara regelmastern: fliken Gränsvärden. Samma form som i hela kontobeskrivningsfilen. */
+export function regelmasterXlsx(rm: Regelmaster): Buffer {
   const wb = XLSX.utils.book_new();
-  const ark1 = XLSX.utils.aoa_to_sheet(konton);
-  ark1['!cols'] = [{ wch: 8 }, { wch: 32 }, { wch: 60 }];
-  XLSX.utils.book_append_sheet(wb, ark1, 'Kontobeskrivningar');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(granser), 'Gränsvärden');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(granserRader(rm)), 'Gränsvärden');
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
 }

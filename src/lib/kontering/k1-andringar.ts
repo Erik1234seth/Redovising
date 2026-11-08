@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { anvandAndringar, medAndring, originalNummer, type K1Andring, type K1Konto } from './regelverk';
+import { anvandAndringar, anvandRegelmaster, medAndring, originalNummer, type K1Andring, type K1Konto } from './regelverk';
+import { hamtaRegelmaster } from './regelmaster';
 import { anvandPrinciper, PRINCIPER } from './principer';
 
 /**
@@ -60,9 +61,15 @@ export function synligaKonton(sparade: Map<string, SparadAndring>): string[] {
   return [...new Set([...originalNummer(), ...sparade.keys()])].filter((nr) => !sparade.get(nr)?.borttagenAt).sort();
 }
 
-/** Läser den löpande kontoplanen och principerna och låter konteringen använda dem. Anropas när en kontering börjar. */
+/**
+ * Läser den löpande kontoplanen, principerna och regelmastern och låter
+ * konteringen använda dem. Anropas när en kontering börjar.
+ */
 export async function laddaK1Andringar(supabase: SupabaseClient): Promise<void> {
-  const [alla, principer] = await Promise.all([hamtaK1Andringar(supabase, 'lopande'), hamtaPrinciper(supabase, 'lopande')]);
+  const [alla, principer, rm] = await Promise.all([
+    hamtaK1Andringar(supabase, 'lopande'), hamtaPrinciper(supabase, 'lopande'), hamtaRegelmaster(supabase, 'lopande'),
+  ]);
+  anvandRegelmaster(rm);
   const andringar = new Map([...alla].map(([k, v]) => [k, v.andring]));
   anvandAndringar(andringar, new Set([...alla].filter(([, v]) => v.borttagenAt).map(([k]) => k)));
   anvandPrinciper(principer.lista);

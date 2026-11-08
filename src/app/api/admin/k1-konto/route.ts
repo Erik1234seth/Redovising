@@ -7,6 +7,7 @@ import {
 import { k1Fil, medAndring, originalKonto, type K1Andring } from '@/lib/kontering/regelverk';
 import { k1Xlsx } from '@/lib/kontering/k1-xlsx';
 import { importeraKonton, lasKontoFil } from '@/lib/kontering/k1-import';
+import { hamtaRegelmaster } from '@/lib/kontering/regelmaster';
 
 /**
  * Byråns två kontoplaner, löpande bokföring och bokslut (@/lib/kontering/k1-andringar).
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
 
     const fil = sp.get('fil');
     if (fil) {
-      const data = k1Fil(andringar(sparade), borttagna(sparade));
+      const data = k1Fil(andringar(sparade), borttagna(sparade), await hamtaRegelmaster(supabase, variant));
       const datum = new Date().toLocaleDateString('sv-SE');
       const namn = `K1_kontobeskrivningar_${variant === 'bokslut' ? 'bokslut' : 'lopande'}_${datum}`;
       if (fil === 'json') {
