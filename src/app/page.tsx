@@ -465,6 +465,7 @@ export default function Home() {
             "url": "https://enklabokslut.se",
             "priceRange": "399 kr/mån",
             "areaServed": { "@type": "Country", "name": "Sverige" },
+            "founder": { "@type": "Person", "name": "Erik Seth" },
           })
         }}
       />

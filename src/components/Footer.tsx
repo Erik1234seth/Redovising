@@ -121,8 +121,9 @@ export default function Footer() {
           <p className="text-white/35 text-xs">
             © {new Date().getFullYear()} Enkla Bokslut. Alla rättigheter förbehållna.
           </p>
+          {/* Namnet står som vanlig text så att sökmotorer kopplar Erik Seth till Enkla Bokslut */}
           <p className="text-white/35 text-xs">
-            Enkla Bokslut är en del av Sethapp Innovation
+            Enkla Bokslut är en del av Sethapp Innovation, grundat av Erik Seth
           </p>
         </div>
       </div>
