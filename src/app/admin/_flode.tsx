@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { momsText, type Momsdel, type Omvand } from '@/lib/kontering/momsdelar';
 import { kr } from './_verifikationer';
 import { KontoLank } from './_k1-konto';
@@ -269,6 +269,8 @@ export function Flode({ userId }: { userId: string }) {
         {startfel && <span className="text-sm text-red-600">{startfel}</span>}
       </div>
 
+      <OsakraMejl userId={userId} uppdaterad={rader} />
+
       <details className="bg-white border border-slate-200 rounded-lg">
         <summary className="px-4 py-3 text-sm font-semibold text-slate-800 cursor-pointer select-none">Välj själv — kör om enskilda filer</summary>
         <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-y border-slate-200">
@@ -346,6 +348,119 @@ export function Flode({ userId }: { userId: string }) {
 
       {laddfel && <p className="text-red-600 text-sm">{laddfel}</p>}
       {korningar.map((delar) => <Korning key={delar[0].korning} delar={delar} onTaBort={() => taBort(delar[0].korning)} onGodkann={godkann} />)}
+    </div>
+  );
+}
+
+interface OsakraUtkast { id: string; till: string; amne: string; text: string }
+
+/**
+ * Ett samlat mejl till kunden om de gula konteringarna som inte är godkända
+ * (/api/admin/osakra-mejl). AI:n skriver det; det går ut först när man trycker
+ * Skicka. Texten och ämnet går att ändra innan.
+ */
+function OsakraMejl({ userId, uppdaterad }: { userId: string; uppdaterad: unknown }) {
+  const [info, setInfo] = useState<{ antal: number; nya: number; utkast: OsakraUtkast | null } | null>(null);
+  const [text, setText] = useState('');
+  const [amne, setAmne] = useState('');
+  const [arbetar, setArbetar] = useState<'' | 'skriver' | 'skickar' | 'slanger'>('');
+  const [fel, setFel] = useState('');
+  const [skickat, setSkickat] = useState('');
+
+  // Texten fylls bara i när ett nytt utkast visas, så att det man skrivit inte skrivs över när listan laddas om
+  const visatId = useRef<string | null>(null);
+  const visa = useCallback((u: OsakraUtkast | null) => {
+    if ((u?.id ?? null) === visatId.current) return;
+    visatId.current = u?.id ?? null;
+    setText(u?.text ?? '');
+    setAmne(u?.amne ?? '');
+  }, []);
+
+  const ladda = useCallback(async () => {
+    try {
+      const d = await (await fetch(`/api/admin/osakra-mejl?userId=${encodeURIComponent(userId)}`)).json();
+      if (d.error) throw new Error(d.error);
+      setInfo(d);
+      visa(d.utkast);
+    } catch (err) {
+      setFel(err instanceof Error ? err.message : String(err));
+    }
+  }, [userId, visa]);
+  useEffect(() => { ladda(); }, [ladda, uppdaterad]);
+
+  async function kor(steg: 'skriver' | 'skickar' | 'slanger') {
+    setArbetar(steg);
+    setFel('');
+    try {
+      if (steg === 'skriver') {
+        const d = await (await fetch('/api/admin/osakra-mejl', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }),
+        })).json();
+        if (d.error) throw new Error(d.error);
+        setSkickat('');
+      } else {
+        const utkast = info?.utkast;
+        if (!utkast) return;
+        const d = await (await fetch('/api/admin/inkorg', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(steg === 'skickar' ? { action: 'skicka-mejl', id: utkast.id, text, amne } : { action: 'slang-mejl', id: utkast.id }),
+        })).json();
+        if (d.error) throw new Error(d.error);
+        if (steg === 'skickar') setSkickat(utkast.till);
+      }
+      await ladda();
+    } catch (err) {
+      setFel(err instanceof Error ? err.message : String(err));
+    } finally {
+      setArbetar('');
+    }
+  }
+
+  if (!info) return null;
+  const utkast = info.utkast;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg px-4 py-3 space-y-3 max-w-3xl">
+      <div className="flex flex-wrap items-center gap-3">
+        <h3 className="font-semibold text-slate-800 text-sm mr-auto">Mejl om osäkra</h3>
+        {!utkast && (
+          <button onClick={() => kor('skriver')} disabled={!info.antal || !!arbetar}
+            className="border border-blue-600 text-blue-700 text-sm font-medium px-3 py-1.5 rounded disabled:opacity-40">
+            {arbetar === 'skriver' ? 'AI:n skriver…' : info.antal ? `Skriv mejl om osäkra · ${info.antal}` : 'Inga osäkra att fråga om'}
+          </button>
+        )}
+      </div>
+      {!utkast && (
+        <p className="text-xs text-slate-500">
+          Gula konteringar som inte är godkända. AI:n samlar frågorna så att kunden får så få frågor som möjligt. Inget skickas förrän du trycker Skicka.
+          {skickat && <span className="text-emerald-700"> Mejlet skickades till {skickat}.</span>}
+        </p>
+      )}
+      {utkast && (
+        <>
+          <p className="text-xs text-slate-500">
+            Till {utkast.till}. Läs igenom och ändra om du vill — mejlet går iväg först när du trycker Skicka.
+            {info.nya > 0 && <span className="text-amber-700"> {info.nya} osäkra har tillkommit sedan mejlet skrevs — skriv om för att få med dem.</span>}
+          </p>
+          <input value={amne} onChange={(e) => setAmne(e.target.value)} placeholder="Ämne"
+            className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm text-slate-900 bg-white" />
+          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={14}
+            className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm text-slate-900 bg-white font-sans" />
+          <div className="flex flex-wrap items-center gap-3">
+            <button onClick={() => kor('skickar')} disabled={!!arbetar || !text.trim()}
+              className="bg-blue-600 text-white text-sm font-medium px-4 py-1.5 rounded disabled:opacity-40">
+              {arbetar === 'skickar' ? 'Skickar…' : 'Skicka'}
+            </button>
+            <button onClick={() => kor('skriver')} disabled={!!arbetar} className="text-sm text-blue-700 hover:underline disabled:opacity-40">
+              {arbetar === 'skriver' ? 'AI:n skriver…' : 'Skriv om'}
+            </button>
+            <button onClick={() => kor('slanger')} disabled={!!arbetar} className="text-sm text-slate-500 hover:text-red-600 disabled:opacity-40">
+              Släng
+            </button>
+          </div>
+        </>
+      )}
+      {fel && <p className="text-sm text-red-600">{fel}</p>}
     </div>
   );
 }

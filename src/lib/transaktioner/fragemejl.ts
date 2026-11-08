@@ -50,7 +50,12 @@ interface Rad {
   riktning: string;
   tillrackligt: Tillrackligt | null;
   fraga_utkast_id: string | null;
+  /** Mejlet om osäkra: varför konteringen är gul (AI:ns motivering), när inget står under saknas. */
+  osaker?: string;
 }
+
+/** Vilket mejl som skrivs: kl 18-mejlet om det som saknas, eller mejlet om osäkra från Flöde. */
+type Lage = 'saknas' | 'osakra';
 
 const kr = new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** Utkast som inte gått iväg. Deras frågor är inte ställda. */
@@ -80,6 +85,39 @@ async function fragorAttStalla(supabase: SupabaseClient, userId?: string): Promi
   const stalld = new Set((utkast ?? []).filter((u) => !EJ_SKICKAD.includes(u.status)).map((u) => u.id));
   rader = rader.filter((t) => !bokforda.has(t.id) && !(t.fraga_utkast_id && stalld.has(t.fraga_utkast_id)));
   return rader;
+}
+
+/**
+ * Mejlet om osäkra (knappen i Flöde): kundens gula konteringar från Flöde som
+ * byrån inte godkänt eller valt konto för, inte är dubbletter eller bokförda och
+ * inte redan frågats om i ett skickat mejl. Röda (Stopp) är byråns att lösa.
+ */
+export async function osakraAttFraga(supabase: SupabaseClient, userId: string): Promise<Rad[]> {
+  const { data: konteringar, error: kFel } = await supabase.from('konteringar')
+    .select('transaktion_id, motivering').eq('user_id', userId).eq('modell', 'gpt-6.1-sol').eq('omdome', 'gul').limit(1000);
+  if (kFel) throw new Error(kFel.message);
+  const motivering = new Map((konteringar ?? []).map((k) => [k.transaktion_id as string, String(k.motivering ?? '')]));
+  if (!motivering.size) return [];
+
+  const { data, error } = await supabase.from('transaktioner')
+    .select('id, user_id, underlag_id, datum, beskrivning, motpart, belopp, valuta, riktning, tillrackligt, fraga_utkast_id')
+    .eq('user_id', userId).in('id', [...motivering.keys()]).is('dublett_av', null).is('vald_kontering', null)
+    .order('datum', { ascending: true });
+  if (error) throw new Error(error.message);
+  let rader = (data ?? []) as Rad[];
+  if (!rader.length) return [];
+
+  const ids = rader.map((t) => t.id);
+  const utkastIds = [...new Set(rader.map((t) => t.fraga_utkast_id).filter(Boolean))] as string[];
+  const [{ data: verif, error: vFel }, { data: utkast, error: uFel }] = await Promise.all([
+    supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', ids),
+    utkastIds.length ? supabase.from('mejl_utkast').select('id, status').in('id', utkastIds) : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (vFel ?? uFel) throw new Error((vFel ?? uFel)!.message);
+  const bokforda = new Set((verif ?? []).map((v) => v.transaktion_id));
+  const stalld = new Set((utkast ?? []).filter((u) => !EJ_SKICKAD.includes(u.status)).map((u) => u.id));
+  rader = rader.filter((t) => !bokforda.has(t.id) && !(t.fraga_utkast_id && stalld.has(t.fraga_utkast_id)));
+  return rader.map((t) => ({ ...t, osaker: motivering.get(t.id) }));
 }
 
 /**
@@ -126,6 +164,16 @@ async function sidorAttFraga(supabase: SupabaseClient, userId?: string): Promise
 }
 
 /**
+ * Mejlet om osäkra från Flöde: skrivs som ett utkast (syns också i inkorgen)
+ * och skickas när byrån trycker Skicka i Flöde. Null när inget är osäkert.
+ */
+export async function skrivOsakraMejl(supabase: SupabaseClient, userId: string) {
+  const rader = await osakraAttFraga(supabase, userId);
+  if (!rader.length) return null;
+  return skrivFragemejl(supabase, userId, rader, [], 'osakra');
+}
+
+/**
  * Skriver kundens frågemejl som ett utkast i inkorgen. Null när det inte
  * finns något att fråga om.
  */
@@ -134,7 +182,8 @@ export async function skrivFragemejl(
   userId: string,
   rader?: Rad[],
   sidfragor?: Sidfraga[],
-): Promise<{ utkastId: string; antal: number } | null> {
+  lage: Lage = 'saknas',
+): Promise<{ utkastId: string; antal: number; till: string; amne: string; text: string } | null> {
   const fragor = rader ?? await fragorAttStalla(supabase, userId);
   const sidor = sidfragor ?? await sidorAttFraga(supabase, userId);
   if (!fragor.length && !sidor.length) return null;
@@ -173,7 +222,9 @@ export async function skrivFragemejl(
     return `${rubrik}:\n${rader.map((t) => {
       const vem = [t.motpart, t.beskrivning].filter(Boolean).join(', ') || 'okänd transaktion';
       const belopp = `${kr.format(Number(t.belopp))} ${t.valuta && t.valuta !== 'SEK' ? t.valuta : 'kr'}`;
-      const vad = t.tillrackligt!.saknas.map((s) => `${s.vad} (${s.varfor})`).join('; ');
+      const vad = t.tillrackligt?.saknas?.length
+        ? t.tillrackligt.saknas.map((s) => `${s.vad} (${s.varfor})`).join('; ')
+        : `vi är osäkra på bokföringen — byråns anteckning, inte till kunden: ${t.osaker || 'okänt varför'}`;
       const kontext = kontextFor(instruktioner, t);
       return `    • ${t.datum ?? 'okänt datum'}, ${vem}, ${belopp}${t.riktning === 'in' ? ' in' : ''}: ${vad}${kontext ? `\n      ${kontext.replace(/\n/g, '\n      ')}` : ''}`;
     }).join('\n')}`;
@@ -188,17 +239,23 @@ export async function skrivFragemejl(
   const aldsta = [...(underlag ?? [])].map((u) => String(u.created_at)).sort()[0] ?? null;
   const tydliga = await tydligaUnderlag(supabase, userId, aldsta);
   const underlagKontext = (tydliga ? 'ÖVRIGA UNDERLAG: kundens övriga underlag från samma period var tydliga och kunde bokföras utan frågor.\n\n' : '')
-    + (fragor.length ? `TRANSAKTIONER SOM SAKNAR UPPGIFTER (${fragor.length} st):\n${block.join('\n\n')}\n\n` : '')
+    + (fragor.length ? `${lage === 'osakra' ? 'TRANSAKTIONER VI ÄR OSÄKRA PÅ' : 'TRANSAKTIONER SOM SAKNAR UPPGIFTER'} (${fragor.length} st):\n${block.join('\n\n')}\n\n` : '')
     + (sidor.length ? `UNDERLAG DÄR SIDOR SAKNAS (${sidor.length} st) — be kunden skicka de saknade sidorna, gärna som foto:\n${sidblock.join('\n')}\n\n` : '')
     + 'Skriv ETT vänligt och personligt mejl till kunden. Börja med att tacka för underlagen och säga att det mesta var tydligt'
     + (tydliga ? ' — nämn att de övriga underlagen var tydliga och är klara, utan att räkna dem — ' : ' ')
     + 'innan du kommer till det som saknas. Tonen ska vara varm och enkel, som från en byrå som gärna hjälper till, inte som en lista med krav. '
     + 'Skriv inte hur många underlag eller transaktioner det gäller — varken de tydliga eller dem du frågar om. '
     + 'Avsluta med en kort vänlig rad, till exempel att kunden bara kan svara på mejlet och att det går bra att höra av sig om något är oklart. '
-    + 'Fråga efter just det som saknas ovan, för alla transaktionerna och underlagen. Gå igenom dem en och en, '
-    + 'med datum, motpart och belopp så att kunden ser vilken det gäller. '
-    + 'Är det samma fråga för flera transaktioner — till exempel om bilen i verksamheten är firmans eller privat — ställer du den en gång, '
-    + 'med transaktionerna den gäller uppräknade kort under, i stället för att upprepa frågan för varje. '
+    + (lage === 'osakra'
+      ? 'Vi är osäkra på hur transaktionerna ovan ska bokföras. Fråga bara efter det vi behöver veta för att välja rätt konto och moms, och ställ så FÅ frågor som möjligt. '
+        + 'Täcker en generell fråga flera transaktioner — till exempel vad kunden använder en viss sorts inköp till, om alla köp från samma leverantör, '
+        + 'eller om bilen i verksamheten är firmans eller privat — ställer du den en gång och räknar kort upp vilka transaktioner den gäller (datum, motpart, belopp). '
+        + 'Ställ en egen fråga om en enskild transaktion bara när den inte går att täcka med en generell fråga. '
+        + 'Byråns anteckningar om varför vi är osäkra är bara till för dig: skriv dem aldrig i mejlet. '
+      : 'Fråga efter just det som saknas ovan, för alla transaktionerna och underlagen. Gå igenom dem en och en, '
+        + 'med datum, motpart och belopp så att kunden ser vilken det gäller. '
+        + 'Är det samma fråga för flera transaktioner — till exempel om bilen i verksamheten är firmans eller privat — ställer du den en gång, '
+        + 'med transaktionerna den gäller uppräknade kort under, i stället för att upprepa frågan för varje. ')
     + 'Det ska kännas som att vi ber om hjälp att göra klart, inte som ett förhör. Utgå från att allt är i sin ordning: '
     + 'skriv inte varför något ser oklart eller misstänkt ut (till exempel att en faktura är ställd till en annan person, eller att något kan vara privat), '
     + 'ställ inga motfrågor eller dubbla frågor, och upprepa inte frågan vid varje rad. Formulera frågorna mjukt, till exempel "Kan du berätta …" eller '
@@ -243,7 +300,7 @@ export async function skrivFragemejl(
     const { error: sFel } = await supabase.from('bokforing_underlag').update({ sidor_fraga_utkast_id: utkast.id }).in('id', sidor.map((u) => u.id));
     if (sFel) throw new Error(sFel.message);
   }
-  return { utkastId: utkast.id, antal: fragor.length + sidor.length };
+  return { utkastId: utkast.id, antal: fragor.length + sidor.length, till, amne, text };
 }
 
 /** Dygnets körning: ett frågemejl per kund som har något att fråga om. */
