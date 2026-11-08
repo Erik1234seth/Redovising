@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import type { k1Fil, Parameter } from './regelverk';
+import type { k1Fil, Parameter, Regel } from './regelverk';
 import type { AiRegel } from './airegler';
 import { AI_KOLUMNER } from './regelmaster';
 
@@ -47,6 +47,21 @@ export function gransvardenXlsx(parametrar: Parameter[]): Buffer {
     ]);
   }
   return bok(granser, 'Gränsvärden', [{ wch: 44 }, { wch: 50 }, { wch: 10 }, { wch: 16 }]);
+}
+
+/** Beloppskontrollerna i kod (den gamla regeltabellen), fliken Beloppskontroller med rubrikraden rule_id. */
+export function beloppskontrollerXlsx(regler: Regel[]): Buffer {
+  const rader: (string | number)[][] = [[
+    'rule_id', 'rule_name', 'value_id', 'comparison_operator', 'aggregation_scope', 'vat_treatment',
+    'valid_from', 'valid_to', 'applies_to_accounts', 'rule_notes', 'status', 'version',
+  ]];
+  for (const r of regler) {
+    rader.push([
+      r.id, r.namn, r.parameterId, r.operator, r.omfattning, r.moms, r.gallerFran ?? '', r.gallerTill ?? '',
+      lista(r.konton), r.anteckning, 'active', r.version ?? '',
+    ]);
+  }
+  return bok(rader, 'Beloppskontroller', [{ wch: 44 }, { wch: 50 }, { wch: 40 }]);
 }
 
 /** Regelmasterns AI-regler i en kontoplan, med samma kolumner som byråns regelmasterfil. */

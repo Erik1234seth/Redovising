@@ -218,12 +218,16 @@ export default function Regler() {
           <span className="font-semibold text-slate-900">Beloppskontroller i kod</span>
           <span className="text-xs text-slate-500"> · {data.regelmaster.regler.length} regler ur {data.regelmaster.kalla} · visa</span>
           <p className="text-xs text-slate-500 mt-0.5">
-            Den gamla regeltabellen (rule_id). Den importeras inte längre, men &quot;prövas i kod&quot; betyder att systemet
+            Den gamla regeltabellen (rule_id). Den går att ladda ner men importeras inte längre, och &quot;prövas i kod&quot; betyder att systemet
             fortfarande jämför beloppet med gränsen. Värdena kommer från gränsvärdena ovan.
           </p>
         </summary>
-        <input value={sok} onChange={(e) => setSok(e.target.value)} placeholder="Sök regel eller konto…"
-          className="w-full sm:w-64 my-3 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500" />
+        <div className="flex flex-wrap items-center gap-3 my-3">
+          <input value={sok} onChange={(e) => setSok(e.target.value)} placeholder="Sök regel eller konto…"
+            className="w-full sm:w-64 mr-auto bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500" />
+          <a href={`/api/admin/regelmaster?variant=${variant}&del=beloppskontroller&fil=xlsx`} className={KNAPP}>Ladda ner xlsx</a>
+          <a href={`/api/admin/regelmaster?variant=${variant}&del=beloppskontroller&fil=json`} className={KNAPP}>Ladda ner JSON</a>
+        </div>
         {!regler.length && <p className="text-sm text-slate-500">Inga regler matchar.</p>}
         <ul className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
           {regler.map((r) => (
