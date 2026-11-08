@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { aterstallK1Konto, hamtaK1Andringar, sparaK1Andring } from '@/lib/kontering/k1-andringar';
 import { k1Fil, medAndring, originalKonto, type K1Andring } from '@/lib/kontering/regelverk';
 import { k1Xlsx } from '@/lib/kontering/k1-xlsx';
+import { importeraKonton, lasKontoFil } from '@/lib/kontering/k1-import';
 
 /**
  * Byrån ändrar och lägger till K1-konton (@/lib/kontering/k1-andringar).
@@ -13,6 +14,8 @@ import { k1Xlsx } from '@/lib/kontering/k1-xlsx';
  *   PUT                spara kontots text — fält som är lika med originalet sparas som original.
  *                      `ny: true` lägger till ett konto som inte finns i k1.json.
  *   DELETE ?konto=     återställ kontot till originalet, eller ta bort ett tillagt konto
+ *   POST               importera en xlsx- eller JSON-fil (formulärfältet fil) med samma struktur som
+ *                      nedladdningen. Utan spara=1 visas bara vad som skulle ändras.
  */
 
 function getSupabase() {
@@ -144,6 +147,31 @@ export async function PUT(request: NextRequest) {
     if (Object.values(andring).every((v) => v === null)) await aterstallK1Konto(supabase, original.konto);
     else await sparaK1Andring(supabase, original.konto, andring);
     return NextResponse.json({ ok: true });
+  } catch (err) {
+    return fel(err);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return fel('Skicka filen som formulär', 400);
+  }
+  const fil = form.get('fil');
+  if (!(fil instanceof File)) return fel('Ingen fil', 400);
+  if (!/\.(xlsx|json)$/i.test(fil.name)) return fel('Filen ska vara .xlsx eller .json', 400);
+  let konton;
+  try {
+    konton = lasKontoFil(Buffer.from(await fil.arrayBuffer()), fil.name);
+  } catch (err) {
+    return fel(err, 400);
+  }
+  if (!konton.length) return fel('Hittade inga konton i filen', 400);
+  try {
+    const plan = await importeraKonton(getSupabase(), konton, form.get('spara') === '1');
+    return NextResponse.json({ ...plan, iFilen: konton.length });
   } catch (err) {
     return fel(err);
   }

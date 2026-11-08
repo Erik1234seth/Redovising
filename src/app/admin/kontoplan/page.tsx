@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KontoRuta } from '../_k1-konto';
 
 /**
@@ -8,7 +8,18 @@ import { KontoRuta } from '../_k1-konto';
  * och tillagda konton. Klick på ett konto öppnar samma ruta som i Flöde och
  * Kontering. Hela kontobeskrivningarna kan laddas ner som JSON (som k1.json)
  * eller xlsx (samma form som filen k1.json byggs från, se scripts/k1-till-json.mjs).
+ *
+ * Importera tar en fil med samma struktur (@/lib/kontering/k1-import): först
+ * visas vad som skulle ändras, sedan sparas det när man trycker Importera.
  */
+
+interface Importplan {
+  andrade: { konto: string; namn: string; falt: string[] }[];
+  nya: { konto: string; namn: string }[];
+  ogiltiga: { konto: string; fel: string }[];
+  oforandrade: number;
+  iFilen: number;
+}
 
 interface Rad {
   konto: string;
@@ -29,6 +40,7 @@ export default function Kontoplan() {
   const [sok, setSok] = useState('');
   const [bara, setBara] = useState<'alla' | 'byran'>('alla');
   const [oppet, setOppet] = useState<{ konto: string; ny: boolean } | null>(null);
+  const [importFil, setImportFil] = useState<File | null>(null);
 
   const ladda = useCallback(() => {
     fetch('/api/admin/k1-konto')
@@ -65,6 +77,11 @@ export default function Kontoplan() {
         <a href="/api/admin/k1-konto?fil=json" className="text-sm border border-slate-300 bg-white rounded-lg px-3 py-1.5 text-slate-700 hover:border-slate-400">
           Ladda ner JSON
         </a>
+        <label className="text-sm border border-slate-300 bg-white rounded-lg px-3 py-1.5 text-slate-700 hover:border-slate-400 cursor-pointer">
+          Importera
+          <input type="file" accept=".xlsx,.json" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setImportFil(f); }} />
+        </label>
         <button onClick={() => setOppet({ konto: '', ny: true })} className="text-sm bg-blue-600 text-white font-medium rounded-lg px-3 py-1.5">
           Lägg till konto
         </button>
@@ -111,9 +128,115 @@ export default function Kontoplan() {
         })}
       </div>
 
+      {importFil && <Import fil={importFil} onStang={() => setImportFil(null)} onKlar={ladda} />}
+
       {oppet && (
         <KontoRuta key={oppet.konto || 'ny'} konto={oppet.konto} ny={oppet.ny} onStang={() => setOppet(null)} onSparad={ladda} />
       )}
+    </div>
+  );
+}
+
+/** Visar vad filen ändrar och sparar det när man trycker Importera. */
+function Import({ fil, onStang, onKlar }: { fil: File; onStang: () => void; onKlar: () => void }) {
+  const [plan, setPlan] = useState<Importplan | null>(null);
+  const [fel, setFel] = useState('');
+  const [sparar, setSparar] = useState(false);
+  const [klar, setKlar] = useState(false);
+  const skickad = useRef(false);
+
+  const skicka = useCallback(async (spara: boolean) => {
+    const form = new FormData();
+    form.append('fil', fil);
+    if (spara) form.append('spara', '1');
+    const d = await (await fetch('/api/admin/k1-konto', { method: 'POST', body: form })).json();
+    if (d.error) throw new Error(d.error);
+    return d as Importplan;
+  }, [fil]);
+
+  useEffect(() => {
+    if (skickad.current) return;
+    skickad.current = true;
+    skicka(false).then(setPlan).catch((err) => setFel(err instanceof Error ? err.message : String(err)));
+  }, [skicka]);
+
+  async function importera() {
+    setSparar(true);
+    setFel('');
+    try {
+      setPlan(await skicka(true));
+      setKlar(true);
+      onKlar();
+    } catch (err) {
+      setFel(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSparar(false);
+    }
+  }
+
+  const antal = plan ? plan.andrade.length + plan.nya.length : 0;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-start justify-center p-4 overflow-y-auto" onClick={onStang}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl my-8" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-baseline gap-3 px-5 py-4 border-b border-slate-200">
+          <h2 className="font-semibold text-slate-900">Importera {fil.name}</h2>
+          <button onClick={onStang} className="ml-auto text-slate-400 hover:text-slate-700 text-xl leading-none" aria-label="Stäng">×</button>
+        </div>
+        <div className="px-5 py-4 space-y-4 text-sm">
+          {!plan && !fel && <p className="text-slate-500">Läser filen…</p>}
+          {plan && (
+            <>
+              <p className="text-slate-600">
+                {plan.iFilen} konton i filen · {plan.oforandrade} oförändrade
+                {klar ? ` · ${antal} importerade — gäller från nästa kontering` : ''}
+              </p>
+              {plan.nya.length > 0 && (
+                <div>
+                  <p className="font-medium text-emerald-700">Nya konton ({plan.nya.length})</p>
+                  <ul className="mt-1 space-y-0.5 text-slate-900">
+                    {plan.nya.map((k) => <li key={k.konto}><span className="font-mono">{k.konto}</span> {k.namn}</li>)}
+                  </ul>
+                </div>
+              )}
+              {plan.andrade.length > 0 && (
+                <div>
+                  <p className="font-medium text-blue-700">Ändrade konton ({plan.andrade.length})</p>
+                  <ul className="mt-1 space-y-0.5 text-slate-900">
+                    {plan.andrade.map((k) => (
+                      <li key={k.konto}>
+                        <span className="font-mono">{k.konto}</span> {k.namn}
+                        <span className="text-slate-500"> — {k.falt.join(', ')}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {plan.ogiltiga.length > 0 && (
+                <div>
+                  <p className="font-medium text-red-700">Hoppas över ({plan.ogiltiga.length})</p>
+                  <ul className="mt-1 space-y-0.5 text-slate-900">
+                    {plan.ogiltiga.map((k, i) => <li key={i}><span className="font-mono">{k.konto}</span> {k.fel}</li>)}
+                  </ul>
+                </div>
+              )}
+              {!antal && !klar && <p className="text-slate-500">Filen ändrar inget.</p>}
+              <p className="text-xs text-slate-400">
+                Namn, beskrivning och listorna importeras. Konton som saknas i filen rörs inte, och gränsvärdena följer inte med.
+              </p>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-3 px-5 py-3 border-t border-slate-200">
+          {fel && <span className="text-sm text-red-600">{fel}</span>}
+          <button onClick={onStang} className="ml-auto text-sm text-slate-600 px-3 py-1.5">{klar ? 'Stäng' : 'Avbryt'}</button>
+          {!klar && (
+            <button onClick={importera} disabled={sparar || !antal} className="bg-blue-600 text-white text-sm font-medium px-3 py-1.5 rounded disabled:opacity-40">
+              {sparar ? 'Importerar…' : `Importera ${antal} ${antal === 1 ? 'konto' : 'konton'}`}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
