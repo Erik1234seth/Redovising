@@ -8,7 +8,9 @@ import CookieConsent from "@/components/CookieConsent";
 import { headers } from "next/headers";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "700", "800"], variable: "--font-plus-jakarta" });
+// Ingen viktlista: den variabla fonten hämtas som en fil. Med fasta vikter svarar Google ibland med
+// /l/font?kit=…&skey=…-adresser som Turbopack i Next 16.1 inte klarar ("queries have exactly one entry").
+const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-plus-jakarta" });
 
 export const metadata: Metadata = {
   title: "Enkla Bokslut - Årsredovisning & Bokslut för Enskild Firma | NE-bilaga",
