@@ -65,6 +65,8 @@ interface Tx {
     momshantering: string;
   } | null;
   verifikation: { konto: string; kontonamn: string; belopp: number }[] | null;
+  /** Faktureringsmetoden: fakturans datum och betalningen som egen verifikation. */
+  faktura?: { datum: string; betalning: { datum: string; rader: { konto: string; kontonamn: string; belopp: number }[] } } | null;
   fel: string | null;
   godkand?: { at: string } | null;
   transaktionId?: string;
@@ -585,7 +587,25 @@ function FilVy({ fil: f, onGodkann }: { fil: Fil; onGodkann: (nr: number, val: b
   );
 }
 
-function TxVy({ t, gammal, onGodkann }: { t: Tx; gammal: Gammal | null; onGodkann: (val: boolean) => Promise<void> }) {
+/** En verifikations rader, debet och kredit. */
+function Rader({ rader }: { rader: { konto: string; kontonamn: string; belopp: number }[] }) {
+  return (
+    <table className="mt-1 tabular-nums">
+      <tbody>
+        {rader.map((r, i) => (
+          <tr key={i}>
+            <td className="pr-3">{r.konto}</td>
+            <td className="pr-3">{r.kontonamn}</td>
+            <td className="pr-3 text-right">{r.belopp > 0 ? kr.format(r.belopp) : ''}</td>
+            <td className="text-right">{r.belopp < 0 ? kr.format(-r.belopp) : ''}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function TxVy({ t, gammal, onGodkann }:{ t: Tx; gammal: Gammal | null; onGodkann: (val: boolean) => Promise<void> }) {
   const [sparar, setSparar] = useState(false);
   const [godkannFel, setGodkannFel] = useState('');
   async function satt(val: boolean) {
@@ -663,18 +683,16 @@ function TxVy({ t, gammal, onGodkann }: { t: Tx; gammal: Gammal | null; onGodkan
         <details className="text-xs text-slate-500">
           <summary className="cursor-pointer select-none">Verifikation och uppgifter</summary>
           {t.verifikation && (
-            <table className="mt-1 tabular-nums">
-              <tbody>
-                {t.verifikation.map((r, i) => (
-                  <tr key={i}>
-                    <td className="pr-3">{r.konto}</td>
-                    <td className="pr-3">{r.kontonamn}</td>
-                    <td className="pr-3 text-right">{r.belopp > 0 ? kr.format(r.belopp) : ''}</td>
-                    <td className="text-right">{r.belopp < 0 ? kr.format(-r.belopp) : ''}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <>
+              {t.faktura && <div className="mt-1 font-medium">Fakturan {t.faktura.datum} (faktureringsmetoden)</div>}
+              <Rader rader={t.verifikation} />
+            </>
+          )}
+          {t.faktura && (
+            <>
+              <div className="mt-1 font-medium">Betalningen {t.faktura.betalning.datum}</div>
+              <Rader rader={t.faktura.betalning.rader} />
+            </>
           )}
           {t.vat_nummer && <div className="mt-1">VAT: {t.vat_nummer}</div>}
           {Object.keys(t.uppgifter ?? {}).length > 0 && <pre className="mt-1 whitespace-pre-wrap break-all">{JSON.stringify(t.uppgifter, null, 1)}</pre>}

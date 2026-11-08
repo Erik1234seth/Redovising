@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { tolkaBetalsatt } from './betalsatt';
-import { TRANSAKTION_KOLUMNER, verifikationsrader, type ValdKontering } from './kontera';
+import { TRANSAKTION_KOLUMNER, planeradeVerifikationer, type ValdKontering } from './kontera';
 import { slutligKontering } from './preliminar';
 import type { Flagga } from './regelverk';
 
@@ -11,6 +11,9 @@ import type { Flagga } from './regelverk';
  * och transaktionen är preliminär igen: grön blir den verifikation om 14
  * dagar, annars väntar den på Granska. Har dublettkollen nu kommit fram till
  * att transaktionen är en dubblett tas verifikationen bort på samma sätt.
+ *
+ * Vid faktureringsmetoden har en faktura två verifikationer, fakturan och
+ * betalningen. De jämförs och tas bort tillsammans.
  *
  * Utom när perioden redan är inlämnad till Skatteverket — momsperioden
  * (månad, kvartal eller år) eller inkomståret. Då ligger verifikationen kvar,
@@ -30,10 +33,10 @@ export interface Ersattning {
   inlamnade: number;
 }
 
-type Rad = Parameters<typeof verifikationsrader>[0] & { vald_kontering: ValdKontering | null; dublett_av: string | null; dublett_orsak: string | null };
+type Rad = Parameters<typeof planeradeVerifikationer>[0] & { vald_kontering: ValdKontering | null; dublett_av: string | null; dublett_orsak: string | null };
 
-const nyckel = (rader: { konto: string; belopp: number }[]) =>
-  rader.filter((r) => Math.abs(r.belopp) >= 0.005).map((r) => `${r.konto}:${Math.round(r.belopp * 100)}`).sort().join('|');
+const nyckel = (datum: string, rader: { konto: string; belopp: number }[]) =>
+  `${datum}#${rader.filter((r) => Math.abs(r.belopp) >= 0.005).map((r) => `${r.konto}:${Math.round(r.belopp * 100)}`).sort().join('|')}`;
 
 /** Periodnycklarna i `inlamningar` som ett datum hör till. */
 function perioder(datum: string): { moms: string[]; ne: string } {
@@ -52,15 +55,16 @@ export async function ersattVerifikationer(supabase: SupabaseClient, userId: str
   if (error) throw new Error(`Kunde inte läsa verifikationerna: ${error.message}`);
   if (!verif?.length) return res;
 
-  const ids = verif.map((v) => v.transaktion_id as string);
+  const ids = [...new Set(verif.map((v) => v.transaktion_id as string))];
   const [{ data: trans, error: tFel }, { data: konteringar, error: kFel }, { data: profil }, { data: inl }] = await Promise.all([
     supabase.from('transaktioner').select(`${TRANSAKTION_KOLUMNER}, vald_kontering, dublett_av, dublett_orsak`).in('id', ids),
     supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, momsdelar, omvand, omdome, flaggor').in('transaktion_id', ids),
-    supabase.from('profiles').select('har_foretagskonto').eq('id', userId).maybeSingle(),
+    supabase.from('profiles').select('har_foretagskonto, redovisningsmetod').eq('id', userId).maybeSingle(),
     supabase.from('inlamningar').select('typ, period').eq('profile_id', userId),
   ]);
   if (tFel ?? kFel) throw new Error(`Kunde inte läsa transaktionerna: ${(tFel ?? kFel)!.message}`);
   const betalsatt = tolkaBetalsatt(profil?.har_foretagskonto ?? null);
+  const metod = (profil?.redovisningsmetod as string | null) ?? null;
   const inlamnad = new Set((inl ?? []).map((r) => `${r.typ}:${r.period}`));
   const arInlamnad = (datum: string | null) => {
     if (!datum) return false;
@@ -68,9 +72,10 @@ export async function ersattVerifikationer(supabase: SupabaseClient, userId: str
     return p.moms.some((m) => inlamnad.has(`moms:${m}`)) || inlamnad.has(`ne:${p.ne}`);
   };
 
-  for (const v of verif) {
-    const t = (trans ?? []).find((x) => x.id === v.transaktion_id) as unknown as Rad | undefined;
+  for (const id of ids) {
+    const t = (trans ?? []).find((x) => x.id === id) as unknown as Rad | undefined;
     if (!t) continue;
+    const bokforda = verif.filter((v) => v.transaktion_id === id);
     const k = (konteringar ?? []).filter((x) => x.transaktion_id === t.id);
     const dublett = !!(t.dublett_av || t.dublett_orsak);
     const slutlig = dublett ? null : slutligKontering(t.vald_kontering, k);
@@ -78,18 +83,20 @@ export async function ersattVerifikationer(supabase: SupabaseClient, userId: str
     let samma = false;
     if (slutlig && betalsatt) {
       try {
-        const nya = verifikationsrader(t, slutlig.konto, slutlig.momssats, betalsatt, slutlig.motkonto ?? undefined, slutlig.momsdelar, slutlig.omvand);
-        const gamla = ((v.verifikation_rader ?? []) as { konto: string; belopp: number; borttagen: boolean }[])
-          .filter((r) => !r.borttagen).map((r) => ({ konto: r.konto, belopp: Number(r.belopp) }));
-        samma = nyckel(nya) === nyckel(gamla);
+        const nya = planeradeVerifikationer(t, slutlig.konto, slutlig.momssats, betalsatt, metod, slutlig.motkonto ?? undefined, slutlig.momsdelar, slutlig.omvand)
+          .map((v) => nyckel(v.datum, v.rader)).sort();
+        const gamla = bokforda.map((v) => nyckel(String(v.datum),
+          ((v.verifikation_rader ?? []) as { konto: string; belopp: number; borttagen: boolean }[])
+            .filter((r) => !r.borttagen).map((r) => ({ konto: r.konto, belopp: Number(r.belopp) })))).sort();
+        samma = nya.join('\n') === gamla.join('\n');
       } catch {
         samma = false;
       }
     }
-    if (samma) { res.oforandrade++; continue; }
+    if (samma) { res.oforandrade += bokforda.length; continue; }
 
-    if (arInlamnad(v.datum)) {
-      res.inlamnade++;
+    if (bokforda.some((v) => arInlamnad(v.datum))) {
+      res.inlamnade += bokforda.length;
       const text = dublett
         ? 'Är nu markerad som dubblett, men verifikationen ligger kvar eftersom perioden är inlämnad — rätta för hand.'
         : 'Den nya konteringen avviker från den bokförda verifikationen, men perioden är inlämnad och verifikationen ligger kvar — rätta för hand.';
@@ -101,11 +108,11 @@ export async function ersattVerifikationer(supabase: SupabaseClient, userId: str
       continue;
     }
 
-    const { error: dFel } = await supabase.from('verifikationer').delete().eq('id', v.id);
+    const { error: dFel } = await supabase.from('verifikationer').delete().in('id', bokforda.map((v) => v.id));
     if (dFel) throw new Error(`Kunde inte ta bort verifikationen: ${dFel.message}`);
     // Preliminär igen från nu — konteringen satte redan tiden, men en dubblett konteras inte
     await supabase.from('transaktioner').update({ preliminar_at: dublett ? null : new Date().toISOString() }).eq('id', t.id);
-    res.ersatta++;
+    res.ersatta += bokforda.length;
   }
   return res;
 }

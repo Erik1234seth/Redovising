@@ -90,6 +90,7 @@ export async function bokforForfallna(
 
   const res = { bokforda: 0, fel: [] as string[] };
   const betalsatt = new Map<string, Betalsatt | null>();
+  const metod = new Map<string, string | null>();
   for (let i = 0; i < rader.length; i += 200) {
     const del = rader.slice(i, i + 200);
     const ids = del.map((t) => t.id);
@@ -105,14 +106,15 @@ export async function bokforForfallna(
       const slutlig = slutligKontering(t.vald_kontering, (k.data ?? []).filter((x) => x.transaktion_id === t.id));
       if (!slutlig) continue;
       if (!betalsatt.has(t.user_id)) {
-        const { data: p } = await supabase.from('profiles').select('har_foretagskonto').eq('id', t.user_id).maybeSingle();
+        const { data: p } = await supabase.from('profiles').select('har_foretagskonto, redovisningsmetod').eq('id', t.user_id).maybeSingle();
         betalsatt.set(t.user_id, tolkaBetalsatt(p?.har_foretagskonto ?? null));
+        metod.set(t.user_id, p?.redovisningsmetod ?? null);
       }
       const bs = betalsatt.get(t.user_id);
       const namn = [t.motpart, t.beskrivning].filter(Boolean).join(', ') || t.id;
       if (!bs) { res.fel.push(`${namn}: kunden saknar betalsätt (Kundkontext)`); continue; }
       try {
-        await bokfor(supabase, t, slutlig.konto, slutlig.momssats, bs, slutlig.signatur, slutlig.motkonto ?? undefined, slutlig.momsdelar, slutlig.omvand);
+        await bokfor(supabase, t, slutlig.konto, slutlig.momssats, bs, slutlig.signatur, slutlig.motkonto ?? undefined, slutlig.momsdelar, slutlig.omvand, metod.get(t.user_id));
         res.bokforda++;
       } catch (err) {
         res.fel.push(`${namn}: ${err instanceof Error ? err.message : String(err)}`);

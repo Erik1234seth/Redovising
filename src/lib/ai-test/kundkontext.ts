@@ -6,7 +6,7 @@
 
 export const KUND_KOLUMNER =
   'id, full_name, email, company_name, org_nr, momsnr, verksamhet, ort, ' +
-  'moms_period, bokforing_metod, saljer_till, saljer_i, koper_i, har_foretagskonto, start_ar, ' +
+  'moms_period, redovisningsmetod, saljer_till, saljer_i, koper_i, har_foretagskonto, start_ar, ' +
   'forsta_deklarationsar';
 
 export interface Kund {
@@ -19,7 +19,8 @@ export interface Kund {
   verksamhet: string | null;
   ort: string | null;
   moms_period: string | null;
-  bokforing_metod: string | null;
+  /** Kontantmetoden eller faktureringsmetoden — byrån väljer den på kundkortet. */
+  redovisningsmetod: string | null;
   saljer_till: string | null;
   saljer_i: string | null;
   koper_i: string | null;
@@ -75,7 +76,11 @@ export function byggKundkontext(k: Kund | null): string {
   if (k.momsnr) rader.push(`- Momsreg.nr: ${k.momsnr}`);
   if (k.ort) rader.push(`- Ort: ${k.ort}`);
   if (k.moms_period) rader.push(`- Momsperiod: ${MOMS_PERIOD[k.moms_period] ?? k.moms_period}`);
-  if (k.bokforing_metod) rader.push(`- Bokföringsmetod: ${k.bokforing_metod}`);
+  rader.push(k.redovisningsmetod === 'faktureringsmetoden'
+    ? '- Redovisningsmetod: faktureringsmetoden'
+    : k.redovisningsmetod === 'kontantmetoden'
+      ? '- Redovisningsmetod: kontantmetoden'
+      : '- Redovisningsmetod: inte vald — utgå från kontantmetoden');
   if (k.saljer_till) rader.push(`- Säljer till: ${SALJER_TILL[k.saljer_till] ?? k.saljer_till}`);
   if (k.saljer_i) rader.push(`- Säljer i: ${OMRADE[k.saljer_i] ?? k.saljer_i}`);
   if (k.koper_i) rader.push(`- Köper i: ${OMRADE[k.koper_i] ?? k.koper_i}`);

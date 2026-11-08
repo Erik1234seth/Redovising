@@ -26,7 +26,7 @@ import { slaUppKonto } from './regelverk';
  */
 
 /** Betal- och momskonton. De säger inget om vad affären är, så de visas inte för en bokförd rad. */
-const BETAL_OCH_MOMS = new Set(['1930', '2013', '2017', '2641', '2611', '2614', '2615', '2621', '2631', '2645', '2647']);
+const BETAL_OCH_MOMS = new Set(['1930', '2013', '2017', '2440', '1500', '2641', '2611', '2614', '2615', '2621', '2631', '2645', '2647']);
 
 // Sonnet räcker: kundbilden byggs sällan och kräver inget djupt resonemang (provkört 2026-10-29)
 const MODELL = 'claude-sonnet-5-5' as const;
@@ -278,7 +278,7 @@ const SCHEMA = {
   properties: { kundbild: { type: 'string' } },
 };
 
-const FAST = `Du hjälper en svensk bokföringsbyrå att förstå en kund — en enskild näringsidkare med förenklat årsbokslut (K1) och kontantmetoden — innan kundens transaktioner konteras.
+const FAST = `Du hjälper en svensk bokföringsbyrå att förstå en kund — en enskild näringsidkare med förenklat årsbokslut (K1), som bokför enligt kontantmetoden eller faktureringsmetoden (se kundprofilen) — innan kundens transaktioner konteras.
 
 Du får kundprofilen, kundens mejl till byrån och en lista med kundens transaktioner (K1, K2 …). Skriv en kundbild på svenska som en kollega kan läsa på två minuter innan hen konterar en enskild transaktion. Den ska hjälpa till att förstå vad en transaktion är — inte välja konto.
 

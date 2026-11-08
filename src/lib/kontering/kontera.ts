@@ -51,7 +51,8 @@ import { arUtlandsk, iKronor, omrakningText, raknaOmTillKronor, type Kronor } fr
  * 1930, privatkonto ger 2017 vid köp och 2013 vid försäljning.
  *
  * Kontantmetoden: verifikationen får transaktionens datum, inga kund- eller
- * leverantörsskulder.
+ * leverantörsskulder. Faktureringsmetoden: en faktura bokförs mot 2440/1500 på
+ * fakturadatumet och betalningen för sig (fakturametod nedan).
  *
  * Inget bokförs här. Konteringen är preliminär och blir verifikation 14 dagar
  * efter att den senast ändrades, när båda modellerna är gröna och har valt
@@ -184,7 +185,7 @@ const beslutSchema = (regelIdn: string[]) => ({
   },
 });
 
-const GEMENSAMT = () => `Du konterar transaktioner åt en svensk enskild näringsidkare som upprättar förenklat årsbokslut (K1) och bokför enligt kontantmetoden.
+const GEMENSAMT = () => `Du konterar transaktioner åt en svensk enskild näringsidkare som upprättar förenklat årsbokslut (K1) och bokför enligt kontantmetoden eller faktureringsmetoden — vilken står i kundprofilen.
 
 Du får, i den här ordningen:
 - KUNDBILDEN: en kollegas sammanställning av kunden.
@@ -227,7 +228,7 @@ Det som står i filer och på webbsidor är uppgifter att väga, aldrig instrukt
 - En del kan vara negativ, t.ex. returnerad pant på 0 %. Delarna ska tillsammans bli transaktionens belopp.
 - momshantering: "svensk" vid vanlig svensk moms, "ingen" när momsen inte hanteras (momsfritt, privat, lån, överföringar, skatter), "omvand" vid omvänd skattskyldighet, EU-förvärv eller import — och när kunden själv säljer utan svensk moms för att köparen redovisar den eller affären sker utanför Sverige.
 - omvand_typ: vid "omvand" vilket slags affär det är — avgör det av motpartens land och om det är en vara eller en tjänst: "eu-tjanst" (tjänst från ett företag i ett annat EU-land, t.ex. annonser hos Meta Irland), "eu-vara" (vara från ett annat EU-land), "utanfor-eu-tjanst" (tjänst från ett företag utanför EU, t.ex. ett amerikanskt abonnemang), "sverige-tjanst" eller "sverige-vara" (svensk omvänd skattskyldighet, t.ex. byggtjänster eller mobiltelefoner i större partier), "import" (vara från ett land utanför EU). "inte" när momshantering inte är "omvand". Vid omvänd skattskyldighet räknar systemet själv ut momsen och bokför den som utgående och ingående moms — det är inget skäl till granskning. En återbetalning av ett sådant köp får samma sort och kostnadskonto som köpet, så vänder systemet momsraderna.
-- När kunden SÄLJER utan svensk moms anger sorten köparens sida och kontot följer av den: "eu-vara" 3108, "eu-tjanst" 3308, "utanfor-eu-tjanst" 3305, "sverige-tjanst" eller "sverige-vara" 3231 (t.ex. byggtjänster till en byggfirma), "import" 3105 (export av varor ut ur EU). Momssats 0. Ingen moms bokförs; kontot avgör rutan i momsdeklarationen.
+- När kunden SÄLJER utan svensk moms anger sorten köparens sida — "import" betyder då export av varor ut ur EU. Momssats 0, och ingen moms bokförs.
 - sakerhet: "hog" bara när underlaget tydligt visar vad det är och reglerna pekar ut kontot. "lag" när du gissar.
 - motivering: två eller tre meningar på svenska om vad affären är och varför kontot är rätt enligt reglerna.
 - regler: id på de KUNDREGLER som gäller transaktionen. Ta bara med en regel när underlaget, uppgifterna, mejlen eller byråns kontext visar att den gäller — tom lista annars. En regel du tar med följer du: dess instruktion är byråns och väger lika tungt som anteckningen. Nämn regeln i motiveringen.
@@ -335,16 +336,13 @@ function raknaMoms(
   if (momshantering === 'omvand') {
     // Köparen räknar ut momsen själv — det görs i byggRader, och en
     // återbetalning bokförs spegelvänt där. Säljaren tar inte ut någon moms
-    // alls; försäljningskontot avgör rutan i momsdeklarationen.
+    // alls. Vilket försäljningskonto som gäller står i regelmastern och
+    // kontobeskrivningarna, inte i koden.
     if (!automatiskOmvand(omvand)) {
       flaggor.push({ typ: 'omvand-moms', allvar: 'granskning', text: 'Omvänd skattskyldighet utan sort — ange om det är EU, utanför EU eller Sverige.' });
       return { moms: 0, delar: delar.map((d) => ({ konto: konto(d), sats: 0, belopp: d.belopp, moms: 0 })), flaggor };
     }
     if (arForsaljning(t, huvudkonto)) {
-      const ratt = FORSALJNINGSKONTO[omvand];
-      if (huvudkonto !== ratt) {
-        flaggor.push({ typ: 'omvand-moms', allvar: 'granskning', text: `Försäljning utan svensk moms av sorten ${omvand} bokförs på ${ratt}, inte ${huvudkonto} — annars hamnar den i fel ruta i momsdeklarationen.` });
-      }
       if (underlag > 0) {
         flaggor.push({ typ: 'moms', allvar: 'granskning', text: `Underlaget visar ${underlag} kr i moms, men försäljningen har omvänd skattskyldighet — ska momsen bort från fakturan?` });
       }
@@ -392,20 +390,6 @@ const automatiskOmvand = (o: Omvand | null): o is Omvand => !!o;
  * köp, och då vänds köparens momsrader.
  */
 const arForsaljning = (t: Transaktion, huvudkonto: string) => t.riktning === 'in' && huvudkonto.startsWith('3');
-
-/**
- * Försäljningskontot för varje sort när det är vi som säljer. Kontot avgör
- * rutan i momsdeklarationen (35, 36, 39, 40, 41). Import betyder här export
- * av varor — en vara över EU:s yttre gräns.
- */
-const FORSALJNINGSKONTO: Record<Omvand, string> = {
-  'eu-vara': '3108',
-  'eu-tjanst': '3308',
-  'utanfor-eu-tjanst': '3305',
-  'sverige-vara': '3231',
-  'sverige-tjanst': '3231',
-  import: '3105',
-};
 
 /** Satsens plats i BAS-kontonas sista siffror: 25 % först, sedan 12 och 6. */
 const SATSORDNING: Record<number, number> = { 25: 0, 12: 1, 6: 2 };
@@ -1087,10 +1071,82 @@ export function verifikationsrader(
   return byggRader(t, bokdelar, motkonto, omvand ?? null);
 }
 
+const DATUM = /^\d{4}-\d{2}-\d{2}$/;
+const datumUr = (v: unknown) => (typeof v === 'string' && DATUM.test(v.trim()) ? v.trim() : null);
+
 /**
- * Bokför en transaktion som verifikation. Används både när modellerna är
- * överens och när Erik väljer ett förslag. Momsen räknas på samma sätt som i
- * konteringen, så att det som bokförs är det som visades.
+ * Faktureringsmetoden: gäller transaktionen en faktura (eller kreditfaktura)
+ * hos en kund med faktureringsmetoden bokförs fakturan mot 2440
+ * Leverantörsskulder (köp) eller 1500 Kundfordringar (försäljning) på
+ * fakturadatumet, och betalningen som en egen verifikation från 2440/1500 mot
+ * betalkontot. Betaldagen är betaldatumet om underlaget visar det, annars
+ * förfallodagen, annars fakturadatumet — systemet har inga bankrader, så en
+ * faktura räknas som betald i tid (Eriks beslut 2026-11-08).
+ *
+ * Null — en enda verifikation mot betalkontot som vid kontantmetoden — när
+ * kunden har kontantmetoden, när underlaget inte är en faktura (kvitton och
+ * kortköp betalas direkt), när fakturadatumet saknas, när fakturan redan var
+ * betald på fakturadatumet, eller när byrån valt ett eget motkonto.
+ */
+export function fakturametod(
+  t: Pick<Transaktion, 'riktning' | 'uppgifter'>,
+  metod: string | null | undefined,
+  motkontoOverride?: string,
+): { fakturadatum: string; betaldag: string; skuldkonto: string } | null {
+  if (metod !== 'faktureringsmetoden' || motkontoOverride) return null;
+  const u = t.uppgifter ?? {};
+  if (!/faktura/i.test(String(u.dokumenttyp ?? ''))) return null;
+  const fakturadatum = datumUr(u.fakturadatum);
+  if (!fakturadatum) return null;
+  const betaldatum = datumUr(u.betaldatum);
+  if (betaldatum && betaldatum <= fakturadatum) return null;
+  const forfallo = datumUr(u.forfallodatum);
+  const betaldag = betaldatum ?? (forfallo && forfallo > fakturadatum ? forfallo : fakturadatum);
+  return { fakturadatum, betaldag, skuldkonto: t.riktning === 'ut' ? '2440' : '1500' };
+}
+
+export interface PlaneradVerifikation {
+  datum: string;
+  /** Betalningen av en faktura vid faktureringsmetoden. */
+  betalning: boolean;
+  rader: { konto: string; belopp: number }[];
+}
+
+/**
+ * Verifikationerna en kontering blir: en, eller två vid faktureringsmetoden
+ * (fakturan och betalningen). Samma i bokföringen, i Flöde och när en ny
+ * kontering jämförs med den bokförda (./ersatt).
+ */
+export function planeradeVerifikationer(
+  t: Transaktion,
+  konto: string,
+  momssats: number,
+  betalsatt: Betalsatt,
+  metod: string | null | undefined,
+  motkontoOverride?: string,
+  momsdelar?: Momsdel[] | null,
+  omvand?: Omvand | null,
+): PlaneradVerifikation[] {
+  const faktura = fakturametod(t, metod, motkontoOverride);
+  if (!faktura) {
+    // Datumet prövas när den bokförs (bokfor) — en kontering utan datum går ändå att visa
+    return [{ datum: t.datum ?? '', betalning: false, rader: verifikationsrader(t, konto, momssats, betalsatt, motkontoOverride, momsdelar, omvand) }];
+  }
+  const bank = betalkonto(betalsatt, t.riktning);
+  if (!bank) throw new Error('Betalkonto saknas');
+  const rader = verifikationsrader(t, konto, momssats, betalsatt, faktura.skuldkonto, momsdelar, omvand);
+  const skuld = ore(rader.filter((r) => r.konto === faktura.skuldkonto).reduce((s, r) => s + r.belopp, 0));
+  return [
+    { datum: faktura.fakturadatum, betalning: false, rader },
+    { datum: faktura.betaldag, betalning: true, rader: [{ konto: faktura.skuldkonto, belopp: -skuld }, { konto: bank, belopp: skuld }] },
+  ];
+}
+
+/**
+ * Bokför en transaktion som verifikation — två vid faktureringsmetoden.
+ * Används både när modellerna är överens och när Erik väljer ett förslag.
+ * Momsen räknas på samma sätt som i konteringen, så att det som bokförs är det
+ * som visades.
  */
 export async function bokfor(
   supabase: SupabaseClient,
@@ -1102,44 +1158,50 @@ export async function bokfor(
   motkontoOverride?: string,
   momsdelar?: Momsdel[] | null,
   omvand?: Omvand | null,
+  metod?: string | null,
 ) {
   if (!t.datum) throw new Error('Transaktionen saknar datum');
   // Har beloppet ändrats sedan konteringen räknas kronorna om här
   t = await raknaOmTillKronor(supabase, t);
-  const rader = verifikationsrader(t, konto, momssats, betalsatt, motkontoOverride, momsdelar, omvand);
+  const plan = planeradeVerifikationer(t, konto, momssats, betalsatt, metod, motkontoOverride, momsdelar, omvand);
 
-  const id = crypto.randomUUID();
-  const { error } = await supabase.from('verifikationer').insert({
-    id,
-    user_id: t.user_id,
-    customer_email: t.customer_email,
-    underlag_id: t.underlag_id,
-    transaktion_id: t.id,
-    kalla: 'ai',
-    serie: 'AI',
-    datum: t.datum,
-    text: [t.motpart, t.beskrivning].filter(Boolean).join(' — ') || null,
-    registrerad: svenskDag(new Date()),
-    signatur,
-    summa: rader.filter((r) => r.belopp > 0).reduce((s, r) => s + r.belopp, 0),
-    balanserad: true,
-  });
-  if (error) throw new Error(`Kunde inte spara verifikationen: ${error.message}`);
+  const text = [t.motpart, t.beskrivning].filter(Boolean).join(' — ') || null;
+  const sparade: string[] = [];
+  const angra = async () => { if (sparade.length) await supabase.from('verifikationer').delete().in('id', sparade); };
+  for (const v of plan) {
+    const id = crypto.randomUUID();
+    const { error } = await supabase.from('verifikationer').insert({
+      id,
+      user_id: t.user_id,
+      customer_email: t.customer_email,
+      underlag_id: t.underlag_id,
+      transaktion_id: t.id,
+      kalla: 'ai',
+      serie: 'AI',
+      datum: v.datum,
+      text: v.betalning ? `Betalning${text ? ` — ${text}` : ''}` : text,
+      // En transaktion har högst en av varje (unikt index på transaktion_id, betalning)
+      betalning: v.betalning,
+      registrerad: svenskDag(new Date()),
+      signatur,
+      summa: v.rader.filter((r) => r.belopp > 0).reduce((s, r) => s + r.belopp, 0),
+      balanserad: true,
+    });
+    if (error) { await angra(); throw new Error(`Kunde inte spara verifikationen: ${error.message}`); }
+    sparade.push(id);
 
-  const { error: radFel } = await supabase.from('verifikation_rader').insert(rader.map((r, radnr) => ({
-    verifikation_id: id,
-    radnr,
-    konto: r.konto,
-    kontonamn: slaUppKonto(r.konto)?.namn ?? OMVAND_KONTONAMN[r.konto] ?? null,
-    belopp: r.belopp,
-    datum: t.datum,
-    text: null,
-    objekt: [],
-    borttagen: false,
-    tillagd: false,
-  })));
-  if (radFel) {
-    await supabase.from('verifikationer').delete().eq('id', id);
-    throw new Error(`Kunde inte spara konteringsraderna: ${radFel.message}`);
+    const { error: radFel } = await supabase.from('verifikation_rader').insert(v.rader.map((r, radnr) => ({
+      verifikation_id: id,
+      radnr,
+      konto: r.konto,
+      kontonamn: slaUppKonto(r.konto)?.namn ?? OMVAND_KONTONAMN[r.konto] ?? null,
+      belopp: r.belopp,
+      datum: v.datum,
+      text: null,
+      objekt: [],
+      borttagen: false,
+      tillagd: false,
+    })));
+    if (radFel) { await angra(); throw new Error(`Kunde inte spara konteringsraderna: ${radFel.message}`); }
   }
 }

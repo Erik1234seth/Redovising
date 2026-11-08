@@ -35,7 +35,7 @@ async function buildSenderContext(
     const [{ data: p }, { data: txs }, { count }, kundpris] = await Promise.all([
       supabase
         .from('profiles')
-        .select('full_name, email, company_name, org_nr, momsnr, verksamhet, ort, moms_period, start_ar, bokforing_metod, forsta_deklarationsar')
+        .select('full_name, email, company_name, org_nr, momsnr, verksamhet, ort, moms_period, start_ar, forsta_deklarationsar')
         .eq('id', userId)
         .single(),
       supabase
@@ -60,7 +60,6 @@ async function buildSenderContext(
     if (p?.verksamhet) lines.push(`- Verksamhet: ${p.verksamhet}`);
     if (p?.ort) lines.push(`- Ort: ${p.ort}`);
     if (p?.moms_period) lines.push(`- Momsperiod: ${MOMS_PERIOD_TEXT[p.moms_period] ?? p.moms_period}`);
-    if (p?.bokforing_metod) lines.push(`- Bokföringsmetod: ${p.bokforing_metod}`);
     if (p?.start_ar) lines.push(`- Startår: ${p.start_ar}`);
     if (p?.forsta_deklarationsar === true) lines.push('- Första deklarationsåret för firman — ingen tidigare bokföring');
     if (p?.forsta_deklarationsar === false) lines.push('- Kunden har deklarerat för firman tidigare år');

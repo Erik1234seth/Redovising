@@ -33,7 +33,7 @@ function helK1(): string {
  * Instruktionen med hela K1. Byggs vid varje anrop, eftersom byrån kan ha
  * ändrat en kontobeskrivning (se ../k1-andringar) — ladda ändringarna först.
  */
-export const instruktion = () => `Du är redovisningskonsult på en svensk bokföringsbyrå. Kunden är en enskild näringsidkare som upprättar förenklat årsbokslut (K1) och bokför enligt kontantmetoden.
+export const instruktion = () => `Du är redovisningskonsult på en svensk bokföringsbyrå. Kunden är en enskild näringsidkare som upprättar förenklat årsbokslut (K1). Kunden bokför enligt kontantmetoden eller faktureringsmetoden — vilken står under Redovisningsmetod i kundprofilen.
 
 Du får alla underlag kunden skickat in sedan förra gången och går igenom dem i ett svar. För varje fil:
 1. Avgör vad filen är (sort).
@@ -92,15 +92,7 @@ En affär får bara bokföras en gång. Jämför varje transaktion med KUNDENS T
 
 SAKNAS
 Av det vi har ska det gå att avgöra datum, belopp, moms (beloppet, satsen eller att ingen svensk moms ska redovisas) och vad affären gäller. Ett belopp i utländsk valuta räcker — fråga aldrig efter kronor eller kurs.
-Extra när transaktionen pekar på det — exempel, inte en fullständig lista; tänk som en redovisare:
-- Försäljning till ett företag i ett annat EU-land utan svensk moms: köparens VAT-nummer. Står det på underlaget och fakturan saknar moms, utgå från omvänd skattskyldighet och skriv antagandet.
-- Köp av tjänster från ett företag i ett annat land: att säljaren finns utomlands — land eller VAT-nummer.
-- Byggtjänster åt eller från en byggfirma: att fakturan anger omvänd skattskyldighet och båda parters momsregistreringsnummer.
-- ROT- eller RUT-arbete: köparens personnummer, fastighetsbeteckning eller bostadsrättsförening, och arbetskostnaden för sig.
-- Representation (måltid, fika, evenemang med kunder eller andra): syftet och vilka som deltog.
-- Inköp av något som kan vara en inventarie för mer än ett halvt prisbasbelopp: vad det är.
-- Drivmedel, bilreparationer, fordonshyra: om bilen i verksamheten är firmans eller privat — står det i kundprofilen, mejlen eller byråns kontext frågar du inte. Annars skriver du "vad" exakt så: "om bilen i verksamheten är firmans eller privat".
-- Ett köp som kan vara privat: utgå från att det som rimligen hör till verksamheten gör det, och skriv det som antagande. Fråga bara när något faktiskt tyder på att det är privat.
+Vad mer som behövs i särskilda fall — VAT-nummer, ROT och RUT, representation och liknande — står i byråns regelmaster nedan. När en regel säger att något ska frågas eller begäras från kunden och det inte framgår, skriver du det i "saknas". Reglerna är inte en fullständig lista; tänk som en redovisare.
 Det kunden redan svarat på i mejlen saknas inte. Ett underlag behöver inte uppfylla alla formella krav — visar det vad som köpts, beloppet och momsen räcker det. Gör hellre ett rimligt antagande än att fråga om sådant som inte spelar någon roll: fråga bara när ett fel antagande ger fel moms, fel avdrag eller fel skatt.
 - "saknas": en rad per sak, "vad" kort och så att kunden förstår ("momsbeloppet", "vilka som deltog och syftet"), "varfor" en mening till byrån. Tom lista när det räcker.
 - "antaganden": det du antagit, tom sträng när inget.
@@ -109,13 +101,13 @@ KONTERING
 Se efter hur kundens liknande köp redan konterats — samma leverantör, samma slags varor — och följ samma linje när reglerna tillåter det. Det är ledtrådar: stämmer en tidigare kontering inte med K1-reglerna gäller reglerna, och då säger du det i motiveringen. Står det en instruktion från byrån i byråns kontext följer du den — den väger tyngst av allt.
 - Välj bara konton ur K1-kontoplanen nedan. Inga andra konton, inte heller BAS-underkonton som 3001 eller 5410. Välj aldrig betalkontot — bank- eller privatsidan bokförs av systemet.
 - Använd kundens verksamhet för att avgöra vad ett köp är till för. Har kunden i ett mejl förklarat vad ett köp avser väger det tyngre än en gissning.
-- Momsen på ett utländskt underlag är oftast utländsk moms och ger aldrig avdrag för svensk ingående moms.
 - delar: en rad per konto och momssats, med beloppet inklusive moms. Hör allt till samma konto och har samma momssats blir det en enda rad med hela beloppet. Hör delar av transaktionen till olika konton, dela upp den — även när en del är liten. Har underlaget flera momssatser blir det en rad per sats, även med samma konto. Ta beloppen ur underlagets rader och momsspecifikation.
 - momssats: svensk moms som ingår i delens belopp (25, 12, 6 eller 0). 0 när ingen avdragsgill eller utgående moms finns. Vid omvänd skattskyldighet är det den svenska sats som hade gällt om köpet gjorts i Sverige — oftast 25 — fast ingen moms ingår i beloppet.
 - moms: delens moms enligt underlaget, null när underlaget inte visar någon moms. En del kan vara negativ, t.ex. returnerad pant. Delarna ska tillsammans bli transaktionens belopp.
 - momshantering: "svensk" vid vanlig svensk moms, "ingen" när momsen inte hanteras (momsfritt, privat, lån, överföringar, skatter), "omvand" vid omvänd skattskyldighet, EU-förvärv eller import — och när kunden själv säljer utan svensk moms för att köparen redovisar den eller affären sker utanför Sverige.
-- omvand_typ: vid "omvand" vilket slags affär — "eu-tjanst" (tjänst från ett företag i ett annat EU-land, t.ex. annonser hos Meta Irland), "eu-vara", "utanfor-eu-tjanst" (t.ex. ett amerikanskt abonnemang), "sverige-tjanst" eller "sverige-vara" (svensk omvänd skattskyldighet, t.ex. byggtjänster), "import" (vara från ett land utanför EU). "inte" annars. Systemet räknar själv ut och bokför momsen — det är inget skäl till granskning. När kunden SÄLJER utan svensk moms följer kontot av sorten: "eu-vara" 3108, "eu-tjanst" 3308, "utanfor-eu-tjanst" 3305, "sverige-tjanst" eller "sverige-vara" 3231, "import" 3105 (export). Momssats 0.
-- sakerhet: "hog" när underlaget tydligt visar vad det är och reglerna pekar ut kontot. "medel" när kontot är rimligt men något är oklart. "lag" när du gissar.
+- omvand_typ: vid "omvand" vilket slags affär — "eu-tjanst" (tjänst från ett företag i ett annat EU-land, t.ex. annonser hos Meta Irland), "eu-vara", "utanfor-eu-tjanst" (t.ex. ett amerikanskt abonnemang), "sverige-tjanst" eller "sverige-vara" (svensk omvänd skattskyldighet, t.ex. byggtjänster), "import" (vara från ett land utanför EU). "inte" annars. Systemet räknar själv ut och bokför momsen — det är inget skäl till granskning. När kunden SÄLJER utan svensk moms anger sorten köparens sida — "import" betyder då export av varor ut ur EU — och momssatsen är 0.
+- sakerhet: "hog" när underlaget visar vad affären är och reglerna pekar ut konto och moms. Att ett annat konto i teorin också vore möjligt, eller att en regel har undantag som inget tyder på, sänker inte säkerheten. "medel" när du valt konto och moms men en konkret uppgift som kan ändra kontot eller momsen saknas eller är oklar. "lag" när underlaget inte räcker för att välja konto eller moms och du gissar.
+- osaker_pa: vid "medel" eller "lag" en mening till byrån om exakt vad du är osäker på och vad som skulle avgöra det, t.ex. "Om skrivbordet är en inventarie eller förbrukning — priset per styck syns inte." Tom sträng vid "hog".
 - motivering: två eller tre meningar på svenska om vad affären är och varför kontot är rätt enligt reglerna.
 - regler: id på de KUNDREGLER som gäller transaktionen, bara när underlaget, mejlen eller byråns kontext visar det. En regel du tar med följer du.
 - brutna_regler: punkter ur reglerna för de konton du valt som inte stämmer, citerade ur texten. Tom lista när allt stämmer.
@@ -202,7 +194,7 @@ export function schema(regelIdn: string[]) {
       kontering: {
         type: 'object',
         additionalProperties: false,
-        required: ['delar', 'momshantering', 'omvand_typ', 'sakerhet', 'motivering', 'regler', 'brutna_regler', 'granskning_kravs'],
+        required: ['delar', 'momshantering', 'omvand_typ', 'sakerhet', 'osaker_pa', 'motivering', 'regler', 'brutna_regler', 'granskning_kravs'],
         properties: {
           delar: {
             type: 'array',
@@ -221,6 +213,7 @@ export function schema(regelIdn: string[]) {
           momshantering: { type: 'string', enum: ['svensk', 'ingen', 'omvand'] },
           omvand_typ: { type: 'string', enum: ['inte', 'eu-tjanst', 'eu-vara', 'utanfor-eu-tjanst', 'sverige-tjanst', 'sverige-vara', 'import'] },
           sakerhet: { type: 'string', enum: ['hog', 'medel', 'lag'] },
+          osaker_pa: text,
           motivering: text,
           regler: { type: 'array', items: { type: 'string', enum: regelIdn } },
           brutna_regler: { type: 'array', items: text },
@@ -275,6 +268,8 @@ export interface SvarTransaktion {
     momshantering: 'svensk' | 'ingen' | 'omvand';
     omvand_typ: string;
     sakerhet: 'hog' | 'medel' | 'lag';
+    /** Vad modellen är osäker på. Saknas i svar från före 2026-11-08. */
+    osaker_pa?: string;
     motivering: string;
     regler: string[];
     brutna_regler: string[];

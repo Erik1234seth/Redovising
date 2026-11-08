@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { konteringUrBeslut, verifikationsrader, OMVAND_KONTONAMN, type Beslut, type Kontering, type Transaktion } from '../kontera';
+import { konteringUrBeslut, planeradeVerifikationer, OMVAND_KONTONAMN, type Beslut, type Kontering, type Transaktion } from '../kontera';
 import { laddaK1Andringar as laddK1Andringar } from '../k1-andringar';
 import { iKronor, raknaOmTillKronor, type Kronor } from '../kronor';
 import { slaUppKonto, type Flagga } from '../regelverk';
@@ -47,6 +47,11 @@ export interface ResultatTransaktion {
     momshantering: string;
   }) | null;
   verifikation: { konto: string; kontonamn: string; belopp: number }[] | null;
+  /**
+   * Faktureringsmetoden: fakturan bokförs mot 2440/1500 på fakturadatumet
+   * (verifikation ovan) och betalningen för sig på betaldagen.
+   */
+  faktura?: { datum: string; betalning: { datum: string; rader: { konto: string; kontonamn: string; belopp: number }[] } } | null;
   fel: string | null;
   /** Byrån har godkänt en gul kontering som den är. */
   godkand?: { at: string } | null;
@@ -107,7 +112,7 @@ function valutakod(v: string | null | undefined): string {
 }
 
 /** Betal- och momskonton säger inget om vad affären är. */
-const BETAL_OCH_MOMS = /^(1930|2013|2017|26\d\d)$/;
+const BETAL_OCH_MOMS = /^(1930|2013|2017|2440|1500|26\d\d)$/;
 
 /** Det som redan finns för underlagen: transaktionerna, förslagen, valet och bokföringen. */
 export async function gamlaKonteringar(supabase: SupabaseClient, underlagIds: string[]): Promise<Map<string, GammalTransaktion[]>> {
@@ -219,18 +224,25 @@ async function provaTransaktion(
     const k = konteringUrBeslut(iKr, kontext.betalsatt, beslut, kontext.regelIdn);
 
     // Det som också hindrar grönt i omgången
-    const flaggor: Flagga[] = [...k.flaggor];
-    if (s.kontering.sakerhet === 'medel') flaggor.push({ typ: 'osaker', allvar: 'granskning', text: 'Modellens säkerhet: medel.' });
+    // Vad modellen är osäker på står i flaggan, så att det syns i Flöde och följer med till mejlet om osäkra
+    const osakerPa = s.kontering.osaker_pa?.trim() ?? '';
+    const flaggor: Flagga[] = k.flaggor.map((f) => (f.typ === 'osaker' && osakerPa ? { ...f, text: `${f.text} ${osakerPa}` } : f));
+    if (s.kontering.sakerhet === 'medel') flaggor.push({ typ: 'osaker', allvar: 'granskning', text: `Modellens säkerhet: medel.${osakerPa ? ` ${osakerPa}` : ''}` });
     if (bas.saknas.length) flaggor.push({ typ: 'saknas', allvar: 'granskning', text: `Saknas: ${bas.saknas.map((x) => x.vad).join(', ')}` });
     if (s.dublett.status === 'dublett') flaggor.push({ typ: 'dublett', allvar: 'stopp', text: 'Dubblett — bokförs inte.' });
     if (ref && !ref.ok) flaggor.push({ typ: 'dublett', allvar: 'granskning', text: 'Dubbletten pekar på en rad som inte finns.' });
 
     let verifikation: ResultatTransaktion['verifikation'] = null;
+    let faktura: ResultatTransaktion['faktura'] = null;
     let fel: string | null = null;
     if (k.konto) {
       try {
-        const rader = verifikationsrader(t, k.konto, k.momssats ?? 0, kontext.betalsatt, undefined, k.momsdelar, k.omvand);
-        verifikation = rader.map((r) => ({ konto: r.konto, kontonamn: kontonamn(r.konto), belopp: ore(r.belopp) }));
+        const plan = planeradeVerifikationer(t, k.konto, k.momssats ?? 0, kontext.betalsatt,
+          kontext.redovisningsmetod, undefined, k.momsdelar, k.omvand);
+        const visa = (rader: { konto: string; belopp: number }[]) => rader.map((r) => ({ konto: r.konto, kontonamn: kontonamn(r.konto), belopp: ore(r.belopp) }));
+        const rader = plan[0].rader;
+        verifikation = visa(rader);
+        if (plan[1]) faktura = { datum: plan[0].datum, betalning: { datum: plan[1].datum, rader: visa(plan[1].rader) } };
         const summa = ore(rader.reduce((x, r) => x + r.belopp, 0));
         if (Math.abs(summa) > 0.005) flaggor.push({ typ: 'balans', allvar: 'stopp', text: `Verifikationen går inte jämnt ut (${summa} kr).` });
       } catch (err) {
@@ -258,6 +270,7 @@ async function provaTransaktion(
         momshantering: s.kontering.momshantering,
       },
       verifikation,
+      faktura,
       fel,
     };
   } catch (err) {

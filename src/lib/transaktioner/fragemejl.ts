@@ -50,7 +50,7 @@ interface Rad {
   riktning: string;
   tillrackligt: Tillrackligt | null;
   fraga_utkast_id: string | null;
-  /** Mejlet om osäkra: varför konteringen är gul (AI:ns motivering), när inget står under saknas. */
+  /** Mejlet om osäkra: varför konteringen är gul (flaggorna och AI:ns motivering), när inget står under saknas. */
   osaker?: string;
 }
 
@@ -94,9 +94,15 @@ async function fragorAttStalla(supabase: SupabaseClient, userId?: string): Promi
  */
 export async function osakraAttFraga(supabase: SupabaseClient, userId: string): Promise<Rad[]> {
   const { data: konteringar, error: kFel } = await supabase.from('konteringar')
-    .select('transaktion_id, motivering').eq('user_id', userId).eq('modell', 'gpt-6.1-sol').eq('omdome', 'gul').limit(1000);
+    .select('transaktion_id, motivering, flaggor').eq('user_id', userId).eq('modell', 'gpt-6.1-sol').eq('omdome', 'gul').limit(1000);
   if (kFel) throw new Error(kFel.message);
-  const motivering = new Map((konteringar ?? []).map((k) => [k.transaktion_id as string, String(k.motivering ?? '')]));
+  // Varför den är gul — flaggorna, där det modellen är osäker på står — och konteringens motivering
+  const motivering = new Map((konteringar ?? []).map((k) => {
+    const varfor = ((k.flaggor ?? []) as { typ?: string; text?: string }[])
+      .filter((f) => f.typ !== 'saknas' && f.text).map((f) => f.text).join(' ');
+    const mot = String(k.motivering ?? '');
+    return [k.transaktion_id as string, [varfor, mot && `Konteringen: ${mot}`].filter(Boolean).join(' ')];
+  }));
   if (!motivering.size) return [];
 
   const { data, error } = await supabase.from('transaktioner')

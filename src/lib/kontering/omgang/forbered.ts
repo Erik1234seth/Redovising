@@ -63,6 +63,8 @@ export interface Anropsdel {
 /** Det som behövs när svaret kommer tillbaka. */
 export interface Kontext {
   betalsatt: Betalsatt;
+  /** profiles.redovisningsmetod — faktureringsmetoden ger två verifikationer per faktura. */
+  redovisningsmetod?: string | null;
   regelIdn: string[];
   /** K-nummer i kundens lista → transaktionens id. */
   kNummer: Record<string, string>;
@@ -319,5 +321,5 @@ export async function forberedOmgang(
     });
   }
 
-  return { delar, hoppade, kontext: { betalsatt, regelIdn: kunden.regelIdn, kNummer: kunden.kNummer, vNummer: kunden.vNummer } };
+  return { delar, hoppade, kontext: { betalsatt, redovisningsmetod: kund?.redovisningsmetod ?? null, regelIdn: kunden.regelIdn, kNummer: kunden.kNummer, vNummer: kunden.vNummer } };
 }
