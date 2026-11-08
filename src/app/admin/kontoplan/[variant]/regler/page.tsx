@@ -2,19 +2,47 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import type { RegelmasterRad } from '@/lib/kontering/regelverk';
+import type { Parameter, RegelmasterRad } from '@/lib/kontering/regelverk';
 
 /**
  * De generella reglerna i en kontoplan (/api/admin/regler): byråns principer
- * (var kontoplan har sina, går att ändra här), regelmasterns gränsvärden (var
- * kontoplan har sina, laddas ner och importeras här — se @/lib/kontering/regelmaster) och det som skrivits i flödesschemat för alla kunder (bara löpande).
+ * (var kontoplan har sina, går att ändra här), gränsvärdena (gemensamma för
+ * löpande och bokslut), regelmasterns regler (var kontoplan har sina) — båda
+ * laddas ner och importeras här, se @/lib/kontering/regelmaster — och det som
+ * skrivits i flödesschemat för alla kunder (bara löpande).
  * Kundspecifika regler hör inte hit.
  */
 
 interface Data {
   principer: { inledning: string; lista: string[]; updatedAt: string | null };
-  regelmaster: { kalla: string; updatedAt: string | null; antalParametrar: number; regler: RegelmasterRad[] };
+  regelmaster: { kalla: string; updatedAt: string | null; regler: RegelmasterRad[] };
+  gransvarden: { kalla: string; updatedAt: string | null; parametrar: Parameter[] };
   flodesschema: { id: string; typ: 'kontext' | 'regel'; steg: string; namn: string | null; galler: string | null; text: string; created_at: string }[];
+}
+
+type Slag = 'gransvarden' | 'regler';
+
+const KNAPP = 'text-sm border border-slate-300 bg-white rounded-lg px-3 py-1.5 text-slate-700 hover:border-slate-400';
+
+/** Ladda ner xlsx/JSON och Importera, för gränsvärdena eller reglerna. */
+function Filknappar({ href, onFil }: { href: string; onFil: (f: File) => void }) {
+  return (
+    <>
+      <a href={`${href}fil=xlsx`} className={KNAPP}>Ladda ner xlsx</a>
+      <a href={`${href}fil=json`} className={KNAPP}>Ladda ner JSON</a>
+      <label className={`${KNAPP} cursor-pointer`}>
+        Importera
+        <input type="file" accept=".xlsx,.json" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onFil(f); }} />
+      </label>
+    </>
+  );
+}
+
+function parameterVarde(p: Parameter, alla: Map<string, Parameter>) {
+  const v = typeof p.varde === 'number' ? p.varde.toLocaleString('sv-SE') : p.varde;
+  const bas = p.basParameter ? alla.get(p.basParameter) : null;
+  return `${v} ${p.enhet}${bas ? ` (${(p.multiplikator ?? 1).toLocaleString('sv-SE')} × ${bas.namn})` : ''}`;
 }
 
 const OPERATOR: Record<string, string> = {
@@ -42,7 +70,8 @@ export default function Regler() {
   const [data, setData] = useState<Data | null>(null);
   const [fel, setFel] = useState('');
   const [sok, setSok] = useState('');
-  const [importFil, setImportFil] = useState<File | null>(null);
+  const [sokVarde, setSokVarde] = useState('');
+  const [importFil, setImportFil] = useState<{ slag: Slag; fil: File } | null>(null);
 
   const ladda = useCallback(() => {
     fetch(`/api/admin/regler?variant=${variant}`)
@@ -59,6 +88,12 @@ export default function Regler() {
       || r.konton.some((k) => k.startsWith(q))
       || r.anteckning.toLowerCase().includes(q));
   }, [data, sok]);
+
+  const parametrar = useMemo(() => new Map((data?.gransvarden.parametrar ?? []).map((p) => [p.id, p])), [data]);
+  const varden = useMemo(() => {
+    const q = sokVarde.trim().toLowerCase();
+    return (data?.gransvarden.parametrar ?? []).filter((p) => !q || p.namn.toLowerCase().includes(q) || p.id.toLowerCase().includes(q));
+  }, [data, sokVarde]);
 
   if (fel) return <p className="text-sm text-red-600">{fel}</p>;
   if (!data) return <p className="text-sm text-slate-500">Laddar…</p>;
@@ -95,31 +130,53 @@ export default function Regler() {
         )}
       </section>}
 
+      {importFil && <ImportFil variant={variant} slag={importFil.slag} fil={importFil.fil} onStang={() => setImportFil(null)} onKlar={ladda} />}
+
       <section>
         <div className="flex flex-wrap items-end gap-3 mb-3">
           <div className="mr-auto">
-            <h2 className="font-semibold text-slate-900">Regelmastern: gränsvärden och regler</h2>
+            <h2 className="font-semibold text-slate-900">Gränsvärden <span className="font-normal text-slate-500">· gemensamma för löpande bokföring och bokslut</span></h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              {data.regelmaster.regler.length} regler och {data.regelmaster.antalParametrar} värden ur {data.regelmaster.kalla}
-              {data.regelmaster.updatedAt ? `, importerad ${DATUM.format(new Date(data.regelmaster.updatedAt))}` : ' (k1.json, utgångsläget)'}.
+              {data.gransvarden.parametrar.length} värden ur {data.gransvarden.kalla}
+              {data.gransvarden.updatedAt ? `, importerade ${DATUM.format(new Date(data.gransvarden.updatedAt))}` : ' (k1.json, utgångsläget)'}.
+              En import här gäller båda kontoplanerna. Reglerna nedan räknar med värdena.
+            </p>
+          </div>
+          <Filknappar href="/api/admin/gransvarden?" onFil={(fil) => setImportFil({ slag: 'gransvarden', fil })} />
+        </div>
+        <input value={sokVarde} onChange={(e) => setSokVarde(e.target.value)} placeholder="Sök värde…"
+          className="w-full sm:w-64 mb-3 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500" />
+        {!varden.length && <p className="text-sm text-slate-500">Inga värden matchar.</p>}
+        <ul className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+          {varden.map((p) => (
+            <li key={p.id} className="px-4 py-2.5 flex flex-wrap gap-x-3 gap-y-0.5 items-baseline">
+              <span className="text-sm font-medium text-slate-900">{p.namn}</span>
+              <span className="text-sm text-slate-600">{parameterVarde(p, parametrar)}</span>
+              <span className="ml-auto text-xs text-slate-400">
+                {p.gallerFran || p.gallerTill ? `${p.gallerFran ?? '…'} – ${p.gallerTill ?? 'tills vidare'}` : 'Gäller tills vidare'}
+                {p.senastKontrollerad ? ` · kontrollerat ${p.senastKontrollerad}` : ''}
+              </span>
+              <span className="basis-full text-[11px] font-mono text-slate-400">{p.id}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <div className="flex flex-wrap items-end gap-3 mb-3">
+          <div className="mr-auto">
+            <h2 className="font-semibold text-slate-900">Regelmastern: regler</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {data.regelmaster.regler.length} regler ur {data.regelmaster.kalla}
+              {data.regelmaster.updatedAt ? `, importerade ${DATUM.format(new Date(data.regelmaster.updatedAt))}` : ' (k1.json, utgångsläget)'}.
+              Gäller bara {variant === 'lopande' ? 'löpande bokföring' : 'bokslut'}.
               &quot;Prövas i kod&quot; betyder att beloppet jämförs med gränsen innan AI:n svarar. De andra står i kontotexten som AI:n läser.
             </p>
           </div>
-          <a href={`/api/admin/regelmaster?variant=${variant}&fil=xlsx`} className="text-sm border border-slate-300 bg-white rounded-lg px-3 py-1.5 text-slate-700 hover:border-slate-400">
-            Ladda ner xlsx
-          </a>
-          <a href={`/api/admin/regelmaster?variant=${variant}&fil=json`} className="text-sm border border-slate-300 bg-white rounded-lg px-3 py-1.5 text-slate-700 hover:border-slate-400">
-            Ladda ner JSON
-          </a>
-          <label className="text-sm border border-slate-300 bg-white rounded-lg px-3 py-1.5 text-slate-700 hover:border-slate-400 cursor-pointer">
-            Importera
-            <input type="file" accept=".xlsx,.json" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setImportFil(f); }} />
-          </label>
+          <Filknappar href={`/api/admin/regelmaster?variant=${variant}&`} onFil={(fil) => setImportFil({ slag: 'regler', fil })} />
         </div>
         <input value={sok} onChange={(e) => setSok(e.target.value)} placeholder="Sök regel eller konto…"
           className="w-full sm:w-64 mb-3 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:border-blue-500" />
-        {importFil && <ImportRegelmaster variant={variant} fil={importFil} onStang={() => setImportFil(null)} onKlar={ladda} />}
         {!regler.length && <p className="text-sm text-slate-500">Inga regler matchar.</p>}
         <ul className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
           {regler.map((r) => (
@@ -234,20 +291,25 @@ interface Jamforelse {
   borttagna: { id: string; namn: string }[];
   oforandrade: number;
 }
-interface RegelmasterPlan {
-  regler: Jamforelse;
-  parametrar: Jamforelse;
+interface ImportPlan {
+  regler?: Jamforelse;
+  parametrar?: Jamforelse;
   ogiltiga: { id: string; fel: string }[];
-  iFilen: { regler: number; parametrar: number };
+  forstaImport: boolean;
+  reglerUtanVarde?: { variant: 'lopande' | 'bokslut'; id: string; namn: string; parameterId: string }[];
+  iFilen: number;
 }
 
-const antalAndringar = (j: Jamforelse) => j.andrade.length + j.nya.length + j.borttagna.length;
+const antalAndringar = (j?: Jamforelse) => (j ? j.andrade.length + j.nya.length + j.borttagna.length : 0);
 
-/** Visar vad filen ändrar i regelmastern och ersätter den när man trycker Importera. */
-function ImportRegelmaster({ variant, fil, onStang, onKlar }: {
-  variant: 'lopande' | 'bokslut'; fil: File; onStang: () => void; onKlar: () => void;
+/**
+ * Visar vad filen ändrar och ersätter gränsvärdena (gemensamma) eller
+ * kontoplanens regler när man trycker Importera.
+ */
+function ImportFil({ variant, slag, fil, onStang, onKlar }: {
+  variant: 'lopande' | 'bokslut'; slag: Slag; fil: File; onStang: () => void; onKlar: () => void;
 }) {
-  const [plan, setPlan] = useState<RegelmasterPlan | null>(null);
+  const [plan, setPlan] = useState<ImportPlan | null>(null);
   const [fel, setFel] = useState('');
   const [sparar, setSparar] = useState(false);
   const [klar, setKlar] = useState(false);
@@ -258,11 +320,10 @@ function ImportRegelmaster({ variant, fil, onStang, onKlar }: {
     form.append('fil', fil);
     form.append('variant', variant);
     if (spara) form.append('spara', '1');
-    const d = await (await fetch('/api/admin/regelmaster', { method: 'POST', body: form })).json();
+    const d = await (await fetch(slag === 'gransvarden' ? '/api/admin/gransvarden' : '/api/admin/regelmaster', { method: 'POST', body: form })).json();
     if (d.error) throw new Error(d.error);
-    return d as RegelmasterPlan;
-  }, [fil, variant]);
-
+    return d as ImportPlan;
+  }, [fil, variant, slag]);
   useEffect(() => {
     if (skickad.current) return;
     skickad.current = true;
@@ -284,6 +345,7 @@ function ImportRegelmaster({ variant, fil, onStang, onKlar }: {
   }
 
   const antal = plan ? antalAndringar(plan.regler) + antalAndringar(plan.parametrar) : 0;
+  const galler = slag === 'gransvarden' ? 'löpande bokföring och bokslut' : variant === 'lopande' ? 'löpande bokföring' : 'bokslut';
 
   const grupp = (rubrik: string, j: Jamforelse) => (
     <div className="space-y-2">
@@ -315,7 +377,7 @@ function ImportRegelmaster({ variant, fil, onStang, onKlar }: {
     <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-start justify-center p-4 overflow-y-auto" onClick={onStang}>
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl my-8" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-baseline gap-3 px-5 py-4 border-b border-slate-200">
-          <h2 className="font-semibold text-slate-900">Importera regelmaster {fil.name}</h2>
+          <h2 className="font-semibold text-slate-900">Importera {slag === 'gransvarden' ? 'gränsvärden' : 'regler'} {fil.name}</h2>
           <button onClick={onStang} className="ml-auto text-slate-400 hover:text-slate-700 text-xl leading-none" aria-label="Stäng">×</button>
         </div>
         <div className="px-5 py-4 space-y-5 text-sm">
@@ -323,11 +385,22 @@ function ImportRegelmaster({ variant, fil, onStang, onKlar }: {
           {plan && (
             <>
               <p className="text-slate-600">
-                {plan.iFilen.regler} regler och {plan.iFilen.parametrar} värden i filen
-                {klar ? ` · ${antal} ändringar sparade${variant === 'lopande' ? ' — gäller från nästa kontering' : ''}` : ''}
+                {plan.iFilen} {slag === 'gransvarden' ? 'värden' : 'regler'} i filen · gäller {galler}
+                {klar ? ` · ${antal ? `${antal} ändringar sparade — gäller från nästa kontering` : 'sparad som källa'}` : ''}
               </p>
-              {grupp('Regler', plan.regler)}
-              {grupp('Värden (parametrar)', plan.parametrar)}
+              {plan.parametrar && grupp('Gränsvärden', plan.parametrar)}
+              {plan.regler && grupp('Regler', plan.regler)}
+              {!!plan.reglerUtanVarde?.length && (
+                <div>
+                  <p className="font-medium text-amber-700">Regler som pekar på ett värde som saknas i filen ({plan.reglerUtanVarde.length})</p>
+                  <p className="text-xs text-slate-500">De prövas inte längre i kod förrän värdet finns igen eller reglerna importeras utan det.</p>
+                  <ul className="mt-0.5 space-y-0.5 text-slate-900">
+                    {plan.reglerUtanVarde.map((x) => (
+                      <li key={`${x.variant}-${x.id}`}>{x.namn} <span className="text-slate-500">({x.variant === 'lopande' ? 'löpande' : 'bokslut'}) — {x.parameterId}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {plan.ogiltiga.length > 0 && (
                 <div>
                   <p className="font-medium text-red-700">Hoppas över ({plan.ogiltiga.length})</p>
@@ -336,9 +409,13 @@ function ImportRegelmaster({ variant, fil, onStang, onKlar }: {
                   </ul>
                 </div>
               )}
-              {!antal && !klar && <p className="text-slate-500">Filen ändrar inget.</p>}
+              {!antal && !klar && (
+                <p className="text-slate-500">
+                  {plan.forstaImport ? 'Filen har samma innehåll som utgångsläget (k1.json). Importera för att filen ska stå som källa.' : 'Filen ändrar inget.'}
+                </p>
+              )}
               <p className="text-xs text-slate-400">
-                Filen ersätter hela regelmastern. Det som saknas i filen slutar gälla men finns kvar under Historik.
+                Filen ersätter {slag === 'gransvarden' ? 'alla gränsvärden' : 'alla regler i kontoplanen'}. Det som saknas i filen slutar gälla men finns kvar under Historik.
               </p>
             </>
           )}
@@ -347,8 +424,8 @@ function ImportRegelmaster({ variant, fil, onStang, onKlar }: {
           {fel && <span className="text-sm text-red-600">{fel}</span>}
           <button onClick={onStang} className="ml-auto text-sm text-slate-600 px-3 py-1.5">{klar ? 'Stäng' : 'Avbryt'}</button>
           {!klar && (
-            <button onClick={importera} disabled={sparar || !antal} className="bg-blue-600 text-white text-sm font-medium px-3 py-1.5 rounded disabled:opacity-40">
-              {sparar ? 'Importerar…' : `Importera — ${antal} ${antal === 1 ? 'ändring' : 'ändringar'}`}
+            <button onClick={importera} disabled={sparar || !plan || (!antal && !plan.forstaImport)} className="bg-blue-600 text-white text-sm font-medium px-3 py-1.5 rounded disabled:opacity-40">
+              {sparar ? 'Importerar…' : antal ? `Importera — ${antal} ${antal === 1 ? 'ändring' : 'ändringar'}` : 'Importera'}
             </button>
           )}
         </div>

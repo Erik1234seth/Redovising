@@ -13,7 +13,7 @@ import { medAndring, originalKonto, type K1Andring, type K1Konto } from './regel
  * Bara texten byrån kan ändra följer med — namn, beskrivning och listorna.
  * Ett konto som inte finns i k1.json läggs till. Filen är hela kontoplanen:
  * konton som saknas i den tas bort ur vyn men finns kvar i historiken.
- * Gränsvärdena (parametrar och regler) importeras inte: de ändras i k1.json.
+ * Gränsvärdena och regelmasterns regler importeras inte här: de har egna filer på fliken Regler (./regelmaster).
  */
 
 const FALT = ['namn', 'beskrivning', 'anvandNar', 'anvandInteNar', 'beslutsregler', 'varningar', 'exempel', 'granskningNar', 'nyckelord'] as const;

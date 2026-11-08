@@ -8,7 +8,8 @@ import { hamtaPrinciper, sparaPrinciper, tolkaVariant } from '@/lib/kontering/k1
 /**
  * De generella reglerna i en kontoplan (variant lopande eller bokslut), för fliken Regler:
  *   - byråns principer — gäller alltid, alla kunder. Var kontoplan har sina.
- *   - regelmastern: gränsvärdena och reglerna, var kontoplan har sina (@/lib/kontering/regelmaster)
+ *   - gränsvärdena, gemensamma för båda kontoplanerna, och regelmasterns regler,
+ *     som var kontoplan har sina (@/lib/kontering/regelmaster)
  *   - regler och kontext som byrån skrivit i flödesschemat för alla kunder (bara löpande)
  *
  *   GET ?variant=      allt ovan
@@ -50,7 +51,8 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({
       principer: { inledning: PRINCIPER_INLEDNING, lista: principer.lista, updatedAt: principer.updatedAt },
-      regelmaster: { kalla: rm.kalla, updatedAt: rm.updatedAt, antalParametrar: rm.parametrar.length, regler: regelmaster(rm) },
+      regelmaster: { kalla: rm.kalla, updatedAt: rm.updatedAt, regler: regelmaster(rm) },
+      gransvarden: { kalla: rm.gransvarden.kalla, updatedAt: rm.gransvarden.updatedAt, parametrar: rm.parametrar },
       flodesschema,
     });
   } catch (err) {
