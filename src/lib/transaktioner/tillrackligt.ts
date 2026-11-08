@@ -1,7 +1,8 @@
 import { loggaOpenAI, type Anropsinfo } from '@/lib/ai-logg';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { KUND_KOLUMNER, byggKundkontext, type Kund } from '@/lib/ai-test/kundkontext';
-import { BYRANS_PRINCIPER } from '@/lib/kontering/principer';
+import { byransPrinciper } from '@/lib/kontering/principer';
+import { laddaK1Andringar } from '@/lib/kontering/k1-andringar';
 import { kompletteringText, type Komplettering } from './komplettera';
 import { hamtaInstruktioner, kontextFor, reglerText } from './instruktioner';
 import { iKo, openaiFetch } from '@/lib/ai-anrop';
@@ -41,7 +42,7 @@ export interface Tillrackligt {
   modell: string;
 }
 
-const SYSTEM = `Du kontrollerar transaktioner åt en svensk bokföringsbyrå innan de bokförs. Kunderna är enskilda näringsidkare med förenklat årsbokslut (K1). Du konterar inte — du avgör bara om det vi har räcker.
+const SYSTEM = () => `Du kontrollerar transaktioner åt en svensk bokföringsbyrå innan de bokförs. Kunderna är enskilda näringsidkare med förenklat årsbokslut (K1). Du konterar inte — du avgör bara om det vi har räcker.
 
 För varje transaktion får du det som lästs ut ur underlaget, en avskrift av underlaget, kundens tidigare bokföring av liknande saker och det kunden skrivit i mejl.
 
@@ -70,7 +71,7 @@ Fråga inte om moms på en del av underlaget som inte skulle ge mer avdrag. En a
 
 Gör hellre ett rimligt antagande och skriv det i "antaganden" än att fråga om sådant som inte spelar någon roll — fråga bara när ett fel antagande skulle ge fel moms, fel avdrag eller fel skatt. En privat rad är tillräcklig: den blir eget uttag eller egen insättning.
 
-${BYRANS_PRINCIPER}
+${byransPrinciper()}
 
 "vad" är kort och skrivet så att kunden förstår vad vi frågar efter: "momsbeloppet", "köparens VAT-nummer", "vilka som deltog och syftet".
 
@@ -110,6 +111,7 @@ export async function kollaTillrackligt(supabase: SupabaseClient, underlagId: st
 }
 
 async function kolla(supabase: SupabaseClient, underlagId: string) {
+  await laddaK1Andringar(supabase);
   const { data: u, error } = await supabase.from('bokforing_underlag').select('id, user_id').eq('id', underlagId).maybeSingle();
   if (error) throw new Error(`Kunde inte läsa underlaget: ${error.message}`);
   if (!u) throw new Error('Underlaget finns inte');
@@ -227,7 +229,7 @@ async function fraga(user: string, anrop: Anropsinfo): Promise<{ nr?: unknown; s
       model: MODELL,
       reasoning_effort: 'high',
       response_format: { type: 'json_object' },
-      messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: user }],
+      messages: [{ role: 'system', content: SYSTEM() }, { role: 'user', content: user }],
       max_completion_tokens: 32000,
     }),
   });

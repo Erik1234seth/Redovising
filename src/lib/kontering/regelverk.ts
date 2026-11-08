@@ -116,15 +116,23 @@ export function medAndring(nr: string, a: K1Andring | undefined): K1Konto {
   return { ...ny, endastManuellt: arEndastManuellt(ny) };
 }
 
-/** Lägger byråns ändringar ovanpå k1.json. Anropas med alla ändringar, så att en borttagen ändring försvinner. */
-export function anvandAndringar(andringar: Map<string, K1Andring>): void {
-  const nummer = [...new Set([...ORIGINAL.keys(), ...andringar.keys()])].sort();
+/** Kontonumren i k1.json. */
+export function originalNummer(): string[] {
+  return [...ORIGINAL.keys()];
+}
+
+/**
+ * Lägger byråns ändringar ovanpå k1.json. Anropas med alla ändringar, så att en
+ * borttagen ändring försvinner. Konton i `borttagna` kan inte väljas.
+ */
+export function anvandAndringar(andringar: Map<string, K1Andring>, borttagna: Set<string> = new Set()): void {
+  const nummer = [...new Set([...ORIGINAL.keys(), ...andringar.keys()])].filter((nr) => !borttagna.has(nr)).sort();
   KONTON = new Map(nummer.map((nr) => [nr, medAndring(nr, andringar.get(nr))]));
 }
 
-/** Hela k1.json som den gäller med byråns ändringar och tillagda konton — det som laddas ner. */
-export function k1Fil(andringar: Map<string, K1Andring>) {
-  const nummer = [...new Set([...ORIGINAL.keys(), ...andringar.keys()])].sort();
+/** Hela k1.json som den gäller med byråns ändringar och tillagda konton, utan borttagna — det som laddas ner. */
+export function k1Fil(andringar: Map<string, K1Andring>, borttagna: Set<string> = new Set()) {
+  const nummer = [...new Set([...ORIGINAL.keys(), ...andringar.keys()])].filter((nr) => !borttagna.has(nr)).sort();
   return {
     kalla: KALLA,
     konton: nummer.map((nr) => medAndring(nr, andringar.get(nr))),
@@ -183,6 +191,36 @@ const PROVBAR_ENHET = /^SEK( inkl\. moms| exkl\. moms)?$/;
  * inte i kod. De står kvar i kontots regeltext.
  */
 const INTE_PER_KONTO = new Set(['minor_line_merge_amount_limit', 'minor_line_merge_share_limit', 'minor_line_recurring_annual_limit']);
+
+/** En regel ur gränsvärdestabellen med sitt värde uträknat, till fliken Regler i Kontoplan. */
+export interface RegelmasterRad extends Regel {
+  parameter: { namn: string; varde: number | string; enhet: string; senastKontrollerad: string | null } | null;
+  /** Beloppet prövas mot gränsen i provaKonto. Övriga står bara i kontots text. */
+  provasIKod: boolean;
+}
+
+/** Hela gränsvärdestabellen ur k1.json — det provaKonto och kontotexterna bygger på. */
+export function regelmaster(): RegelmasterRad[] {
+  // provaKonto prövar bara regler som ett konto pekar på
+  const iTrosklar = new Set([...KONTON.values()].flatMap((k) => k.trosklar));
+  return REGLER.map((regel) => {
+    const p = PARAMETRAR.get(regel.parameterId);
+    const lost = losVarde(regel.parameterId);
+    return {
+      ...regel,
+      parameter: p ? {
+        namn: p.namn,
+        varde: lost?.varde ?? p.varde,
+        enhet: p.enhet,
+        senastKontrollerad: p.senastKontrollerad ?? null,
+      } : null,
+      provasIKod: !INTE_PER_KONTO.has(regel.id)
+        && (regel.konton.length > 0 || iTrosklar.has(regel.id))
+        && ['<', '<=', '>', '>='].includes(regel.operator)
+        && !!lost && PROVBAR_ENHET.test(lost.parameter.enhet),
+    };
+  });
+}
 
 /**
  * Prövar ett föreslaget konto mot regelverket.

@@ -4,7 +4,8 @@ import { betalsattText, hamtaArslista, hamtaKundbild, verifikationerIManader, ve
 import { fraga } from './modeller';
 import { momsText, rensaMomsdelar, tolkaOmvand } from './momsdelar';
 import { slutligKontering } from './preliminar';
-import { BYRANS_PRINCIPER } from './principer';
+import { byransPrinciper } from './principer';
+import { laddaK1Andringar } from './k1-andringar';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
 import { reglerAttValja } from '@/lib/transaktioner/kundregler';
 import { hamtaInstruktioner, reglerFor } from '@/lib/transaktioner/instruktioner';
@@ -63,7 +64,7 @@ const SCHEMA = {
   },
 };
 
-const FAST = `Du kontrollerar bokföringen för en svensk enskild näringsidkare med förenklat årsbokslut (K1) och kontantmetoden, åt en bokföringsbyrå.
+const FAST = () => `Du kontrollerar bokföringen för en svensk enskild näringsidkare med förenklat årsbokslut (K1) och kontantmetoden, åt en bokföringsbyrå.
 
 Varje transaktion har konterats för sig av två modeller. Du ser nu alla kundens transaktioner tillsammans (K1, K2 …), med kontot och momsen de fått och vem som bestämt det (byrån, AI, bokförd — eller "AI oense", då står båda modellernas förslag). En uppdelning på flera konton står som "4000 Varor + 2013 Övriga egna uttag". Leta efter det man inte ser i en transaktion åt gången:
 - Samma motpart eller samma slags köp på olika konton utan synlig anledning.
@@ -74,7 +75,7 @@ Varje transaktion har konterats för sig av två modeller. Du ser nu alla kunden
 
 Du har byråns regler — samma som konteringen följer: K1-kontoplanen, hela regeltexten för de konton kunden använder, kundreglerna och byråns kontext. Reglerna går före kundens mönster. Innan du anmärker eller samordnar: pröva både de nuvarande raderna och linjen du vill samordna efter mot kontots regler — "Använd när", "Använd INTE när", beslutsregler och momsregler. Att raderna konterats olika kan ha en förklaring i reglerna (till exempel att pant på engångsförpackningar följer drycken medan returlådor är momsfria) — då är det ingen avvikelse. Strider en rad mot reglerna är det reglerna som är linjen, inte hur de flesta rader ligger.
 
-${BYRANS_PRINCIPER}
+${byransPrinciper()}
 
 Betalkontot (1930, 2013, 2017) sätts av systemet utifrån kundens betalsätt och står inte vid raderna — anmärk inte på det. Det som står under REDAN BOKFÖRT är kundens inlästa bokföring, till exempel försäljning från kassarapporter: räkna med den när du bedömer om något saknas. Anmärk på dubbelbokföring mot den bara när samma affär går att peka ut bland de enskilda verifikationerna: liknande datum och belopp, plus motpart, beskrivning eller verifikationsnummer. Att ett belopp liknar en månadssumma räcker inte.
 
@@ -121,6 +122,7 @@ export async function helhetskontroll(supabase: SupabaseClient, userId: string):
 }
 
 async function kontrollera(supabase: SupabaseClient, userId: string): Promise<Helhet> {
+  await laddaK1Andringar(supabase);
   const [arslista, kundbild, { data: profil }, instruktioner] = await Promise.all([
     hamtaArslista(supabase, userId),
     hamtaKundbild(supabase, userId),
@@ -180,7 +182,7 @@ async function kontrollera(supabase: SupabaseClient, userId: string): Promise<He
     .map((i) => `- (${i.omfang === 'alla' ? 'alla kunder' : 'kunden'}) ${i.text}`).join('\n');
 
   const { data } = await fraga<{ sammanfattning: string; anmarkningar: { rader: number[]; text: string; atgard: string; instruktion: string }[] }>(MODELL, {
-    system: { fast: `${FAST}\n\nK1-KONTOPLAN (konto namn — beskrivning [sökord]):\n${kontolista()}`, kund: '' },
+    system: { fast: `${FAST()}\n\nK1-KONTOPLAN (konto namn — beskrivning [sökord]):\n${kontolista()}`, kund: '' },
     user: [
       byggKundkontext(profil as unknown as Kund | null),
       kundbild ? `KUNDBILDEN:\n${kundbild}` : '',

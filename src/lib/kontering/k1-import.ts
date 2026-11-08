@@ -1,6 +1,8 @@
 import * as XLSX from 'xlsx';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { aterstallK1Konto, hamtaK1Andringar, sparaK1Andring } from './k1-andringar';
+import {
+  aterstallK1Konto, hamtaK1Andringar, kontoText, loggaHistorik, sparaK1Andring, synligaKonton, taBortK1Konto, type Variant,
+} from './k1-andringar';
 import { medAndring, originalKonto, type K1Andring, type K1Konto } from './regelverk';
 
 /**
@@ -9,9 +11,9 @@ import { medAndring, originalKonto, type K1Andring, type K1Konto } from './regel
  * scripts/k1-till-json.mjs, listor separerade med |) eller JSON som k1.json.
  *
  * Bara texten byrån kan ändra följer med — namn, beskrivning och listorna.
- * Ett konto som inte finns i k1.json läggs till. Konton som saknas i filen
- * rörs inte, och gränsvärdena (parametrar och regler) importeras inte: de
- * ändras i k1.json.
+ * Ett konto som inte finns i k1.json läggs till. Filen är hela kontoplanen:
+ * konton som saknas i den tas bort ur vyn men finns kvar i historiken.
+ * Gränsvärdena (parametrar och regler) importeras inte: de ändras i k1.json.
  */
 
 const FALT = ['namn', 'beskrivning', 'anvandNar', 'anvandInteNar', 'beslutsregler', 'varningar', 'exempel', 'granskningNar', 'nyckelord'] as const;
@@ -67,45 +69,72 @@ export function lasKontoFil(data: Buffer, filnamn: string): Text[] {
 
 export interface Importplan {
   andrade: { konto: string; namn: string; falt: string[] }[];
-  nya: { konto: string; namn: string }[];
+  /** Nya konton, och borttagna konton som finns i filen igen (`tillbaka`). */
+  nya: { konto: string; namn: string; tillbaka?: boolean }[];
+  /** Konton som syns nu men saknas i filen — de tas bort ur vyn men finns kvar i historiken. */
+  borttagna: { konto: string; namn: string }[];
   ogiltiga: { konto: string; fel: string }[];
   oforandrade: number;
 }
 
-/** Jämför filen med kontona som de gäller nu, och sparar om `spara` är satt. */
-export async function importeraKonton(supabase: SupabaseClient, konton: Text[], spara: boolean): Promise<Importplan> {
-  const sparade = await hamtaK1Andringar(supabase);
-  const plan: Importplan = { andrade: [], nya: [], ogiltiga: [], oforandrade: 0 };
+/**
+ * Jämför filen med kontoplanen som den gäller nu, och sparar om `spara` är satt.
+ * Filen är hela kontoplanen: ett konto som syns nu men saknas i filen tas bort
+ * ur vyn. Byråns text för det ligger kvar och historiken visar det.
+ */
+export async function importeraKonton(
+  supabase: SupabaseClient, variant: Variant, konton: Text[], spara: boolean, filnamn: string,
+): Promise<Importplan> {
+  const sparade = await hamtaK1Andringar(supabase, variant);
+  const plan: Importplan = { andrade: [], nya: [], borttagna: [], ogiltiga: [], oforandrade: 0 };
   const sedda = new Set<string>();
   const skriv: (() => Promise<void>)[] = [];
+  const historik: Parameters<typeof loggaHistorik>[1] = [];
 
   for (const k of konton) {
     if (sedda.has(k.konto)) { plan.ogiltiga.push({ konto: k.konto, fel: 'Finns två gånger i filen' }); continue; }
-    sedda.add(k.konto);
     if (!/^\d{4}$/.test(k.konto)) { plan.ogiltiga.push({ konto: k.konto, fel: 'Kontonumret ska vara fyra siffror' }); continue; }
     if (!k.namn) { plan.ogiltiga.push({ konto: k.konto, fel: 'Namn saknas' }); continue; }
     if (!k.beskrivning) { plan.ogiltiga.push({ konto: k.konto, fel: 'Beskrivning saknas' }); continue; }
+    sedda.add(k.konto);
 
     const original = originalKonto(k.konto);
-    const nu = original || sparade.has(k.konto) ? medAndring(k.konto, sparade.get(k.konto)?.andring) : null;
+    const sparad = sparade.get(k.konto);
+    const borttagen = !!sparad?.borttagenAt;
+    const nu = original || sparad ? medAndring(k.konto, sparad?.andring) : null;
     const andrat = FALT.filter((f) => !nu || JSON.stringify(k[f]) !== JSON.stringify(nu[f]));
-    if (!andrat.length) { plan.oforandrade++; continue; }
+    if (!andrat.length && !borttagen) { plan.oforandrade++; continue; }
 
-    if (!nu) plan.nya.push({ konto: k.konto, namn: k.namn });
+    if (!nu || borttagen) plan.nya.push({ konto: k.konto, namn: k.namn, ...(borttagen ? { tillbaka: true } : {}) });
     else plan.andrade.push({ konto: k.konto, namn: k.namn, falt: andrat.map((f) => FALTNAMN[f]) });
+    historik.push({
+      variant, konto: k.konto, handling: borttagen ? 'tillbaka' : nu ? 'importerad' : 'tillagd', kalla: filnamn,
+      data: Object.fromEntries([['konto', k.konto], ...FALT.map((f) => [f, k[f]])]),
+    });
 
     if (!original) {
       // Tillagt konto: hela texten sparas
-      skriv.push(() => sparaK1Andring(supabase, k.konto, Object.fromEntries(FALT.map((f) => [f, k[f]])) as K1Andring));
+      skriv.push(() => sparaK1Andring(supabase, variant, k.konto, Object.fromEntries(FALT.map((f) => [f, k[f]])) as K1Andring));
       continue;
     }
     // Bara det som skiljer från k1.json sparas, som när man ändrar i rutan
     const andring = Object.fromEntries(FALT.map((f) => [f, JSON.stringify(k[f]) === JSON.stringify(original[f]) ? null : k[f]]));
     skriv.push(() => Object.values(andring).every((v) => v === null)
-      ? aterstallK1Konto(supabase, k.konto)
-      : sparaK1Andring(supabase, k.konto, andring as K1Andring));
+      ? aterstallK1Konto(supabase, variant, k.konto)
+      : sparaK1Andring(supabase, variant, k.konto, andring as K1Andring));
   }
 
-  if (spara) for (const s of skriv) await s();
+  for (const nr of synligaKonton(sparade)) {
+    if (sedda.has(nr)) continue;
+    const text = kontoText(nr, sparade.get(nr)?.andring);
+    plan.borttagna.push({ konto: nr, namn: String(text.namn ?? '') });
+    historik.push({ variant, konto: nr, handling: 'borttagen', kalla: filnamn, data: text });
+    skriv.push(() => taBortK1Konto(supabase, variant, nr));
+  }
+
+  if (spara) {
+    for (const s of skriv) await s();
+    await loggaHistorik(supabase, historik);
+  }
   return plan;
 }

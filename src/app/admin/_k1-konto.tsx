@@ -4,11 +4,14 @@ import { useEffect, useState } from 'react';
 
 /**
  * Ändra kontobeskrivningen för ett K1-konto. Öppnas när man klickar på ett
- * konto som AI:n valt, eller i kontoplanen (/admin/kontoplan). Ändringen gäller
- * från nästa kontering — den läggs ovanpå k1.json (se @/lib/kontering/k1-andringar).
+ * konto som AI:n valt, eller i kontoplanerna (/admin/kontoplan/lopande och
+ * /bokslut). Ändringen läggs ovanpå k1.json (se @/lib/kontering/k1-andringar).
+ * Konteringen läser den löpande kontoplanen, så klick i Flöde och Kontering
+ * öppnar den.
  *
  * `ny` lägger till ett konto som inte finns i k1.json. Ett tillagt konto har
- * inget original, så "Återställ" blir "Ta bort kontot".
+ * inget original, så "Återställ" blir "Ta bort kontot" — det försvinner ur
+ * vyn men finns kvar i historiken.
  *
  * Listorna skrivs en punkt per rad.
  */
@@ -63,8 +66,10 @@ const TOMT: Konto = {
   varningar: [], exempel: [], granskningNar: [], nyckelord: [],
 };
 
-export function KontoRuta({ konto: kontoIn, ny = false, onStang, onSparad }: {
+export function KontoRuta({ konto: kontoIn, variant = 'lopande', ny = false, onStang, onSparad }: {
   konto: string;
+  /** Kontoplanen: löpande bokföring (som konteringen använder) eller bokslut */
+  variant?: 'lopande' | 'bokslut';
   /** Ett nytt konto som inte är sparat än: inget laddas, kontonumret går att skriva */
   ny?: boolean;
   onStang: () => void;
@@ -92,7 +97,7 @@ export function KontoRuta({ konto: kontoIn, ny = false, onStang, onSparad }: {
 
   useEffect(() => {
     if (ny) return;
-    fetch(`/api/admin/k1-konto?konto=${encodeURIComponent(kontoIn)}`)
+    fetch(`/api/admin/k1-konto?variant=${variant}&konto=${encodeURIComponent(kontoIn)}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.error) throw new Error(d.error);
@@ -102,7 +107,7 @@ export function KontoRuta({ konto: kontoIn, ny = false, onStang, onSparad }: {
         fyll(d.aktuell);
       })
       .catch((err) => setLaddfel(err instanceof Error ? err.message : String(err)));
-  }, [kontoIn, ny]);
+  }, [kontoIn, ny, variant]);
 
   // Esc stänger
   useEffect(() => {
@@ -122,7 +127,7 @@ export function KontoRuta({ konto: kontoIn, ny = false, onStang, onSparad }: {
       const res = await fetch('/api/admin/k1-konto', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ konto: konto.trim(), ny: ar === 'osparat', namn, beskrivning, ...Object.fromEntries(LISTOR.map(({ falt }) => [falt, rader(listor[falt] ?? '')])) }),
+        body: JSON.stringify({ variant, konto: konto.trim(), ny: ar === 'osparat', namn, beskrivning, ...Object.fromEntries(LISTOR.map(({ falt }) => [falt, rader(listor[falt] ?? '')])) }),
       });
       const d = await res.json();
       if (d.error) throw new Error(d.error);
@@ -139,11 +144,11 @@ export function KontoRuta({ konto: kontoIn, ny = false, onStang, onSparad }: {
 
   async function aterstall() {
     if (!original) return;
-    if (ar === 'tillagt' && !confirm(`Ta bort konto ${konto} ${namn}? Konteringen kan inte längre välja det.`)) return;
+    if (ar === 'tillagt' && !confirm(`Ta bort konto ${konto} ${namn}? Det försvinner ur kontoplanen men finns kvar i historiken.`)) return;
     setSparar(true);
     setSparfel('');
     try {
-      const res = await fetch(`/api/admin/k1-konto?konto=${encodeURIComponent(konto)}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/k1-konto?variant=${variant}&konto=${encodeURIComponent(konto)}`, { method: 'DELETE' });
       const d = await res.json();
       if (d.error) throw new Error(d.error);
       onSparad?.();
@@ -165,6 +170,7 @@ export function KontoRuta({ konto: kontoIn, ny = false, onStang, onSparad }: {
           <h2 className="font-semibold text-slate-900">
             {ar === 'osparat' ? 'Nytt konto' : `Konto ${konto} ${namn}`}
           </h2>
+          <span className="text-xs text-slate-500">{variant === 'bokslut' ? 'Bokslut' : 'Löpande bokföring'}</span>
           {ar === 'tillagt' && <span className="text-xs text-emerald-700">Tillagt av byrån</span>}
           {andradAt && <span className="text-xs text-blue-700">{ar === 'tillagt' ? 'Sparat' : 'Ändrad av byrån'} {DATUM.format(new Date(andradAt))}</span>}
           <button onClick={onStang} className="ml-auto text-slate-400 hover:text-slate-700 text-xl leading-none" aria-label="Stäng">×</button>
@@ -172,7 +178,9 @@ export function KontoRuta({ konto: kontoIn, ny = false, onStang, onSparad }: {
         {laddfel ? <p className="px-5 py-4 text-sm text-red-600">{laddfel}</p> : !original ? <p className="px-5 py-4 text-sm text-slate-500">Laddar…</p> : (
           <div className="px-5 py-4 space-y-4 text-sm">
             <p className="text-slate-500 text-xs">
-              Det AI:n läser om kontot. En punkt per rad i listorna. Ändringen gäller från nästa kontering, också i dagens flöde.
+              {variant === 'bokslut'
+                ? 'Kontobeskrivningen i bokslutets kontoplan. En punkt per rad i listorna.'
+                : 'Det AI:n läser om kontot. En punkt per rad i listorna. Ändringen gäller från nästa kontering, också i dagens flöde.'}
             </p>
             <div className="flex gap-3">
               <label className="block w-28">

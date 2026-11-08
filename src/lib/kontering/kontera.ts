@@ -11,7 +11,7 @@ import { iKo } from '@/lib/ai-anrop';
 import { MODELLER, fraga, samtalMedUppslag, type Del, type Modell, type Prova, type Samtal, type Underlagssvar } from './modeller';
 import { momsText, rensaMomsdelar, slaIhopDelar, tolkaOmvand, type Momsdel, type Omvand } from './momsdelar';
 import { kontoBlock, kontolista, provaKonto, slaUppKonto, type Flagga } from './regelverk';
-import { BYRANS_PRINCIPER } from './principer';
+import { byransPrinciper } from './principer';
 import { laddaK1Andringar } from './k1-andringar';
 import { filensRader, underlagetsDelar, type Filrad } from './underlag';
 import { arUtlandsk, iKronor, omrakningText, raknaOmTillKronor, type Kronor } from './kronor';
@@ -183,7 +183,7 @@ const beslutSchema = (regelIdn: string[]) => ({
   },
 });
 
-const GEMENSAMT = `Du konterar transaktioner åt en svensk enskild näringsidkare som upprättar förenklat årsbokslut (K1) och bokför enligt kontantmetoden.
+const GEMENSAMT = () => `Du konterar transaktioner åt en svensk enskild näringsidkare som upprättar förenklat årsbokslut (K1) och bokför enligt kontantmetoden.
 
 Du får, i den här ordningen:
 - KUNDBILDEN: en kollegas sammanställning av kunden.
@@ -203,9 +203,9 @@ Allmänna regler:
 - Står det en instruktion från byrån i anteckningen följer du den. Den väger tyngst av allt. Står det BYRÅNS KONTEXT vid transaktionen följer du den på samma sätt.
 - Bokföringen sker i kronor. Är underlaget i en annan valuta har vi redan räknat om transaktionen: beloppet och momsen står i kronor, och inom parentes står originalbeloppet och kursen — kronbeloppet eller kursen på underlaget när de finns, annars Riksbankens dagskurs. Kontera på kronbeloppet och ange delarnas belopp och moms i kronor. Räkna inte om transaktionen själv, och se inte omräkningen som ett problem eller som skäl till granskning. Originalet, avskriften och filens rader (F1, F2 …) står kvar i originalvalutan — tar du belopp ur underlagets rader räknar du om dem med samma kurs. Momsen på ett utländskt underlag är oftast utländsk moms, och den ger aldrig avdrag för svensk ingående moms — bara svensk moms från en svensk säljare gör det.
 
-${BYRANS_PRINCIPER}`;
+${byransPrinciper()}`;
 
-const KONTERA_FAST = `${GEMENSAMT}
+const KONTERA_FAST = () => `${GEMENSAMT()}
 
 SÅ ARBETAR DU: Ta först reda på vad affären är. Kontoplanen nedan är korta rader. Med verktyget las_konton läser du ett kontos fullständiga regler: beskrivning, "Använd när", "Använd INTE när", beslutsregler och när en människa ska granska. Läs de konton du behöver reglerna för att avgöra, och läs vidare om reglerna pekar mot ett annat konto som kan gälla den här affären. Du får läsa så många konton du behöver, och ett konto du redan läst står kvar i samtalet. Verktygen är hjälpmedel som du använder när de behövs, ingen skyldighet: är affären tydlig konterar du direkt. Du kan använda flera verktyg samtidigt. När du vet nog svarar du med konteringen.
 
@@ -633,7 +633,7 @@ async function konteraMedModell(modell: Modell, t: Transaktion, betalsatt: Betal
   const brutto = Number(t.belopp);
   const netto = ore(brutto - (Number(t.moms) || 0));
   const samtal = await samtalMedUppslag<Beslut>(modell, {
-    system: { fast: KONTERA_FAST, kund: f.kund },
+    system: { fast: KONTERA_FAST(), kund: f.kund },
     delat: f.delat,
     user: f.user,
     namn: 'kontering',

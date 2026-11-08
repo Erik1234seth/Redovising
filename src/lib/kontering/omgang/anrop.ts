@@ -1,5 +1,5 @@
 import { BESKRIVNINGSREGEL, MEJLREGEL } from '@/lib/transaktioner/normalisera';
-import { BYRANS_PRINCIPER } from '../principer';
+import { byransPrinciper } from '../principer';
 import { allaKonton, kontoBlock } from '../regelverk';
 
 /**
@@ -125,7 +125,7 @@ Se efter hur kundens liknande köp redan konterats — samma leverantör, samma 
 ANTECKNINGAR
 Det du ser när du har alla underlag framför dig och som byrån bör veta — t.ex. att två filer verkar höra ihop utan att vara dubbletter, ett mönster i kundens köp, något som verkar fel. Tom lista när inget.
 
-${BYRANS_PRINCIPER}
+${byransPrinciper()}
 
 K1-KONTOPLAN MED REGLER:
 ${helK1()}`;

@@ -25,7 +25,8 @@ const ITEMS: { href: string; label: string }[] = [
   { href: '/admin/arenden', label: 'Ärenden' },
   { href: '/admin/kalender', label: 'Kalender' },
   { href: '/admin/flodesschema', label: 'Flödesschema' },
-  { href: '/admin/kontoplan', label: 'Kontoplan' },
+  { href: '/admin/kontoplan/lopande', label: 'Löpande bokföring' },
+  { href: '/admin/kontoplan/bokslut', label: 'Bokslut' },
 ];
 
 const POLL_MS = 60_000;
