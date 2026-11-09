@@ -17,12 +17,12 @@ export interface Anropsinfo {
 
 /**
  * Dollar per miljon tokens, listpriser 2026-11-07. Claudes cache skrivs alltid
- * med 1 timmes livstid (se ./kontering/modeller). OpenAIs påslag för mycket
- * långa prompter räknas inte med, men tokenantalen sparas så att det går att
- * räkna om.
+ * med 1 timmes livstid (se ./kontering/modeller). "lang" är OpenAIs påslag för
+ * långa prompter: över gränsen kostar hela anropet mer, indata dubbelt och
+ * svaret en och en halv gång.
  */
-const PRISER: Record<string, { indata: number; cacheLast: number; cacheSkriv?: number; utdata: number }> = {
-  'gpt-6.1-sol': { indata: 2, cacheLast: 0.1, utdata: 10 },
+const PRISER: Record<string, { indata: number; cacheLast: number; cacheSkriv?: number; utdata: number; lang?: { over: number; indata: number; utdata: number } }> = {
+  'gpt-6.1-sol': { indata: 2, cacheLast: 0.1, utdata: 10, lang: { over: 272_000, indata: 2, utdata: 1.5 } },
   'gpt-6-luna': { indata: 0.1, cacheLast: 0.01, utdata: 0.5 },
   'text-embedding-3-small': { indata: 0.02, cacheLast: 0, utdata: 0 },
   'claude-opus-5-5': { indata: 4, cacheLast: 0.2, cacheSkriv: 8, utdata: 20 },
@@ -46,7 +46,8 @@ function kostnad(modell: string, t: Tokens): number | null {
   const nyckel = Object.keys(PRISER).find((k) => modell.startsWith(k));
   if (!nyckel) return null;
   const p = PRISER[nyckel];
-  const tokens = t.indata * p.indata + t.cacheLast * p.cacheLast + t.cacheSkrivet * (p.cacheSkriv ?? p.indata) + t.utdata * p.utdata;
+  const lang = p.lang && t.indata + t.cacheLast + t.cacheSkrivet > p.lang.over ? p.lang : { indata: 1, utdata: 1 };
+  const tokens = (t.indata * p.indata + t.cacheLast * p.cacheLast + t.cacheSkrivet * (p.cacheSkriv ?? p.indata)) * lang.indata + t.utdata * p.utdata * lang.utdata;
   return tokens / 1_000_000 + t.webbsokningar * PER_WEBBSOKNING + t.kodmiljoer * PER_KODMILJO;
 }
 

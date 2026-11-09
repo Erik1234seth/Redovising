@@ -15,9 +15,12 @@ import { laddaUpp, raderaFil } from './openai';
  * Förbereder en omgång för en kund: kontrollerar filerna, bygger kunddelen,
  * delar upp underlagen i anrop och laddar upp filerna till OpenAI.
  *
- * Ett anrop får inte bli för stort. Över 272 000 tokens in tar OpenAI dubbelt
- * betalt, och svaret har ett tak på 128 000 tokens med tänkandet. Därför
- * delas underlagen i delar med högst MAX_FILER filer och en tokenbudget.
+ * Helst läses hela omgången i ett anrop, så att en kontoutdragsrad och kvittot
+ * till den ses tillsammans. Över 272 000 tokens in tar OpenAI dubbelt betalt —
+ * det är värt det. Gränserna som återstår är modellens fönster (1 050 000
+ * tokens, varav svaret får 128 000 med tänkandet) och 50 MB filer per anrop.
+ * Bara över dem delas underlagen, i delar med högst MAX_FILER filer och en
+ * tokenbudget.
  *
  * Ingen sida får tappa sitt dokument för att omgången delas:
  * - Ordningen (iOrdning): filerna i samma mejl eller samma uppladdning hålls
@@ -30,16 +33,17 @@ import { laddaUpp, raderaFil } from './openai';
  *   delen efter sätter sin sida som del_av dokumentets första sida.
  */
 
-/** Under OpenAIs gräns på 272 000, med marginal för att uppskattningen är grov. */
-const TOKENTAK = 255_000;
-const MAX_FILER = 30;
+/** Under modellens 922 000 tokens in, med marginal för att uppskattningen är grov. */
+const TOKENTAK = 800_000;
+/** Svaret har 128 000 tokens med tänkandet; 29 filer tog 33 000. */
+const MAX_FILER = 60;
 /** Så många filer på var sida om en del följer med som grannsidor. Ett dokument på upp till fyra sidor klarar gränsen. */
 const GRANNAR = 3;
 /** Plats som hålls för grannsidorna: sex bilder. */
 const GRANNRESERV = 2 * GRANNAR * 3_000;
 /** Filer som laddats upp med mindre mellanrum än så räknas som samma uppladdning. */
 const SAMMA_UPPLADDNING_MS = 10 * 60 * 1000;
-/** OpenAIs gräns är 50 MB filer per anrop. Bilder räknas inte in, men vi räknar allt för säkerhets skull. */
+/** OpenAIs gräns är 50 MB filer per anrop. Bilder räknas inte in. */
 const MAX_BYTE_PER_ANROP = 45 * 1024 * 1024;
 /** Så här många tokens får filerna minst, även när kunddelen är stor. */
 const MIN_FILBUDGET = 40_000;
@@ -240,7 +244,7 @@ export async function forberedOmgang(
   const kontroller = await iKo(ordnade, SAMTIDIGA_UPPLADDNINGAR, ({ rad }) => kontrolleraFil(supabase, rad));
   ordnade.forEach(({ rad: u, samling }, i) => {
     const k = kontroller[i];
-    if (k.ok) godkanda.push({ u, fil: k.fil, samling, tokens: uppskattadeTokens(k.fil), byte: k.fil.typ === 'text' ? 0 : k.fil.bytes.length });
+    if (k.ok) godkanda.push({ u, fil: k.fil, samling, tokens: uppskattadeTokens(k.fil), byte: k.fil.typ === 'dokument' ? k.fil.bytes.length : 0 });
     else hoppade.push({ underlagId: u.id, namn: u.file_name, orsak: k.orsak, varning: !k.tyst });
   });
 
