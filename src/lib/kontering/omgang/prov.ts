@@ -143,9 +143,11 @@ export async function uppdateraProv(supabase: SupabaseClient, rad: Provrad): Pro
   const { data: tagen } = await supabase.from('kontering_prov').update({ status: 'tar-emot' }).eq('id', rad.id).eq('status', 'skickad').select('id');
   if (!tagen?.length) return;
 
-  await loggaOpenAI({ steg: STEG, userId: rad.user_id }, svar.modell || MODELL, svar.usage);
-  const kostnad = kostnadOpenAI(svar.modell || MODELL, svar.usage);
-  const klar = { usage: svar.usage, kostnad_usd: kostnad, klar_at: new Date().toISOString() };
+  const webb = { webbsokningar: svar.sokningar.length };
+  await loggaOpenAI({ steg: STEG, userId: rad.user_id }, svar.modell || MODELL, svar.usage, webb);
+  const kostnad = kostnadOpenAI(svar.modell || MODELL, svar.usage, webb);
+  // Sökningarna sparas med användningen, så att det syns vad modellen letade efter
+  const klar = { usage: { ...svar.usage, webbsokningar: svar.sokningar }, kostnad_usd: kostnad, klar_at: new Date().toISOString() };
 
   try {
     if (!svar.ok) throw new Error(svar.fel);

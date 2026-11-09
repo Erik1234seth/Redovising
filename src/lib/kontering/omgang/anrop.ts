@@ -86,7 +86,7 @@ TRANSAKTIONER
 - "datum": betaldatumet om underlaget visar när det betalades, annars fakturadatumet eller kvittots datum. "ÅÅÅÅ-MM-DD", tom sträng om det inte framgår — gissa inte, skriv varför i "anteckning".
 ${BESKRIVNINGSREGEL}
 - "motpart": säljaren, leverantören eller kunden, tom sträng om det inte framgår.
-- "vat_nummer": motpartens momsregistreringsnummer som det står, tom sträng annars. Hitta aldrig på eller räkna fram ett VAT-nummer.
+- "vat_nummer": motpartens momsregistreringsnummer. Står det på underlaget tar du det därifrån. Står det inte där och motparten är ett företag i ett annat EU-land, eller ett VAT-nummer annars behövs för momsen, söker du upp det på internet (se INTERNET). Tom sträng när du inte hittar något säkert. Hitta aldrig på eller räkna fram ett VAT-nummer.
 - "uppgifter": det som står på underlaget, null för det som inte står. "belopp_sek" när underlaget anger beloppet i kronor för en utländsk valuta, "valutakurs" när det anger en kurs mot kronor. "momsrader" är underlagets momsspecifikation, en rad per sats.
 - "anteckning": kort när något är oläsligt eller osäkert, annars tom sträng.
 ${MEJLREGEL}
@@ -98,6 +98,13 @@ En affär får bara bokföras en gång. Jämför varje transaktion med KUNDENS T
 - Talar för samma affär: samma order-, faktura-, kvitto- eller OCR-nummer (starkast), samma motpart, samma varor, belopp och datum nära varandra. Talar emot: olika nummer av samma sort, olika varor, ett köp som återkommer — en prenumeration, hyra eller månadsavgift är en ny affär varje period (men betalningen av en periods faktura är samma affär som fakturan).
 - "status": "dublett" bara när du är säker — samma nummer, samma underlag inskickat igen, eller en kontoutdragsrad med samma motpart, belopp och datum nära ett kvitto. En dubblett bokförs inte; filen kopplas i stället till affären som ett extra underlag. Ett misstag gör att en riktig affär försvinner. "tveksam" när det kan vara samma affär men beviset inte är starkt; då tittar en människa på den. "unik" annars.
 - "ref": raden, verifikationen eller filen det är en dubblett av, t.ex. "K120", "BOK12" eller "F3". Är samma affär både i ett underlag och i ett komplement i omgången är komplementets rad dubbletten; vid två underlag är den senare dubbletten. Tom sträng vid "unik".
+
+INTERNET
+Du kan söka på internet. Gör det när det hjälper bokföringen och underlaget inte räcker: framför allt för att slå upp motpartens VAT-nummer, men också för att se vad ett företag säljer eller i vilket land det finns.
+- VAT-nummer: leta på företagets egen webbplats (villkor, impressum, kontakt, fakturainformation), i VIES eller i ett offentligt företagsregister. Ta bara ett nummer som tydligt hör till just den motparten, med samma namn och land som på underlaget. Skriv i "anteckning" att VAT-numret är hämtat från internet och varifrån, till exempel "VAT-nummer från leverantörens webbplats".
+- Ett VAT-nummer du hittat på det sättet saknas inte, och du frågar inte kunden efter det.
+- Sök bara på företag och sakfrågor, aldrig på kunden eller på privatpersoner, och skriv inga personuppgifter i sökningarna.
+- Sök inte när underlaget redan räcker.
 
 SAKNAS
 Av det vi har ska det gå att avgöra datum, belopp, moms (beloppet, satsen eller att ingen svensk moms ska redovisas) och vad affären gäller. Ett belopp i utländsk valuta räcker — fråga aldrig efter kronor eller kurs.
@@ -345,6 +352,8 @@ export function byggKropp(kund: string, alla: Indatafil[], regelIdn: string[]): 
     instructions: instruktion(),
     text: { format: { type: 'json_schema', name: 'omgang', strict: true, schema: schema(regelIdn) } },
     input: [{ role: 'user', content }],
+    // Internet, framför allt för att slå upp motpartens VAT-nummer när underlaget saknar det
+    tools: [{ type: 'web_search' }],
     max_output_tokens: MAX_UTDATA,
     prompt_cache_key: 'kontering-omgang',
   };

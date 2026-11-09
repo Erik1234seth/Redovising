@@ -82,10 +82,10 @@ export async function skickaIBakgrunden(body: object): Promise<string> {
 
 export type Svarsstatus =
   | { klar: false; status: string }
-  | { klar: true; ok: true; text: string; usage: Record<string, unknown> | null; modell: string }
-  | { klar: true; ok: false; fel: string; usage: Record<string, unknown> | null; modell: string };
+  | { klar: true; ok: true; text: string; usage: Record<string, unknown> | null; modell: string; sokningar: string[] }
+  | { klar: true; ok: false; fel: string; usage: Record<string, unknown> | null; modell: string; sokningar: string[] };
 
-interface Utdata { type: string; content?: { type: string; text?: string; refusal?: string }[] }
+interface Utdata { type: string; action?: { query?: string }; content?: { type: string; text?: string; refusal?: string }[] }
 
 /** Frågar efter svaret. Klart är det när status inte längre är queued eller in_progress. */
 export async function hamtaSvar(id: string): Promise<Svarsstatus> {
@@ -97,16 +97,18 @@ export async function hamtaSvar(id: string): Promise<Svarsstatus> {
 
   const usage = json.usage ?? null;
   const modell = String(json.model ?? '');
+  // Webbsökningarna modellen gjorde, för kostnaden och för att se vad den letade efter
+  const sokningar = ((json.output ?? []) as Utdata[]).filter((u) => u.type === 'web_search_call').map((u) => u.action?.query ?? '');
   if (status !== 'completed') {
     const orsak = json.incomplete_details?.reason === 'max_output_tokens'
       ? 'Svaret blev för långt och klipptes — dela omgången i färre underlag'
       : json.error?.message ?? json.incomplete_details?.reason ?? status;
-    return { klar: true, ok: false, fel: `Modellen blev inte klar (${status}): ${orsak}`, usage, modell };
+    return { klar: true, ok: false, fel: `Modellen blev inte klar (${status}): ${orsak}`, usage, modell, sokningar };
   }
   const delar = ((json.output ?? []) as Utdata[]).filter((u) => u.type === 'message').flatMap((u) => u.content ?? []);
   const vagran = delar.find((d) => d.type === 'refusal');
-  if (vagran) return { klar: true, ok: false, fel: `Modellen vägrade: ${vagran.refusal}`, usage, modell };
-  return { klar: true, ok: true, text: delar.filter((d) => d.type === 'output_text').map((d) => d.text ?? '').join(''), usage, modell };
+  if (vagran) return { klar: true, ok: false, fel: `Modellen vägrade: ${vagran.refusal}`, usage, modell, sokningar };
+  return { klar: true, ok: true, text: delar.filter((d) => d.type === 'output_text').map((d) => d.text ?? '').join(''), usage, modell, sokningar };
 }
 
 export async function avbryt(id: string): Promise<void> {

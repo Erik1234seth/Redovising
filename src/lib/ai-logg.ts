@@ -111,8 +111,9 @@ export async function loggaOpenAI(
 export function kostnadOpenAI(
   modell: string,
   usage: Record<string, any> | null | undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
+  extra: { webbsokningar?: number; kodmiljoer?: number } = {},
 ): number | null {
-  return kostnad(modell, openaiTokens(usage, {}));
+  return kostnad(modell, openaiTokens(usage, extra));
 }
 
 /** Svaret från Claude. Här ligger cachen utanför input_tokens, och tänkandet ingår i output_tokens utan egen siffra. */
