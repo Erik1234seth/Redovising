@@ -217,7 +217,7 @@ export async function skrivFragemejl(
     .find((u) => u.sender_email?.trim());
   const till = (senaste?.sender_email?.trim() || profil.email?.trim() || '').toLowerCase();
   if (!till) throw new Error('Kunden har ingen mejladress');
-  const amne = mejl ? (mejl.subject?.trim() || '') : 'Några uppgifter saknas för bokföringen';
+  const amne = mejl ? (mejl.subject?.trim() || '') : 'Några frågor om bokföringen';
 
   // Grupperat per underlag, så att kunden ser vilket kvitto eller utdrag det gäller
   const perFil = new Map<string, Rad[]>();
@@ -244,29 +244,35 @@ export async function skrivFragemejl(
   // Hur mycket som var tydligt, så att mejlet inte bara handlar om det som saknas
   const aldsta = [...(underlag ?? [])].map((u) => String(u.created_at)).sort()[0] ?? null;
   const tydliga = await tydligaUnderlag(supabase, userId, aldsta);
-  const underlagKontext = (tydliga ? 'ÖVRIGA UNDERLAG: kundens övriga underlag från samma period var tydliga och kunde bokföras utan frågor.\n\n' : '')
+  const underlagKontext = (tydliga ? 'ÖVRIGA UNDERLAG: kundens övriga underlag från samma period gick att bokföra utan frågor.\n\n' : '')
     + (fragor.length ? `${lage === 'osakra' ? 'TRANSAKTIONER VI ÄR OSÄKRA PÅ' : 'TRANSAKTIONER SOM SAKNAR UPPGIFTER'} (${fragor.length} st):\n${block.join('\n\n')}\n\n` : '')
     + (sidor.length ? `UNDERLAG DÄR SIDOR SAKNAS (${sidor.length} st) — be kunden skicka de saknade sidorna, gärna som foto:\n${sidblock.join('\n')}\n\n` : '')
-    + 'Skriv ETT vänligt och personligt mejl till kunden. Börja med att tacka för underlagen och säga att det mesta var tydligt'
-    + (tydliga ? ' — nämn att de övriga underlagen var tydliga och är klara, utan att räkna dem — ' : ' ')
-    + 'innan du kommer till det som saknas. Tonen ska vara varm och enkel, som från en byrå som gärna hjälper till, inte som en lista med krav. '
-    + 'Skriv inte hur många underlag eller transaktioner det gäller — varken de tydliga eller dem du frågar om. '
-    + 'Avsluta med en kort vänlig rad, till exempel att kunden bara kan svara på mejlet och att det går bra att höra av sig om något är oklart. '
+    // Vad mejlet ska fråga om
     + (lage === 'osakra'
-      ? 'Vi är osäkra på hur transaktionerna ovan ska bokföras. Fråga bara efter det vi behöver veta för att välja rätt konto och moms, och ställ så FÅ frågor som möjligt. '
-        + 'Täcker en generell fråga flera transaktioner — till exempel vad kunden använder en viss sorts inköp till, om alla köp från samma leverantör, '
-        + 'eller om bilen i verksamheten är firmans eller privat — ställer du den en gång och räknar kort upp vilka transaktioner den gäller (datum, motpart, belopp). '
+      ? 'Skriv ETT mejl till kunden. Vi är osäkra på hur transaktionerna ovan ska bokföras. Fråga bara efter det vi behöver veta för att välja rätt konto och moms, och ställ så FÅ frågor som möjligt. '
+        + 'Täcker en generell fråga flera transaktioner, till exempel vad kunden använder en viss sorts inköp till, om alla köp från samma leverantör, '
+        + 'eller om bilen i verksamheten är firmans eller privat, ställer du den en gång och räknar kort upp vilka transaktioner den gäller (datum, motpart, belopp). '
         + 'Ställ en egen fråga om en enskild transaktion bara när den inte går att täcka med en generell fråga. '
         + 'Byråns anteckningar om varför vi är osäkra är bara till för dig: skriv dem aldrig i mejlet. '
-      : 'Fråga efter just det som saknas ovan, för alla transaktionerna och underlagen. Gå igenom dem en och en, '
+      : 'Skriv ETT mejl till kunden. Fråga efter just det som saknas ovan, för alla transaktionerna och underlagen, '
         + 'med datum, motpart och belopp så att kunden ser vilken det gäller. '
-        + 'Är det samma fråga för flera transaktioner — till exempel om bilen i verksamheten är firmans eller privat — ställer du den en gång, '
+        + 'Är det samma fråga för flera transaktioner, till exempel om bilen i verksamheten är firmans eller privat, ställer du den en gång '
         + 'med transaktionerna den gäller uppräknade kort under, i stället för att upprepa frågan för varje. ')
-    + 'Det ska kännas som att vi ber om hjälp att göra klart, inte som ett förhör. Utgå från att allt är i sin ordning: '
-    + 'skriv inte varför något ser oklart eller misstänkt ut (till exempel att en faktura är ställd till en annan person, eller att något kan vara privat), '
-    + 'ställ inga motfrågor eller dubbla frågor, och upprepa inte frågan vid varje rad. Formulera frågorna mjukt, till exempel "Kan du berätta …" eller '
-    + '"Vi skulle behöva …". Förklara varför vi behöver något bara där det hjälper kunden, i en kort mening, utan facktermer. Be kunden svara på mejlet. Fråga inte om något annat, och aldrig om sådant kunden redan svarat på i mejlhistoriken. '
-    + 'Står det BYRÅNS KONTEXT eller BYRÅNS REGLER följer du dem — fråga inte om sådant de redan besvarar.'
+    + 'Utgå från att allt är i sin ordning: skriv inte varför något ser oklart eller misstänkt ut (till exempel att en faktura är ställd till en annan person, eller att något kan vara privat), '
+    + 'och ställ inga motfrågor eller dubbla frågor. Fråga inte om något annat, och aldrig om sådant kunden redan svarat på i mejlhistoriken. '
+    + 'Står det BYRÅNS KONTEXT eller BYRÅNS REGLER följer du dem, och frågar inte om sådant de redan besvarar.\n\n'
+    // Hur det ska låta: som Erik skriver själv, inte som en mall
+    + 'SÅ SKA MEJLET LÅTA: Erik skriver det själv, mellan två andra saker, till en kund han känner. Det ska inte gå att se att en AI skrivit det. '
+    + 'Skriv kort, vardagligt och rakt, som ett vanligt mejl mellan två personer. Hellre lite för kort än för putsat. '
+    + 'Undvik mallfraser: inget "Tack för underlagen!", "Det mesta var tydligt", "Vi skulle bara behöva lite hjälp med några kompletteringar", '
+    + '"för att kunna göra klart resten", "hjälps vi åt", "i lugn och ro" eller "Hör gärna av dig om något är oklart!". '
+    + 'Efter "Hej förnamn," går du rakt på saken med en kort, enkel mening om att du gått igenom det kunden skickat och har några frågor, med egna ord som varierar från gång till gång'
+    + (tydliga ? '. Att resten är bokfört kan du nämna i förbifarten om det faller sig naturligt, men det behövs inte' : '')
+    + '. Inga utropstecken, inga peppiga eller överdrivet artiga ord, ingen sammanfattning och ingen avslutande standardrad. '
+    + 'Skriv inte hur många underlag eller transaktioner det gäller. '
+    + 'Frågorna ställs rakt och vänligt, så som man frågar en kund i verkligheten, inte inlindat. Förklara varför vi behöver något bara när kunden annars inte förstår, med några få ord och utan facktermer. '
+    + 'Listor skrivs med vanligt bindestreck, en rad per transaktion, utan punkt i slutet av raden. Rubriker eller inledande meningar över varje lista behövs bara när mejlet annars blir svårt att följa. '
+    + 'Mejlet slutar när sista frågan är ställd. Vill du avsluta med en rad räcker något kort och vardagligt, till exempel att kunden kan svara direkt här.'
     + (reglerText(instruktioner, userId) ? `\n\n${reglerText(instruktioner, userId)}` : '');
 
   const svar = await handleGeneralQuestion({
