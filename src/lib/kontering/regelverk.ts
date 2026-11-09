@@ -3,12 +3,14 @@ import k1 from './k1.json';
 /**
  * K1-regelverket som konteringen prövar mot.
  *
- * Läses ur k1.json, som byggs från kontobeskrivningarna med `npm run k1`.
- * Det som kan avgöras med en uppslagning eller en jämförelse görs här i kod
+ * Kontona är byråns kontoplan (löpande eller bokslut, ./k1-andringar), med hela
+ * texten för varje konto i databasen. k1.json, byggd med `npm run k1`, är bara
+ * utgångsläget: det som gäller innan laddaK1Andringar har körts, och det som
+ * "Återställ" går tillbaka till. Det som kan avgöras med en uppslagning eller en jämförelse görs här i kod
  * och lämnas aldrig till modellen — den kan inte minnas årets prisbasbelopp
  * och ska inte räkna på beloppsgränser.
  *
- * Bara kontona i k1.json får användas: K1-planen plus BAS-konton för försäljning
+ * Bara kontona i kontoplanen får användas: K1-planen plus BAS-konton för försäljning
  * och inköp utan svensk moms (3105, 3108, 3231, 3305, 3308, 4515 …). Ett konto som inte finns i listan
  * stoppas, även om det är ett giltigt BAS-konto.
  */
@@ -89,12 +91,12 @@ export interface Provning {
 
 export const KALLA: string = k1.kalla;
 const ORIGINAL = new Map((k1.konton as K1Konto[]).map((k) => [k.konto, k]));
-/** Kontona som de gäller: k1.json med byråns ändringar ovanpå (se ./k1-andringar). */
+/** Kontona som de gäller: byråns kontoplan (se ./k1-andringar), k1.json tills den är laddad. */
 let KONTON = new Map(ORIGINAL);
 
 /**
- * Texten byrån kan ändra för ett konto. Ett fält som saknas har originalets text.
- * Ett konto som inte finns i k1.json har byrån lagt till — då är det hela kontot.
+ * Texten byrån kan ändra för ett konto. Kontoplanen sparar hela texten; ett
+ * fält som saknas här har utgångslägets (k1.json) text.
  */
 export type K1Andring = Partial<Pick<K1Konto, 'namn' | 'beskrivning' | 'anvandNar' | 'anvandInteNar' | 'beslutsregler' | 'varningar' | 'exempel' | 'granskningNar' | 'nyckelord'>>;
 
@@ -121,21 +123,41 @@ export function originalNummer(): string[] {
   return [...ORIGINAL.keys()];
 }
 
-/**
- * Lägger byråns ändringar ovanpå k1.json. Anropas med alla ändringar, så att en
- * borttagen ändring försvinner. Konton i `borttagna` kan inte väljas.
- */
-export function anvandAndringar(andringar: Map<string, K1Andring>, borttagna: Set<string> = new Set()): void {
-  const nummer = [...new Set([...ORIGINAL.keys(), ...andringar.keys()])].filter((nr) => !borttagna.has(nr)).sort();
-  KONTON = new Map(nummer.map((nr) => [nr, medAndring(nr, andringar.get(nr))]));
+/** Fälten byrån kan ändra, i den ordning de sparas. */
+export const TEXTFALT = ['namn', 'beskrivning', 'anvandNar', 'anvandInteNar', 'beslutsregler', 'varningar', 'exempel', 'granskningNar', 'nyckelord'] as const;
+
+/** Kontots hela text, med ändringen ovanpå det som gällde. Det är det som sparas. */
+export function helText(nr: string, a?: K1Andring): Required<K1Andring> {
+  const k = medAndring(nr, a);
+  return Object.fromEntries(TEXTFALT.map((f) => [f, k[f]])) as Required<K1Andring>;
+}
+
+/** De fält där kontot skiljer sig från utgångsläget (k1.json) — det som visas som ändrat. */
+export function skillnadMotOriginal(nr: string, a?: K1Andring): K1Andring {
+  const o = ORIGINAL.get(nr);
+  const k = helText(nr, a);
+  return Object.fromEntries(TEXTFALT.filter((f) => !o || JSON.stringify(k[f]) !== JSON.stringify(o[f])).map((f) => [f, k[f]])) as K1Andring;
 }
 
 /**
- * Hela k1.json som den gäller med byråns ändringar och tillagda konton, utan
- * borttagna — det som laddas ner. Gränsvärdena är kontoplanens regelmaster.
+ * Kontoplanens konton: raderna byrån har, utan borttagna. En kontoplan utan
+ * några rader alls har inte kopierats än och visar utgångsläget.
+ */
+function kontoNummer(andringar: Map<string, K1Andring>, borttagna: Set<string>): string[] {
+  return [...(andringar.size ? andringar.keys() : ORIGINAL.keys())].filter((nr) => !borttagna.has(nr)).sort();
+}
+
+/** Låter konteringen använda kontoplanen. Konton i `borttagna` kan inte väljas. */
+export function anvandAndringar(andringar: Map<string, K1Andring>, borttagna: Set<string> = new Set()): void {
+  KONTON = new Map(kontoNummer(andringar, borttagna).map((nr) => [nr, medAndring(nr, andringar.get(nr))]));
+}
+
+/**
+ * Hela kontoplanen som den gäller, utan borttagna konton — det som laddas ner
+ * (k1-lopande.json, k1-bokslut.json). Gränsvärdena är kontoplanens regelmaster.
  */
 export function k1Fil(andringar: Map<string, K1Andring>, borttagna: Set<string> = new Set(), rm: Regelmaster = K1_REGELMASTER) {
-  const nummer = [...new Set([...ORIGINAL.keys(), ...andringar.keys()])].filter((nr) => !borttagna.has(nr)).sort();
+  const nummer = kontoNummer(andringar, borttagna);
   return {
     kalla: KALLA,
     konton: nummer.map((nr) => medAndring(nr, andringar.get(nr))),

@@ -4,7 +4,7 @@ import {
   aterstallK1Konto, hamtaK1Andringar, kontoText, loggaHistorik, sparaK1Andring, synligaKonton, taBortK1Konto, tolkaVariant,
   type SparadAndring, type Variant,
 } from '@/lib/kontering/k1-andringar';
-import { k1Fil, medAndring, originalKonto, type K1Andring } from '@/lib/kontering/regelverk';
+import { helText, k1Fil, medAndring, originalKonto, skillnadMotOriginal, type K1Andring } from '@/lib/kontering/regelverk';
 import { k1Xlsx } from '@/lib/kontering/k1-xlsx';
 import { importeraKonton, lasKontoFil } from '@/lib/kontering/k1-import';
 import { hamtaRegelmaster } from '@/lib/kontering/regelmaster';
@@ -17,10 +17,10 @@ import { hamtaRegelmaster } from '@/lib/kontering/regelmaster';
  *   GET                alla konton som syns, för kontoplanen
  *   GET ?fil=json|xlsx hela kontobeskrivningarna med ändringar och nya konton
  *   GET ?historik=1    allt som ändrats, nyast först
- *   PUT                spara kontots text — fält som är lika med originalet sparas som original.
+ *   PUT                spara kontots text (hela texten sparas i kontoplanen).
  *                      `ny: true` lägger till ett konto som inte finns i k1.json.
  *                      `tillbaka: true` tar tillbaka ett borttaget konto.
- *   DELETE ?konto=     återställ kontot till originalet, eller ta bort ett tillagt konto ur vyn
+ *   DELETE ?konto=     återställ kontot till utgångsläget (k1.json), eller ta bort ett tillagt konto ur vyn
  *   POST               importera en xlsx- eller JSON-fil (formulärfältet fil) med samma struktur som
  *                      nedladdningen. Konton som saknas i filen tas bort ur vyn. Utan spara=1 visas
  *                      bara vad som skulle ändras.
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     if (fil) {
       const data = k1Fil(andringar(sparade), borttagna(sparade), await hamtaRegelmaster(supabase, variant));
       const datum = new Date().toLocaleDateString('sv-SE');
-      const namn = `K1_kontobeskrivningar_${variant === 'bokslut' ? 'bokslut' : 'lopande'}_${datum}`;
+      const namn = `k1-${variant === 'bokslut' ? 'bokslut' : 'lopande'}_${datum}`;
       if (fil === 'json') {
         return new NextResponse(JSON.stringify(data, null, 1) + '\n', {
           headers: {
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
           konto: nr,
           namn: k.namn,
           beskrivning: k.beskrivning,
-          status: !originalKonto(nr) ? 'ny' : s ? 'andrad' : 'original',
+          status: !originalKonto(nr) ? 'ny' : Object.keys(skillnadMotOriginal(nr, s?.andring)).length ? 'andrad' : 'original',
           andradAt: s?.updatedAt ?? null,
         };
       });
@@ -113,7 +113,8 @@ export async function GET(request: NextRequest) {
     if (!original && !sparad) return fel(`${konto} finns inte i kontoplanen`, 404);
     return NextResponse.json({
       original,
-      andring: sparad?.andring ?? null,
+      // Det som skiljer från utgångsläget — kontoplanen sparar hela texten
+      andring: sparad ? skillnadMotOriginal(konto.trim(), sparad.andring) : null,
       andradAt: sparad?.updatedAt ?? null,
       borttagenAt: sparad?.borttagenAt ?? null,
       aktuell: medAndring(konto.trim(), sparad?.andring),
@@ -142,9 +143,7 @@ export async function PUT(request: NextRequest) {
 
     if (body.tillbaka) {
       if (!sparad?.borttagenAt) return fel(`${konto} är inte borttaget`, 400);
-      // Ett originalkonto utan egen text behöver ingen rad alls
-      if (original && !Object.keys(sparad.andring).length) await aterstallK1Konto(supabase, variant, konto);
-      else await sparaK1Andring(supabase, variant, konto, {});
+      await sparaK1Andring(supabase, variant, konto, {}, sparad.andring);
       await loggaHistorik(supabase, [{ variant, konto, handling: 'tillbaka', data: kontoText(konto, sparad.andring) }]);
       return NextResponse.json({ ok: true });
     }
@@ -172,27 +171,23 @@ export async function PUT(request: NextRequest) {
 
     if (body.ny) return fel(`${konto} ${original.namn} finns redan${sparad?.borttagenAt ? ' men är borttaget — ta tillbaka det under Historik' : ''}`, 409);
 
-    // Bara det som skiljer från originalet sparas, så att en senare ny k1.json syns i resten
-    const andring: { [K in keyof K1Andring]: K1Andring[K] | null } = {};
+    // Hela texten sparas i kontoplanen: det som skickats ovanpå det som gällde
+    const andring: K1Andring = {};
     for (const falt of ['namn', 'beskrivning'] as const) {
       const v = typeof body[falt] === 'string' ? body[falt].trim() : undefined;
       if (v === undefined) continue;
       if (!v) return fel(falt === 'namn' ? 'Kontot behöver ett namn' : 'Beskrivningen kan inte vara tom', 400);
-      andring[falt] = v === original[falt] ? null : v;
+      andring[falt] = v;
     }
     for (const falt of LISTOR) {
       const v = body[falt];
       if (v === undefined) continue;
       if (!Array.isArray(v)) return fel(`${falt} ska vara en lista`, 400);
-      const rader = v.map((x) => String(x ?? '').trim()).filter(Boolean);
-      andring[falt] = JSON.stringify(rader) === JSON.stringify(original[falt]) ? null : rader;
+      andring[falt] = v.map((x) => String(x ?? '').trim()).filter(Boolean);
     }
 
-    const tomt = Object.values(andring).every((v) => v === null);
-    if (tomt) await aterstallK1Konto(supabase, variant, original.konto);
-    else await sparaK1Andring(supabase, variant, original.konto, andring);
-    const efter = Object.fromEntries(Object.entries(andring).filter(([, v]) => v !== null)) as K1Andring;
-    await loggaHistorik(supabase, [{ variant, konto: original.konto, handling: tomt ? 'aterstalld' : 'sparad', data: kontoText(original.konto, efter) }]);
+    await sparaK1Andring(supabase, variant, original.konto, andring, sparad?.andring);
+    await loggaHistorik(supabase, [{ variant, konto: original.konto, handling: 'sparad', data: kontoText(original.konto, helText(original.konto, { ...sparad?.andring, ...andring })) }]);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return fel(err);

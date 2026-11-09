@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { anvandAndringar, anvandRegelmaster, medAndring, originalNummer, type K1Andring, type K1Konto } from './regelverk';
+import { anvandAndringar, anvandRegelmaster, helText, medAndring, originalNummer, type K1Andring, type K1Konto } from './regelverk';
 import { hamtaAiRegler, hamtaRegelmaster } from './regelmaster';
 import { anvandPrinciper, PRINCIPER } from './principer';
 import { anvandAiRegler } from './airegler';
@@ -9,11 +9,12 @@ import { anvandAiRegler } from './airegler';
  * och bokslut, med var sina kontobeskrivningar och principer. Konteringen
  * använder den löpande.
  *
- * Originalet är k1.json, byggt från xlsx-filen med `npm run k1`. Ändringarna
- * sparas per kontoplan och konto i `k1_konto_andringar` och läggs ovanpå när en
- * kontering börjar, så att de gäller direkt utan ny deploy. Ett fält som är
- * null har originalets text. Ett konto med `borttagen_at` syns inte och kan
- * inte väljas, men texten ligger kvar.
+ * Varje kontoplan är en hel kopia: `k1_konto_andringar` har en rad per
+ * kontoplan och konto med hela texten, och den läses när en kontering börjar,
+ * så att det som ändras gäller direkt utan ny deploy. k1.json (byggd från
+ * xlsx-filen med `npm run k1`) är bara utgångsläget som "Återställ" går
+ * tillbaka till — en ny k1.json ändrar ingen kontoplan. Ett konto med
+ * `borttagen_at` syns inte och kan inte väljas, men texten ligger kvar.
  *
  * Allt som ändras skrivs också till `kontoplan_historik`, med kontots text
  * efteråt (vid borttagning: som den var).
@@ -57,9 +58,9 @@ export async function hamtaK1Andringar(supabase: SupabaseClient, variant: Varian
   return new Map(((data ?? []) as Rad[]).map((r) => [r.konto, { andring: franRad(r), updatedAt: r.updated_at, borttagenAt: r.borttagen_at }]));
 }
 
-/** Kontona som syns i kontoplanen: k1.json plus tillagda, utan borttagna. */
+/** Kontona som syns i kontoplanen: dess rader utan borttagna (utgångsläget om den inte har några). */
 export function synligaKonton(sparade: Map<string, SparadAndring>): string[] {
-  return [...new Set([...originalNummer(), ...sparade.keys()])].filter((nr) => !sparade.get(nr)?.borttagenAt).sort();
+  return [...(sparade.size ? sparade.keys() : originalNummer())].filter((nr) => !sparade.get(nr)?.borttagenAt).sort();
 }
 
 /**
@@ -78,20 +79,21 @@ export async function laddaK1Andringar(supabase: SupabaseClient): Promise<void> 
   anvandPrinciper(principer.lista);
 }
 
-/** Sparar kontots ändrade fält. Ett fält som är null går tillbaka till originalet. Kontot syns igen om det var borttaget. */
-export async function sparaK1Andring(supabase: SupabaseClient, variant: Variant, konto: string, andring: { [K in keyof K1Andring]?: K1Andring[K] | null }): Promise<void> {
+/**
+ * Sparar kontots hela text: ändringen ovanpå det som gäller nu (`nu`, kontots
+ * sparade text). Kontot syns igen om det var borttaget.
+ */
+export async function sparaK1Andring(supabase: SupabaseClient, variant: Variant, konto: string, andring: K1Andring, nu?: K1Andring): Promise<void> {
+  const hel = helText(konto, { ...nu, ...andring });
   const rad: Record<string, unknown> = { variant, konto, updated_at: new Date().toISOString(), borttagen_at: null };
-  for (const [falt, kolumn] of Object.entries(FALT)) {
-    if (falt in andring) rad[kolumn] = andring[falt as keyof K1Andring] ?? null;
-  }
+  for (const [falt, kolumn] of Object.entries(FALT)) rad[kolumn] = hel[falt as keyof K1Andring];
   const { error } = await supabase.from('k1_konto_andringar').upsert(rad, { onConflict: 'variant,konto' });
   if (error) throw new Error(`Kunde inte spara kontobeskrivningen: ${error.message}`);
 }
 
-/** Tar bort alla ändringar för kontot — originalet gäller igen. */
+/** Ger kontot utgångslägets (k1.json) text igen. Raden finns kvar — den är kontot i kontoplanen. */
 export async function aterstallK1Konto(supabase: SupabaseClient, variant: Variant, konto: string): Promise<void> {
-  const { error } = await supabase.from('k1_konto_andringar').delete().eq('variant', variant).eq('konto', konto);
-  if (error) throw new Error(`Kunde inte återställa kontot: ${error.message}`);
+  await sparaK1Andring(supabase, variant, konto, {});
 }
 
 /** Tar bort kontot ur vyn. Byråns text ligger kvar, så det kommer tillbaka som det var. */

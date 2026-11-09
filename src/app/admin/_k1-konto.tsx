@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 /**
  * Ändra kontobeskrivningen för ett K1-konto. Öppnas när man klickar på ett
  * konto som AI:n valt, eller i kontoplanerna (/admin/kontoplan/lopande och
- * /bokslut). Ändringen läggs ovanpå k1.json (se @/lib/kontering/k1-andringar).
+ * /bokslut). Kontoplanen sparar hela texten (se @/lib/kontering/k1-andringar); k1.json är utgångsläget.
  * Konteringen läser den löpande kontoplanen, så klick i Flöde och Kontering
  * öppnar den.
  *
@@ -219,7 +219,7 @@ export function KontoRuta({ konto: kontoIn, variant = 'lopande', ny = false, onS
           {ar === 'osparat' && !sparfel && <span className="text-sm text-slate-500">Kontonummer, namn och beskrivning krävs, resten kan fyllas i senare</span>}
           {andradAt && (
             <button onClick={aterstall} disabled={sparar} className="text-sm text-slate-500 hover:text-red-600 disabled:opacity-40">
-              {ar === 'tillagt' ? 'Ta bort kontot' : 'Återställ till originalet'}
+              {ar === 'tillagt' ? 'Ta bort kontot' : 'Återställ till utgångsläget'}
             </button>
           )}
           <button onClick={onStang} className="ml-auto text-sm text-slate-600 px-3 py-1.5">Stäng</button>

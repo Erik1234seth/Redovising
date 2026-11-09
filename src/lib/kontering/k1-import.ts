@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
-  aterstallK1Konto, hamtaK1Andringar, kontoText, loggaHistorik, sparaK1Andring, synligaKonton, taBortK1Konto, type Variant,
+  hamtaK1Andringar, kontoText, loggaHistorik, sparaK1Andring, synligaKonton, taBortK1Konto, type Variant,
 } from './k1-andringar';
 import { medAndring, originalKonto, type K1Andring, type K1Konto } from './regelverk';
 
@@ -10,8 +10,9 @@ import { medAndring, originalKonto, type K1Andring, type K1Konto } from './regel
  * nedladdningen i Kontoplan: xlsx (fliken Kontobeskrivningar, kolumnerna i
  * scripts/k1-till-json.mjs, listor separerade med |) eller JSON som k1.json.
  *
- * Bara texten byrån kan ändra följer med — namn, beskrivning och listorna.
- * Ett konto som inte finns i k1.json läggs till. Filen är hela kontoplanen:
+ * Bara texten byrån kan ändra följer med — namn, beskrivning och listorna. Hela
+ * texten sparas i kontoplanen, så det som står i filen är det som gäller.
+ * Ett konto som inte finns i kontoplanen läggs till. Filen är hela kontoplanen:
  * konton som saknas i den tas bort ur vyn men finns kvar i historiken.
  * Gränsvärdena och regelmasterns regler importeras inte här: de har egna filer på fliken Regler (./regelmaster).
  */
@@ -112,16 +113,7 @@ export async function importeraKonton(
       data: Object.fromEntries([['konto', k.konto], ...FALT.map((f) => [f, k[f]])]),
     });
 
-    if (!original) {
-      // Tillagt konto: hela texten sparas
-      skriv.push(() => sparaK1Andring(supabase, variant, k.konto, Object.fromEntries(FALT.map((f) => [f, k[f]])) as K1Andring));
-      continue;
-    }
-    // Bara det som skiljer från k1.json sparas, som när man ändrar i rutan
-    const andring = Object.fromEntries(FALT.map((f) => [f, JSON.stringify(k[f]) === JSON.stringify(original[f]) ? null : k[f]]));
-    skriv.push(() => Object.values(andring).every((v) => v === null)
-      ? aterstallK1Konto(supabase, variant, k.konto)
-      : sparaK1Andring(supabase, variant, k.konto, andring as K1Andring));
+    skriv.push(() => sparaK1Andring(supabase, variant, k.konto, Object.fromEntries(FALT.map((f) => [f, k[f]])) as K1Andring));
   }
 
   for (const nr of synligaKonton(sparade)) {
