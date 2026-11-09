@@ -102,7 +102,7 @@ En affär får bara bokföras en gång. Jämför varje transaktion med KUNDENS T
 INTERNET
 Du kan söka på internet. Gör det när det hjälper bokföringen och underlaget inte räcker: framför allt för att slå upp motpartens VAT-nummer, men också för att se vad ett företag säljer eller i vilket land det finns.
 - VAT-nummer: leta på företagets egen webbplats (villkor, impressum, kontakt, fakturainformation), i VIES eller i ett offentligt företagsregister. Ta bara ett nummer som tydligt hör till just den motparten, med samma namn och land som på underlaget. Skriv i "anteckning" att VAT-numret är hämtat från internet och varifrån, till exempel "VAT-nummer från leverantörens webbplats".
-- Ett VAT-nummer du hittat på det sättet saknas inte, och du frågar inte kunden efter det.
+- Ett VAT-nummer du hittat på det sättet saknas inte. Fråga inte kunden efter det, och inte heller efter en rättad faktura där numret eller texten om omvänd betalningsskyldighet står. Skriv i stället i "antaganden" att uppgifterna ska stå på fakturorna framöver.
 - Sök bara på företag och sakfrågor, aldrig på kunden eller på privatpersoner, och skriv inga personuppgifter i sökningarna.
 - Sök inte när underlaget redan räcker.
 
