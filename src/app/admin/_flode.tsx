@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { momsText, type Momsdel, type Omvand } from '@/lib/kontering/momsdelar';
 import { kr } from './_verifikationer';
 import { KontoLank } from './_k1-konto';
@@ -149,6 +149,23 @@ function filLank(id: string) {
   return `/api/admin/underlag/${id}/ladda-ner?visa`;
 }
 
+/** Transaktionen i ord, så att AI:n vet vilken i filen anteckningen gäller. */
+function vilken(t: Tx): string {
+  return `${t.datum ?? 'utan datum'} ${t.riktning === 'in' ? '+' : '−'}${t.belopp} ${t.valuta} ${t.motpart || t.beskrivning || ''}`.trim();
+}
+
+interface Markerad { underlagId: string; vilken: string }
+
+/**
+ * Byråns anteckningar: en transaktion kan markeras, och en anteckning på en
+ * eller flera körs om med anteckningen som kontext (POST anteckning).
+ */
+const Anteckningar = createContext<{
+  markerade: Map<string, Markerad>;
+  markera: (nyckel: string, m: Markerad | null) => void;
+  korOm: (text: string, tx: Markerad[]) => Promise<void>;
+} | null>(null);
+
 /** Den gamla transaktionen som är samma affär: samma riktning och nästan samma belopp. */
 function sammaGamla(t: Tx, gamla: Gammal[]): Gammal | null {
   const belopp = t.belopp;
@@ -172,6 +189,10 @@ export function Flode({ userId }: { userId: string }) {
   const [baraUnderlag, setBaraUnderlag] = useState(true);
   const [startar, setStartar] = useState(false);
   const [startfel, setStartfel] = useState('');
+  const [markerade, setMarkerade] = useState<Map<string, Markerad>>(new Map());
+  const [anteckning, setAnteckning] = useState('');
+  const [korOmFel, setKorOmFel] = useState('');
+  const [korOmStartar, setKorOmStartar] = useState(false);
 
   const ladda = useCallback(async () => {
     try {
@@ -230,6 +251,40 @@ export function Flode({ userId }: { userId: string }) {
     }
   }
 
+  const markera = useCallback((nyckel: string, m: Markerad | null) => setMarkerade((gamla) => {
+    const nya = new Map(gamla);
+    if (m) nya.set(nyckel, m); else nya.delete(nyckel);
+    return nya;
+  }), []);
+
+  /** Sparar anteckningen på transaktionerna och kör om deras filer. Felet kastas till den som frågade. */
+  const korOm = useCallback(async (text: string, tx: Markerad[]) => {
+    const res = await fetch('/api/admin/kontering-prov', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, anteckning: text, transaktioner: tx }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    await ladda();
+  }, [userId, ladda]);
+
+  const anteckningar = useMemo(() => ({ markerade, markera, korOm }), [markerade, markera, korOm]);
+
+  async function korOmMarkerade() {
+    setKorOmStartar(true);
+    setKorOmFel('');
+    try {
+      await korOm(anteckning, [...markerade.values()]);
+      setMarkerade(new Map());
+      setAnteckning('');
+    } catch (err) {
+      setKorOmFel(err instanceof Error ? err.message : String(err));
+    } finally {
+      setKorOmStartar(false);
+    }
+  }
+
   /** Godkänn en gul kontering, eller ångra. Felet visas vid raden. */
   const godkann: Godkann = async (radId, fil, nr, godkand) => {
     const res = await fetch('/api/admin/kontering-prov', {
@@ -252,8 +307,10 @@ export function Flode({ userId }: { userId: string }) {
 
   const allaValda = synliga.length > 0 && synliga.every((u) => valda.includes(u.id));
   const nyaSet = new Set(attKora);
+  const filerMarkerade = new Set([...markerade.values()].map((m) => m.underlagId)).size;
 
   return (
+    <Anteckningar.Provider value={anteckningar}>
     <div className="space-y-6">
       <div className="text-sm text-slate-600 max-w-3xl">
         Kör Flöde skickar allt som inte körts — och filer kunden skickat något nytt om — till GPT-6.1 Sol, som sorterar, läser ut, letar dubbletter mot det bokförda, säger vad som saknas och konterar.
@@ -352,7 +409,35 @@ export function Flode({ userId }: { userId: string }) {
 
       {laddfel && <p className="text-red-600 text-sm">{laddfel}</p>}
       {korningar.map((delar) => <Korning key={delar[0].korning} delar={delar} onTaBort={() => taBort(delar[0].korning)} onGodkann={godkann} />)}
+
+      {markerade.size > 0 && (
+        <div className="sticky bottom-0 z-10 bg-white border border-blue-300 rounded-lg shadow-lg p-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="font-semibold text-slate-800">{markerade.size} {markerade.size === 1 ? 'transaktion markerad' : 'transaktioner markerade'}</span>
+            <span className="text-slate-500">{filerMarkerade} {filerMarkerade === 1 ? 'fil' : 'filer'} körs om · ca {Math.max(1, Math.round(filerMarkerade * KR_PER_UNDERLAG))} kr</span>
+            <button onClick={() => setMarkerade(new Map())} className="ml-auto text-slate-500 hover:text-slate-800">Avmarkera alla</button>
+          </div>
+          <textarea
+            value={anteckning}
+            onChange={(e) => setAnteckning(e.target.value)}
+            rows={2}
+            placeholder="Anteckning till AI:n, t.ex. ”Det här är privata köp” eller ”Bilen är en lätt lastbil”"
+            className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm text-slate-900 bg-white"
+          />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={korOmMarkerade}
+              disabled={!anteckning.trim() || korOmStartar}
+              className="bg-blue-600 text-white text-sm font-medium px-3 py-1.5 rounded disabled:opacity-40"
+            >
+              {korOmStartar ? 'Förbereder och skickar…' : `Kör om ${markerade.size} med anteckningen`}
+            </button>
+            {korOmFel && <span className="text-sm text-red-600">{korOmFel}</span>}
+          </div>
+        </div>
+      )}
     </div>
+    </Anteckningar.Provider>
   );
 }
 
@@ -552,12 +637,12 @@ function Del({ rad: d, visaNummer, onGodkann }: { rad: Provrad; visaNummer: bool
           <ul className="mt-1 space-y-0.5 text-slate-700 list-disc pl-5">{r.anteckningar.map((a, i) => <li key={i}>{a}</li>)}</ul>
         </div>
       )}
-      {r?.filer.map((f) => <FilVy key={f.fil} fil={f} onGodkann={(nr, val) => onGodkann(f.fil, nr, val)} />)}
+      {r?.filer.map((f) => <FilVy key={f.fil} radId={d.id} fil={f} onGodkann={(nr, val) => onGodkann(f.fil, nr, val)} />)}
     </div>
   );
 }
 
-function FilVy({ fil: f, onGodkann }: { fil: Fil; onGodkann: (nr: number, val: boolean) => Promise<void> }) {
+function FilVy({ radId, fil: f, onGodkann }: { radId: string; fil: Fil; onGodkann: (nr: number, val: boolean) => Promise<void> }) {
   // Gamla transaktioner som ingen ny motsvarar visas sist
   const matchade = new Set(f.transaktioner.map((t) => sammaGamla(t, f.gammalt)?.id).filter(Boolean));
   const overblivna = f.gammalt.filter((g) => !matchade.has(g.id) && !g.dublett);
@@ -579,7 +664,7 @@ function FilVy({ fil: f, onGodkann }: { fil: Fil; onGodkann: (nr: number, val: b
       )}
       {f.transaktioner.length > 0 && (
         <div className="divide-y divide-slate-100">
-          {f.transaktioner.map((t) => <TxVy key={t.nr} t={t} gammal={sammaGamla(t, f.gammalt)} onGodkann={(val) => onGodkann(t.nr, val)} />)}
+          {f.transaktioner.map((t) => <TxVy key={t.nr} nyckel={`${radId}|${f.fil}|${t.nr}`} underlagId={f.underlagId} t={t} gammal={sammaGamla(t, f.gammalt)} onGodkann={(val) => onGodkann(t.nr, val)} />)}
         </div>
       )}
       {overblivna.length > 0 && (
@@ -609,7 +694,66 @@ function Rader({ rader }: { rader: { konto: string; kontonamn: string; belopp: n
   );
 }
 
-function TxVy({ t, gammal, onGodkann }:{ t: Tx; gammal: Gammal | null; onGodkann: (val: boolean) => Promise<void> }) {
+/** Kryssrutan som markerar transaktionen för en gemensam anteckning. */
+function Markera({ nyckel, underlagId, t }: { nyckel: string; underlagId: string; t: Tx }) {
+  const a = useContext(Anteckningar);
+  if (!a) return null;
+  return (
+    <input
+      type="checkbox"
+      title="Markera för att köra om flera med samma anteckning"
+      checked={a.markerade.has(nyckel)}
+      onChange={(e) => a.markera(nyckel, e.target.checked ? { underlagId, vilken: vilken(t) } : null)}
+      className="accent-blue-600 self-center"
+    />
+  );
+}
+
+/** Anteckning på en transaktion: skrivs in och körs om direkt. */
+function Anteckna({ underlagId, t }: { underlagId: string; t: Tx }) {
+  const a = useContext(Anteckningar);
+  const [oppen, setOppen] = useState(false);
+  const [text, setText] = useState('');
+  const [startar, setStartar] = useState(false);
+  const [fel, setFel] = useState('');
+  if (!a) return null;
+  if (!oppen) return <button onClick={() => setOppen(true)} className="text-xs text-blue-700 hover:underline">Anteckning och kör om</button>;
+  async function kor() {
+    setStartar(true);
+    setFel('');
+    try {
+      await a!.korOm(text, [{ underlagId, vilken: vilken(t) }]);
+      setOppen(false);
+      setText('');
+    } catch (err) {
+      setFel(err instanceof Error ? err.message : String(err));
+    } finally {
+      setStartar(false);
+    }
+  }
+  return (
+    <div className="space-y-1.5 basis-full">
+      <textarea
+        autoFocus
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={2}
+        placeholder="Vad ska AI:n veta om transaktionen?"
+        className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm text-slate-900 bg-white"
+      />
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <button onClick={kor} disabled={!text.trim() || startar} className="bg-blue-600 text-white font-medium px-2.5 py-1 rounded disabled:opacity-40">
+          {startar ? 'Förbereder och skickar…' : 'Kör om med anteckningen'}
+        </button>
+        <button onClick={() => setOppen(false)} className="text-slate-500 hover:text-slate-800">Avbryt</button>
+        <span className="text-slate-400">Hela filen körs om. Anteckningen följer med i senare körningar också.</span>
+        {fel && <span className="text-red-600">{fel}</span>}
+      </div>
+    </div>
+  );
+}
+
+function TxVy({ nyckel, underlagId, t, gammal, onGodkann }:{ nyckel: string; underlagId: string; t: Tx; gammal: Gammal | null; onGodkann: (val: boolean) => Promise<void> }) {
   const [sparar, setSparar] = useState(false);
   const [godkannFel, setGodkannFel] = useState('');
   async function satt(val: boolean) {
@@ -621,11 +765,13 @@ function TxVy({ t, gammal, onGodkann }:{ t: Tx; gammal: Gammal | null; onGodkann
   if (t.kopplad?.startsWith('Kopplad')) {
     return (
       <div className="px-3 py-2 text-sm flex flex-wrap items-baseline gap-x-2 text-slate-500">
+        <Markera nyckel={nyckel} underlagId={underlagId} t={t} />
         <span className="tabular-nums">{t.datum ?? 'utan datum'}</span>
         <span>{t.beskrivning || '—'}</span>
         {t.motpart && <span>· {t.motpart}</span>}
         <span className="tabular-nums">{t.riktning === 'in' ? '+' : '−'}{kr.format(t.belopp)}{t.valuta !== 'SEK' ? ` ${t.valuta}` : ''}</span>
         <span className="text-xs basis-full">{t.kopplad}</span>
+        <Anteckna underlagId={underlagId} t={t} />
       </div>
     );
   }
@@ -640,6 +786,7 @@ function TxVy({ t, gammal, onGodkann }:{ t: Tx; gammal: Gammal | null; onGodkann
       {/* Vänster: transaktionen och den nya konteringen */}
       <div className="space-y-1.5 min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-2">
+          <Markera nyckel={nyckel} underlagId={underlagId} t={t} />
           <span className="text-slate-500 tabular-nums">{t.datum ?? <span className="text-blue-700">utan datum</span>}</span>
           <span className="text-slate-900 font-medium">{t.beskrivning || '—'}</span>
           {t.motpart && <span className="text-slate-500">· {t.motpart}</span>}
@@ -696,6 +843,7 @@ function TxVy({ t, gammal, onGodkann }:{ t: Tx; gammal: Gammal | null; onGodkann
         )}
         {t.antaganden && <p className="text-xs text-slate-500">Antaganden: {t.antaganden}</p>}
         {t.anteckning && <p className="text-xs text-slate-500">Anteckning: {t.anteckning}</p>}
+        <Anteckna underlagId={underlagId} t={t} />
         <details className="text-xs text-slate-500">
           <summary className="cursor-pointer select-none">Verifikation och uppgifter</summary>
           {t.verifikation && (

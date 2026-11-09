@@ -9,7 +9,9 @@ import { godkannProv, raderaProv, startaProv, underlagAttKora, uppdateraProv, ty
  *   GET     kundens underlag att välja bland, de som Kör Flöde tar (attKora) och
  *           kundens körningar. Delar som är skickade frågas efter hos OpenAI,
  *           och klara svar prövas och skrivs.
- *   POST    starta en körning: { nya: true } tar allt som inte körts, annars underlagIds
+ *   POST    starta en körning: { nya: true } tar allt som inte körts, annars underlagIds.
+ *           { anteckning, transaktioner: [{ underlagId, vilken }] } sparar byråns
+ *           anteckning som kontext på underlagen och kör om dem.
  *   PATCH   godkänn en gul kontering, eller ångra
  *   DELETE  ta bort en körning ur listan (det bokförda ligger kvar)
  */
@@ -70,7 +72,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { userId?: string; underlagIds?: string[]; nya?: boolean };
+  let body: { userId?: string; underlagIds?: string[]; nya?: boolean; anteckning?: string; transaktioner?: { underlagId?: string; vilken?: string }[] };
   try {
     body = await request.json();
   } catch {
@@ -79,6 +81,25 @@ export async function POST(request: NextRequest) {
   if (!body.userId) return fel('userId saknas', 400);
   const supabase = getSupabase();
   try {
+    // Byråns anteckning på en eller flera transaktioner: sparas som kontext på
+    // underlaget och följer med när filerna körs om, nu och senare
+    if (body.anteckning !== undefined) {
+      const text = String(body.anteckning).trim().slice(0, 4000);
+      const tx = (body.transaktioner ?? []).filter((t) => typeof t.underlagId === 'string' && t.underlagId);
+      if (!text) return fel('Skriv anteckningen', 400);
+      if (!tx.length) return fel('Välj minst en transaktion', 400);
+      const ids = [...new Set(tx.map((t) => t.underlagId!))];
+      const { data: egna, error: uFel } = await supabase.from('bokforing_underlag').select('id').eq('user_id', body.userId).in('id', ids);
+      if (uFel) throw new Error(uFel.message);
+      if ((egna ?? []).length !== ids.length) return fel('Ett av underlagen hör inte till kunden', 400);
+      const { error: iFel } = await supabase.from('flodes_instruktioner').insert(tx.map((t) => ({
+        typ: 'kontext', omfang: 'underlag', steg: 'konteras', user_id: body.userId, underlag_id: t.underlagId, transaktion_id: null,
+        text: `Gäller transaktionen ${String(t.vilken ?? '').trim().slice(0, 300) || 'i filen'}: ${text}`,
+      })));
+      if (iFel) throw new Error(`Kunde inte spara anteckningen: ${iFel.message}`);
+      const korning = await startaProv(supabase, body.userId, ids);
+      return NextResponse.json({ ok: true, korning });
+    }
     // Kör Flöde: allt som inte körts, eller där kunden skickat något nytt
     const ids = body.nya
       ? await underlagAttKora(supabase, body.userId)
