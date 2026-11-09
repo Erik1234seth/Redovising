@@ -162,7 +162,7 @@ export async function verifikationerIManader(supabase: SupabaseClient, userId: s
   const rader: string[] = [];
   for (let fran = 0; ; fran += 1000) {
     const { data, error } = await supabase.from('verifikationer')
-      .select('serie, nummer, datum, text, verifikation_rader(konto, belopp, borttagen)')
+      .select('id, serie, nummer, datum, text, verifikation_rader(konto, belopp, borttagen)')
       .eq('user_id', userId).is('transaktion_id', null).gte('datum', `${[...valda].sort()[0]}-01`).order('datum').range(fran, fran + 999);
     if (error) throw new Error(`Kunde inte läsa kundens verifikationer: ${error.message}`);
     for (const v of data ?? []) {
@@ -185,13 +185,13 @@ export async function verifikationerIManader(supabase: SupabaseClient, userId: s
  */
 export async function bokfordaVerifikationer(
   supabase: SupabaseClient, userId: string, max = 1000,
-): Promise<{ text: string; vNummer: Record<string, string> }> {
+): Promise<{ text: string; vNummer: Record<string, string>; vId: Record<string, string> }> {
   const fran = `${new Date().getFullYear() - 1}-01-01`;
   const kr = (n: number) => Math.round(Math.abs(n)).toLocaleString('sv-SE');
-  const lista: { namn: string; rad: string }[] = [];
+  const lista: { id: string; namn: string; rad: string }[] = [];
   for (let start = 0; ; start += 1000) {
     const { data, error } = await supabase.from('verifikationer')
-      .select('serie, nummer, datum, text, verifikation_rader(konto, belopp, borttagen)')
+      .select('id, serie, nummer, datum, text, verifikation_rader(konto, belopp, borttagen)')
       .eq('user_id', userId).is('transaktion_id', null).gte('datum', fran)
       .order('datum').order('nummer').range(start, start + 999);
     if (error) throw new Error(`Kunde inte läsa kundens verifikationer: ${error.message}`);
@@ -200,23 +200,27 @@ export async function bokfordaVerifikationer(
         .filter((r) => !r.borttagen && Number(r.belopp))
         .map((r) => `${r.konto} ${Number(r.belopp) > 0 ? 'debet' : 'kredit'} ${kr(Number(r.belopp))}`);
       const namn = `${v.serie ?? ''}${v.nummer ?? ''} ${v.datum} ${String(v.text ?? '').slice(0, 60)}`.replace(/\s+/g, ' ').trim();
-      lista.push({ namn, rad: `${v.datum} ${v.serie ?? ''}${v.nummer ?? ''} · ${String(v.text ?? '').slice(0, 100)} · ${konton.join(', ')}`.replace(/\s+/g, ' ') });
+      lista.push({ id: v.id as string, namn, rad: `${v.datum} ${v.serie ?? ''}${v.nummer ?? ''} · ${String(v.text ?? '').slice(0, 100)} · ${konton.join(', ')}`.replace(/\s+/g, ' ') });
     }
     if ((data ?? []).length < 1000) break;
   }
-  if (!lista.length) return { text: '', vNummer: {} };
+  if (!lista.length) return { text: '', vNummer: {}, vId: {} };
   // De senaste räcker när listan är lång — äldre underlag är oftast redan körda
   const visas = lista.slice(-max);
   const borta = lista.length - visas.length;
   const vNummer: Record<string, string> = {};
+  // Verifikationens id, så att ett underlag kan kopplas till den (Flöde)
+  const vId: Record<string, string> = {};
   // BOK, inte V: många kunder har verifikationsserien V, och då blandas "V17" ihop
   const rader = visas.map((v, i) => {
     vNummer[`BOK${i + 1}`] = v.namn;
+    vId[`BOK${i + 1}`] = v.id;
     return `BOK${i + 1} ${v.rad}`;
   });
   return {
     text: `BOKFÖRDA VERIFIKATIONER — kundens inlästa verifikationer från ${fran}, en rad var (${visas.length} st${borta ? `, de ${borta} äldsta utelämnade` : ''}):\n${rader.join('\n')}\nDet som står här är bokfört och ska inte bokföras igen.`,
     vNummer,
+    vId,
   };
 }
 

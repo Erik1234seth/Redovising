@@ -36,7 +36,7 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
 
   const [{ data: underlag, error: uFel }, { data: gamla, error: tFel }, { data: verUnderlag, error: vFel }] = await Promise.all([
     supabase.from('bokforing_underlag').select('id, user_id, sender_email, sortering, sortering_orsak').in('id', ids),
-    supabase.from('transaktioner').select('id, underlag_id, datum, belopp, valuta, motpart, beskrivning, fraga_utkast_id').in('underlag_id', ids),
+    supabase.from('transaktioner').select('id, underlag_id, datum, belopp, valuta, riktning, motpart, beskrivning, fraga_utkast_id').in('underlag_id', ids),
     supabase.from('verifikationer').select('underlag_id').in('underlag_id', ids),
   ]);
   if (uFel ?? tFel ?? vFel) throw new Error(`Kunde inte läsa underlagen: ${(uFel ?? tFel ?? vFel)!.message}`);
@@ -61,6 +61,23 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
     if (t.dublett.transaktionId && !finnsKvar.has(t.dublett.transaktionId)) t.dublett.transaktionId = null;
   }
 
+  // Kopplingar från andra filer till transaktioner som ersätts nu försvinner med
+  // dem. De läses först och pekas om till de nya transaktionerna (pekaOm).
+  const inkommande: Koppling[] = [];
+  for (let i = 0; i < gamlaIds.length; i += 200) {
+    const { data, error } = await supabase.from('underlag_kopplingar')
+      .select('user_id, underlag_id, transaktion_id, datum, belopp, motivering').in('transaktion_id', gamlaIds.slice(i, i + 200));
+    if (error) throw new Error(`Kunde inte läsa kopplingarna: ${error.message}`);
+    inkommande.push(...((data ?? []) as Koppling[]));
+  }
+
+  const skrivs = (f: ResultatFil) => {
+    const u = rader.get(f.underlagId);
+    return !!u && u.user_id === userId && !bokfordaUnderlag.has(f.underlagId) && !f.delAv && (f.sort === 'underlag' || f.sort === 'komplement');
+  };
+  const kopplingar = planeraKopplingar(resultat, skrivs);
+  const skrivna = new Set<string>();
+
   for (const f of resultat.filer) {
     const u = rader.get(f.underlagId);
     try {
@@ -76,14 +93,118 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
       }
       const deras = (gamla ?? []).filter((t) => t.underlag_id === f.underlagId);
       await sparaInstruktioner(supabase, f.underlagId, deras);
+      // Filens egna kopplingar görs om från svaret
+      const { error: kFel } = await supabase.from('underlag_kopplingar').delete().eq('underlag_id', f.underlagId);
+      if (kFel) throw new Error(`Kunde inte ta bort filens gamla kopplingar: ${kFel.message}`);
       const { error: dFel } = await supabase.from('transaktioner').delete().eq('underlag_id', f.underlagId);
       if (dFel) throw new Error(`Kunde inte ta bort de gamla transaktionerna: ${dFel.message}`);
       // Har kunden redan fått frågor om filen frågas inte samma sak igen
       const fragad = deras.find((t) => t.fraga_utkast_id)?.fraga_utkast_id ?? null;
-      f.skrivet = await skrivFil(supabase, u, f, perFil, fragad);
+      f.skrivet = await skrivFil(supabase, u, f, perFil, fragad, kopplingar);
+      skrivna.add(f.underlagId);
     } catch (err) {
       f.skrivet = `Fel: ${err instanceof Error ? err.message : String(err)}`;
     }
+  }
+
+  await kopplaUnderlag(supabase, userId, resultat, kopplingar, skrivna);
+  await pekaOm(supabase, resultat, inkommande, gamla ?? [], kopplingar, skrivna);
+}
+
+interface Mal { transaktion_id?: string; verifikation_id?: string; malFil?: string }
+interface Koppling { user_id: string; underlag_id: string; transaktion_id: string | null; datum: string | null; belopp: number | null; motivering: string | null }
+
+/**
+ * En säker dubblett är samma affär som något som redan finns — kvittot till en
+ * kontoutdragsrad, en verifikation i SIE. Den blir ingen egen transaktion; filen
+ * kopplas dit som ett extra underlag. Det som pekas ut avgörs här, innan något
+ * skrivs, och transaktionerna som ska skrivas får sina id redan nu så att en
+ * rad i en annan fil i körningen kan pekas på.
+ *
+ * Går dubbletten inte att peka ut — en fil i ett annat anrop, en rad som
+ * ersatts — sparas den som förut: en transaktion som inte bokförs.
+ */
+function planeraKopplingar(resultat: Resultat, skrivs: (f: ResultatFil) => boolean): Map<ResultatTransaktion, Mal> {
+  const mal = new Map<ResultatTransaktion, Mal>();
+  const filer = resultat.filer.filter(skrivs);
+  for (const f of filer) {
+    for (const t of f.transaktioner) {
+      if (t.dublett.status !== 'dublett') continue;
+      if (t.dublett.transaktionId) mal.set(t, { transaktion_id: t.dublett.transaktionId });
+      else if (t.dublett.verifikationId) mal.set(t, { verifikation_id: t.dublett.verifikationId });
+    }
+  }
+  for (const f of filer) for (const t of f.transaktioner) if (!mal.has(t)) t.transaktionId = randomUUID();
+
+  // En annan fil i samma körning: raden med samma belopp, eller filens enda rad
+  const perNr = new Map(filer.map((f) => [f.fil.toUpperCase(), f]));
+  for (const f of filer) {
+    for (const t of f.transaktioner) {
+      if (t.dublett.status !== 'dublett' || mal.has(t)) continue;
+      const malFil = perNr.get(t.dublett.ref.trim().toUpperCase());
+      if (!malFil || malFil === f) continue;
+      const kandidater = malFil.transaktioner.filter((x) => !mal.has(x) && x.dublett.status !== 'dublett' && x.transaktionId);
+      const vald = kandidater.find((x) => Math.abs(x.belopp - t.belopp) < 1 && x.riktning === t.riktning)
+        ?? (kandidater.length === 1 ? kandidater[0] : undefined);
+      if (!vald) continue;
+      mal.set(t, { transaktion_id: vald.transaktionId, malFil: malFil.underlagId });
+      t.transaktionId = undefined;
+    }
+  }
+  return mal;
+}
+
+/** Sparar kopplingarna för filerna som skrevs. */
+async function kopplaUnderlag(
+  supabase: SupabaseClient, userId: string, resultat: Resultat,
+  kopplingar: Map<ResultatTransaktion, Mal>, skrivna: Set<string>,
+) {
+  for (const f of resultat.filer) {
+    if (!skrivna.has(f.underlagId)) continue;
+    const rader = new Map<string, Record<string, unknown>>();
+    for (const t of f.transaktioner) {
+      const m = kopplingar.get(t);
+      if (!m) continue;
+      // Pekar den på en rad i en fil som inte skrevs finns raden inte
+      if (m.malFil && !skrivna.has(m.malFil)) { t.kopplad = `Kunde inte kopplas — ${t.dublett.refText || 'raden'} skrevs inte.`; continue; }
+      const nyckel = m.transaktion_id ?? `v${m.verifikation_id}`;
+      rader.set(nyckel, {
+        user_id: userId, underlag_id: f.underlagId,
+        transaktion_id: m.transaktion_id ?? null, verifikation_id: m.verifikation_id ?? null,
+        datum: t.datum, belopp: t.belopp, motivering: t.dublett.motivering || null,
+      });
+      t.kopplad = `Kopplad till ${t.dublett.refText || (m.verifikation_id ? 'en bokförd verifikation' : 'en befintlig transaktion')} som extra underlag.`;
+    }
+    if (!rader.size) continue;
+    const { error } = await supabase.from('underlag_kopplingar').insert([...rader.values()]);
+    if (error) f.skrivet = `${f.skrivet ?? ''} Kopplingarna kunde inte sparas: ${error.message}`.trim();
+  }
+}
+
+/**
+ * Kopplingar från andra filer till en transaktion som ersattes pekas om till
+ * den nya transaktionen ur samma fil med samma belopp och riktning. Filer som
+ * själva skrevs om i körningen har redan fått nya kopplingar.
+ */
+async function pekaOm(
+  supabase: SupabaseClient, resultat: Resultat, inkommande: Koppling[],
+  gamla: { id: string; underlag_id: string; datum: string | null; belopp: number; riktning?: string | null }[],
+  kopplingar: Map<ResultatTransaktion, Mal>, skrivna: Set<string>,
+) {
+  const rader: Record<string, unknown>[] = [];
+  for (const k of inkommande) {
+    if (skrivna.has(k.underlag_id)) continue;
+    const g = gamla.find((x) => x.id === k.transaktion_id);
+    if (!g || !skrivna.has(g.underlag_id)) continue;
+    const nya = (resultat.filer.find((f) => f.underlagId === g.underlag_id)?.transaktioner ?? [])
+      .filter((t) => t.transaktionId && !kopplingar.has(t) && Math.abs(t.belopp - Number(g.belopp)) < 1 && t.riktning === g.riktning);
+    const ny = nya.find((t) => t.datum === g.datum) ?? nya[0];
+    if (!ny) continue;
+    rader.push({ ...k, transaktion_id: ny.transaktionId });
+  }
+  if (rader.length) {
+    const { error } = await supabase.from('underlag_kopplingar').insert(rader);
+    if (error) console.error('[flode] kunde inte peka om kopplingarna:', error.message);
   }
 }
 
@@ -114,6 +235,7 @@ async function skrivFil(
   f: ResultatFil,
   perFil: Map<string, Filpost>,
   fragad: string | null,
+  kopplingar: Map<ResultatTransaktion, Mal>,
 ): Promise<string> {
   const nu = DAGS();
   const handsorterad = u.sortering_orsak === FLYTTAD_FOR_HAND && u.sortering === 'underlag';
@@ -127,9 +249,10 @@ async function skrivFil(
     return `Sida i ${huvud.namn}.`;
   }
 
-  // Ett kontoutdrag med transaktioner skrivs som ett underlag; utan går det till övriga filer
-  if (f.sort !== 'underlag' && !(f.sort === 'kontoutdrag' && f.transaktioner.length)) {
-    const vad = f.vad || (f.sort === 'kontoutdrag' ? 'Kontoutdrag' : 'Inget underlag för bokföringen');
+  // Bara det som inte har med bokföringen att göra går till övriga filer. Ett
+  // komplement (kontoutdrag, skattekontoutdrag, rapporter) stannar bland underlagen.
+  if (f.sort !== 'underlag' && f.sort !== 'komplement') {
+    const vad = f.vad || 'Inget underlag för bokföringen';
     if (handsorterad) {
       await uppdatera(supabase, u.id, { ...tom, del_av: null, transaktioner_notering: vad, transaktioner_fel: `AI:n hittade inga transaktioner — den tror att filen är ${vad}` });
       return `Ligger bland underlagen för hand, men AI:n tror att det är ${vad.toLowerCase()} — inga transaktioner.`;
@@ -139,7 +262,9 @@ async function skrivFil(
   }
 
   const email = u.sender_email?.trim().toLowerCase() || null;
-  const nya = f.transaktioner.map((t) => ({ t, id: randomUUID() }));
+  // Det som är samma affär som något som redan finns kopplas dit efteråt (kopplaUnderlag)
+  const kopplade = f.transaktioner.filter((t) => kopplingar.has(t)).length;
+  const nya = f.transaktioner.filter((t) => !kopplingar.has(t)).map((t) => ({ t, id: t.transaktionId ?? randomUUID() }));
   const rows = nya.map(({ t, id }) => transaktionsrad(t, id, u, email, fragad, nu));
   if (rows.length) {
     const { error } = await supabase.from('transaktioner').insert(rows);
@@ -171,13 +296,18 @@ async function skrivFil(
 
   await uppdatera(supabase, u.id, {
     ...tom,
-    ...(handsorterad ? {} : { sortering: 'underlag', sortering_orsak: 'Läst av Flöde', sortering_at: nu }),
+    ...(handsorterad ? {} : { sortering: 'underlag', sortering_orsak: f.sort === 'komplement' ? 'Komplement (Flöde)' : 'Läst av Flöde', sortering_at: nu }),
     del_av: null,
     transaktioner_antal: rows.length,
     transaktioner_notering: f.vad || null,
-    transaktioner_fel: rows.length ? null : 'AI:n hittade inga transaktioner i filen',
+    // Ett komplement behöver inte ha egna transaktioner
+    transaktioner_fel: rows.length || kopplade || f.sort === 'komplement' ? null : 'AI:n hittade inga transaktioner i filen',
   });
-  return rows.length ? `${rows.length} ${rows.length === 1 ? 'transaktion sparad' : 'transaktioner sparade'}.` : 'Inga transaktioner i filen.';
+  const delar = [
+    rows.length ? `${rows.length} ${rows.length === 1 ? 'transaktion sparad' : 'transaktioner sparade'}` : '',
+    kopplade ? `${kopplade} kopplad${kopplade === 1 ? '' : 'e'} till det som redan fanns` : '',
+  ].filter(Boolean);
+  return delar.length ? `${delar.join(', ')}.` : f.sort === 'komplement' ? 'Komplement utan egna transaktioner.' : 'Inga transaktioner i filen.';
 }
 
 function transaktionsrad(t: ResultatTransaktion, id: string, u: UnderlagRad, email: string | null, fragad: string | null, nu: string) {

@@ -38,7 +38,7 @@ export interface ResultatTransaktion {
   /** Omräkningen när underlaget är i en annan valuta. */
   kronor: Kronor | null;
   /** refText är dubbletten som byrån ser den — datum, belopp och motpart, eller filens namn. */
-  dublett: SvarTransaktion['dublett'] & { transaktionId: string | null; refText: string };
+  dublett: SvarTransaktion['dublett'] & { transaktionId: string | null; refText: string; verifikationId?: string | null };
   saknas: SvarTransaktion['saknas'];
   antaganden: string;
   kontering: (Pick<Kontering, 'konto' | 'momssats' | 'momsdelar' | 'omvand' | 'motivering' | 'regler' | 'flaggor' | 'omdome' | 'granskning'> & {
@@ -57,6 +57,8 @@ export interface ResultatTransaktion {
   godkand?: { at: string } | null;
   /** Transaktionen i bokföringen, när svaret skrivits dit (./skriv). */
   transaktionId?: string;
+  /** Samma affär som något som redan finns: filen kopplades dit i stället för att bli en egen transaktion (./skriv). */
+  kopplad?: string;
 }
 
 export interface GammalTransaktion {
@@ -158,7 +160,7 @@ async function provaTransaktion(
   nr: number,
   s: SvarTransaktion,
   kontext: Kontext,
-  finns: (ref: string) => { ok: boolean; transaktionId: string | null },
+  finns: (ref: string) => { ok: boolean; transaktionId: string | null; verifikationId?: string | null },
 ): Promise<ResultatTransaktion> {
   const uppgifter = rensaUppgifter(s.uppgifter);
   const ref = s.dublett.status === 'unik' ? null : finns(s.dublett.ref.trim().toUpperCase());
@@ -174,7 +176,7 @@ async function provaTransaktion(
     vat_nummer: s.vat_nummer,
     anteckning: s.anteckning,
     uppgifter,
-    dublett: { ...s.dublett, transaktionId: ref?.transaktionId ?? null, refText: '' },
+    dublett: { ...s.dublett, transaktionId: ref?.transaktionId ?? null, verifikationId: ref?.verifikationId ?? null, refText: '' },
     saknas: s.saknas ?? [],
     antaganden: s.antaganden,
   };
@@ -229,7 +231,7 @@ async function provaTransaktion(
     const flaggor: Flagga[] = k.flaggor.map((f) => (f.typ === 'osaker' && osakerPa ? { ...f, text: `${f.text} ${osakerPa}` } : f));
     if (s.kontering.sakerhet === 'medel') flaggor.push({ typ: 'osaker', allvar: 'granskning', text: `Modellens säkerhet: medel.${osakerPa ? ` ${osakerPa}` : ''}` });
     if (bas.saknas.length) flaggor.push({ typ: 'saknas', allvar: 'granskning', text: `Saknas: ${bas.saknas.map((x) => x.vad).join(', ')}` });
-    if (s.dublett.status === 'dublett') flaggor.push({ typ: 'dublett', allvar: 'stopp', text: 'Dubblett — bokförs inte.' });
+    if (s.dublett.status === 'dublett') flaggor.push({ typ: 'dublett', allvar: 'stopp', text: 'Samma affär som något som redan finns — filen kopplas dit och bokförs inte igen.' });
     if (ref && !ref.ok) flaggor.push({ typ: 'dublett', allvar: 'granskning', text: 'Dubbletten pekar på en rad som inte finns.' });
 
     let verifikation: ResultatTransaktion['verifikation'] = null;
@@ -305,7 +307,7 @@ export async function provaSvar(
   const finns = (ref: string) => {
     if (/^K\d+$/.test(ref)) return { ok: ref in kontext.kNummer, transaktionId: kontext.kNummer[ref] ?? null };
     if (/^[FG]\d+$/.test(ref)) return { ok: perFil.has(ref), transaktionId: null };
-    if (/^BOK\d+$/.test(ref)) return { ok: ref in (kontext.vNummer ?? {}), transaktionId: null };
+    if (/^BOK\d+$/.test(ref)) return { ok: ref in (kontext.vNummer ?? {}), transaktionId: null, verifikationId: kontext.vId?.[ref] ?? null };
     return { ok: false, transaktionId: null };
   };
 
@@ -316,8 +318,8 @@ export async function provaSvar(
     if (!s) kontroller.push(`${f.fil} (${f.namn}) fick inget svar — skickas med nästa gång.`);
     const delAv = (s?.del_av ?? '').trim().toUpperCase();
     if (delAv && (!perFil.has(delAv) || delAv === f.fil.toUpperCase())) kontroller.push(`${f.fil} sägs vara en sida av ${s?.del_av}, som inte finns i omgången.`);
-    // Ett kontoutdrag kan ge enstaka transaktioner när kundens mejl förklarar raderna
-    const medTx = s?.sort === 'underlag' || s?.sort === 'kontoutdrag';
+    // Ett komplement (kontoutdrag, skattekontoutdrag …) kan också ge transaktioner
+    const medTx = s?.sort === 'underlag' || s?.sort === 'komplement';
     if (s && !medTx && s.transaktioner.length) kontroller.push(`${f.fil} är sorterad som ${s.sort} men har transaktioner — de räknas inte.`);
     if (s && delAv && s.transaktioner.length) kontroller.push(`${f.fil} är en sida av ${delAv} men har egna transaktioner — de räknas inte.`);
 

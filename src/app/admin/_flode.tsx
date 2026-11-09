@@ -70,6 +70,8 @@ interface Tx {
   fel: string | null;
   godkand?: { at: string } | null;
   transaktionId?: string;
+  /** Samma affär som något som redan fanns: filen kopplades dit i stället för att bli en egen transaktion. */
+  kopplad?: string;
 }
 
 interface Gammal {
@@ -474,8 +476,10 @@ function Korning({ delar, onTaBort, onGodkann }: { delar: Provrad[]; onTaBort: (
   const usd = delar.reduce((s, d) => s + (Number(d.kostnad_usd) || 0), 0);
   const underlag = delar.reduce((s, d) => s + d.underlag_ids.length, 0);
   const tx = delar.flatMap((d) => d.resultat?.filer ?? []).flatMap((f) => f.transaktioner);
-  const grona = tx.filter((t) => t.kontering?.omdome === 'gron').length;
-  const godkanda = tx.filter((t) => t.godkand).length;
+  const kopplade = tx.filter((t) => t.kopplad?.startsWith('Kopplad')).length;
+  const egna = tx.filter((t) => !t.kopplad?.startsWith('Kopplad'));
+  const grona = egna.filter((t) => t.kontering?.omdome === 'gron').length;
+  const godkanda = egna.filter((t) => t.godkand).length;
   const minuter = delar.every((d) => d.klar_at)
     ? Math.round((Math.max(...delar.map((d) => new Date(d.klar_at!).getTime())) - new Date(forsta.created_at).getTime()) / 60000)
     : null;
@@ -487,7 +491,7 @@ function Korning({ delar, onTaBort, onGodkann }: { delar: Provrad[]; onTaBort: (
         <span className="text-slate-600">{underlag} underlag{delar.length > 1 ? ` i ${delar.length} anrop` : ''}</span>
         {klara < delar.length
           ? <span className="text-blue-700">Väntar på svar ({klara} av {delar.length} klara) — sidan frågar var 15:e sekund</span>
-          : <span className="text-slate-600">{tx.length} transaktioner · {grona} gröna{godkanda ? ` · ${godkanda} ${godkanda === 1 ? 'godkänd' : 'godkända'}` : ''} · {tx.length - grona - godkanda} till Granska{minuter !== null ? ` · ${minuter} min` : ''}</span>}
+          : <span className="text-slate-600">{egna.length} transaktioner · {grona} gröna{godkanda ? ` · ${godkanda} ${godkanda === 1 ? 'godkänd' : 'godkända'}` : ''} · {egna.length - grona - godkanda} till Granska{kopplade ? ` · ${kopplade} kopplade till det som fanns` : ''}{minuter !== null ? ` · ${minuter} min` : ''}</span>}
         {usd > 0 && <span className="text-slate-600">{kr.format(usd * USD_SEK)} ({usd.toFixed(2)} USD)</span>}
         <span className="ml-auto">
           {bekrafta ? (
@@ -612,6 +616,18 @@ function TxVy({ t, gammal, onGodkann }:{ t: Tx; gammal: Gammal | null; onGodkann
     setSparar(true);
     setGodkannFel('');
     try { await onGodkann(val); } catch (err) { setGodkannFel(err instanceof Error ? err.message : String(err)); } finally { setSparar(false); }
+  }
+  // Kopplad till det som redan fanns: ingen egen transaktion, inget att granska
+  if (t.kopplad?.startsWith('Kopplad')) {
+    return (
+      <div className="px-3 py-2 text-sm flex flex-wrap items-baseline gap-x-2 text-slate-500">
+        <span className="tabular-nums">{t.datum ?? 'utan datum'}</span>
+        <span>{t.beskrivning || '—'}</span>
+        {t.motpart && <span>· {t.motpart}</span>}
+        <span className="tabular-nums">{t.riktning === 'in' ? '+' : '−'}{kr.format(t.belopp)}{t.valuta !== 'SEK' ? ` ${t.valuta}` : ''}</span>
+        <span className="text-xs basis-full">{t.kopplad}</span>
+      </div>
+    );
   }
   const k = t.kontering;
   const o = k ? OMDOME[k.omdome] : null;

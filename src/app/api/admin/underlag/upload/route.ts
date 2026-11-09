@@ -1,14 +1,13 @@
-import { NextRequest, NextResponse, after } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { UNDERLAG_BUCKET, folderFor, resolveUserId } from '@/lib/inmail/save-attachments';
 import { isSieFile } from '@/lib/sie/parse';
 import { importSieUnderlag } from '@/lib/sie/import';
 import { sorteringVidUppladdning } from '@/lib/underlag/sortering';
-import { definieraTyst } from '@/lib/underlag/definiera';
 import { arZip } from '@/lib/underlag/filtyp';
 import { packaUppZip } from '@/lib/underlag/zip';
 
-// Definieringen av underlaget körs efter svaret och behöver tid för AI-anropet
+// Uppackning av zip-arkiv och SIE-import kan ta tid
 export const maxDuration = 300;
 
 /**
@@ -125,9 +124,7 @@ export async function POST(request: NextRequest) {
           gmail_message_id: null, file_path: body.path, file_name: fileName,
         })
         : [];
-      after(async () => {
-        for (const id of [data.id, ...urZip]) await definieraTyst(supabase, id);
-      });
+      // Ingen AI körs här — Flöde läser och sorterar filen (sedan 2026-11-09)
       return NextResponse.json({ ok: true, id: data.id, sie, uppackade: urZip.length });
     }
 

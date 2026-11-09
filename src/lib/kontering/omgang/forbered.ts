@@ -70,6 +70,8 @@ export interface Kontext {
   kNummer: Record<string, string>;
   /** BOK-nummer i listan över bokförda verifikationer → verifikationen i text ("A55 2026-07-31 0060"). */
   vNummer?: Record<string, string>;
+  /** BOK-numret → verifikationens id, för kopplingar (./skriv). */
+  vId?: Record<string, string>;
 }
 
 export interface Hoppad {
@@ -162,7 +164,7 @@ export function utanRadnummer(text: string): string {
 async function kunddel(
   supabase: SupabaseClient, userId: string, kund: Kund | null, betalsatt: Betalsatt,
   instruktioner: Instruktion[], utanUnderlag: Set<string>,
-): Promise<{ text: string; regelIdn: string[]; kNummer: Record<string, string>; vNummer: Record<string, string> }> {
+): Promise<{ text: string; regelIdn: string[]; kNummer: Record<string, string>; vNummer: Record<string, string>; vId: Record<string, string> }> {
   const regler = reglerFor(instruktioner, userId);
   const [kundbild, arslista, mejl, bokfort, verifikationer] = await Promise.all([
     hamtaKundbild(supabase, userId),
@@ -183,7 +185,7 @@ async function kunddel(
     `KUNDENS TRANSAKTIONER (${arslista.rader.length} st, äldst först):\n${arslista.text || '(inga)'}`,
   ].filter(Boolean).join('\n\n');
   const kNummer = Object.fromEntries([...arslista.nummer].map(([id, nr]) => [`K${nr}`, id]));
-  return { text, regelIdn: regler.map((r) => r.id), kNummer, vNummer: verifikationer.vNummer };
+  return { text, regelIdn: regler.map((r) => r.id), kNummer, vNummer: verifikationer.vNummer, vId: verifikationer.vId };
 }
 
 /**
@@ -321,5 +323,5 @@ export async function forberedOmgang(
     });
   }
 
-  return { delar, hoppade, kontext: { betalsatt, redovisningsmetod: kund?.redovisningsmetod ?? null, regelIdn: kunden.regelIdn, kNummer: kunden.kNummer, vNummer: kunden.vNummer } };
+  return { delar, hoppade, kontext: { betalsatt, redovisningsmetod: kund?.redovisningsmetod ?? null, regelIdn: kunden.regelIdn, kNummer: kunden.kNummer, vNummer: kunden.vNummer, vId: kunden.vId } };
 }

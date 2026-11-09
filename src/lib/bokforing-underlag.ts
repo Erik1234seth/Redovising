@@ -70,8 +70,8 @@ export async function uploadUnderlag(files: File[], onFile?: (name: string) => v
     if (dbError) throw new Error(`Kunde inte spara ${file.name}: ${dbError.message}`);
   }
 
-  // Ber servern låta AI:n definiera de nya underlagen. Filerna är redan sparade,
-  // så går anropet fel märker kunden ingenting — de kan definieras i admin senare.
+  // Ber servern sortera de nya underlagen efter reglerna och packa upp zip-arkiv.
+  // Filerna är redan sparade, så går anropet fel märker kunden ingenting.
   const { data: { session } } = await supabase.auth.getSession();
   fetch('/api/underlag/definiera', {
     method: 'POST',

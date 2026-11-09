@@ -1,11 +1,9 @@
-import { after } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isSieFile } from '@/lib/sie/parse';
 import { importSieUnderlag } from '@/lib/sie/import';
 import { profilForAdress } from './profil';
 import { arVarAdress } from '@/lib/underlag/var-fil';
 import { sorteringVidUppladdning } from '@/lib/underlag/sortering';
-import { definieraTyst } from '@/lib/underlag/definiera';
 import { arZip } from '@/lib/underlag/filtyp';
 import { packaUppZip } from '@/lib/underlag/zip';
 
@@ -170,17 +168,13 @@ async function insertRow(
 
   // Ett zip-arkiv packas upp innan svaret går tillbaka: Apps Script anropar
   // mejlflödet strax efter, och då ska filerna i arkivet redan finnas där
-  const urZip = arZip(info.fileName, info.mimeType)
-    ? await packaUppZip(supabase, {
+  // Ingen AI körs här — Flöde läser och sorterar filen (sedan 2026-11-09)
+  if (arZip(info.fileName, info.mimeType)) {
+    await packaUppZip(supabase, {
       id: saved.id, user_id: userId, sender_email: info.email, source: 'mejl',
       gmail_message_id: info.messageId, file_path: path, file_name: info.fileName,
-    })
-    : [];
-
-  // AI:n definierar underlaget efter att svaret gått iväg — mejlflödet ska inte vänta på den
-  after(async () => {
-    for (const id of [saved.id, ...urZip]) await definieraTyst(supabase, id);
-  });
+    });
+  }
 
   return { status: 'saved' };
 }
