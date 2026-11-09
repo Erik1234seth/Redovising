@@ -449,7 +449,7 @@ interface OsakraUtkast { id: string; till: string; amne: string; text: string }
  * Skicka. Texten och ämnet går att ändra innan.
  */
 function OsakraMejl({ userId, uppdaterad }: { userId: string; uppdaterad: unknown }) {
-  const [info, setInfo] = useState<{ antal: number; nya: number; utkast: OsakraUtkast | null } | null>(null);
+  const [info, setInfo] = useState<{ antal: number; nya: number; fragade: number; utkast: OsakraUtkast | null } | null>(null);
   const [text, setText] = useState('');
   const [amne, setAmne] = useState('');
   const [arbetar, setArbetar] = useState<'' | 'skriver' | 'skickar' | 'slanger'>('');
@@ -522,6 +522,7 @@ function OsakraMejl({ userId, uppdaterad }: { userId: string; uppdaterad: unknow
       {!utkast && (
         <p className="text-xs text-slate-500">
           Gula konteringar som inte är godkända. AI:n samlar frågorna så att kunden får så få frågor som möjligt. Inget skickas förrän du trycker Skicka.
+          {info.fragade > 0 && <span className="text-amber-700"> {info.fragade === info.antal ? (info.antal === 1 ? 'Den' : 'Alla') : `${info.fragade} av dem`} har varit med i ett mejl förut utan att bli lösta — mejlet frågar igen.</span>}
           {skickat && <span className="text-emerald-700"> Mejlet skickades till {skickat}.</span>}
         </p>
       )}

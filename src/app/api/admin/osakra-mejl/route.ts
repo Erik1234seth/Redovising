@@ -6,7 +6,8 @@ import { osakraAttFraga, skrivOsakraMejl } from '@/lib/transaktioner/fragemejl';
  * Mejlet om osäkra i Flöde (@/lib/transaktioner/fragemejl): ett samlat mejl
  * till kunden om de gula konteringar byrån inte godkänt.
  *
- *   GET  ?userId=   hur många som är osäkra, och ett oskickat utkast om dem om det finns
+ *   GET  ?userId=   hur många som är osäkra (fragade: hur många av dem som redan varit med
+ *                   i ett skickat mejl), och ett oskickat utkast om dem om det finns
  *   POST { userId } skriver mejlet. Det blir ett utkast som skickas med Skicka i
  *                   Flöde (/api/admin/inkorg, action skicka-mejl).
  */
@@ -44,6 +45,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       antal: rader.length,
       nya,
+      // Redan med i ett skickat mejl utan att ha lösts — kunden kan ha missat frågan
+      fragade: rader.filter((t) => t.fragad).length,
       utkast: utkast ? { id: utkast.id, till: utkast.till_email, amne: utkast.amne ?? '', text: utkast.text } : null,
     });
   } catch (err) {
