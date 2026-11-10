@@ -225,11 +225,17 @@ async function provaTransaktion(
     };
     const k = konteringUrBeslut(iKr, kontext.betalsatt, beslut, kontext.regelIdn);
 
-    // Det som också hindrar grönt i omgången
-    // Vad modellen är osäker på står i flaggan, så att det syns i Flöde och följer med till mejlet om osäkra
+    // Det som också hindrar grönt i omgången.
+    // Osäkerheten och granskningen blir en flagga med det modellen är osäker på, så att det syns i
+    // Flöde och följer med till mejlet om osäkra. Står osäkerheten redan under saknas behövs den inte,
+    // utom vid låg säkerhet.
     const osakerPa = s.kontering.osaker_pa?.trim() ?? '';
-    const flaggor: Flagga[] = k.flaggor.map((f) => (f.typ === 'osaker' && osakerPa ? { ...f, text: `${f.text} ${osakerPa}` } : f));
-    if (s.kontering.sakerhet === 'medel') flaggor.push({ typ: 'osaker', allvar: 'granskning', text: `Modellens säkerhet: medel.${osakerPa ? ` ${osakerPa}` : ''}` });
+    const flaggor: Flagga[] = k.flaggor.filter((f) => f.typ !== 'osaker' && f.typ !== 'manuell-granskning');
+    const sak = s.kontering.sakerhet;
+    if ((sak !== 'hog' || s.kontering.granskning_kravs) && (osakerPa || !bas.saknas.length || sak === 'lag')) {
+      const rubrik = sak === 'lag' ? 'Modellens säkerhet: låg.' : sak === 'medel' ? 'Modellens säkerhet: medel.' : 'Kräver granskning enligt reglerna.';
+      flaggor.push({ typ: sak === 'hog' ? 'manuell-granskning' : 'osaker', allvar: 'granskning', text: osakerPa ? `${rubrik} ${osakerPa}` : rubrik });
+    }
     if (bas.saknas.length) flaggor.push({ typ: 'saknas', allvar: 'granskning', text: `Saknas: ${bas.saknas.map((x) => x.vad).join(', ')}` });
     if (s.dublett.status === 'dublett') flaggor.push({ typ: 'dublett', allvar: 'stopp', text: 'Samma affär som något som redan finns — filen kopplas dit och bokförs inte igen.' });
     if (ref && !ref.ok) flaggor.push({ typ: 'dublett', allvar: 'granskning', text: 'Dubbletten pekar på en rad som inte finns.' });
@@ -280,6 +286,23 @@ async function provaTransaktion(
   }
 }
 
+/**
+ * Webbsökningen lägger ibland källor i texterna, som "([skatteverket.se](https://…?utm_source=openai))".
+ * De tas bort; en länk mitt i en mening blir sin text.
+ */
+function utanLankar<T>(v: T): T {
+  if (typeof v === 'string') {
+    return v
+      .replace(/\s*\(\[[^\]]*\]\([^)]*\)\)/g, '')
+      .replace(/\[([^\]]*)\]\(https?:[^)]*\)/g, '$1')
+      .replace(/\s*\(?https?:\/\/[^\s)]*[^\s).,;]\)?/g, '')
+      .trim() as T;
+  }
+  if (Array.isArray(v)) return v.map(utanLankar) as T;
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, utanLankar(x)])) as T;
+  return v;
+}
+
 /** Tolkar och prövar svaret för en del av omgången. */
 export async function provaSvar(
   supabase: SupabaseClient,
@@ -289,6 +312,7 @@ export async function provaSvar(
   kontext: Kontext,
   hoppade: Hoppad[],
 ): Promise<Resultat> {
+  svar = utanLankar(svar);
   // Spärrarna i kontoreglerna prövas med byråns ändringar
   await laddK1Andringar(supabase);
   const kontroller: string[] = [];

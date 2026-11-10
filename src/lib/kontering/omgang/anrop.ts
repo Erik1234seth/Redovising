@@ -88,7 +88,7 @@ ${BESKRIVNINGSREGEL}
 - "motpart": säljaren, leverantören eller kunden, tom sträng om det inte framgår.
 - "vat_nummer": motpartens momsregistreringsnummer. Står det på underlaget tar du det därifrån. Står det inte där och motparten är ett företag i ett annat EU-land, eller ett VAT-nummer annars behövs för momsen, söker du upp det på internet (se INTERNET). Tom sträng när du inte hittar något säkert. Hitta aldrig på eller räkna fram ett VAT-nummer.
 - "uppgifter": det som står på underlaget, null för det som inte står. "belopp_sek" när underlaget anger beloppet i kronor för en utländsk valuta, "valutakurs" när det anger en kurs mot kronor. "momsrader" är underlagets momsspecifikation, en rad per sats.
-- "anteckning": kort när något är oläsligt eller osäkert, annars tom sträng.
+- "anteckning": kort, bara fakta byrån behöver och som inte står någon annanstans — var ett VAT-nummer hittades, att något på underlaget är oläsligt. Inte öresavrundningar eller formfel som inte påverkar bokföringen, och inte det som står i "saknas" eller "osaker_pa". Annars tom sträng.
 ${MEJLREGEL}
 
 DUBBLETTER
@@ -105,13 +105,15 @@ Du kan söka på internet. Gör det när det hjälper bokföringen och underlage
 - Ett VAT-nummer du hittat på det sättet saknas inte. Fråga inte kunden efter det, och inte heller efter en rättad faktura där numret eller texten om omvänd betalningsskyldighet står. Skriv i stället i "antaganden" att uppgifterna ska stå på fakturorna framöver.
 - Sök bara på företag och sakfrågor, aldrig på kunden eller på privatpersoner, och skriv inga personuppgifter i sökningarna.
 - Sök inte när underlaget redan räcker.
+- Skriv aldrig länkar eller källhänvisningar i svaret. Var ett VAT-nummer kommer ifrån skriver du med ord i "anteckning".
 
 SAKNAS
 Av det vi har ska det gå att avgöra datum, belopp, moms (beloppet, satsen eller att ingen svensk moms ska redovisas) och vad affären gäller. Ett belopp i utländsk valuta räcker — fråga aldrig efter kronor eller kurs.
 Vad mer som behövs i särskilda fall — VAT-nummer, ROT och RUT, representation och liknande — står i byråns regelmaster nedan. När en regel säger att något ska frågas eller begäras från kunden och det inte framgår, skriver du det i "saknas". Reglerna är inte en fullständig lista; tänk som en redovisare.
 Det kunden redan svarat på i mejlen saknas inte. Ett underlag behöver inte uppfylla alla formella krav — visar det vad som köpts, beloppet och momsen räcker det. Gör hellre ett rimligt antagande än att fråga om sådant som inte spelar någon roll: fråga bara när ett fel antagande ger fel moms, fel avdrag eller fel skatt.
+Be inte om en rättad eller ny faktura för formfel när affären ändå går att bokföra — ett organisations- eller momsnummer som inte stämmer, öresavrundning, ett namn som avviker. Gör ett antagande och skriv det i "antaganden". Hellre en fråga kunden svarar på med ett ord ("Var det en kundmiddag?") än ett nytt dokument, och en fråga för det som har samma svar.
 - "saknas": en rad per sak, "vad" kort och så att kunden förstår ("momsbeloppet", "vilka som deltog och syftet"), "varfor" en mening till byrån. Tom lista när det räcker.
-- "antaganden": det du antagit, tom sträng när inget.
+- "antaganden": de antaganden konteringen bygger på, t.ex. "Utgår från att datorn används i verksamheten." Inte att konteringen är preliminär eller väntar på svar. Tom sträng när inget.
 
 KONTERING
 Se efter hur kundens liknande köp redan konterats — samma leverantör, samma slags varor — och följ samma linje när reglerna tillåter det. Det är ledtrådar: stämmer en tidigare kontering inte med K1-reglerna gäller reglerna, och då säger du det i motiveringen. Står det en instruktion från byrån i byråns kontext följer du den — den väger tyngst av allt.
@@ -123,11 +125,11 @@ Se efter hur kundens liknande köp redan konterats — samma leverantör, samma 
 - momshantering: "svensk" vid vanlig svensk moms, "ingen" när momsen inte hanteras (momsfritt, privat, lån, överföringar, skatter), "omvand" vid omvänd skattskyldighet, EU-förvärv eller import — och när kunden själv säljer utan svensk moms för att köparen redovisar den eller affären sker utanför Sverige.
 - omvand_typ: vid "omvand" vilket slags affär — "eu-tjanst" (tjänst från ett företag i ett annat EU-land, t.ex. annonser hos Meta Irland), "eu-vara", "utanfor-eu-tjanst" (t.ex. ett amerikanskt abonnemang), "sverige-tjanst" eller "sverige-vara" (svensk omvänd skattskyldighet, t.ex. byggtjänster), "import" (vara från ett land utanför EU). "inte" annars. Systemet räknar själv ut och bokför momsen — det är inget skäl till granskning. När kunden SÄLJER utan svensk moms anger sorten köparens sida — "import" betyder då export av varor ut ur EU — och momssatsen är 0.
 - sakerhet: "hog" när underlaget visar vad affären är och reglerna pekar ut konto och moms. Att ett annat konto i teorin också vore möjligt, eller att en regel har undantag som inget tyder på, sänker inte säkerheten. "medel" när du valt konto och moms men en konkret uppgift som kan ändra kontot eller momsen saknas eller är oklar. "lag" när underlaget inte räcker för att välja konto eller moms och du gissar.
-- osaker_pa: vid "medel" eller "lag" en mening till byrån om exakt vad du är osäker på och vad som skulle avgöra det, t.ex. "Om skrivbordet är en inventarie eller förbrukning — priset per styck syns inte." Tom sträng vid "hog".
-- motivering: två eller tre meningar på svenska om vad affären är och varför kontot är rätt enligt reglerna.
+- osaker_pa: vid "medel" eller "lag", eller när granskning_kravs är true, en mening till byrån om exakt vad du är osäker på eller vilken granskningspunkt som stämmer, och vad som skulle avgöra det, t.ex. "Om skrivbordet är en inventarie eller förbrukning — priset per styck syns inte." Upprepa inte det som står i "saknas": täcker det osäkerheten är osaker_pa en tom sträng. Tom sträng vid "hog" utan granskning.
+- motivering: på svenska, vad affären är och varför kontot och momsen är rätt enligt reglerna. Bara det — vad som saknas eller är osäkert står i "saknas" och "osaker_pa", inte här.
 - regler: id på de KUNDREGLER som gäller transaktionen, bara när underlaget, mejlen eller byråns kontext visar det. En regel du tar med följer du.
 - brutna_regler: punkter ur reglerna för de konton du valt som inte stämmer, citerade ur texten. Tom lista när allt stämmer.
-- granskning_kravs: true bara när en punkt under "Kräver manuell granskning när" konkret stämmer på just den här transaktionen, eller när underlaget verkligen inte räcker för att välja konto och moms. Allmänna punkter som "Användningen är oklar" stämmer inte bara för att det i teorin kan vara så. Säg i motiveringen vilken punkt som stämmer.
+- granskning_kravs: true bara när en punkt under "Kräver manuell granskning när" konkret stämmer på just den här transaktionen, eller när underlaget verkligen inte räcker för att välja konto och moms. Allmänna punkter som "Användningen är oklar" stämmer inte bara för att det i teorin kan vara så. Säg i osaker_pa vilken punkt som stämmer.
 - Beloppsgränser i reglerna (halvt prisbasbelopp och liknande) prövas av systemet efteråt. Transaktionen konteras direkt från underlaget: punkter om vilket BAS-konto en post tidigare bokförts på, och om bokslutsjusteringar som lager, periodiseringar och avskrivningar, gäller inte här.
 - En dubblett ("dublett") konteras ändå, så att den går att jämföra.
 
