@@ -2,20 +2,21 @@ import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { FLYTTAD_FOR_HAND } from '@/lib/underlag/sortering';
 import { valjKonto } from '../kontera';
+import { bokforForfallna } from '../preliminar';
 import { MODELL } from './anrop';
 import type { Filpost } from './forbered';
 import type { Resultat, ResultatFil, ResultatTransaktion } from './svar';
 
 /**
  * Flödets svar skrivs till bokföringen: underlagens transaktioner ersätts med
- * de nya, och varje transaktion får sin kontering. Därifrån är det som förut —
- * en grön kontering blir verifikation efter 14 dagar (../preliminar), en gul
- * väntar tills byrån godkänt den eller valt konto i Kontering, en röd bokförs
- * inte. Det som saknas frågas efter i kl 18-mejlet (Skriv mail).
+ * de nya, och varje transaktion får sin kontering. En grön kontering blir
+ * verifikation direkt (../preliminar), en gul när byrån godkänt den eller valt
+ * konto i Kontering, en röd bokförs inte. Det som saknas frågas efter i kl
+ * 18-mejlet (Skriv mail).
  *
- * Ett underlag med något bokfört rörs inte: att ersätta transaktionerna skulle
- * ta bort verifikationerna med dem. Ett redan bokfört underlag (kassarapport)
- * läses in med Plocka verif i flödesschemat, som förut.
+ * Verifikationerna Flöde gjort hör till transaktionerna och försvinner med dem
+ * när filen körs om. Ett underlag med verifikationer som inte kommer från en
+ * transaktion (inläst SIE, Plocka verif för en kassarapport) rörs inte.
  */
 
 const DAGS = () => new Date().toISOString();
@@ -37,19 +38,12 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
   const [{ data: underlag, error: uFel }, { data: gamla, error: tFel }, { data: verUnderlag, error: vFel }] = await Promise.all([
     supabase.from('bokforing_underlag').select('id, user_id, sender_email, sortering, sortering_orsak').in('id', ids),
     supabase.from('transaktioner').select('id, underlag_id, datum, belopp, valuta, riktning, motpart, beskrivning, fraga_utkast_id').in('underlag_id', ids),
-    supabase.from('verifikationer').select('underlag_id').in('underlag_id', ids),
+    // Bara verifikationer som inte kommer från en transaktion — Flödes egna ersätts med transaktionerna
+    supabase.from('verifikationer').select('underlag_id').in('underlag_id', ids).is('transaktion_id', null),
   ]);
   if (uFel ?? tFel ?? vFel) throw new Error(`Kunde inte läsa underlagen: ${(uFel ?? tFel ?? vFel)!.message}`);
   const gamlaIds = (gamla ?? []).map((t) => t.id as string);
-  const { data: verTx, error: vtFel } = gamlaIds.length
-    ? await supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', gamlaIds)
-    : { data: [], error: null };
-  if (vtFel) throw new Error(`Kunde inte läsa verifikationerna: ${vtFel.message}`);
-  const bokfordTx = new Set((verTx ?? []).map((v) => v.transaktion_id as string));
-  const bokfordaUnderlag = new Set([
-    ...(verUnderlag ?? []).map((v) => v.underlag_id as string),
-    ...(gamla ?? []).filter((t) => bokfordTx.has(t.id)).map((t) => t.underlag_id as string),
-  ]);
+  const bokfordaUnderlag = new Set((verUnderlag ?? []).map((v) => v.underlag_id as string));
   const rader = new Map(((underlag ?? []) as UnderlagRad[]).map((u) => [u.id, u]));
 
   // En dubblett kan peka på en transaktion som ersatts — av en annan fil i samma
@@ -83,7 +77,7 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
     try {
       if (!u) { f.skrivet = 'Underlaget finns inte längre — inget skrevs.'; continue; }
       if (u.user_id !== userId) { f.skrivet = 'Underlaget hör till en annan kund — inget skrevs.'; continue; }
-      if (bokfordaUnderlag.has(f.underlagId)) { f.skrivet = 'Något är redan bokfört från filen — den rördes inte. Ångra bokföringen i Kontering om den ska göras om.'; continue; }
+      if (bokfordaUnderlag.has(f.underlagId)) { f.skrivet = 'Filens verifikationer är inlästa (SIE eller Plocka verif) — den rördes inte.'; continue; }
       if (!f.sort) { f.skrivet = 'Inget svar — filen rördes inte. Kör den igen.'; continue; }
       if (f.sort === 'verifikationer') {
         // Lästs i Flöde, så att Kör Flöde inte skickar den igen
@@ -96,6 +90,7 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
       // Filens egna kopplingar görs om från svaret
       const { error: kFel } = await supabase.from('underlag_kopplingar').delete().eq('underlag_id', f.underlagId);
       if (kFel) throw new Error(`Kunde inte ta bort filens gamla kopplingar: ${kFel.message}`);
+      // Verifikationerna Flöde gjort förut följer med (on delete cascade)
       const { error: dFel } = await supabase.from('transaktioner').delete().eq('underlag_id', f.underlagId);
       if (dFel) throw new Error(`Kunde inte ta bort de gamla transaktionerna: ${dFel.message}`);
       // Har kunden redan fått frågor om filen frågas inte samma sak igen
@@ -109,6 +104,18 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
 
   await kopplaUnderlag(supabase, userId, resultat, kopplingar, skrivna);
   await pekaOm(supabase, resultat, inkommande, gamla ?? [], kopplingar, skrivna);
+
+  // De gröna bokförs direkt
+  for (const f of resultat.filer) {
+    if (!skrivna.has(f.underlagId)) continue;
+    try {
+      const { bokforda, fel } = await bokforForfallna(supabase, { userId, underlagId: f.underlagId, nu: true });
+      const delar = [bokforda ? `${bokforda} bokförd${bokforda === 1 ? '' : 'a'}.` : '', ...fel.map((x) => `Kunde inte bokföras: ${x}`)].filter(Boolean);
+      if (delar.length) f.skrivet = [f.skrivet, ...delar].filter(Boolean).join(' ');
+    } catch (err) {
+      f.skrivet = `${f.skrivet ?? ''} Kunde inte bokföras: ${err instanceof Error ? err.message : String(err)}`.trim();
+    }
+  }
 }
 
 interface Mal { transaktion_id?: string; verifikation_id?: string; malFil?: string }
@@ -351,14 +358,14 @@ async function uppdatera(supabase: SupabaseClient, id: string, falt: Record<stri
 
 /**
  * Byrån godkänner en gul kontering som den är — samma sak som att välja
- * kontot i Kontering. Den blir verifikation 14 dagar senare. Ångra tar bort
- * valet, och då väntar transaktionen på granskning igen.
+ * kontot i Kontering. Den blir verifikation direkt. Ångra tar bort
+ * verifikationen och valet, och då väntar transaktionen på granskning igen.
  */
 export async function godkannTransaktion(supabase: SupabaseClient, userId: string, t: ResultatTransaktion, godkand: boolean): Promise<void> {
   if (!t.transaktionId) throw new Error('Transaktionen sparades inte i bokföringen — se filens rad');
-  const { count } = await supabase.from('verifikationer').select('id', { count: 'exact', head: true }).eq('transaktion_id', t.transaktionId);
-  if (count) throw new Error('Transaktionen är redan bokförd — ångra bokföringen i Kontering först');
   if (!godkand) {
+    const { error: vFel } = await supabase.from('verifikationer').delete().eq('transaktion_id', t.transaktionId).eq('user_id', userId).eq('kalla', 'ai');
+    if (vFel) throw new Error(`Kunde inte ta bort verifikationen: ${vFel.message}`);
     const { error } = await supabase.from('transaktioner').update({ vald_kontering: null, preliminar_at: DAGS() }).eq('id', t.transaktionId).eq('user_id', userId);
     if (error) throw new Error(`Kunde inte ångra: ${error.message}`);
     return;

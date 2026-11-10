@@ -4,23 +4,23 @@ import { TRANSAKTION_KOLUMNER, bokfor, type ValdKontering } from './kontera';
 import { rensaMomsdelar, sammaMoms, tolkaOmvand, type Momsdel, type Omvand } from './momsdelar';
 
 /**
- * Konteringen är preliminär i 14 dagar. Under tiden går den att ändra hur
- * mycket som helst — konteras om, få ett annat konto, eller försvinna när en
- * sida till samma kvitto kommer in och underlaget läses om. Ingenting ligger
- * i bokföringen förrän tiden gått.
- *
- * Klockan räknas från `transaktioner.preliminar_at`, som sätts varje gång
- * konteringen ändras: ny AI-kontering, ett konto Erik valt, en ändrad
- * transaktion, en ångrad bokföring.
+ * Sedan 2026-11-10 bokförs konteringen direkt: Flöde gör verifikationer av
+ * de gröna när körningen är klar, och en gul blir verifikation när byrån
+ * godkänner den eller väljer konto (`valjKonto`). En omkörning i Flöde
+ * ersätter transaktionerna, och verifikationerna försvinner med dem.
+ * Momsfilen, huvudboken och NE läser verifikationerna.
  *
  * Det som blir verifikation är byråns val om det finns, annars AI:ns
  * kontering när den är grön. Finns flera förslag (från tiden då två modeller
  * konterade) ska alla vara gröna och överens. Allt annat väntar på granskning.
  *
- * Cron-jobbet /api/cron/verifikationer kör `bokforForfallna` en gång om dygnet.
+ * `transaktioner.preliminar_at` säger att transaktionen får bokföras. Är den
+ * tom (bokföringen ångrad i Kontering) väntar transaktionen tills byrån väljer
+ * konto. Cron-jobbet /api/cron/verifikationer kör `bokforForfallna` en gång om
+ * dygnet och tar det som inte gick att bokföra direkt.
  */
 
-export const PRELIMINAR_DAGAR = 14;
+export const PRELIMINAR_DAGAR = 0;
 const DAG = 86_400_000;
 
 /** Dagen konteringen blir verifikation, YYYY-MM-DD. */
@@ -65,13 +65,12 @@ export function slutligKontering(vald: ValdKontering | null, konteringar: Konter
 type Rad = Parameters<typeof bokfor>[1] & { vald_kontering: ValdKontering | null; preliminar_at: string | null };
 
 /**
- * Gör preliminära konteringar till verifikationer. Utan `nu` bara de som
- * legat orörda i 14 dagar; med `nu` alla som är klara — för knappen i
- * flödesschemat. Det som redan är bokfört och dubbletter rörs inte.
+ * Gör klara konteringar till verifikationer. Det som redan är bokfört och
+ * dubbletter rörs inte.
  */
 export async function bokforForfallna(
   supabase: SupabaseClient,
-  { userId, underlagId, nu = false }: { userId?: string; underlagId?: string; nu?: boolean } = {},
+  { userId, underlagId, transaktionIds, nu = false }: { userId?: string; underlagId?: string; transaktionIds?: string[]; nu?: boolean } = {},
 ): Promise<{ bokforda: number; fel: string[] }> {
   const grans = new Date(Date.now() - PRELIMINAR_DAGAR * DAG).toISOString();
   const rader: Rad[] = [];
@@ -82,6 +81,7 @@ export async function bokforForfallna(
     if (!nu) q = q.lte('preliminar_at', grans);
     if (userId) q = q.eq('user_id', userId);
     if (underlagId) q = q.eq('underlag_id', underlagId);
+    if (transaktionIds) q = q.in('id', transaktionIds);
     const { data, error } = await q;
     if (error) throw new Error(`Kunde inte läsa transaktionerna: ${error.message}`);
     rader.push(...(data ?? []) as unknown as Rad[]);

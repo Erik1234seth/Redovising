@@ -881,8 +881,8 @@ export const TRANSAKTION_KOLUMNER =
  * Betalkontot följer kunden, utom när kunden betalar från båda hållen; då
  * skickas det med.
  *
- * Valet är preliminärt som allt annat: det sparas på transaktionen och blir
- * verifikation 14 dagar senare (./preliminar). Till dess går det att ändra.
+ * Valet sparas på transaktionen och bokförs direkt (./preliminar). Var den
+ * redan bokförd byts verifikationen mot en ny. En dubblett bokförs inte.
  */
 export async function valjKonto(
   supabase: SupabaseClient,
@@ -897,16 +897,13 @@ export async function valjKonto(
   omvand?: Omvand | null,
 ) {
   const { data: t, error } = await supabase
-    .from('transaktioner').select(TRANSAKTION_KOLUMNER).eq('id', transaktionId).eq('user_id', userId).maybeSingle();
+    .from('transaktioner').select(`${TRANSAKTION_KOLUMNER}, dublett_av, dublett_orsak`).eq('id', transaktionId).eq('user_id', userId).maybeSingle();
   if (error) throw new Error(`Kunde inte läsa transaktionen: ${error.message}`);
   if (!t) throw new Error('Transaktionen finns inte');
-  const { data: profil } = await supabase.from('profiles').select('har_foretagskonto').eq('id', userId).maybeSingle();
+  const { data: profil } = await supabase.from('profiles').select('har_foretagskonto, redovisningsmetod').eq('id', userId).maybeSingle();
   const betalsatt = tolkaBetalsatt(profil?.har_foretagskonto ?? null);
   if (!betalsatt) throw new Error('Välj först om kunden betalar via företagskonto eller privatkonto');
   if (motkonto && !['1930', '2013', '2017'].includes(motkonto)) throw new Error(`${motkonto} är inget betalkonto`);
-  const { count } = await supabase
-    .from('verifikationer').select('id', { count: 'exact', head: true }).eq('transaktion_id', transaktionId);
-  if (count) throw new Error('Transaktionen är redan bokförd — ångra först');
   if (![0, 6, 12, 25].includes(momssats)) throw new Error('Momssatsen måste vara 0, 6, 12 eller 25');
   if (!slaUppKonto(konto)) throw new Error(`${konto} finns inte bland K1-kontona`);
   for (const d of momsdelar ?? []) {
@@ -917,6 +914,13 @@ export async function valjKonto(
   const vald: ValdKontering = { konto, momssats, momsdelar: rensaMomsdelar(momsdelar), omvand: omvand ?? null, motkonto: motkonto ?? null, at: nu };
   const { error: uFel } = await supabase.from('transaktioner').update({ vald_kontering: vald, preliminar_at: nu }).eq('id', transaktionId);
   if (uFel) throw new Error(`Kunde inte spara valet: ${uFel.message}`);
+
+  // Bokförs direkt. En tidigare verifikation från transaktionen byts ut.
+  const rad = t as unknown as Transaktion & { dublett_av: string | null; dublett_orsak: string | null };
+  if (rad.dublett_av || rad.dublett_orsak) return;
+  const { error: dFel } = await supabase.from('verifikationer').delete().eq('transaktion_id', transaktionId).eq('user_id', userId).eq('kalla', 'ai');
+  if (dFel) throw new Error(`Kunde inte ta bort den gamla verifikationen: ${dFel.message}`);
+  await bokfor(supabase, rad, konto, momssats, betalsatt, 'Erik', motkonto, vald.momsdelar, vald.omvand, profil?.redovisningsmetod ?? null);
 }
 
 /** Kontot byrån valt för hand, i `transaktioner.vald_kontering`. */

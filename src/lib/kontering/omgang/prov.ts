@@ -48,8 +48,9 @@ async function raderaFiler(filer: Filpost[]) {
 /**
  * Underlagen som Kör Flöde tar: de som inte lästs i Flöde, eller där kunden
  * skickat något nytt sedan dess. Inte övriga filer, sidor av ett annat
- * underlag, filer vars verifikationer redan lästs in (SIE, verifikationslistor),
- * filer med något bokfört, eller filtyper AI:n inte läser.
+ * underlag, filer vars verifikationer redan lästs in (SIE, verifikationslistor,
+ * Plocka verif) eller filtyper AI:n inte läser. Det Flöde själv bokfört hindrar
+ * inte — det ersätts när filen körs om.
  */
 export async function underlagAttKora(supabase: SupabaseClient, userId: string): Promise<string[]> {
   const { data, error } = await supabase.from('bokforing_underlag')
@@ -64,22 +65,12 @@ export async function underlagAttKora(supabase: SupabaseClient, userId: string):
     && (!u.flode_at || (!!u.kund_svar_at && u.kund_svar_at > u.flode_at)));
   if (!kandidater.length) return [];
 
-  // Något bokfört från filen: en verifikation på filen eller på en transaktion ur den
+  // Verifikationer på filen som inte kommer från en transaktion (SIE, Plocka verif)
   const ids = kandidater.map((u) => u.id);
   const bokforda = new Set<string>();
   for (let i = 0; i < ids.length; i += 200) {
-    const del = ids.slice(i, i + 200);
-    const [{ data: ver }, { data: tx }] = await Promise.all([
-      supabase.from('verifikationer').select('underlag_id').in('underlag_id', del),
-      supabase.from('transaktioner').select('id, underlag_id').in('underlag_id', del),
-    ]);
+    const { data: ver } = await supabase.from('verifikationer').select('underlag_id').in('underlag_id', ids.slice(i, i + 200)).is('transaktion_id', null);
     for (const v of ver ?? []) bokforda.add(v.underlag_id as string);
-    const txIds = (tx ?? []).map((t) => t.id as string);
-    for (let j = 0; j < txIds.length; j += 200) {
-      const { data: vt } = await supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', txIds.slice(j, j + 200));
-      const med = new Set((vt ?? []).map((v) => v.transaktion_id as string));
-      for (const t of tx ?? []) if (med.has(t.id as string)) bokforda.add(t.underlag_id as string);
-    }
   }
   return ids.filter((id) => !bokforda.has(id));
 }

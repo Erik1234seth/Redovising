@@ -3,8 +3,8 @@ import { createServerClient } from '@/lib/supabase-server';
 import { bokforForfallna } from '@/lib/kontering/preliminar';
 
 /**
- * Gör preliminära konteringar som legat orörda i 14 dagar till verifikationer,
- * en gång om dygnet. Se `@/lib/kontering/preliminar`.
+ * Bokför klara konteringar som inte gick att bokföra direkt, en gång om
+ * dygnet. Se `@/lib/kontering/preliminar`.
  *
  * 04:00 UTC är 06:00 svensk sommartid.
  */

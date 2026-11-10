@@ -14,8 +14,8 @@ import { slutligKontering, verifikationFran } from '@/lib/kontering/preliminar';
  *   POST    kontera EN transaktion med båda modellerna (en per anrop, så att
  *           anropet hinner klart inom fem minuter — fliken kör flera parallellt).
  *           Med en instruktion rättas transaktionen först och konteras om.
- *   PUT     välj ett förslag eller ett eget konto för hand — preliminärt, det
- *           blir verifikation om 14 dagar (se `@/lib/kontering/preliminar`)
+ *   PUT     välj ett förslag eller ett eget konto för hand — det bokförs
+ *           direkt (se `@/lib/kontering/preliminar`)
  *   PATCH   rätta transaktionens datum, belopp, moms, valuta eller riktning
  *   DELETE  radera bokföringen, eller hela konteringen (förslag och bokföring),
  *           för en eller flera transaktioner — de kan då konteras om
@@ -216,10 +216,10 @@ export async function DELETE(request: NextRequest) {
         const { error: kFel } = await supabase.from('konteringar').delete().in('transaktion_id', del).eq('user_id', userId);
         if (kFel) throw new Error(`Kunde inte ta bort konteringarna: ${kFel.message}`);
       }
-      // Ångrad bokföring blir preliminär igen och väntar 14 nya dagar; raderad
+      // Ångrad bokföring väntar tills byrån väljer konto igen; raderad
       // kontering tar också bort kontot byrån valt
       const { error: tFel } = await supabase.from('transaktioner').update(bara === 'bokforing'
-        ? { preliminar_at: new Date().toISOString() }
+        ? { preliminar_at: null }
         : { preliminar_at: null, vald_kontering: null }).in('id', del).eq('user_id', userId);
       if (tFel) throw new Error(`Kunde inte spara ändringen: ${tFel.message}`);
     }

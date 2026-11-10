@@ -11,7 +11,7 @@ import { KontoLank } from './_k1-konto';
  * saknas och konterar (@/lib/kontering/omgang).
  *
  * Svaret skrivs till bokföringen: transaktionerna och konteringarna ersätts,
- * gröna blir verifikationer efter 14 dagar och gula när byrån godkänt dem här
+ * gröna blir verifikationer direkt och gula när byrån godkänt dem här
  * eller valt konto i Kontering. Resultatet visas rad för rad, med det som fanns
  * förut bredvid.
  */
@@ -319,7 +319,7 @@ export function Flode({ userId }: { userId: string }) {
     <div className="space-y-6">
       <div className="text-sm text-slate-600 max-w-3xl">
         Kör Flöde skickar allt som inte körts — och filer kunden skickat något nytt om — till GPT-6.1 Sol, som sorterar, läser ut, letar dubbletter mot det bokförda, säger vad som saknas och konterar.
-        Övriga filer, SIE-filer och filer med något bokfört tas inte med. Gröna blir verifikationer efter 14 dagar, gula när du godkänt dem eller valt konto i Kontering.
+        Övriga filer och filer med inlästa verifikationer (SIE, Plocka verif) tas inte med. Gröna bokförs direkt, gula när du godkänt dem eller valt konto i Kontering. Körs en fil om ersätts det Flöde bokfört från den.
         Det som saknas frågas efter i kl 18-mejlet.
       </div>
 
@@ -828,7 +828,7 @@ function TxVy({ nyckel, underlagId, t, gammal, onGodkann }:{ nyckel: string; und
               ))}
               <span className="text-slate-500 text-xs">säkerhet {SAKERHET[k.sakerhet] ?? k.sakerhet}</span>
               {o && !t.godkand && <span className={`text-xs ${k.omdome === 'gron' ? 'text-emerald-700' : k.omdome === 'rod' ? 'text-red-600' : 'text-amber-700'}`}>{o.text}</span>}
-              {t.godkand && <span className="text-xs text-emerald-700 font-medium" title="Blir verifikation 14 dagar efter godkännandet">✓ Godkänd av byrån</span>}
+              {t.godkand && <span className="text-xs text-emerald-700 font-medium" title="Bokförd som verifikation när den godkändes">✓ Godkänd av byrån</span>}
               {k.omdome === 'gul' && !t.godkand && (
                 <button onClick={() => satt(true)} disabled={sparar} className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-2 py-0.5 disabled:opacity-40">
                   {sparar ? 'Sparar…' : 'Godkänn'}

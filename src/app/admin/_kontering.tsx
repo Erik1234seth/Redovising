@@ -10,9 +10,8 @@ import { kr } from './_verifikationer';
  *
  * Båda modellerna (GPT-6.1 Sol och Claude Opus 5.5) konterar varje transaktion.
  * När båda är gröna och har valt samma konto och moms är den klar; annars blir
- * det förslag, och här väljer Erik ett av dem eller ett eget konto. Allt är
- * preliminärt och blir verifikation 14 dagar efter senaste ändringen (se
- * `@/lib/kontering/preliminar`) — till dess går det att ändra fritt.
+ * det förslag, och här väljer Erik ett av dem eller ett eget konto. Det som är
+ * klart bokförs direkt (se `@/lib/kontering/preliminar`).
  *
  * En transaktion konteras per anrop — två modeller med två pass var tar upp
  * till ett par minuter, och ett anrop får ta högst fem. Fliken kör några
@@ -193,8 +192,7 @@ export function KonteringsVy({ userId, betalsatt }: { userId: string; betalsatt:
     <div className="space-y-5">
       <p className="text-slate-500 text-xs">
         Båda modellerna konterar varje rad enligt K1. Klar när båda är gröna och överens om konto och moms, eller
-        när du valt konto — annars blir det förslag. Allt är preliminärt och blir verifikation 14 dagar efter
-        senaste ändringen. Betalkonto:{' '}
+        när du valt konto — annars blir det förslag. Det som är klart bokförs direkt. Betalkonto:{' '}
         <span className="text-slate-700">
           {betalsatt === 'foretagskonto' ? '1930 Företagskonto' : betalsatt === 'privatkonto' ? '2017 Egna insättningar / 2013 Egna uttag' : 'väljs per rad'}
         </span>
@@ -595,7 +593,7 @@ function Detalj({
           {r.vald
             ? `Du har valt ${r.vald.konto} (${momsText(r.vald.momssats, r.vald.momsdelar, r.vald.omvand)}${r.vald.motkonto ? `, betalt via ${r.vald.motkonto}` : ''}).`
             : 'Båda modellerna är gröna och överens.'}
-          {' '}Preliminärt — blir verifikation {dag(r.verifikationFran)} om inget ändras. Väljer du ett annat konto börjar de 14 dagarna om.
+          {' '}Klar men inte bokförd än — den bokförs nästa morgon, eller direkt om du väljer konto.
         </p>
       )}
       {r.konteringar.length > 0 ? (
