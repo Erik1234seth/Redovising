@@ -160,6 +160,10 @@ interface Markerad { underlagId: string; vilken: string }
  * Byråns anteckningar: en transaktion kan markeras, och en anteckning på en
  * eller flera körs om med anteckningen som kontext (POST anteckning).
  */
+/** Filtret i Flöde: bara transaktioner som inte är gröna (gula, röda och de utan kontering). */
+const BaraOsakra = createContext(false);
+const arOsaker = (t: Tx) => !t.kontering || t.kontering.omdome !== 'gron';
+
 const Anteckningar = createContext<{
   markerade: Map<string, Markerad>;
   markera: (nyckel: string, m: Markerad | null) => void;
@@ -187,6 +191,7 @@ export function Flode({ userId }: { userId: string }) {
   const [valda, setValda] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [baraUnderlag, setBaraUnderlag] = useState(true);
+  const [baraOsakra, setBaraOsakra] = useState(false);
   const [startar, setStartar] = useState(false);
   const [startfel, setStartfel] = useState('');
   const [markerade, setMarkerade] = useState<Map<string, Markerad>>(new Map());
@@ -408,7 +413,16 @@ export function Flode({ userId }: { userId: string }) {
       </details>
 
       {laddfel && <p className="text-red-600 text-sm">{laddfel}</p>}
-      {korningar.map((delar) => <Korning key={delar[0].korning} delar={delar} onTaBort={() => taBort(delar[0].korning)} onGodkann={godkann} />)}
+      {korningar.length > 0 && (
+        <label className="text-sm text-slate-700 flex items-center gap-1.5 w-fit">
+          <input type="checkbox" checked={baraOsakra} onChange={(e) => setBaraOsakra(e.target.checked)} className="accent-blue-600" />
+          Visa bara gula och röda
+          <span className="text-slate-500">({rader.flatMap((r) => r.resultat?.filer ?? []).flatMap((f) => f.transaktioner).filter(arOsaker).length})</span>
+        </label>
+      )}
+      <BaraOsakra.Provider value={baraOsakra}>
+        {korningar.map((delar) => <Korning key={delar[0].korning} delar={delar} onTaBort={() => taBort(delar[0].korning)} onGodkann={godkann} />)}
+      </BaraOsakra.Provider>
 
       {markerade.size > 0 && (
         <div className="sticky bottom-0 z-10 bg-white border border-blue-300 rounded-lg shadow-lg p-3 space-y-2">
@@ -644,9 +658,13 @@ function Del({ rad: d, visaNummer, onGodkann }: { rad: Provrad; visaNummer: bool
 }
 
 function FilVy({ radId, fil: f, onGodkann }: { radId: string; fil: Fil; onGodkann: (nr: number, val: boolean) => Promise<void> }) {
+  const bara = useContext(BaraOsakra);
   // Gamla transaktioner som ingen ny motsvarar visas sist
   const matchade = new Set(f.transaktioner.map((t) => sammaGamla(t, f.gammalt)?.id).filter(Boolean));
   const overblivna = f.gammalt.filter((g) => !matchade.has(g.id) && !g.dublett);
+  // Med filtret visas bara de som inte är gröna; en fil utan svar visas ändå
+  const visade = bara ? f.transaktioner.filter(arOsaker) : f.transaktioner;
+  if (bara && !visade.length && f.sort) return null;
   return (
     <div className="border border-slate-200 rounded">
       <div className="flex flex-wrap items-baseline gap-x-3 px-3 py-2 bg-slate-50 border-b border-slate-200 text-sm">
@@ -663,9 +681,9 @@ function FilVy({ radId, fil: f, onGodkann }: { radId: string; fil: Fil; onGodkan
           {f.skrivet}
         </div>
       )}
-      {f.transaktioner.length > 0 && (
+      {visade.length > 0 && (
         <div className="divide-y divide-slate-100">
-          {f.transaktioner.map((t) => <TxVy key={t.nr} nyckel={`${radId}|${f.fil}|${t.nr}`} underlagId={f.underlagId} t={t} gammal={sammaGamla(t, f.gammalt)} onGodkann={(val) => onGodkann(t.nr, val)} />)}
+          {visade.map((t) => <TxVy key={t.nr} nyckel={`${radId}|${f.fil}|${t.nr}`} underlagId={f.underlagId} t={t} gammal={sammaGamla(t, f.gammalt)} onGodkann={(val) => onGodkann(t.nr, val)} />)}
         </div>
       )}
       {overblivna.length > 0 && (
