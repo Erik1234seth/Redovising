@@ -229,6 +229,45 @@ export async function godkannProv(
 }
 
 /**
+ * Byrån raderar transaktioner som inte ska bokföras. Transaktionen tas bort,
+ * och med den konteringarna, verifikationerna, kopplingarna och anteckningarna
+ * (on delete cascade). Den försvinner också ur körningen. Körs filen om kommer
+ * den tillbaka. Svarar med hur många som raderades.
+ */
+export async function raderaTransaktioner(
+  supabase: SupabaseClient, userId: string, valda: { id: string; fil: string; nr: number }[],
+): Promise<number> {
+  const radIds = [...new Set(valda.map((v) => v.id))];
+  const { data, error } = await supabase.from('kontering_prov').select('id, resultat, jamfor_med').eq('user_id', userId).in('id', radIds);
+  if (error) throw new Error(`Kunde inte läsa körningen: ${error.message}`);
+  const rader = new Map((data ?? []).map((r) => [r.id as string, r as { id: string; resultat: Resultat | null; jamfor_med: string | null }]));
+
+  const txIds = new Set<string>();
+  for (const v of valda) {
+    const rad = rader.get(v.id);
+    const t = rad?.resultat?.filer.find((f) => f.fil === v.fil)?.transaktioner.find((x) => x.nr === v.nr);
+    if (!rad || !t) throw new Error('En av transaktionerna finns inte i körningen — ladda om sidan');
+    if (rad.jamfor_med) throw new Error('En jämförelse är inte bokförd — det finns inget att radera');
+    if (!t.transaktionId) throw new Error(`${t.datum ?? 'Utan datum'} ${t.belopp} ${t.motpart || t.beskrivning || ''} är ingen egen transaktion i bokföringen och kan inte raderas`.trim());
+    txIds.add(t.transaktionId);
+  }
+
+  const ids = [...txIds];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { error: dFel } = await supabase.from('transaktioner').delete().eq('user_id', userId).in('id', ids.slice(i, i + 200));
+    if (dFel) throw new Error(`Kunde inte radera transaktionerna: ${dFel.message}`);
+  }
+
+  for (const rad of rader.values()) {
+    if (!rad.resultat) continue;
+    for (const f of rad.resultat.filer) f.transaktioner = f.transaktioner.filter((t) => !t.transaktionId || !txIds.has(t.transaktionId));
+    const { error: uFel } = await supabase.from('kontering_prov').update({ resultat: rad.resultat }).eq('id', rad.id);
+    if (uFel) throw new Error(`Transaktionerna raderades, men körningen kunde inte uppdateras: ${uFel.message}`);
+  }
+  return ids.length;
+}
+
+/**
  * Tar bort en körning ur listan. En del som inte är klar avbryts hos
  * leverantören. Det som redan skrivits till bokföringen ligger kvar.
  */

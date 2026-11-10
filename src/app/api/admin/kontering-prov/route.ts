@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { anvandJamforelse, godkannProv, raderaProv, startaProv, underlagAttKora, uppdateraProv, type Provrad } from '@/lib/kontering/omgang/prov';
+import { anvandJamforelse, godkannProv, raderaProv, raderaTransaktioner, startaProv, underlagAttKora, uppdateraProv, type Provrad } from '@/lib/kontering/omgang/prov';
 import { FLODESMODELLER, arFlodesmodell, type Flodesmodell } from '@/lib/kontering/omgang/leverantor';
 import type { Resultat } from '@/lib/kontering/omgang/svar';
 
@@ -18,6 +18,7 @@ import type { Resultat } from '@/lib/kontering/omgang/svar';
  *           { anteckning, transaktioner: [{ underlagId, vilken }] } sparar byråns
  *           anteckning som kontext på underlagen och kör om dem.
  *   PATCH   godkänn en gul kontering, eller ångra. { anvand: korning } bokför en jämförelse i stället.
+ *           { radera: [{ id, fil, nr }] } raderar transaktionerna ur bokföringen.
  *   DELETE  ta bort en körning ur listan (det bokförda ligger kvar)
  */
 
@@ -165,13 +166,28 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** Godkänn en gul kontering, eller ångra: { userId, id, fil, nr, godkand }. Bokför en jämförelse: { userId, anvand }. */
+/**
+ * Godkänn en gul kontering, eller ångra: { userId, id, fil, nr, godkand }. Bokför en jämförelse: { userId, anvand }.
+ * Radera transaktioner: { userId, radera: [{ id, fil, nr }] }.
+ */
 export async function PATCH(request: NextRequest) {
-  let body: { userId?: string; id?: string; fil?: string; nr?: number; godkand?: boolean; anvand?: string };
+  let body: { userId?: string; id?: string; fil?: string; nr?: number; godkand?: boolean; anvand?: string; radera?: { id?: unknown; fil?: unknown; nr?: unknown }[] };
   try {
     body = await request.json();
   } catch {
     return fel('Ogiltig JSON', 400);
+  }
+  if (body.userId && body.radera) {
+    const valda = (Array.isArray(body.radera) ? body.radera : [])
+      .filter((v) => typeof v.id === 'string' && typeof v.fil === 'string' && typeof v.nr === 'number')
+      .map((v) => ({ id: v.id as string, fil: v.fil as string, nr: v.nr as number }));
+    if (!valda.length) return fel('Välj minst en transaktion', 400);
+    try {
+      const raderade = await raderaTransaktioner(getSupabase(), body.userId, valda);
+      return NextResponse.json({ ok: true, raderade });
+    } catch (err) {
+      return fel(err);
+    }
   }
   if (body.userId && body.anvand) {
     try {

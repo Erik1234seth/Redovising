@@ -194,7 +194,11 @@ function vilken(t: Tx): string {
   return `${t.datum ?? 'utan datum'} ${t.riktning === 'in' ? '+' : '−'}${t.belopp} ${t.valuta} ${t.motpart || t.beskrivning || ''}`.trim();
 }
 
-interface Markerad { underlagId: string; vilken: string }
+/** Var transaktionen står: körningens rad, filen och numret i filen. */
+interface Plats { id: string; fil: string; nr: number }
+
+/** `radera` finns när transaktionen är en egen transaktion i bokföringen, som går att radera. */
+interface Markerad { underlagId: string; vilken: string; radera?: Plats }
 
 /**
  * Byråns anteckningar: en transaktion kan markeras, och en anteckning på en
@@ -266,6 +270,9 @@ export function Flode({ userId }: { userId: string }) {
   const [anteckning, setAnteckning] = useState('');
   const [korOmFel, setKorOmFel] = useState('');
   const [korOmStartar, setKorOmStartar] = useState(false);
+  const [raderaBekrafta, setRaderaBekrafta] = useState(false);
+  const [raderar, setRaderar] = useState(false);
+  const [raderaFel, setRaderaFel] = useState('');
   const [val, setValState] = useState<Val>('gpt');
   useEffect(() => {
     try { const v = localStorage.getItem(VAL_NYCKEL); if (v && v in VAL) setValState(v as Val); } catch { /* utan lagring: GPT */ }
@@ -374,6 +381,33 @@ export function Flode({ userId }: { userId: string }) {
     }
   }
 
+  /** Raderar de markerade transaktionerna ur bokföringen. Markerade som inte går att radera står kvar. */
+  async function raderaMarkerade() {
+    const att = [...markerade.entries()].filter(([, m]) => m.radera);
+    setRaderar(true);
+    setRaderaFel('');
+    try {
+      const res = await fetch('/api/admin/kontering-prov', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, radera: att.map(([, m]) => m.radera) }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setMarkerade((gamla) => {
+        const kvar = new Map(gamla);
+        for (const [nyckel] of att) kvar.delete(nyckel);
+        return kvar;
+      });
+      setRaderaBekrafta(false);
+      await ladda();
+    } catch (err) {
+      setRaderaFel(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRaderar(false);
+    }
+  }
+
   /** Godkänn en gul kontering, eller ångra. Felet visas vid raden. */
   const godkann: Godkann = async (radId, fil, nr, godkand) => {
     const res = await fetch('/api/admin/kontering-prov', {
@@ -413,6 +447,7 @@ export function Flode({ userId }: { userId: string }) {
   const allaValda = synliga.length > 0 && synliga.every((u) => valda.includes(u.id));
   const nyaSet = new Set(attKora);
   const filerMarkerade = new Set([...markerade.values()].map((m) => m.underlagId)).size;
+  const raderbara = [...markerade.values()].filter((m) => m.radera).length;
 
   return (
     <Anteckningar.Provider value={anteckningar}>
@@ -571,7 +606,7 @@ export function Flode({ userId }: { userId: string }) {
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="font-semibold text-slate-800">{markerade.size} {markerade.size === 1 ? 'transaktion markerad' : 'transaktioner markerade'}</span>
             <span className="text-slate-500">{filerMarkerade} {filerMarkerade === 1 ? 'fil' : 'filer'} körs om med {VAL[val].text} · ca {prisFor(val, filerMarkerade)} kr</span>
-            <button onClick={() => setMarkerade(new Map())} className="ml-auto text-slate-500 hover:text-slate-800">Avmarkera alla</button>
+            <button onClick={() => { setMarkerade(new Map()); setRaderaBekrafta(false); }} className="ml-auto text-slate-500 hover:text-slate-800">Avmarkera alla</button>
           </div>
           <textarea
             value={anteckning}
@@ -589,6 +624,24 @@ export function Flode({ userId }: { userId: string }) {
               {korOmStartar ? 'Förbereder och skickar…' : `Kör om ${markerade.size} med anteckningen`}
             </button>
             {korOmFel && <span className="text-sm text-red-600">{korOmFel}</span>}
+            <span className="ml-auto flex flex-wrap items-center gap-3 text-sm">
+              {raderaBekrafta ? (
+                <>
+                  <span className="text-slate-500 text-xs">Transaktionerna och deras verifikationer tas bort. Körs filen om kommer de tillbaka.</span>
+                  <button onClick={raderaMarkerade} disabled={raderar} className="bg-red-600 text-white font-medium px-3 py-1.5 rounded disabled:opacity-40">
+                    {raderar ? 'Raderar…' : `Ja, radera ${raderbara}`}
+                  </button>
+                  <button onClick={() => setRaderaBekrafta(false)} disabled={raderar} className="text-slate-500 hover:text-slate-800">Avbryt</button>
+                </>
+              ) : (
+                <button onClick={() => setRaderaBekrafta(true)} disabled={!raderbara}
+                  title={raderbara < markerade.size ? 'Jämförelser och rader som kopplats till något som redan fanns är inga egna transaktioner och raderas inte' : undefined}
+                  className="text-red-600 hover:text-red-700 font-medium disabled:opacity-40">
+                  {raderbara === markerade.size ? `Radera ${raderbara}` : `Radera ${raderbara} av ${markerade.size}`}
+                </button>
+              )}
+              {raderaFel && <span className="text-red-600">{raderaFel}</span>}
+            </span>
           </div>
         </div>
       )}
@@ -847,7 +900,7 @@ function FilVy({ radId, fil: f, onGodkann }: { radId: string; fil: Fil; onGodkan
       )}
       {visade.length > 0 && (
         <div className="divide-y divide-slate-100">
-          {visade.map((t) => <TxVy key={t.nr} nyckel={`${radId}|${f.fil}|${t.nr}`} underlagId={f.underlagId} t={t} gammal={sammaGamla(t, f.gammalt)} onGodkann={(val) => onGodkann(t.nr, val)} />)}
+          {visade.map((t) => <TxVy key={t.nr} plats={{ id: radId, fil: f.fil, nr: t.nr }} underlagId={f.underlagId} t={t} gammal={sammaGamla(t, f.gammalt)} onGodkann={(val) => onGodkann(t.nr, val)} />)}
         </div>
       )}
       {overblivna.length > 0 && (
@@ -877,16 +930,22 @@ function Rader({ rader }: { rader: { konto: string; kontonamn: string; belopp: n
   );
 }
 
-/** Kryssrutan som markerar transaktionen för en gemensam anteckning. */
-function Markera({ nyckel, underlagId, t }: { nyckel: string; underlagId: string; t: Tx }) {
+const platsNyckel = (p: Plats) => `${p.id}|${p.fil}|${p.nr}`;
+
+/** Kryssrutan som markerar transaktionen för en gemensam anteckning, eller för att radera den. */
+function Markera({ plats, underlagId, t }: { plats: Plats; underlagId: string; t: Tx }) {
   const a = useContext(Anteckningar);
+  const jamforelse = useContext(ArJamforelse);
   if (!a) return null;
+  const nyckel = platsNyckel(plats);
+  // Bara egna transaktioner i bokföringen går att radera — inte en jämförelse eller en kopplad rad
+  const radera = t.transaktionId && !jamforelse && !t.kopplad?.startsWith('Kopplad') ? plats : undefined;
   return (
     <input
       type="checkbox"
-      title="Markera för att köra om flera med samma anteckning"
+      title="Markera för att köra om med en anteckning, eller för att radera"
       checked={a.markerade.has(nyckel)}
-      onChange={(e) => a.markera(nyckel, e.target.checked ? { underlagId, vilken: vilken(t) } : null)}
+      onChange={(e) => a.markera(nyckel, e.target.checked ? { underlagId, vilken: vilken(t), radera } : null)}
       className="accent-blue-600 self-center"
     />
   );
@@ -936,7 +995,7 @@ function Anteckna({ underlagId, t }: { underlagId: string; t: Tx }) {
   );
 }
 
-function TxVy({ nyckel, underlagId, t, gammal, onGodkann }:{ nyckel: string; underlagId: string; t: Tx; gammal: Gammal | null; onGodkann: (val: boolean) => Promise<void> }) {
+function TxVy({ plats, underlagId, t, gammal, onGodkann }:{ plats: Plats; underlagId: string; t: Tx; gammal: Gammal | null; onGodkann: (val: boolean) => Promise<void> }) {
   const jamforelse = useContext(ArJamforelse);
   const [sparar, setSparar] = useState(false);
   const [godkannFel, setGodkannFel] = useState('');
@@ -949,7 +1008,7 @@ function TxVy({ nyckel, underlagId, t, gammal, onGodkann }:{ nyckel: string; und
   if (t.kopplad?.startsWith('Kopplad')) {
     return (
       <div className="px-3 py-2 text-sm flex flex-wrap items-baseline gap-x-2 text-slate-500">
-        <Markera nyckel={nyckel} underlagId={underlagId} t={t} />
+        <Markera plats={plats} underlagId={underlagId} t={t} />
         <span className="tabular-nums">{t.datum ?? 'utan datum'}</span>
         <span>{t.beskrivning || '—'}</span>
         {t.motpart && <span>· {t.motpart}</span>}
@@ -970,7 +1029,7 @@ function TxVy({ nyckel, underlagId, t, gammal, onGodkann }:{ nyckel: string; und
       {/* Vänster: transaktionen och den nya konteringen */}
       <div className="space-y-1.5 min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-2">
-          <Markera nyckel={nyckel} underlagId={underlagId} t={t} />
+          <Markera plats={plats} underlagId={underlagId} t={t} />
           <span className="text-slate-500 tabular-nums">{t.datum ?? <span className="text-blue-700">utan datum</span>}</span>
           <span className="text-slate-900 font-medium">{t.beskrivning || '—'}</span>
           {t.motpart && <span className="text-slate-500">· {t.motpart}</span>}
