@@ -7,20 +7,21 @@ import { hamtaInstruktioner, kontextFor, reglerFor, type Instruktion } from '@/l
 import { tolkaBetalsatt, type Betalsatt } from '../betalsatt';
 import { bokfordaVerifikationer, hamtaArslista, hamtaKundbild, verifikationsSammanfattning } from '../kundbild';
 import { laddaK1Andringar } from '../k1-andringar';
-import { instruktionensTokens, byggKropp, type Indatafil } from './anrop';
+import { instruktionensTokens, type Indatafil } from './anrop';
 import { kontrolleraFil, uppskattadeTokens, type Forberedd, type Underlagsrad } from './filer';
-import { laddaUpp, raderaFil } from './openai';
+import type { Leverantor } from './leverantor';
 
 /**
  * Förbereder en omgång för en kund: kontrollerar filerna, bygger kunddelen,
- * delar upp underlagen i anrop och laddar upp filerna till OpenAI.
+ * delar upp underlagen i anrop och laddar upp filerna till modellens
+ * leverantör (./leverantor: OpenAI eller Claude).
  *
  * Helst läses hela omgången i ett anrop, så att en kontoutdragsrad och kvittot
  * till den ses tillsammans. Över 272 000 tokens in tar OpenAI dubbelt betalt —
  * det är värt det. Gränserna som återstår är modellens fönster (1 050 000
  * tokens, varav svaret får 128 000 med tänkandet) och 50 MB filer per anrop.
- * Bara över dem delas underlagen, i delar med högst MAX_FILER filer och en
- * tokenbudget.
+ * Bara över dem delas underlagen, i delar med högst så många filer som
+ * leverantören tar (maxFiler) och en tokenbudget.
  *
  * Ingen sida får tappa sitt dokument för att omgången delas:
  * - Ordningen (iOrdning): filerna i samma mejl eller samma uppladdning hålls
@@ -35,8 +36,6 @@ import { laddaUpp, raderaFil } from './openai';
 
 /** Under modellens 922 000 tokens in, med marginal för att uppskattningen är grov. */
 const TOKENTAK = 800_000;
-/** Svaret har 128 000 tokens med tänkandet; 60 filer tog 43 000 (ungefär 700 per fil). */
-const MAX_FILER = 150;
 /** Så många filer på var sida om en del följer med som grannsidor. Ett dokument på upp till fyra sidor klarar gränsen. */
 const GRANNAR = 3;
 /** Plats som hålls för grannsidorna: sex bilder. */
@@ -207,6 +206,7 @@ export async function forberedOmgang(
   supabase: SupabaseClient,
   userId: string,
   underlagIds: string[],
+  lev: Leverantor,
 ): Promise<Forberedelse> {
   // Byråns ändringar i kontobeskrivningarna gäller från och med nu
   await laddaK1Andringar(supabase);
@@ -244,7 +244,9 @@ export async function forberedOmgang(
   const kontroller = await iKo(ordnade, SAMTIDIGA_UPPLADDNINGAR, ({ rad }) => kontrolleraFil(supabase, rad));
   ordnade.forEach(({ rad: u, samling }, i) => {
     const k = kontroller[i];
-    if (k.ok) godkanda.push({ u, fil: k.fil, samling, tokens: uppskattadeTokens(k.fil), byte: k.fil.typ === 'dokument' ? k.fil.bytes.length : 0 });
+    const nej = k.ok && k.fil.typ !== 'text' ? lev.tarEmot(k.fil.mime) : null;
+    if (nej) hoppade.push({ underlagId: u.id, namn: u.file_name, orsak: nej, varning: true });
+    else if (k.ok) godkanda.push({ u, fil: k.fil, samling, tokens: uppskattadeTokens(k.fil), byte: k.fil.typ === 'dokument' ? k.fil.bytes.length : 0 });
     else hoppade.push({ underlagId: u.id, namn: u.file_name, orsak: k.orsak, varning: !k.tyst });
   });
 
@@ -255,7 +257,7 @@ export async function forberedOmgang(
   let tokens = 0, byte = 0;
   for (const g of godkanda) {
     const sista = grupper[grupper.length - 1];
-    if (!sista || sista.length >= MAX_FILER || tokens + g.tokens > budget || byte + g.byte > MAX_BYTE_PER_ANROP) {
+    if (!sista || sista.length >= lev.maxFiler || tokens + g.tokens > budget || byte + g.byte > MAX_BYTE_PER_ANROP) {
       grupper.push([g]);
       tokens = g.tokens; byte = g.byte;
     } else {
@@ -289,7 +291,7 @@ export async function forberedOmgang(
     const uppladdade = await iKo(poster, SAMTIDIGA_UPPLADDNINGAR, async (p) => {
       try {
         if (p.fil.typ === 'text') return { ...p, fileId: null as string | null };
-        const fileId = await laddaUpp(p.u.file_name, p.fil.bytes, p.fil.mime, p.fil.typ === 'bild' ? 'vision' : 'user_data');
+        const fileId = await lev.laddaUpp(p.u.file_name, p.fil.bytes, p.fil.mime, p.fil.typ);
         return { ...p, fileId };
       } catch (err) {
         // En grannsida som inte gick upp är bara mindre sammanhang
@@ -299,7 +301,7 @@ export async function forberedOmgang(
     });
     const klara = uppladdade.filter((x): x is NonNullable<typeof x> => !!x);
     if (!klara.some((k) => !k.granne)) {
-      await Promise.all(klara.filter((k) => k.fileId).map((k) => raderaFil(k.fileId!).catch(() => {})));
+      await Promise.all(klara.filter((k) => k.fileId).map((k) => lev.raderaFil(k.fileId!).catch(() => {})));
       continue;
     }
 
@@ -322,7 +324,7 @@ export async function forberedOmgang(
     });
     delar.push({
       filer,
-      kropp: byggKropp(kunden.text, indata, kunden.regelIdn),
+      kropp: lev.byggKropp(kunden.text, indata, kunden.regelIdn),
       tokens: fast + klara.reduce((s, k) => s + k.tokens, 0),
     });
   }

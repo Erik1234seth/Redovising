@@ -4,6 +4,7 @@ import { smsKontextForMejl } from '@/lib/inkorg/kontext';
 import type { Tillrackligt } from './tillrackligt';
 import { hamtaInstruktioner, kontextFor, reglerText } from './instruktioner';
 import { svenskDag } from '@/lib/dagskassa';
+import { FLODESMODELLER } from '@/lib/kontering/omgang/leverantor';
 
 /**
  * Steget "Skriv mail" i flödesschemat: frågemejlet till kunden om det som
@@ -100,7 +101,7 @@ async function fragorAttStalla(supabase: SupabaseClient, userId?: string): Promi
  */
 export async function osakraAttFraga(supabase: SupabaseClient, userId: string): Promise<Rad[]> {
   const { data: konteringar, error: kFel } = await supabase.from('konteringar')
-    .select('transaktion_id, motivering, flaggor').eq('user_id', userId).eq('modell', 'gpt-6.1-sol').eq('omdome', 'gul').limit(1000);
+    .select('transaktion_id, motivering, flaggor').eq('user_id', userId).in('modell', [...FLODESMODELLER]).eq('omdome', 'gul').limit(1000);
   if (kFel) throw new Error(kFel.message);
   // Varför den är gul — flaggorna, där det modellen är osäker på står — och konteringens motivering
   const motivering = new Map((konteringar ?? []).map((k) => {

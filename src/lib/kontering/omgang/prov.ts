@@ -1,20 +1,24 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { kostnadOpenAI, loggaOpenAI } from '@/lib/ai-logg';
-import { MODELL, type Svar } from './anrop';
+import type { Svar } from './anrop';
 import { kanSkickas } from './filer';
 import { forberedOmgang, type Filpost, type Hoppad, type Kontext } from './forbered';
-import { avbryt, hamtaSvar, raderaFil, skickaIBakgrunden } from './openai';
+import { leverantor, type Flodesmodell } from './leverantor';
 import { skrivResultat, godkannTransaktion } from './skriv';
 import { provaSvar, type Resultat } from './svar';
 
 /**
- * Flöde: konteringen sedan 2026-11-07. Omgången körs på valda underlag i
- * bakgrundsläget (fullpris, svar på några minuter). Svaret prövas i kod och
+ * Flöde: konteringen sedan 2026-11-07. Omgången körs på valda underlag med
+ * GPT-6.1 Sol eller Claude Opus 5.5 (./leverantor). Svaret prövas i kod och
  * skrivs till bokföringen (./skriv) — transaktioner och konteringar — och
  * körningen sparas i `kontering_prov` så att den syns i fliken Flöde.
  *
  * Varje del av omgången är en rad. Svaret hämtas när adminsidan frågar
- * (`uppdateraProv`), och då raderas filerna hos OpenAI.
+ * (`uppdateraProv`), och då raderas filerna hos leverantören.
+ *
+ * Jämförelse (`jamfor_med`): samma underlag körs också med den andra
+ * modellen, men det svaret skrivs inte till bokföringen. Det prövas först när
+ * huvudkörningen är klar, så att "Förut" i Flöde visar huvudmodellens
+ * kontering bredvid. Byrån kan välja jämförelsen i stället (`anvandJamforelse`).
  */
 
 export interface Provrad {
@@ -25,9 +29,14 @@ export interface Provrad {
   del: number;
   delar: number;
   status: 'forbereder' | 'skickad' | 'tar-emot' | 'klar' | 'fel';
+  /** Modellen som körde (./leverantor). */
+  modell: string;
+  /** Jämförelse med huvudkörningen (dess `korning`): skrivs inte till bokföringen. */
+  jamfor_med: string | null;
   underlag_ids: string[];
   filer: Filpost[];
   varningar: Hoppad[];
+  /** Svarets id hos leverantören — OpenAI-svaret eller Claudes batch. */
   openai_id: string | null;
   kontext: Kontext | null;
   resultat: unknown;
@@ -40,8 +49,9 @@ export interface Provrad {
 
 const STEG = 'flode';
 
-async function raderaFiler(filer: Filpost[]) {
-  await Promise.all(filer.filter((f) => f.fileId).map((f) => raderaFil(f.fileId!).catch((err) =>
+async function raderaFiler(modell: string, filer: Filpost[]) {
+  const lev = leverantor(modell);
+  await Promise.all(filer.filter((f) => f.fileId).map((f) => lev.raderaFil(f.fileId!).catch((err) =>
     console.error(`[kontering-prov] kunde inte radera ${f.fileId}:`, err instanceof Error ? err.message : err))));
 }
 
@@ -75,16 +85,24 @@ export async function underlagAttKora(supabase: SupabaseClient, userId: string):
   return ids.filter((id) => !bokforda.has(id));
 }
 
-/** Startar en provkörning. Svarar med körningens id när alla delar är skickade. */
-export async function startaProv(supabase: SupabaseClient, userId: string, underlagIds: string[]): Promise<string> {
-  const korning = crypto.randomUUID();
-  const forb = await forberedOmgang(supabase, userId, underlagIds);
+/**
+ * Startar en körning med modellen. Svarar med körningens id när alla delar är
+ * skickade. Med `jamforMed` blir det en jämförelse med den körningen.
+ */
+export async function startaProv(
+  supabase: SupabaseClient, userId: string, underlagIds: string[],
+  o: { modell: Flodesmodell; korning?: string; jamforMed?: string | null },
+): Promise<string> {
+  const korning = o.korning ?? crypto.randomUUID();
+  const lev = leverantor(o.modell);
+  const bas = { modell: lev.modell, jamfor_med: o.jamforMed ?? null };
+  const forb = await forberedOmgang(supabase, userId, underlagIds, lev);
   const delar = forb.delar.length;
 
   // Inget gick att skicka — raden visar varför
   if (!delar) {
     const { error } = await supabase.from('kontering_prov').insert({
-      user_id: userId, korning, status: 'klar', underlag_ids: underlagIds, varningar: forb.hoppade, kontext: forb.kontext,
+      ...bas, user_id: userId, korning, status: 'klar', underlag_ids: underlagIds, varningar: forb.hoppade, kontext: forb.kontext,
       resultat: { filer: [], anteckningar: [], kontroller: ['Inget underlag gick att skicka.'], hoppade: forb.hoppade }, klar_at: new Date().toISOString(),
     });
     if (error) throw new Error(`Kunde inte spara provkörningen: ${error.message}`);
@@ -93,6 +111,7 @@ export async function startaProv(supabase: SupabaseClient, userId: string, under
 
   for (const [i, d] of forb.delar.entries()) {
     const { data: rad, error } = await supabase.from('kontering_prov').insert({
+      ...bas,
       user_id: userId,
       korning,
       del: i + 1,
@@ -107,14 +126,14 @@ export async function startaProv(supabase: SupabaseClient, userId: string, under
       uppskattade_tokens: d.tokens,
     }).select('id').single();
     if (error) {
-      await raderaFiler(d.filer);
+      await raderaFiler(lev.modell, d.filer);
       throw new Error(`Kunde inte spara provkörningen: ${error.message}`);
     }
     try {
-      const openaiId = await skickaIBakgrunden(d.kropp);
-      await supabase.from('kontering_prov').update({ status: 'skickad', openai_id: openaiId }).eq('id', rad.id);
+      const id = await lev.skicka(d.kropp);
+      await supabase.from('kontering_prov').update({ status: 'skickad', openai_id: id }).eq('id', rad.id);
     } catch (err) {
-      await raderaFiler(d.filer);
+      await raderaFiler(lev.modell, d.filer);
       await supabase.from('kontering_prov').update({ status: 'fel', fel: err instanceof Error ? err.message : String(err), klar_at: new Date().toISOString() }).eq('id', rad.id);
     }
   }
@@ -123,20 +142,25 @@ export async function startaProv(supabase: SupabaseClient, userId: string, under
 
 /**
  * Hämtar svaret för en skickad del om det är klart, prövar det och sparar
- * resultatet. Bara en fråga åt gången tar emot samma rad.
+ * resultatet. Bara en fråga åt gången tar emot samma rad. En jämförelse väntar
+ * tills huvudkörningen är klar, och skrivs inte.
  */
 export async function uppdateraProv(supabase: SupabaseClient, rad: Provrad): Promise<void> {
   if (rad.status !== 'skickad' || !rad.openai_id) return;
-  const svar = await hamtaSvar(rad.openai_id);
+  if (rad.jamfor_med) {
+    const { count } = await supabase.from('kontering_prov').select('id', { count: 'exact', head: true })
+      .eq('korning', rad.jamfor_med).in('status', ['forbereder', 'skickad', 'tar-emot']);
+    if (count) return;
+  }
+  const lev = leverantor(rad.modell);
+  const svar = await lev.hamtaSvar(rad.openai_id);
   if (!svar.klar) return;
 
   // Ta raden — en annan flik kan fråga samtidigt
   const { data: tagen } = await supabase.from('kontering_prov').update({ status: 'tar-emot' }).eq('id', rad.id).eq('status', 'skickad').select('id');
   if (!tagen?.length) return;
 
-  const webb = { webbsokningar: svar.sokningar.length };
-  await loggaOpenAI({ steg: STEG, userId: rad.user_id }, svar.modell || MODELL, svar.usage, webb);
-  const kostnad = kostnadOpenAI(svar.modell || MODELL, svar.usage, webb);
+  const kostnad = await lev.logga({ steg: STEG, userId: rad.user_id }, svar);
   // Sökningarna sparas med användningen, så att det syns vad modellen letade efter
   const klar = { usage: { ...svar.usage, webbsokningar: svar.sokningar }, kostnad_usd: kostnad, klar_at: new Date().toISOString() };
 
@@ -150,12 +174,37 @@ export async function uppdateraProv(supabase: SupabaseClient, rad: Provrad): Pro
     }
     if (!rad.kontext) throw new Error('Körningens kontext saknas');
     const resultat = await provaSvar(supabase, rad.user_id, rad.filer, data, rad.kontext, rad.varningar ?? []);
-    await skrivResultat(supabase, rad.user_id, rad.filer, resultat);
+    if (!rad.jamfor_med) await skrivResultat(supabase, rad.user_id, rad.filer, resultat, svar.modell || lev.modell);
     await supabase.from('kontering_prov').update({ ...klar, status: 'klar', svar: data, resultat }).eq('id', rad.id);
   } catch (err) {
     await supabase.from('kontering_prov').update({ ...klar, status: 'fel', fel: err instanceof Error ? err.message : String(err) }).eq('id', rad.id);
   } finally {
-    await raderaFiler(rad.filer);
+    await raderaFiler(lev.modell, rad.filer);
+  }
+}
+
+/**
+ * Byrån väljer jämförelsen i stället för huvudkörningen: svaret prövas på nytt
+ * mot det som nu är bokfört och skrivs, och körningen blir en vanlig körning.
+ * Den är nyare än huvudkörningen och ersätter den därför i listan.
+ */
+export async function anvandJamforelse(supabase: SupabaseClient, userId: string, korning: string): Promise<void> {
+  const { data, error } = await supabase.from('kontering_prov').select('id, status, modell, jamfor_med, filer, kontext, varningar, svar')
+    .eq('user_id', userId).eq('korning', korning).order('del');
+  if (error) throw new Error(`Kunde inte läsa körningen: ${error.message}`);
+  const delar = (data ?? []) as (Pick<Provrad, 'id' | 'status' | 'modell' | 'jamfor_med' | 'filer' | 'kontext' | 'varningar'> & { svar: Svar | null })[];
+  if (!delar.length) throw new Error('Körningen finns inte');
+  if (!delar.some((d) => d.jamfor_med)) throw new Error('Körningen är redan bokförd');
+  if (delar.some((d) => d.status !== 'klar' && d.status !== 'fel')) throw new Error('Jämförelsen är inte klar än');
+  for (const d of delar) {
+    if (d.status === 'klar' && d.svar && d.kontext) {
+      const resultat = await provaSvar(supabase, userId, d.filer, d.svar, d.kontext, d.varningar ?? []);
+      await skrivResultat(supabase, userId, d.filer, resultat, d.modell);
+      const { error: uFel } = await supabase.from('kontering_prov').update({ resultat, jamfor_med: null }).eq('id', d.id);
+      if (uFel) throw new Error(`Kunde inte spara körningen: ${uFel.message}`);
+    } else {
+      await supabase.from('kontering_prov').update({ jamfor_med: null }).eq('id', d.id);
+    }
   }
 }
 
@@ -172,6 +221,7 @@ export async function godkannProv(
   const t = resultat?.filer.find((f) => f.fil === fil)?.transaktioner.find((x) => x.nr === nr);
   if (!resultat || !t) throw new Error('Transaktionen finns inte i körningen');
   if (godkand && t.kontering?.omdome !== 'gul') throw new Error('Bara gula konteringar kan godkännas');
+  if (!t.transaktionId) throw new Error('Transaktionen är inte bokförd — välj körningen först');
   await godkannTransaktion(supabase, userId, t, godkand);
   t.godkand = godkand ? { at: new Date().toISOString() } : null;
   const { error: uFel } = await supabase.from('kontering_prov').update({ resultat }).eq('id', radId);
@@ -179,15 +229,15 @@ export async function godkannProv(
 }
 
 /**
- * Tar bort en körning ur listan. En del som inte är klar avbryts hos OpenAI.
- * Det som redan skrivits till bokföringen ligger kvar.
+ * Tar bort en körning ur listan. En del som inte är klar avbryts hos
+ * leverantören. Det som redan skrivits till bokföringen ligger kvar.
  */
 export async function raderaProv(supabase: SupabaseClient, userId: string, korning: string): Promise<void> {
-  const { data, error } = await supabase.from('kontering_prov').select('id, status, openai_id, filer').eq('user_id', userId).eq('korning', korning);
+  const { data, error } = await supabase.from('kontering_prov').select('id, status, modell, openai_id, filer').eq('user_id', userId).eq('korning', korning);
   if (error) throw new Error(`Kunde inte läsa körningen: ${error.message}`);
-  for (const r of (data ?? []) as Pick<Provrad, 'id' | 'status' | 'openai_id' | 'filer'>[]) {
-    if (r.status === 'skickad' && r.openai_id) await avbryt(r.openai_id).catch(() => {});
-    if (r.status === 'skickad' || r.status === 'forbereder') await raderaFiler(r.filer ?? []);
+  for (const r of (data ?? []) as Pick<Provrad, 'id' | 'status' | 'modell' | 'openai_id' | 'filer'>[]) {
+    if (r.status === 'skickad' && r.openai_id) await leverantor(r.modell).avbryt(r.openai_id).catch(() => {});
+    if (r.status === 'skickad' || r.status === 'forbereder') await raderaFiler(r.modell, r.filer ?? []);
   }
   const { error: dFel } = await supabase.from('kontering_prov').delete().eq('user_id', userId).eq('korning', korning);
   if (dFel) throw new Error(`Kunde inte ta bort körningen: ${dFel.message}`);

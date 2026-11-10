@@ -53,7 +53,7 @@ function kostnad(modell: string, t: Tokens): number | null {
 
 let klient: SupabaseClient | null = null;
 
-async function spara(anrop: Anropsinfo, modell: string, t: Tokens): Promise<void> {
+async function spara(anrop: Anropsinfo, modell: string, t: Tokens, pris?: number | null): Promise<void> {
   try {
     klient ??= createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -70,7 +70,7 @@ async function spara(anrop: Anropsinfo, modell: string, t: Tokens): Promise<void
       tankande: t.tankande,
       webbsokningar: t.webbsokningar,
       kodmiljoer: t.kodmiljoer,
-      kostnad_usd: kostnad(modell, t),
+      kostnad_usd: pris !== undefined ? pris : kostnad(modell, t),
     });
     if (error) console.error('[ai-logg] kunde inte spara:', error.message);
   } catch (err) {
@@ -116,19 +116,43 @@ export function kostnadOpenAI(
   return kostnad(modell, openaiTokens(usage, extra));
 }
 
-/** Svaret från Claude. Här ligger cachen utanför input_tokens, och tänkandet ingår i output_tokens utan egen siffra. */
-export async function loggaClaude(
-  anrop: Anropsinfo,
-  modell: string,
-  usage: Record<string, any> | null | undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
-): Promise<void> {
-  await spara(anrop, modell, {
+/** Claudes svar. Här ligger cachen utanför input_tokens, och tänkandet ingår i output_tokens. */
+function claudeTokens(usage: Record<string, any> | null | undefined): Tokens { // eslint-disable-line @typescript-eslint/no-explicit-any
+  return {
     indata: tal(usage?.input_tokens),
     cacheLast: tal(usage?.cache_read_input_tokens),
     cacheSkrivet: tal(usage?.cache_creation_input_tokens),
     utdata: tal(usage?.output_tokens),
-    tankande: 0,
+    tankande: tal(usage?.output_tokens_details?.thinking_tokens),
     webbsokningar: tal(usage?.server_tool_use?.web_search_requests),
     kodmiljoer: 0,
-  });
+  };
+}
+
+/** Batch-API:t tar halva priset för tokens. Sökningarna kostar som vanligt. */
+function claudeKostnad(modell: string, t: Tokens, batch: boolean): number | null {
+  const hel = kostnad(modell, t);
+  if (hel === null || !batch) return hel;
+  const extra = t.webbsokningar * PER_WEBBSOKNING;
+  return (hel - extra) / 2 + extra;
+}
+
+/** Svaret från Claude. */
+export async function loggaClaude(
+  anrop: Anropsinfo,
+  modell: string,
+  usage: Record<string, any> | null | undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
+  extra: { batch?: boolean } = {},
+): Promise<void> {
+  const t = claudeTokens(usage);
+  await spara(anrop, modell, t, extra.batch ? claudeKostnad(modell, t, true) : undefined);
+}
+
+/** Vad ett Claude-anrop kostade i dollar, till listpris. */
+export function kostnadClaude(
+  modell: string,
+  usage: Record<string, any> | null | undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
+  extra: { batch?: boolean } = {},
+): number | null {
+  return claudeKostnad(modell, claudeTokens(usage), !!extra.batch);
 }

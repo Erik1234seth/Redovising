@@ -6,9 +6,13 @@ import { kr } from './_verifikationer';
 import { KontoLank } from './_k1-konto';
 
 /**
- * Flöde — konteringen sedan 2026-11-07: en modell (GPT-6.1 Sol) får alla valda
- * underlag i ett anrop och sorterar, läser ut, letar dubbletter, säger vad som
- * saknas och konterar (@/lib/kontering/omgang).
+ * Flöde — konteringen sedan 2026-11-07: en modell (GPT-6.1 Sol eller Claude
+ * Opus 5.5) får alla valda underlag i ett anrop och sorterar, läser ut, letar
+ * dubbletter, säger vad som saknas och konterar (@/lib/kontering/omgang).
+ *
+ * Med "båda" körs samma underlag också med den andra modellen som jämförelse.
+ * Jämförelsen bokförs inte; dess "Förut" visar huvudmodellens kontering, och
+ * byrån kan bokföra jämförelsen i stället.
  *
  * Svaret skrivs till bokföringen: transaktionerna och konteringarna ersätts,
  * gröna blir verifikationer direkt och gula när byrån godkänt dem här
@@ -116,10 +120,18 @@ interface Provrad {
   del: number;
   delar: number;
   status: 'forbereder' | 'skickad' | 'tar-emot' | 'klar' | 'fel';
+  modell: string;
+  /** Jämförelse med den körningen: inte bokförd. */
+  jamfor_med: string | null;
   underlag_ids: string[];
   varningar: Hoppad[];
   resultat: Resultat | null;
-  usage: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number }; output_tokens_details?: { reasoning_tokens?: number } } | null;
+  /** OpenAI: cachen ingår i input_tokens. Claude: cachen står för sig, och tänkandet heter thinking_tokens. */
+  usage: {
+    input_tokens?: number; output_tokens?: number;
+    input_tokens_details?: { cached_tokens?: number }; output_tokens_details?: { reasoning_tokens?: number; thinking_tokens?: number };
+    cache_read_input_tokens?: number; cache_creation_input_tokens?: number;
+  } | null;
   kostnad_usd: number | null;
   uppskattade_tokens: number | null;
   fel: string | null;
@@ -128,8 +140,22 @@ interface Provrad {
 
 /** Ungefärlig kurs för att visa kostnaden i kronor. */
 const USD_SEK = 9.88;
-/** Fullpris per underlag, ungefär — visas innan körningen startar. */
-const KR_PER_UNDERLAG = 0.25;
+/** Kronor per underlag, ungefär — visas innan körningen startar. Claude körs i batch till halva priset. */
+const KR_PER_UNDERLAG: Record<string, number> = { 'gpt-6.1-sol': 0.25, 'claude-opus-5-5': 0.15 };
+
+/** Vad Kör Flöde kör med: modellen som bokför, och om den andra körs som jämförelse. */
+const VAL = {
+  gpt: { modell: 'gpt-6.1-sol', jamfor: false, text: 'GPT-6.1 Sol' },
+  claude: { modell: 'claude-opus-5-5', jamfor: false, text: 'Claude Opus 5.5' },
+  'gpt+claude': { modell: 'gpt-6.1-sol', jamfor: true, text: 'Båda — GPT bokför, Claude jämförs' },
+  'claude+gpt': { modell: 'claude-opus-5-5', jamfor: true, text: 'Båda — Claude bokför, GPT jämförs' },
+} as const;
+type Val = keyof typeof VAL;
+const VAL_NYCKEL = 'flode-modell';
+const prisFor = (v: Val, antal: number) => {
+  const andra = VAL[v].modell === 'gpt-6.1-sol' ? 'claude-opus-5-5' : 'gpt-6.1-sol';
+  return Math.max(1, Math.round(antal * (KR_PER_UNDERLAG[VAL[v].modell] + (VAL[v].jamfor ? KR_PER_UNDERLAG[andra] : 0))));
+};
 type Godkann = (radId: string, fil: string, nr: number, godkand: boolean) => Promise<void>;
 
 const VANTANDE = new Set(['forbereder', 'skickad', 'tar-emot']);
@@ -144,6 +170,20 @@ const OMDOME: Record<string, { prick: string; text: string }> = {
   rod: { prick: 'bg-red-500', text: 'Stopp' },
 };
 const MODELL: Record<string, string> = { 'gpt-6.1-sol': 'Sol', 'claude-opus-5-5': 'Opus', 'gpt-6-astra': 'Astra', 'gpt-5.5': 'GPT-5.5' };
+const MODELLNAMN: Record<string, string> = { 'gpt-6.1-sol': 'GPT-6.1 Sol', 'claude-opus-5-5': 'Claude Opus 5.5' };
+
+/** Körningen är en jämförelse: inget är bokfört, så inget kan godkännas. */
+const ArJamforelse = createContext(false);
+
+/** Tokens i ett anrop, oavsett leverantör: allt in, varav cachat, ut och varav tänkande. */
+function tokenrad(u: NonNullable<Provrad['usage']>): string {
+  const claude = u.cache_read_input_tokens !== undefined || u.cache_creation_input_tokens !== undefined;
+  const cachat = claude ? (u.cache_read_input_tokens ?? 0) : (u.input_tokens_details?.cached_tokens ?? 0);
+  const inn = (u.input_tokens ?? 0) + (claude ? cachat + (u.cache_creation_input_tokens ?? 0) : 0);
+  const tank = u.output_tokens_details?.thinking_tokens ?? u.output_tokens_details?.reasoning_tokens ?? 0;
+  const sv = (n: number) => n.toLocaleString('sv-SE');
+  return `${sv(inn)} in (${sv(cachat)} cachade) · ${sv(u.output_tokens ?? 0)} ut, varav ${sv(tank)} tänkande`;
+}
 
 function filLank(id: string) {
   return `/api/admin/underlag/${id}/ladda-ner?visa`;
@@ -198,6 +238,15 @@ export function Flode({ userId }: { userId: string }) {
   const [anteckning, setAnteckning] = useState('');
   const [korOmFel, setKorOmFel] = useState('');
   const [korOmStartar, setKorOmStartar] = useState(false);
+  const [val, setValState] = useState<Val>('gpt');
+  useEffect(() => {
+    try { const v = localStorage.getItem(VAL_NYCKEL); if (v && v in VAL) setValState(v as Val); } catch { /* utan lagring: GPT */ }
+  }, []);
+  const setVal = (v: Val) => {
+    setValState(v);
+    try { localStorage.setItem(VAL_NYCKEL, v); } catch { /* bara för den här gången */ }
+  };
+  const modellval = { modell: VAL[val].modell, jamfor: VAL[val].jamfor };
 
   const ladda = useCallback(async () => {
     try {
@@ -232,7 +281,14 @@ export function Flode({ userId }: { userId: string }) {
   const korningar = useMemo(() => {
     const m = new Map<string, Provrad[]>();
     for (const r of rader) m.set(r.korning, [...(m.get(r.korning) ?? []), r]);
-    return [...m.values()].map((d) => d.sort((a, b) => a.del - b.del));
+    const alla = [...m.values()].map((d) => d.sort((a, b) => a.del - b.del));
+    // En jämförelse visas direkt efter sin huvudkörning
+    const ut: Provrad[][] = [];
+    for (const d of alla) {
+      if (d[0].jamfor_med && m.has(d[0].jamfor_med)) continue;
+      ut.push(d, ...alla.filter((j) => j[0].jamfor_med === d[0].korning));
+    }
+    return ut;
   }, [rader]);
 
   /** Kör Flöde (nya) tar allt som inte körts; annars de valda. */
@@ -243,7 +299,7 @@ export function Flode({ userId }: { userId: string }) {
       const res = await fetch('/api/admin/kontering-prov', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nya ? { userId, nya: true } : { userId, underlagIds: valda }),
+        body: JSON.stringify(nya ? { userId, nya: true, ...modellval } : { userId, underlagIds: valda, ...modellval }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -267,12 +323,12 @@ export function Flode({ userId }: { userId: string }) {
     const res = await fetch('/api/admin/kontering-prov', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, anteckning: text, transaktioner: tx }),
+      body: JSON.stringify({ userId, anteckning: text, transaktioner: tx, ...modellval }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     await ladda();
-  }, [userId, ladda]);
+  }, [userId, ladda, modellval.modell, modellval.jamfor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const anteckningar = useMemo(() => ({ markerade, markera, korOm }), [markerade, markera, korOm]);
 
@@ -302,6 +358,18 @@ export function Flode({ userId }: { userId: string }) {
     await ladda();
   };
 
+  /** Bokför en jämförelse i stället för huvudkörningen. */
+  async function anvand(korning: string) {
+    const res = await fetch('/api/admin/kontering-prov', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, anvand: korning }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    await ladda();
+  }
+
   async function taBort(korning: string) {
     await fetch(`/api/admin/kontering-prov?userId=${encodeURIComponent(userId)}&korning=${korning}`, { method: 'DELETE' });
     await ladda();
@@ -318,12 +386,21 @@ export function Flode({ userId }: { userId: string }) {
     <Anteckningar.Provider value={anteckningar}>
     <div className="space-y-6">
       <div className="text-sm text-slate-600 max-w-3xl">
-        Kör Flöde skickar allt som inte körts — och filer kunden skickat något nytt om — till GPT-6.1 Sol, som sorterar, läser ut, letar dubbletter mot det bokförda, säger vad som saknas och konterar.
+        Kör Flöde skickar allt som inte körts — och filer kunden skickat något nytt om — till modellen du väljer, som sorterar, läser ut, letar dubbletter mot det bokförda, säger vad som saknas och konterar.
+        GPT svarar på några minuter. Claude körs i batch till halva priset och kan ta längre tid. Med Båda körs den andra modellen som jämförelse: den bokförs inte, men visar sin kontering med den bokförda bredvid, och du kan välja den i stället.
         Övriga filer och filer med inlästa verifikationer (SIE, Plocka verif) tas inte med. Gröna bokförs direkt, gula när du godkänt dem eller valt konto i Kontering. Körs en fil om ersätts det Flöde bokfört från den.
         Det som saknas frågas efter i kl 18-mejlet.
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={val}
+          onChange={(e) => setVal(e.target.value as Val)}
+          className="border border-slate-300 rounded px-2 py-2 text-sm text-slate-900 bg-white"
+          title="Modellen som kör Flöde"
+        >
+          {(Object.keys(VAL) as Val[]).map((v) => <option key={v} value={v}>{VAL[v].text}</option>)}
+        </select>
         <button
           onClick={() => starta(true)}
           disabled={!attKora.length || startar}
@@ -331,7 +408,7 @@ export function Flode({ userId }: { userId: string }) {
         >
           {startar ? 'Förbereder och skickar…' : attKora.length ? `Kör Flöde · ${attKora.length} underlag` : 'Inget nytt att köra'}
         </button>
-        {attKora.length > 0 && !startar && <span className="text-sm text-slate-500">ca {Math.max(1, Math.round(attKora.length * KR_PER_UNDERLAG))} kr</span>}
+        {attKora.length > 0 && !startar && <span className="text-sm text-slate-500">ca {prisFor(val, attKora.length)} kr</span>}
         {startfel && <span className="text-sm text-red-600">{startfel}</span>}
       </div>
 
@@ -352,7 +429,7 @@ export function Flode({ userId }: { userId: string }) {
             Dölj övriga filer
           </label>
           <span className="ml-auto text-sm text-slate-600">
-            {valda.length} valda{valda.length ? ` · ca ${Math.max(1, Math.round(valda.length * KR_PER_UNDERLAG))} kr` : ''}
+            {valda.length} valda{valda.length ? ` · ca ${prisFor(val, valda.length)} kr` : ''}
           </span>
           <button
             onClick={() => starta(false)}
@@ -421,14 +498,16 @@ export function Flode({ userId }: { userId: string }) {
         </label>
       )}
       <BaraOsakra.Provider value={baraOsakra}>
-        {korningar.map((delar) => <Korning key={delar[0].korning} delar={delar} onTaBort={() => taBort(delar[0].korning)} onGodkann={godkann} />)}
+        {korningar.map((delar) => (
+          <Korning key={delar[0].korning} delar={delar} onTaBort={() => taBort(delar[0].korning)} onGodkann={godkann} onAnvand={() => anvand(delar[0].korning)} />
+        ))}
       </BaraOsakra.Provider>
 
       {markerade.size > 0 && (
         <div className="sticky bottom-0 z-10 bg-white border border-blue-300 rounded-lg shadow-lg p-3 space-y-2">
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="font-semibold text-slate-800">{markerade.size} {markerade.size === 1 ? 'transaktion markerad' : 'transaktioner markerade'}</span>
-            <span className="text-slate-500">{filerMarkerade} {filerMarkerade === 1 ? 'fil' : 'filer'} körs om · ca {Math.max(1, Math.round(filerMarkerade * KR_PER_UNDERLAG))} kr</span>
+            <span className="text-slate-500">{filerMarkerade} {filerMarkerade === 1 ? 'fil' : 'filer'} körs om med {VAL[val].text} · ca {prisFor(val, filerMarkerade)} kr</span>
             <button onClick={() => setMarkerade(new Map())} className="ml-auto text-slate-500 hover:text-slate-800">Avmarkera alla</button>
           </div>
           <textarea
@@ -569,9 +648,17 @@ function OsakraMejl({ userId, uppdaterad }: { userId: string; uppdaterad: unknow
   );
 }
 
-function Korning({ delar, onTaBort, onGodkann }: { delar: Provrad[]; onTaBort: () => void; onGodkann: Godkann }) {
+function Korning({ delar, onTaBort, onGodkann, onAnvand }: { delar: Provrad[]; onTaBort: () => void; onGodkann: Godkann; onAnvand: () => Promise<void> }) {
   const [bekrafta, setBekrafta] = useState(false);
+  const [anvander, setAnvander] = useState(false);
+  const [anvandFel, setAnvandFel] = useState('');
   const forsta = delar[0];
+  const jamforelse = !!forsta.jamfor_med;
+  async function bokfor() {
+    setAnvander(true);
+    setAnvandFel('');
+    try { await onAnvand(); } catch (err) { setAnvandFel(err instanceof Error ? err.message : String(err)); } finally { setAnvander(false); }
+  }
   const klara = delar.filter((d) => d.status === 'klar' || d.status === 'fel').length;
   const usd = delar.reduce((s, d) => s + (Number(d.kostnad_usd) || 0), 0);
   const underlag = delar.reduce((s, d) => s + d.underlag_ids.length, 0);
@@ -585,14 +672,23 @@ function Korning({ delar, onTaBort, onGodkann }: { delar: Provrad[]; onTaBort: (
     : null;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg">
+    <div className={`bg-white border rounded-lg ${jamforelse ? 'border-violet-300 ml-6' : 'border-slate-200'}`}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 border-b border-slate-200 text-sm">
-        <h3 className="font-semibold text-slate-800">Körning {TID.format(new Date(forsta.created_at))}</h3>
+        <h3 className="font-semibold text-slate-800">{jamforelse ? 'Jämförelse' : 'Körning'} {TID.format(new Date(forsta.created_at))}</h3>
+        <span className="text-xs font-medium text-slate-700 bg-slate-100 rounded px-1.5 py-0.5">{MODELLNAMN[forsta.modell] ?? forsta.modell}</span>
+        {jamforelse && <span className="text-xs text-violet-700">Inte bokförd — Förut visar det som bokfördes</span>}
         <span className="text-slate-600">{underlag} underlag{delar.length > 1 ? ` i ${delar.length} anrop` : ''}</span>
         {klara < delar.length
-          ? <span className="text-blue-700">Väntar på svar ({klara} av {delar.length} klara) — sidan frågar var 15:e sekund</span>
+          ? <span className="text-blue-700">Väntar på svar ({klara} av {delar.length} klara){forsta.modell === 'claude-opus-5-5' ? ' — Claude körs i batch och kan ta en stund' : ''}{jamforelse ? '. En jämförelse tas emot när huvudkörningen är klar' : ''} — sidan frågar var 15:e sekund</span>
           : <span className="text-slate-600">{egna.length} transaktioner · {grona} gröna{godkanda ? ` · ${godkanda} ${godkanda === 1 ? 'godkänd' : 'godkända'}` : ''} · {egna.length - grona - godkanda} till Granska{kopplade ? ` · ${kopplade} kopplade till det som fanns` : ''}{minuter !== null ? ` · ${minuter} min` : ''}</span>}
         {usd > 0 && <span className="text-slate-600">{kr.format(usd * USD_SEK)} ({usd.toFixed(2)} USD)</span>}
+        {jamforelse && klara === delar.length && delar.some((d) => d.status === 'klar') && (
+          <button onClick={bokfor} disabled={anvander} className="text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 rounded px-2 py-1 disabled:opacity-40"
+            title="Ersätter det huvudkörningen bokförde för de här underlagen">
+            {anvander ? 'Bokför…' : 'Bokför den här i stället'}
+          </button>
+        )}
+        {anvandFel && <span className="text-xs text-red-600">{anvandFel}</span>}
         <span className="ml-auto">
           {bekrafta ? (
             <>
@@ -605,9 +701,11 @@ function Korning({ delar, onTaBort, onGodkann }: { delar: Provrad[]; onTaBort: (
           )}
         </span>
       </div>
-      <div className="divide-y divide-slate-200">
-        {delar.map((d) => <Del key={d.id} rad={d} visaNummer={delar.length > 1} onGodkann={(fil, nr, val) => onGodkann(d.id, fil, nr, val)} />)}
-      </div>
+      <ArJamforelse.Provider value={jamforelse}>
+        <div className="divide-y divide-slate-200">
+          {delar.map((d) => <Del key={d.id} rad={d} visaNummer={delar.length > 1} onGodkann={(fil, nr, val) => onGodkann(d.id, fil, nr, val)} />)}
+        </div>
+      </ArJamforelse.Provider>
     </div>
   );
 }
@@ -615,7 +713,7 @@ function Korning({ delar, onTaBort, onGodkann }: { delar: Provrad[]; onTaBort: (
 function Del({ rad: d, visaNummer, onGodkann }: { rad: Provrad; visaNummer: boolean; onGodkann: (fil: string, nr: number, val: boolean) => Promise<void> }) {
   const r = d.resultat;
   const hoppade = r?.hoppade ?? d.varningar ?? [];
-  const tokens = d.usage ? `${(d.usage.input_tokens ?? 0).toLocaleString('sv-SE')} in (${(d.usage.input_tokens_details?.cached_tokens ?? 0).toLocaleString('sv-SE')} cachade) · ${(d.usage.output_tokens ?? 0).toLocaleString('sv-SE')} ut, varav ${(d.usage.output_tokens_details?.reasoning_tokens ?? 0).toLocaleString('sv-SE')} tänkande` : '';
+  const tokens = d.usage ? tokenrad(d.usage) : '';
   return (
     <div className="px-4 py-3 space-y-3">
       {(visaNummer || tokens) && (
@@ -773,6 +871,7 @@ function Anteckna({ underlagId, t }: { underlagId: string; t: Tx }) {
 }
 
 function TxVy({ nyckel, underlagId, t, gammal, onGodkann }:{ nyckel: string; underlagId: string; t: Tx; gammal: Gammal | null; onGodkann: (val: boolean) => Promise<void> }) {
+  const jamforelse = useContext(ArJamforelse);
   const [sparar, setSparar] = useState(false);
   const [godkannFel, setGodkannFel] = useState('');
   async function satt(val: boolean) {
@@ -823,13 +922,13 @@ function TxVy({ nyckel, underlagId, t, gammal, onGodkann }:{ nyckel: string; und
                 <KontoLank konto={k.konto} className="font-semibold text-slate-800">{k.konto} {k.kontonamn}</KontoLank>
               ) : <span className="font-semibold text-red-600">Inget konto</span>}
               <span className="text-slate-600">{momsText(k.momssats, k.momsdelar, k.omvand)}</span>
-              {(k.momsdelar ?? []).filter((d) => d.konto && d.konto !== k.konto).map((d) => (
-                <KontoLank key={d.konto} konto={d.konto!} className="text-slate-700 text-xs">{d.konto}</KontoLank>
+              {[...new Set((k.momsdelar ?? []).map((d) => d.konto).filter((x): x is string => !!x && x !== k.konto))].map((konto) => (
+                <KontoLank key={konto} konto={konto} className="text-slate-700 text-xs">{konto}</KontoLank>
               ))}
               <span className="text-slate-500 text-xs">säkerhet {SAKERHET[k.sakerhet] ?? k.sakerhet}</span>
               {o && !t.godkand && <span className={`text-xs ${k.omdome === 'gron' ? 'text-emerald-700' : k.omdome === 'rod' ? 'text-red-600' : 'text-amber-700'}`}>{o.text}</span>}
               {t.godkand && <span className="text-xs text-emerald-700 font-medium" title="Bokförd som verifikation när den godkändes">✓ Godkänd av byrån</span>}
-              {k.omdome === 'gul' && !t.godkand && (
+              {k.omdome === 'gul' && !t.godkand && !jamforelse && (
                 <button onClick={() => satt(true)} disabled={sparar} className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-2 py-0.5 disabled:opacity-40">
                   {sparar ? 'Sparar…' : 'Godkänn'}
                 </button>

@@ -29,8 +29,12 @@ interface UnderlagRad {
   sortering_orsak: string | null;
 }
 
-/** Skriver svaret. Varje fil får `skrivet` — vad som hände med den — och varje transaktion sitt id. */
-export async function skrivResultat(supabase: SupabaseClient, userId: string, filer: Filpost[], resultat: Resultat): Promise<void> {
+/**
+ * Skriver svaret. Varje fil får `skrivet` — vad som hände med den — och varje
+ * transaktion sitt id. `modell` är modellen som svarade; den står på
+ * transaktionerna och konteringarna.
+ */
+export async function skrivResultat(supabase: SupabaseClient, userId: string, filer: Filpost[], resultat: Resultat, modell: string = MODELL): Promise<void> {
   const ids = resultat.filer.map((f) => f.underlagId);
   if (!ids.length) return;
   const perFil = new Map(filer.map((f) => [f.fil.toUpperCase(), f]));
@@ -95,7 +99,7 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
       if (dFel) throw new Error(`Kunde inte ta bort de gamla transaktionerna: ${dFel.message}`);
       // Har kunden redan fått frågor om filen frågas inte samma sak igen
       const fragad = deras.find((t) => t.fraga_utkast_id)?.fraga_utkast_id ?? null;
-      f.skrivet = await skrivFil(supabase, u, f, perFil, fragad, kopplingar);
+      f.skrivet = await skrivFil(supabase, u, f, perFil, fragad, kopplingar, modell);
       skrivna.add(f.underlagId);
     } catch (err) {
       f.skrivet = `Fel: ${err instanceof Error ? err.message : String(err)}`;
@@ -243,6 +247,7 @@ async function skrivFil(
   perFil: Map<string, Filpost>,
   fragad: string | null,
   kopplingar: Map<ResultatTransaktion, Mal>,
+  modell: string,
 ): Promise<string> {
   const nu = DAGS();
   const handsorterad = u.sortering_orsak === FLYTTAD_FOR_HAND && u.sortering === 'underlag';
@@ -272,7 +277,7 @@ async function skrivFil(
   // Det som är samma affär som något som redan finns kopplas dit efteråt (kopplaUnderlag)
   const kopplade = f.transaktioner.filter((t) => kopplingar.has(t)).length;
   const nya = f.transaktioner.filter((t) => !kopplingar.has(t)).map((t) => ({ t, id: t.transaktionId ?? randomUUID() }));
-  const rows = nya.map(({ t, id }) => transaktionsrad(t, id, u, email, fragad, nu));
+  const rows = nya.map(({ t, id }) => transaktionsrad(t, id, u, email, fragad, nu, modell));
   if (rows.length) {
     const { error } = await supabase.from('transaktioner').insert(rows);
     if (error) throw new Error(`Kunde inte spara transaktionerna: ${error.message}`);
@@ -280,14 +285,14 @@ async function skrivFil(
   const konteringar = nya.filter(({ t }) => t.kontering).map(({ t, id }) => ({
     transaktion_id: id,
     user_id: u.user_id,
-    modell: MODELL,
+    modell,
     konto: t.kontering!.konto,
     momssats: t.kontering!.momssats,
     momsdelar: t.kontering!.momsdelar,
     omvand: t.kontering!.omvand,
     motivering: t.kontering!.motivering,
     regler: t.kontering!.regler,
-    granskning: { ...(t.kontering!.granskning ?? {}), sakerhet: t.kontering!.sakerhet, svarade: MODELL, flode: true },
+    granskning: { ...(t.kontering!.granskning ?? {}), sakerhet: t.kontering!.sakerhet, svarade: modell, flode: true },
     flaggor: t.kontering!.flaggor,
     omdome: t.kontering!.omdome,
     created_at: nu,
@@ -317,7 +322,7 @@ async function skrivFil(
   return delar.length ? `${delar.join(', ')}.` : f.sort === 'komplement' ? 'Komplement utan egna transaktioner.' : 'Inga transaktioner i filen.';
 }
 
-function transaktionsrad(t: ResultatTransaktion, id: string, u: UnderlagRad, email: string | null, fragad: string | null, nu: string) {
+function transaktionsrad(t: ResultatTransaktion, id: string, u: UnderlagRad, email: string | null, fragad: string | null, nu: string, modell: string) {
   const d = t.dublett;
   // En dubblett bokförs inte, och då ska kunden inte heller få frågor om den
   const saknas = d.status === 'dublett' ? [] : t.saknas;
@@ -339,13 +344,13 @@ function transaktionsrad(t: ResultatTransaktion, id: string, u: UnderlagRad, ema
     uppgifter: t.uppgifter,
     kronor: t.kronor,
     kalla: 'ai',
-    modell: MODELL,
-    dublettkoll: { status: d.status, av: d.transaktionId, avFil: d.status === 'unik' ? null : d.refText || null, motivering: d.motivering, modell: MODELL },
+    modell,
+    dublettkoll: { status: d.status, av: d.transaktionId, avFil: d.status === 'unik' ? null : d.refText || null, motivering: d.motivering, modell },
     // En dubblett av en transaktion pekar på den. En dubblett av en hel fil har ingen rad att peka på.
     dublett_av: d.status === 'dublett' ? d.transaktionId : null,
     // Orsaken står alltid: pekar dublett_av på en rad som senare ersätts blir den null, och då ska raden ändå inte bokföras
     dublett_orsak: d.status === 'dublett' ? `Dubblett av ${d.refText || 'ett annat underlag'}` : null,
-    tillrackligt: { status: saknas.length ? 'saknar' : 'tillrackligt', saknas, antaganden: t.antaganden, modell: MODELL },
+    tillrackligt: { status: saknas.length ? 'saknar' : 'tillrackligt', saknas, antaganden: t.antaganden, modell },
     fraga_utkast_id: saknas.length ? fragad : null,
     preliminar_at: t.kontering ? nu : null,
   };
