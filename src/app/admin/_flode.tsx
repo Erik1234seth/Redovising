@@ -200,9 +200,35 @@ interface Markerad { underlagId: string; vilken: string }
  * Byråns anteckningar: en transaktion kan markeras, och en anteckning på en
  * eller flera körs om med anteckningen som kontext (POST anteckning).
  */
-/** Filtret i Flöde: bara transaktioner som inte är gröna (gula, röda och de utan kontering). */
-const BaraOsakra = createContext(false);
+/**
+ * Filtret i Flöde: bara transaktioner som inte är gröna (gula, röda och de utan
+ * kontering), och bara de med datum i perioden. Med en period visas inte
+ * transaktioner utan datum.
+ */
+interface Filter { baraOsakra: boolean; fran: string; tom: string }
+const INGET_FILTER: Filter = { baraOsakra: false, fran: '', tom: '' };
+const FilterCtx = createContext<Filter>(INGET_FILTER);
 const arOsaker = (t: Tx) => !t.kontering || t.kontering.omdome !== 'gron';
+const filterAktivt = (f: Filter) => f.baraOsakra || !!f.fran || !!f.tom;
+function visas(t: Tx, f: Filter): boolean {
+  if (f.baraOsakra && !arOsaker(t)) return false;
+  if ((f.fran || f.tom) && !t.datum) return false;
+  if (f.fran && t.datum! < f.fran) return false;
+  if (f.tom && t.datum! > f.tom) return false;
+  return true;
+}
+
+/** Perioderna att välja bland: kvartal och helår för åren som finns bland transaktionerna, nyast först. */
+function periodval(ar: number[]): { namn: string; fran: string; tom: string }[] {
+  return ar.flatMap((a) => [
+    ...[4, 3, 2, 1].map((q) => ({
+      namn: `Q${q} ${a}`,
+      fran: `${a}-${String(q * 3 - 2).padStart(2, '0')}-01`,
+      tom: `${a}-${String(q * 3).padStart(2, '0')}-${q === 1 || q === 4 ? '31' : '30'}`,
+    })),
+    { namn: `Helår ${a}`, fran: `${a}-01-01`, tom: `${a}-12-31` },
+  ]);
+}
 
 const Anteckningar = createContext<{
   markerade: Map<string, Markerad>;
@@ -232,6 +258,8 @@ export function Flode({ userId }: { userId: string }) {
   const [query, setQuery] = useState('');
   const [baraUnderlag, setBaraUnderlag] = useState(true);
   const [baraOsakra, setBaraOsakra] = useState(false);
+  const [period, setPeriod] = useState({ fran: '', tom: '' });
+  const [egenPeriod, setEgenPeriod] = useState(false);
   const [startar, setStartar] = useState(false);
   const [startfel, setStartfel] = useState('');
   const [markerade, setMarkerade] = useState<Map<string, Markerad>>(new Map());
@@ -378,6 +406,10 @@ export function Flode({ userId }: { userId: string }) {
   if (laddfel && !underlag) return <p className="text-red-600 text-sm">{laddfel}</p>;
   if (!underlag) return <p className="text-slate-500 text-sm">Laddar…</p>;
 
+  const filter: Filter = { baraOsakra, fran: period.fran, tom: period.tom };
+  const allaTx = rader.flatMap((r) => r.resultat?.filer ?? []).flatMap((f) => f.transaktioner);
+  const arMedTx = [...new Set(allaTx.map((t) => Number(t.datum?.slice(0, 4))).filter((a) => a > 2000))].sort((a, b) => b - a);
+
   const allaValda = synliga.length > 0 && synliga.every((u) => valda.includes(u.id));
   const nyaSet = new Set(attKora);
   const filerMarkerade = new Set([...markerade.values()].map((m) => m.underlagId)).size;
@@ -491,17 +523,48 @@ export function Flode({ userId }: { userId: string }) {
 
       {laddfel && <p className="text-red-600 text-sm">{laddfel}</p>}
       {korningar.length > 0 && (
-        <label className="text-sm text-slate-700 flex items-center gap-1.5 w-fit">
-          <input type="checkbox" checked={baraOsakra} onChange={(e) => setBaraOsakra(e.target.checked)} className="accent-blue-600" />
-          Visa bara gula och röda
-          <span className="text-slate-500">({rader.flatMap((r) => r.resultat?.filer ?? []).flatMap((f) => f.transaktioner).filter(arOsaker).length})</span>
-        </label>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-700">
+          <label className="flex items-center gap-1.5">
+            Period
+            <select
+              value={egenPeriod ? 'egen' : periodval(arMedTx).find((p) => p.fran === period.fran && p.tom === period.tom)?.namn ?? ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                setEgenPeriod(v === 'egen');
+                if (v === 'egen') return;
+                const p = periodval(arMedTx).find((x) => x.namn === v);
+                setPeriod(p ? { fran: p.fran, tom: p.tom } : { fran: '', tom: '' });
+              }}
+              className="border border-slate-300 rounded px-2 py-1 bg-white"
+            >
+              <option value="">Alla datum</option>
+              {periodval(arMedTx).map((p) => <option key={p.namn} value={p.namn}>{p.namn}</option>)}
+              <option value="egen">Eget intervall…</option>
+            </select>
+          </label>
+          {egenPeriod && (
+            <span className="flex items-center gap-1.5">
+              <input type="date" value={period.fran} onChange={(e) => setPeriod((p) => ({ ...p, fran: e.target.value }))} className="border border-slate-300 rounded px-2 py-0.5" />
+              –
+              <input type="date" value={period.tom} onChange={(e) => setPeriod((p) => ({ ...p, tom: e.target.value }))} className="border border-slate-300 rounded px-2 py-0.5" />
+            </span>
+          )}
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={baraOsakra} onChange={(e) => setBaraOsakra(e.target.checked)} className="accent-blue-600" />
+            Visa bara gula och röda
+          </label>
+          {filterAktivt(filter) && (
+            <span className="text-slate-500">
+              {allaTx.filter((t) => visas(t, filter)).length} av {allaTx.length} transaktioner
+            </span>
+          )}
+        </div>
       )}
-      <BaraOsakra.Provider value={baraOsakra}>
+      <FilterCtx.Provider value={filter}>
         {korningar.map((delar) => (
           <Korning key={delar[0].korning} delar={delar} onTaBort={() => taBort(delar[0].korning)} onGodkann={godkann} onAnvand={() => anvand(delar[0].korning)} />
         ))}
-      </BaraOsakra.Provider>
+      </FilterCtx.Provider>
 
       {markerade.size > 0 && (
         <div className="sticky bottom-0 z-10 bg-white border border-blue-300 rounded-lg shadow-lg p-3 space-y-2">
@@ -670,6 +733,9 @@ function Korning({ delar, onTaBort, onGodkann, onAnvand }: { delar: Provrad[]; o
   const minuter = delar.every((d) => d.klar_at)
     ? Math.round((Math.max(...delar.map((d) => new Date(d.klar_at!).getTime())) - new Date(forsta.created_at).getTime()) / 60000)
     : null;
+  // En färdig körning utan något som passar filtret visas inte
+  const filter = useContext(FilterCtx);
+  if (filterAktivt(filter) && klara === delar.length && delar.every((d) => d.status === 'klar') && !tx.some((t) => visas(t, filter))) return null;
 
   return (
     <div className={`bg-white border rounded-lg ${jamforelse ? 'border-violet-300 ml-6' : 'border-slate-200'}`}>
@@ -756,13 +822,13 @@ function Del({ rad: d, visaNummer, onGodkann }: { rad: Provrad; visaNummer: bool
 }
 
 function FilVy({ radId, fil: f, onGodkann }: { radId: string; fil: Fil; onGodkann: (nr: number, val: boolean) => Promise<void> }) {
-  const bara = useContext(BaraOsakra);
+  const filter = useContext(FilterCtx);
   // Gamla transaktioner som ingen ny motsvarar visas sist
   const matchade = new Set(f.transaktioner.map((t) => sammaGamla(t, f.gammalt)?.id).filter(Boolean));
   const overblivna = f.gammalt.filter((g) => !matchade.has(g.id) && !g.dublett);
-  // Med filtret visas bara de som inte är gröna; en fil utan svar visas ändå
-  const visade = bara ? f.transaktioner.filter(arOsaker) : f.transaktioner;
-  if (bara && !visade.length && f.sort) return null;
+  // Med filtret visas bara transaktionerna som passar; en fil utan svar visas ändå
+  const visade = f.transaktioner.filter((t) => visas(t, filter));
+  if (filterAktivt(filter) && !visade.length && f.sort) return null;
   return (
     <div className="border border-slate-200 rounded">
       <div className="flex flex-wrap items-baseline gap-x-3 px-3 py-2 bg-slate-50 border-b border-slate-200 text-sm">
