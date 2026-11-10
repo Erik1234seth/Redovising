@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { godkannProv, raderaProv, startaProv, underlagAttKora, uppdateraProv, type Provrad } from '@/lib/kontering/omgang/prov';
+import type { Resultat } from '@/lib/kontering/omgang/svar';
 
 /**
  * Flöde i personkortet — konteringen (@/lib/kontering/omgang). Körningarna
@@ -8,7 +9,8 @@ import { godkannProv, raderaProv, startaProv, underlagAttKora, uppdateraProv, ty
  *
  *   GET     kundens underlag att välja bland, de som Kör Flöde tar (attKora) och
  *           kundens körningar. Delar som är skickade frågas efter hos OpenAI,
- *           och klara svar prövas och skrivs.
+ *           och klara svar prövas och skrivs. Underlag som körts om syns bara i
+ *           den senaste körningen (utanOmkorda).
  *   POST    starta en körning: { nya: true } tar allt som inte körts, annars underlagIds.
  *           { anteckning, transaktioner: [{ underlagId, vilken }] } sparar byråns
  *           anteckning som kontext på underlagen och kör om dem.
@@ -30,6 +32,37 @@ function fel(err: unknown, status = 500) {
   const message = err instanceof Error ? err.message : String(err);
   console.error('[admin/kontering-prov]', message);
   return NextResponse.json({ error: message }, { status });
+}
+
+/**
+ * En ny körning ersätter de äldre för samma underlag: filer som körts om
+ * senare tas bort ur den äldre körningen, och en del där allt körts om visas
+ * inte alls. En körning som inte gick att skicka eller blev fel ersätter
+ * inget. Raderna i databasen ändras inte.
+ */
+function utanOmkorda(rader: Provrad[]): Provrad[] {
+  // Raderna kommer nyast först; delarna i en körning hålls ihop
+  const korningar = new Map<string, Provrad[]>();
+  for (const r of rader) korningar.set(r.korning, [...(korningar.get(r.korning) ?? []), r]);
+
+  const senare = new Set<string>();
+  const ut: Provrad[] = [];
+  for (const delar of korningar.values()) {
+    for (const r of delar) {
+      const ids = r.underlag_ids ?? [];
+      const kvar = ids.filter((id) => !senare.has(id));
+      if (kvar.length === ids.length) { ut.push(r); continue; }
+      if (!kvar.length) continue;
+      const res = r.resultat as Resultat | null;
+      ut.push({
+        ...r,
+        underlag_ids: kvar,
+        resultat: res?.filer ? { ...res, filer: res.filer.filter((f) => !senare.has(f.underlagId)) } : r.resultat,
+      });
+    }
+    for (const r of delar) if (r.status !== 'fel' && r.filer?.length) for (const id of r.underlag_ids ?? []) senare.add(id);
+  }
+  return ut;
 }
 
 const RAD_KOLUMNER = 'id, created_at, user_id, korning, del, delar, status, underlag_ids, filer, varningar, openai_id, kontext, resultat, usage, kostnad_usd, uppskattade_tokens, fel, klar_at';
@@ -62,7 +95,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      korningar: ((rader ?? []) as Provrad[]).map(({ kontext: _k, ...r }) => r),
+      korningar: utanOmkorda((rader ?? []) as Provrad[]).map(({ kontext: _k, ...r }) => r),
       underlag: (underlag ?? []).map((u) => ({ ...u, transaktioner: antal.get(u.id) ?? 0 })),
       attKora,
     });
