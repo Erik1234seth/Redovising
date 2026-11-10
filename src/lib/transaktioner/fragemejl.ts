@@ -154,6 +154,24 @@ async function tydligaUnderlag(supabase: SupabaseClient, userId: string, fragaFr
   return [...perFil.values()].filter(Boolean).length;
 }
 
+/**
+ * Byråns senast skickade frågemejl till andra kunder, så att AI:n får känslan
+ * för hur Erik skriver dem. Det som skickats är Eriks text: han redigerar
+ * utkastet innan han trycker Skicka. Kundens egna mejl finns redan i historiken.
+ */
+async function tidigareFragemejl(supabase: SupabaseClient, userId: string, antal = 5): Promise<string> {
+  const [{ data: tx }, { data: ul }] = await Promise.all([
+    supabase.from('transaktioner').select('fraga_utkast_id').not('fraga_utkast_id', 'is', null).neq('user_id', userId).limit(5000),
+    supabase.from('bokforing_underlag').select('sidor_fraga_utkast_id').not('sidor_fraga_utkast_id', 'is', null).neq('user_id', userId).limit(2000),
+  ]);
+  const ids = [...new Set([...(tx ?? []).map((t) => t.fraga_utkast_id), ...(ul ?? []).map((u) => u.sidor_fraga_utkast_id)])] as string[];
+  if (!ids.length) return '';
+  const { data } = await supabase.from('mejl_utkast').select('text, sent_at')
+    .in('id', ids).eq('status', 'sent').order('sent_at', { ascending: false }).limit(antal);
+  return (data ?? []).filter((m) => m.text?.trim())
+    .map((m, i) => `[Tidigare frågemejl ${i + 1} — ${String(m.sent_at).slice(0, 10)}]\n${m.text.trim()}`).join('\n\n');
+}
+
 /** Dokument där sidor saknas, inkomna före i dag och inte frågade om än. */
 async function sidorAttFraga(supabase: SupabaseClient, userId?: string): Promise<Sidfraga[]> {
   let q = supabase.from('bokforing_underlag')
@@ -250,7 +268,7 @@ export async function skrivFragemejl(
   });
   // Hur mycket som var tydligt, så att mejlet inte bara handlar om det som saknas
   const aldsta = [...(underlag ?? [])].map((u) => String(u.created_at)).sort()[0] ?? null;
-  const tydliga = await tydligaUnderlag(supabase, userId, aldsta);
+  const [tydliga, tidigare] = await Promise.all([tydligaUnderlag(supabase, userId, aldsta), tidigareFragemejl(supabase, userId)]);
   const underlagKontext = (tydliga ? 'ÖVRIGA UNDERLAG: kundens övriga underlag från samma period gick att bokföra utan frågor.\n\n' : '')
     + (fragor.length ? `${lage === 'osakra' ? 'TRANSAKTIONER VI ÄR OSÄKRA PÅ' : 'TRANSAKTIONER SOM SAKNAR UPPGIFTER'} (${fragor.length} st):\n${block.join('\n\n')}\n\n` : '')
     + (sidor.length ? `UNDERLAG DÄR SIDOR SAKNAS (${sidor.length} st) — be kunden skicka de saknade sidorna, gärna som foto:\n${sidblock.join('\n')}\n\n` : '')
@@ -260,14 +278,15 @@ export async function skrivFragemejl(
         + 'Byråns anteckningar om varför vi är osäkra är bara till för dig: skriv dem aldrig i mejlet. '
       : 'Skriv ETT mejl till kunden om det som saknas ovan, med datum, motpart och belopp så att kunden ser vilken transaktion det gäller. ')
     + '\n\nVÄLJ VAD DU FRÅGAR OM: listan ovan är allt konteringen hade synpunkter på, inte en lista att skicka vidare. Gå igenom den som en erfaren redovisare '
-    + 'som vill ha bokföringen rätt utan att jaga kunden, och ställ så FÅ frågor som möjligt:\n'
+    + 'som vill ha bokföringen rätt utan att jaga kunden. Fråga BARA om det absolut nödvändiga — det vi inte kan bokföra rätt utan — och ställ så FÅ frågor som möjligt:\n'
     + '- Hoppa över det som är overkill: små belopp där ett fel antagande bara ger några kronor fel i moms eller avdrag, formella brister på ett kvitto eller en faktura som inte ändrar bokföringen, '
     + 'och dokument vi klarar oss utan för att bokföra rätt. Där gör byrån ett rimligt antagande i stället, och du nämner det inte i mejlet.\n'
     + '- Välj den smidigaste lösningen för kunden. Hellre en fråga som kunden kan svara på med ett ord eller en mening (ja eller nej, vad något användes till, firmans eller privat) '
     + 'än att be om nya dokument, avtal, specifikationer eller rättade fakturor. Be bara om ett dokument när bokföringen verkligen inte går att göra rätt utan det, och då det enklaste: ett foto av kvittot räcker.\n'
     + '- Där det finns ett troligt svar kan du skriva vad vi utgår från, så att kunden bara behöver höra av sig om det är fel, i stället för att fråga.\n'
-    + '- Samla allt som har samma svar i en fråga, till exempel vad kunden använder en viss sorts inköp till, alla köp från samma leverantör, '
-    + 'eller om bilen i verksamheten är firmans eller privat. Ställ frågan en gång och räkna kort upp vilka transaktioner den gäller (datum, motpart, belopp).\n'
+    + '- Skriv generella frågor när det går, så att en fråga besvarar flera transaktioner: vad kunden använder en viss sorts inköp till, alla köp från samma leverantör, '
+    + 'om bilen i verksamheten är firmans eller privat, eller om några udda köp (till exempel tandkräm och kattmat) hör till firman. '
+    + 'Ställ frågan en gång. Räkna bara upp transaktionerna (datum, motpart, belopp) när kunden behöver dem för att kunna svara — annars räcker ett par exempel.\n'
     + '- Varje fråga får en kort förklaring i vanliga ord till varför vi behöver veta det, till exempel att det avgör om momsen går att dra av eller om kostnaden hör till firman. '
     + 'En halv mening räcker, utan facktermer och utan paragrafer.\n'
     + 'Utgå från att allt är i sin ordning: förklaringen handlar om vad vi behöver uppgiften till, aldrig om varför något ser oklart eller misstänkt ut '
@@ -281,11 +300,16 @@ export async function skrivFragemejl(
     + '"för att kunna göra klart resten", "hjälps vi åt", "i lugn och ro" eller "Hör gärna av dig om något är oklart!". '
     + 'Efter "Hej förnamn," går du rakt på saken med en kort, enkel mening om att du gått igenom det kunden skickat och har några frågor, med egna ord som varierar från gång till gång'
     + (tydliga ? '. Att resten är bokfört kan du nämna i förbifarten om det faller sig naturligt, men det behövs inte' : '')
-    + '. Inga utropstecken, inga peppiga eller överdrivet artiga ord, ingen sammanfattning och ingen avslutande standardrad. '
+    + '. Inga peppiga eller överdrivet artiga ord och ingen sammanfattning. '
     + 'Skriv inte hur många underlag eller transaktioner det gäller. '
     + 'Frågorna ställs rakt och vänligt, så som man frågar en kund i verkligheten, inte inlindat. '
     + 'Listor skrivs med vanligt bindestreck, en rad per transaktion, utan punkt i slutet av raden. Rubriker eller inledande meningar över varje lista behövs bara när mejlet annars blir svårt att följa. '
-    + 'Mejlet slutar när sista frågan är ställd. Vill du avsluta med en rad räcker något kort och vardagligt, till exempel att kunden kan svara direkt här.'
+    + 'Mejlet slutar när sista frågan är ställd, med en kort hälsning som i Eriks tidigare mejl.'
+    + (tidigare
+      ? '\n\nERIKS TIDIGARE FRÅGEMEJL till andra kunder, så som han skickade dem. Skriv som han gör: samma ton, längd, sätt att ställa frågor och samma hälsning. '
+        + 'Ta bara känslan — aldrig innehållet, namn eller transaktioner därifrån. Mallfraserna ovan ska bort även om ett äldre mejl har dem.\n\n'
+        + tidigare
+      : '')
     + (reglerText(instruktioner, userId) ? `\n\n${reglerText(instruktioner, userId)}` : '');
 
   const svar = await handleGeneralQuestion({
