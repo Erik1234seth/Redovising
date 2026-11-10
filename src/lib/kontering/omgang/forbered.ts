@@ -35,8 +35,8 @@ import { laddaUpp, raderaFil } from './openai';
 
 /** Under modellens 922 000 tokens in, med marginal för att uppskattningen är grov. */
 const TOKENTAK = 800_000;
-/** Svaret har 128 000 tokens med tänkandet; 29 filer tog 33 000. */
-const MAX_FILER = 60;
+/** Svaret har 128 000 tokens med tänkandet; 60 filer tog 43 000 (ungefär 700 per fil). */
+const MAX_FILER = 150;
 /** Så många filer på var sida om en del följer med som grannsidor. Ett dokument på upp till fyra sidor klarar gränsen. */
 const GRANNAR = 3;
 /** Plats som hålls för grannsidorna: sex bilder. */
