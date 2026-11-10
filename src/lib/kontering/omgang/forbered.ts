@@ -40,7 +40,7 @@ const MAX_FILER = 150;
 /** Så många filer på var sida om en del följer med som grannsidor. Ett dokument på upp till fyra sidor klarar gränsen. */
 const GRANNAR = 3;
 /** Plats som hålls för grannsidorna: sex bilder. */
-const GRANNRESERV = 2 * GRANNAR * 3_000;
+const GRANNRESERV = 2 * GRANNAR * 1_700;
 /** Filer som laddats upp med mindre mellanrum än så räknas som samma uppladdning. */
 const SAMMA_UPPLADDNING_MS = 10 * 60 * 1000;
 /** OpenAIs gräns är 50 MB filer per anrop. Bilder räknas inte in. */

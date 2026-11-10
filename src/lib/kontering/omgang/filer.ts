@@ -138,14 +138,18 @@ async function avkryptera(bytes: Buffer): Promise<{ ok: true; bytes: Buffer; sid
   }
 }
 
-/** Längsta sidan på en bild som skickas. OpenAI skalar ändå ner till 2048 px vid detail high. */
-const BILD_MAX_PX = 2048;
+/**
+ * Längsta sidan på en bild som skickas. Kvitton och fakturor är fullt läsbara
+ * vid 1500 px, och en bild blir ungefär 45 % färre tokens än vid 2048
+ * (prövat på kundernas foton och skanningar 2026-11-10). Mindre bilder
+ * skickas som de är.
+ */
+const BILD_MAX_PX = 1500;
 
 /**
  * Mobilfoton är 3–5 MB, och ett anrop tar högst 50 MB filer — utan
  * nedskalning fick bara 16 foton plats, och sidorna i samma köpnota hamnade i
- * olika anrop. Nedskalade till 2048 px blir de några hundra kB, utan att
- * modellen ser mindre. Går det inte skickas originalet.
+ * olika anrop. Nedskalade till BILD_MAX_PX blir de några hundra kB. Går det inte skickas originalet.
  */
 async function skalaNer(bytes: Buffer, mime: string): Promise<{ bytes: Buffer; mime: string }> {
   if (mime === 'image/gif') return { bytes, mime };
@@ -229,7 +233,7 @@ export async function kontrolleraFil(supabase: SupabaseClient, u: Underlagsrad):
  * där OpenAI tar dubbelt betalt.
  */
 export function uppskattadeTokens(f: Forberedd): number {
-  if (f.typ === 'bild') return 3_000;
+  if (f.typ === 'bild') return 1_700;
   if (f.typ === 'text') return Math.ceil(f.text.length / 3);
   if (f.mime === DOKUMENT.pdf) return (f.sidor ?? 1) * 3_500;
   return Math.ceil(f.bytes.length / 20);
