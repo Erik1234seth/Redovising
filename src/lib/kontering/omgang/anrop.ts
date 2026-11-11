@@ -59,15 +59,13 @@ SORT
 - "verifikationer": ett underlag som REDAN är bokfört — en verifikationslista, grundbok, dagbok eller huvudbok ur ett bokföringsprogram, med kontonummer i debet och kredit. Inga transaktioner; de läses in på annat sätt.
 - "ovrigt": filen visar inga affärer och är inget komplement till bokföringen — förra årets deklaration eller NE-bilaga, slutskattebesked, brev från Skatteverket, avtal, offerter, registreringsbevis, F-skattebevis, inventarie- och lagerlistor, ID-handlingar, skärmdumpar av inställningar. Välj "ovrigt" bara när du är säker.
 - "vad": kort vad filen är, t.ex. "Kvitto ICA Maxi", "Faktura Telia oktober", "Kontoutdrag Swedbank september".
-Bara "underlag" och "komplement" har transaktioner.
+Bara "underlag" har egna transaktioner; ett komplement har bara dubbletter, se KOMPLEMENT.
 
 KOMPLEMENT
-Ta ut de affärer för företaget som komplementet visar. Varje rad är en av tre sorter:
-- Affären finns redan — bland KUNDENS TRANSAKTIONER, BOKFÖRDA VERIFIKATIONER eller i en annan fil i omgången (kvittot till en kortbetalning, kassans försäljning som kunderna swishat in): ta med raden som dubblett med ref till det den är samma som. Systemet kopplar då komplementet dit som ett extra underlag; inget bokförs två gånger. En betalning av en faktura som redan finns är samma affär som fakturan: samma motpart och samma belopp, fakturan daterad före betalningen och inte redan betald av en annan rad — också när fakturan är en månadsavgift.
-- Affären hör till företaget men finns inte: ta ut den som en transaktion och kontera den som vanligt utifrån motparten och kundens verksamhet. Moms kan inte dras utan kvitto eller faktura, så kontera hela beloppet med momssats 0 när momsen inte framgår av ett annat underlag eller mejl. Det som behövs för att bokföra den — kvittot, vad betalningen avsåg — skriver du i "saknas" som vanligt.
-- Raden är privat eller en överföring mellan kundens egna konton: hoppa över den. Är kontot ett privatkonto (BETALSÄTT eller kontoutdraget visar det) tar du bara ut rader som ser ut att höra till företaget — en känd leverantör, ett bokningssystem, en kund, eller något kundens mejl säger hör till företaget. Resten hoppar du över utan att fråga.
-Ett skattekontoutdrag visar mest sådant som finns på annat håll: inbetalningar syns på bankens kontoutdrag och momsen kommer från momsdeklarationen, och debiterad F-skatt är privat. Ta bara ut det som inte finns någon annanstans — förseningsavgifter, ränta och liknande.
-En resultat- eller balansrapport sammanfattar bokföringen och har inga egna affärer; använd den för att se vad som redan är bokfört.
+Ett komplement används bara som komplement till underlagen — vi konterar bara underlagen, aldrig ett komplement. Komplementet visar att och när något betalades och hjälper dig förstå vad ett underlag gäller.
+- Ta bara ut en rad när affären redan finns — bland KUNDENS TRANSAKTIONER, BOKFÖRDA VERIFIKATIONER eller i ett underlag i omgången (kvittot till en kortbetalning, kassans försäljning som kunderna swishat in): ta med raden som dubblett med ref till det den är samma som. Systemet kopplar då komplementet dit som ett extra underlag; inget bokförs två gånger. En betalning av en faktura som redan finns är samma affär som fakturan: samma motpart och samma belopp, fakturan daterad före betalningen och inte redan betald av en annan rad — också när fakturan är en månadsavgift.
+- Alla andra rader hoppar du över, också när de ser ut att höra till företaget och när du inte är säker på att affären redan finns. De blir inga transaktioner.
+Ett skattekontoutdrag och en resultat- eller balansrapport har inga egna affärer att ta ut; använd dem för att se vad som redan är bokfört.
 Skriv i ANTECKNINGAR om något på ett komplement inte stämmer med resten.
 
 SIDOR
