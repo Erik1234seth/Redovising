@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendSms } from '@/lib/sms/twilio';
 import { normalizePhone } from '@/lib/sms/phone';
+import { build, locate, phoneKey } from '@/lib/personer';
 
 /**
  * SMS som du skriver själv och skickar direkt.
@@ -32,7 +33,7 @@ function getSupabase() {
 
 export async function POST(request: Request) {
   try {
-    const { phone, body } = await request.json();
+    const { phone, body, namn, nyKontakt } = await request.json();
 
     const to = normalizePhone(typeof phone === 'string' ? phone : null);
     if (!to) {
@@ -57,6 +58,21 @@ export async function POST(request: Request) {
         { error: 'Numret har avregistrerat sig från SMS — inget skickades' },
         { status: 409 },
       );
+    }
+
+    // Från "Nytt SMS" i inkorgen: kan vara någon vi aldrig haft kontakt med. Utan
+    // en rad någonstans vet varken inkorgen eller SMS-AI:n vem som svarar, så ett
+    // okänt nummer läggs in som lead. Mejladressen saknas — tom sträng, som
+    // ringlistans leads utan adress.
+    if (nyKontakt) {
+      const kand = locate(await build(), phoneKey(to) ?? to);
+      if (!kand) {
+        const { error: leadFel } = await supabase.from('contact_requests').insert({
+          email: '', name: typeof namn === 'string' && namn.trim() ? namn.trim() : null, phone: to,
+          package_type: 'komplett', ref: 'manuell',
+        });
+        if (leadFel) return NextResponse.json({ error: leadFel.message }, { status: 500 });
+      }
     }
 
     // Raden skrivs före sändningen. Kraschar vi mitt i finns då ett spår av att

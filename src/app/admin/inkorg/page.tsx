@@ -67,10 +67,10 @@ export default function InkorgPage() {
   // Hämtas först när fliken öppnas, och sedan om varje gång man går tillbaka till den
   useEffect(() => { if (flik === 'skickat') laddaSkickat(); }, [flik, laddaSkickat]);
 
-  /** Efter "Nytt mejl": personen finns nu i listan, så tråden öppnas direkt. */
-  const nyttSkickat = async (email: string) => {
+  /** Efter "Nytt mejl"/"Nytt SMS": finns personen i listan öppnas tråden direkt. */
+  const nyttSkickat = async (nyckel: string) => {
     setNytt(false);
-    const traff = (await ladda()).find((k) => k.email?.toLowerCase() === email);
+    const traff = (await ladda()).find((k) => k.email?.toLowerCase() === nyckel || k.phone === nyckel);
     if (traff) { setFlik(traff.kategori); oppna(traff.key); }
   };
 
@@ -150,7 +150,7 @@ export default function InkorgPage() {
             <h1 className="text-xl font-bold text-slate-900">Inkorg</h1>
             <button onClick={() => setNytt(true)}
               className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg">
-              + Nytt mejl
+              + Nytt mejl / SMS
             </button>
           </div>
           <div className="flex gap-1 mb-2 flex-wrap">
@@ -557,7 +557,8 @@ function Utkast({ u, personKey, onKlar }: { u: InkorgUtkast; personKey: string; 
  * personen ny läggs hen in som lead. Med telefonnummer får de ett SMS om
  * mejlet, nu och varje gång vi mejlar dem framöver (mail-notice.ts).
  */
-function NyttMejl({ onSkickat, onAvbryt }: { onSkickat: (email: string) => void; onAvbryt: () => void }) {
+function NyttMejl({ onSkickat, onAvbryt }: { onSkickat: (nyckel: string) => void; onAvbryt: () => void }) {
+  const [kanal, setKanal] = useState<'mejl' | 'sms'>('mejl');
   const [till, setTill] = useState('');
   const [namn, setNamn] = useState('');
   const [telefon, setTelefon] = useState('');
@@ -567,11 +568,24 @@ function NyttMejl({ onSkickat, onAvbryt }: { onSkickat: (email: string) => void;
   const [fel, setFel] = useState('');
   const bilagor = useBilagor();
 
-  const klar = till.includes('@') && rubrik.trim() && text.trim() && !bilagor.laddar;
+  const klar = kanal === 'sms'
+    ? telefon.trim() && text.trim()
+    : till.includes('@') && rubrik.trim() && text.trim() && !bilagor.laddar;
 
   const skicka = async () => {
     setSkickar(true); setFel('');
     try {
+      if (kanal === 'sms') {
+        // Okänt nummer blir lead i sms-send, så att svaret hamnar rätt
+        const res = await fetch('/api/admin/sms-send', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: telefon, body: text, namn, nyKontakt: true }),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || d.error) throw new Error(d.error || 'Kunde inte skicka');
+        onSkickat(d.phone);
+        return;
+      }
       const email = till.trim().toLowerCase();
       await post('/api/admin/inkorg', { action: 'nytt-mejl', till: email, namn, telefon, amne: rubrik, text, bilagor: bilagor.data() });
       onSkickat(email);
@@ -584,24 +598,47 @@ function NyttMejl({ onSkickat, onAvbryt }: { onSkickat: (email: string) => void;
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-900">Nytt mejl</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-bold text-slate-900">{kanal === 'sms' ? 'Nytt SMS' : 'Nytt mejl'}</h2>
+          <div className="flex gap-1">
+            {(['mejl', 'sms'] as const).map((k) => (
+              <button key={k} type="button" onClick={() => { setKanal(k); setFel(''); }}
+                className={`px-2 py-0.5 text-[11px] rounded-md ${kanal === k ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
+                {k === 'mejl' ? 'Mejl' : 'SMS'}
+              </button>
+            ))}
+          </div>
+        </div>
         <button onClick={onAvbryt} className="text-sm text-slate-500 hover:underline">Avbryt</button>
       </div>
-      <div className="grid gap-2 sm:grid-cols-3">
-        <input value={till} onChange={(e) => setTill(e.target.value)} placeholder="Mejladress" type="email" className={falt} />
-        <input value={namn} onChange={(e) => setNamn(e.target.value)} placeholder="Namn (frivilligt)" className={falt} />
-        <input value={telefon} onChange={(e) => setTelefon(e.target.value)} placeholder="Telefon (frivilligt)" type="tel" className={falt} />
-      </div>
-      {telefon.trim() && <p className="text-xs text-slate-500">Ett SMS om mejlet går till numret några minuter efter att mejlet skickats.</p>}
-      <input value={rubrik} onChange={(e) => setRubrik(e.target.value)} placeholder="Ämne" className={falt} />
-      <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Skriv mejlet…"
+      {kanal === 'sms' ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          <input value={telefon} onChange={(e) => setTelefon(e.target.value)} placeholder="Telefonnummer" type="tel" className={falt} />
+          <input value={namn} onChange={(e) => setNamn(e.target.value)} placeholder="Namn (frivilligt)" className={falt} />
+        </div>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-3">
+          <input value={till} onChange={(e) => setTill(e.target.value)} placeholder="Mejladress" type="email" className={falt} />
+          <input value={namn} onChange={(e) => setNamn(e.target.value)} placeholder="Namn (frivilligt)" className={falt} />
+          <input value={telefon} onChange={(e) => setTelefon(e.target.value)} placeholder="Telefon (frivilligt)" type="tel" className={falt} />
+        </div>
+      )}
+      {kanal === 'mejl' && telefon.trim() && <p className="text-xs text-slate-500">Ett SMS om mejlet går till numret några minuter efter att mejlet skickats.</p>}
+      {kanal === 'mejl' && <input value={rubrik} onChange={(e) => setRubrik(e.target.value)} placeholder="Ämne" className={falt} />}
+      <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={kanal === 'sms' ? 'Skriv SMS:et…' : 'Skriv mejlet…'}
         onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && klar) skicka(); }}
-        rows={Math.min(16, Math.max(6, text.split('\n').length + 1))}
+        rows={Math.min(16, Math.max(kanal === 'sms' ? 4 : 6, text.split('\n').length + 1))}
         className={`${falt} resize-none`} />
-      <BilageLista b={bilagor} />
+      {kanal === 'mejl' && <BilageLista b={bilagor} />}
       <div className="flex items-center gap-2">
-        <BilageKnapp b={bilagor} disabled={skickar} />
-        <span className="text-[11px] text-slate-400">signaturen läggs på</span>
+        {kanal === 'mejl' ? (
+          <>
+            <BilageKnapp b={bilagor} disabled={skickar} />
+            <span className="text-[11px] text-slate-400">signaturen läggs på</span>
+          </>
+        ) : (
+          text && <span className="text-[11px] text-slate-400">{text.length} tecken</span>
+        )}
         {fel && <span className="text-xs text-red-600 ml-2">{fel}</span>}
         <button onClick={skicka} disabled={skickar || !klar}
           className="ml-auto px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg disabled:opacity-40">
