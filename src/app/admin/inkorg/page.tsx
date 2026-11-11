@@ -62,7 +62,7 @@ export default function InkorgPage() {
 
   const laddaSkickat = useCallback(() => fetch('/api/admin/inkorg?vy=skickat').then((r) => r.json()).then((d) => {
     if (d.error) setFel(d.error); else setSkickade(d.skickade);
-  }).catch(() => setFel('Kunde inte hämta skickade mejl')), []);
+  }).catch(() => setFel('Kunde inte hämta det skickade')), []);
 
   // Hämtas först när fliken öppnas, och sedan om varje gång man går tillbaka till den
   useEffect(() => { if (flik === 'skickat') laddaSkickat(); }, [flik, laddaSkickat]);
@@ -194,12 +194,16 @@ export default function InkorgPage() {
                       <span className="text-sm truncate mr-auto text-slate-900">
                         <span className="text-slate-400">Till: </span>{m.namn ?? m.till}
                       </span>
+                      {m.status === 'failed' && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 shrink-0">Misslyckades</span>}
                       {m.bilagor.length > 0 && <span className="text-[11px] text-slate-400 shrink-0">📎</span>}
                       <span className="text-[11px] text-slate-400 shrink-0">{tidKort(m.at)}</span>
                     </span>
-                    <span className="block text-xs truncate text-slate-500 mt-0.5">
-                      {m.amne && <span className="font-medium text-slate-700">{m.amne} — </span>}
-                      {m.text.replace(/\s+/g, ' ').slice(0, 160)}
+                    <span className="flex items-center gap-1.5 mt-0.5">
+                      <KanalMarke kanal={m.kanal} />
+                      <span className="text-xs truncate text-slate-500">
+                        {m.amne && <span className="font-medium text-slate-700">{m.amne} — </span>}
+                        {m.text.replace(/\s+/g, ' ').slice(0, 160)}
+                      </span>
                     </span>
                   </button>
                 </li>
@@ -267,7 +271,7 @@ export default function InkorgPage() {
           : flik === 'skickat'
           ? (skickat
             ? <SkickatMejl m={skickat} onOppna={() => { if (skickat.personKey && skickat.kategori) { setFlik(skickat.kategori); oppna(skickat.personKey); } }} />
-            : <p className="text-slate-500 text-sm mt-16 text-center">Välj ett skickat mejl.</p>)
+            : <p className="text-slate-500 text-sm mt-16 text-center">Välj ett skickat mejl eller SMS.</p>)
           : vald
           ? <Trad key={vald} personKey={vald} onAndrat={ladda} />
           : <p className="text-slate-500 text-sm mt-16 text-center">Välj en konversation.</p>}
@@ -394,10 +398,14 @@ function SkickatMejl({ m, onOppna }: { m: InkorgSkickat; onOppna: () => void }) 
     <div className="bg-white border border-slate-200 rounded-xl">
       <header className="p-4 border-b border-slate-200 flex items-start gap-3 flex-wrap">
         <div className="mr-auto min-w-0">
-          <h2 className="text-lg font-bold text-slate-900 break-words">{m.amne || '(inget ämne)'}</h2>
+          <h2 className="text-lg font-bold text-slate-900 break-words flex items-center gap-2">
+            <KanalMarke kanal={m.kanal} />
+            {m.kanal === 'sms' ? 'SMS' : (m.amne || '(inget ämne)')}
+          </h2>
           <p className="text-sm text-slate-500">
             Till {m.namn ? <>{m.namn} &lt;{m.till}&gt;</> : m.till} · {tidLang(m.at)}
           </p>
+          {m.status === 'failed' && <p className="text-xs text-red-600 mt-1">SMS:et gick inte fram.</p>}
         </div>
         {m.personKey && m.kategori && (
           <button onClick={onOppna} className="text-xs px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">

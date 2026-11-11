@@ -145,20 +145,26 @@ const MAX_SKICKADE = 500;
 const SKICKAT_MAX_TEXT = 20_000;
 
 /**
- * Fliken Skickat: allt vi mejlat, nyast först, som Gmails Skickat. Synk-scriptet
+ * Fliken Skickat: allt vi mejlat och SMS:at, nyast först, som Gmails Skickat.
+ * SMS:en kommer från sms_messages, utom de automatiska mallarna. Synk-scriptet
  * hämtar in allt från Gmails Skickat, så även mejl som inte gått via inkorgen
  * finns med. Det vi skickat de senaste minuterna och som ännu inte synkats tas
  * från utkasten, som i tråden.
  */
 async function skickatLista(supabase: Supabase, people: Map<string, Built>, klara: Set<string>): Promise<InkorgSkickat[]> {
-  const [mejl, utkast] = await Promise.all([
+  const [mejl, utkast, sms] = await Promise.all([
     supabase.from('mail_messages')
       .select('gmail_message_id, customer_email, subject, body, attachment_names, sent_at')
       .eq('direction', 'out').order('sent_at', { ascending: false }).limit(MAX_SKICKADE),
     supabase.from('mejl_utkast').select('id, till_email, amne, text, bilagor, sent_at').eq('status', 'sent')
       .gte('sent_at', new Date(Date.now() - SKICKADE_DAGAR * 86_400_000).toISOString()),
+    supabase.from('sms_messages').select('id, phone, body, status, kind, created_at')
+      .eq('direction', 'out').in('status', SYNLIGA_SMS)
+      // Mallarna (välkomst, påminnelser, mejl-notiser) är nio av tio SMS och dränker resten
+      .or(`kind.is.null,kind.not.in.(${AUTOMATISKA.join(',')})`)
+      .order('created_at', { ascending: false }).limit(MAX_SKICKADE),
   ]);
-  const fel = mejl.error ?? utkast.error;
+  const fel = mejl.error ?? utkast.error ?? sms.error;
   if (fel) throw new Error(fel.message);
 
   const perAlias = new Map<string, Built>();
@@ -166,10 +172,18 @@ async function skickatLista(supabase: Supabase, people: Map<string, Built>, klar
   const rad = (id: string, till: string, amne: string | null, text: string, at: string, bilagor: string[]): InkorgSkickat => {
     const p = perAlias.get(emailKey(till) ?? '');
     return {
-      id, till, amne, text: text.slice(0, SKICKAT_MAX_TEXT), at, bilagor,
+      id, kanal: 'mejl', status: null, till, amne, text: text.slice(0, SKICKAT_MAX_TEXT), at, bilagor,
       personKey: p?.key ?? null, namn: p ? visningsnamn(p) : null, kategori: p ? kategori(p, klara) : null,
     };
   };
+  const smsRader = (sms.data ?? []).map((s): InkorgSkickat => {
+    const p = perAlias.get(phoneKey(s.phone) ?? '');
+    return {
+      id: `sms-${s.id}`, kanal: 'sms', status: s.status,
+      till: s.phone, amne: null, text: s.body ?? '', at: s.created_at, bilagor: [],
+      personKey: p?.key ?? null, namn: p ? visningsnamn(p) : null, kategori: p ? kategori(p, klara) : null,
+    };
+  });
 
   const lista = (mejl.data ?? []).map((m) => rad(m.gmail_message_id, m.customer_email ?? '', m.subject, m.body ?? '', m.sent_at, m.attachment_names ?? []));
   for (const u of utkast.data ?? []) {
@@ -179,7 +193,7 @@ async function skickatLista(supabase: Supabase, people: Map<string, Built>, klar
     if (lista.some((m) => m.till.toLowerCase() === till && m.at >= fran)) continue;
     lista.push(rad(`skickat-${u.id}`, u.till_email, u.amne, u.text ?? '', u.sent_at, lasBilagor(u.bilagor).map((b) => b.namn)));
   }
-  return lista.sort((a, b) => b.at.localeCompare(a.at));
+  return [...lista, ...smsRader].sort((a, b) => b.at.localeCompare(a.at));
 }
 
 /** Senaste tidpunkten över alla personens adresser, t.ex. när konversationen öppnades. Tom sträng = aldrig. */

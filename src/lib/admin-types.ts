@@ -510,6 +510,9 @@ export interface InkorgKonversation {
 /** Ett mejl vi skickat, för fliken Skickat. Personen saknas när mottagaren inte finns hos oss. */
 export interface InkorgSkickat {
   id: string;
+  kanal: 'mejl' | 'sms';
+  /** SMS: Twilio-status, t.ex. 'failed'. Mejl: null. */
+  status: string | null;
   till: string;
   amne: string | null;
   text: string;
