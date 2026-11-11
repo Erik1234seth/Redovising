@@ -5,6 +5,8 @@ import { forberedOmgang, type Filpost, type Hoppad, type Kontext } from './forbe
 import { leverantor, type Flodesmodell } from './leverantor';
 import { skrivResultat, godkannTransaktion } from './skriv';
 import { provaSvar, type Resultat } from './svar';
+import { valjKonto } from '../kontera';
+import { slaUppKonto } from '../regelverk';
 
 /**
  * Flöde: konteringen sedan 2026-11-07. Omgången körs på valda underlag med
@@ -227,6 +229,113 @@ export async function godkannProv(
   t.godkand = godkand ? { at: new Date().toISOString() } : null;
   const { error: uFel } = await supabase.from('kontering_prov').update({ resultat }).eq('id', radId);
   if (uFel) throw new Error(`Kunde inte spara godkännandet: ${uFel.message}`);
+}
+
+/** Det byrån kan ändra på en transaktion i Flöde. */
+export interface Redigering {
+  datum: string;
+  beskrivning: string;
+  motpart: string;
+  belopp: number;
+  konto: string;
+  momssats: number;
+}
+
+const ore = (n: number) => Math.round(n * 100) / 100;
+
+/** Momssatsen konteringen har: den enda, eller den första delens. */
+function konteringensSats(k: Resultat['filer'][number]['transaktioner'][number]['kontering']): number {
+  return Number(k?.momssats ?? k?.momsdelar?.[0]?.momssats ?? 0) || 0;
+}
+
+/**
+ * Byrån ändrar en transaktion i Flöde: datum, förklaring, motpart, belopp,
+ * konto och moms. Den bokförs direkt med byråns val, som när kontot väljs i
+ * Kontering, och den gamla verifikationen ersätts. Det gamla står i
+ * transaktionens anteckning. Byts konto, moms eller belopp blir det en
+ * kontering med ett konto och en sats. Körs filen om ersätts ändringen.
+ */
+export async function redigeraProv(
+  supabase: SupabaseClient, userId: string, radId: string, fil: string, nr: number, r: Redigering,
+): Promise<void> {
+  const { data, error } = await supabase.from('kontering_prov').select('resultat, jamfor_med').eq('id', radId).eq('user_id', userId).maybeSingle();
+  if (error) throw new Error(`Kunde inte läsa körningen: ${error.message}`);
+  const resultat = data?.resultat as Resultat | null;
+  const t = resultat?.filer.find((f) => f.fil === fil)?.transaktioner.find((x) => x.nr === nr);
+  if (!resultat || !t) throw new Error('Transaktionen finns inte i körningen — ladda om sidan');
+  if (data?.jamfor_med) throw new Error('En jämförelse är inte bokförd — välj den först');
+  if (!t.transaktionId) throw new Error('Transaktionen finns inte i bokföringen');
+  if (t.dublett.status === 'dublett') throw new Error('En dubblett bokförs inte');
+
+  const datum = String(r.datum ?? '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datum)) throw new Error('Datumet ska skrivas ÅÅÅÅ-MM-DD');
+  const belopp = ore(Number(r.belopp));
+  if (!(belopp > 0)) throw new Error('Beloppet måste vara större än noll');
+  const momssats = Number(r.momssats);
+  if (![0, 6, 12, 25].includes(momssats)) throw new Error('Momsen måste vara 0, 6, 12 eller 25 %');
+  const konto = String(r.konto ?? '').trim();
+  if (!slaUppKonto(konto)) throw new Error(`${konto || 'Kontot'} finns inte bland K1-kontona`);
+  const beskrivning = String(r.beskrivning ?? '').trim();
+  const motpart = String(r.motpart ?? '').trim();
+
+  const { data: rad, error: tFel } = await supabase.from('transaktioner')
+    .select('datum, beskrivning, motpart, belopp, moms, anteckning').eq('id', t.transaktionId).eq('user_id', userId).maybeSingle();
+  if (tFel) throw new Error(`Kunde inte läsa transaktionen: ${tFel.message}`);
+  if (!rad) throw new Error('Transaktionen finns inte längre i bokföringen — ladda om sidan');
+
+  const k = t.kontering;
+  const gammalSats = konteringensSats(k);
+  const sammaKontering = k?.konto === konto && gammalSats === momssats;
+  const sammaBelopp = Number(rad.belopp) === belopp;
+  // Underlagets moms står kvar så länge belopp och sats är desamma, annars räknas den fram
+  const moms = sammaKontering && sammaBelopp ? rad.moms : momssats ? ore((belopp * momssats) / (100 + momssats)) : null;
+  const momsdelar = sammaKontering && sammaBelopp ? k?.momsdelar ?? null : null;
+  const omvand = sammaKontering ? k?.omvand ?? null : null;
+
+  const byten = ([
+    ['datum', rad.datum, datum],
+    ['förklaring', rad.beskrivning, beskrivning],
+    ['motpart', rad.motpart, motpart],
+    ['belopp', rad.belopp, belopp],
+    ['konto', k?.konto, konto],
+    ['moms', k ? `${gammalSats} %` : null, `${momssats} %`],
+  ] as [string, unknown, unknown][])
+    .filter(([, fore, efter]) => String(fore ?? '') !== String(efter ?? ''))
+    .map(([namn, fore, efter]) => `${namn} ${fore || '—'} → ${efter || '—'}`);
+  const nu = new Date().toISOString();
+  const logg = `${nu.slice(0, 10)}: Ändrat av byrån i Flöde${byten.length ? ` (${byten.join(', ')})` : ''}`;
+
+  const { error: uFel } = await supabase.from('transaktioner').update({
+    datum, beskrivning: beskrivning || null, motpart: motpart || null, belopp, moms,
+    anteckning: [rad.anteckning, logg].filter(Boolean).join('\n'),
+  }).eq('id', t.transaktionId).eq('user_id', userId);
+  if (uFel) throw new Error(`Kunde inte spara ändringen: ${uFel.message}`);
+
+  // Bokförs direkt med byråns val; en tidigare verifikation byts ut
+  await valjKonto(supabase, userId, t.transaktionId, konto, momssats, undefined, momsdelar, omvand);
+
+  // Körningen visar det som nu är bokfört
+  const [{ data: ny }, { data: ver }] = await Promise.all([
+    supabase.from('transaktioner').select('kronor').eq('id', t.transaktionId).maybeSingle(),
+    supabase.from('verifikationer').select('datum, betalning, verifikation_rader(radnr, konto, kontonamn, belopp, borttagen)')
+      .eq('transaktion_id', t.transaktionId).eq('user_id', userId).order('betalning'),
+  ]);
+  type VerRad = { radnr: number; konto: string; kontonamn: string | null; belopp: number; borttagen: boolean };
+  const visa = (rader: VerRad[]) => [...rader].filter((x) => !x.borttagen).sort((a, b) => a.radnr - b.radnr)
+    .map((x) => ({ konto: x.konto, kontonamn: x.kontonamn ?? '', belopp: Number(x.belopp) }));
+  const vers = (ver ?? []) as { datum: string; betalning: boolean; verifikation_rader: VerRad[] }[];
+
+  Object.assign(t, { datum, beskrivning, motpart, belopp, moms: moms ?? 0, kronor: ny?.kronor ?? null, fel: null, godkand: null, andrad: { at: nu } });
+  t.kontering = {
+    motivering: '', regler: [], granskning: null, sakerhet: 'hog', momshantering: omvand ? 'omvand' : momssats || momsdelar ? 'svensk' : 'ingen',
+    ...(k ?? {}),
+    konto, kontonamn: slaUppKonto(konto)?.namn ?? '', momssats, momsdelar, omvand, flaggor: [], omdome: 'gron',
+  };
+  t.verifikation = vers[0] ? visa(vers[0].verifikation_rader ?? []) : null;
+  t.faktura = vers[1] ? { datum: vers[0].datum, betalning: { datum: vers[1].datum, rader: visa(vers[1].verifikation_rader ?? []) } } : null;
+
+  const { error: sFel } = await supabase.from('kontering_prov').update({ resultat }).eq('id', radId);
+  if (sFel) throw new Error(`Ändringen bokfördes, men körningen kunde inte uppdateras: ${sFel.message}`);
 }
 
 /**

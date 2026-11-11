@@ -73,6 +73,8 @@ interface Tx {
   faktura?: { datum: string; betalning: { datum: string; rader: { konto: string; kontonamn: string; belopp: number }[] } } | null;
   fel: string | null;
   godkand?: { at: string } | null;
+  /** Byrån har ändrat transaktionen här och bokfört den med sitt val. */
+  andrad?: { at: string } | null;
   transaktionId?: string;
   /** Samma affär som något som redan fanns: filen kopplades dit i stället för att bli en egen transaktion. */
   kopplad?: string;
@@ -234,10 +236,14 @@ function periodval(ar: number[]): { namn: string; fran: string; tom: string }[] 
   ]);
 }
 
+/** Det som går att ändra på en transaktion i Flöde. */
+interface Redigering { datum: string; beskrivning: string; motpart: string; belopp: number; konto: string; momssats: number }
+
 const Anteckningar = createContext<{
   markerade: Map<string, Markerad>;
   markera: (nyckel: string, m: Markerad | null) => void;
   korOm: (text: string, tx: Markerad[]) => Promise<void>;
+  redigera: (plats: Plats, r: Redigering) => Promise<void>;
 } | null>(null);
 
 /** Den gamla transaktionen som är samma affär: samma riktning och nästan samma belopp. */
@@ -370,7 +376,19 @@ export function Flode({ userId }: { userId: string }) {
     await ladda();
   }, [userId, ladda, modellval.modell, modellval.jamfor]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const anteckningar = useMemo(() => ({ markerade, markera, korOm }), [markerade, markera, korOm]);
+  /** Ändrar transaktionen och bokför den med byråns val. Felet kastas till formuläret. */
+  const redigera = useCallback(async (plats: Plats, r: Redigering) => {
+    const res = await fetch('/api/admin/kontering-prov', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, id: plats.id, fil: plats.fil, nr: plats.nr, redigera: r }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    await ladda();
+  }, [userId, ladda]);
+
+  const anteckningar = useMemo(() => ({ markerade, markera, korOm, redigera }), [markerade, markera, korOm, redigera]);
 
   async function korOmMarkerade() {
     setKorOmStartar(true);
@@ -1016,10 +1034,72 @@ function Anteckna({ underlagId, t }: { underlagId: string; t: Tx }) {
   );
 }
 
+/** Ändra datum, förklaring, motpart, belopp, konto och moms. Sparas och bokförs direkt. */
+function Redigera({ plats, t, onStang }: { plats: Plats; t: Tx; onStang: () => void }) {
+  const a = useContext(Anteckningar);
+  const k = t.kontering;
+  const [f, setF] = useState({
+    datum: t.datum ?? '',
+    beskrivning: t.beskrivning,
+    motpart: t.motpart,
+    belopp: String(t.belopp).replace('.', ','),
+    konto: k?.konto ?? '',
+    momssats: String(Number(k?.momssats ?? k?.momsdelar?.[0]?.momssats ?? 0) || 0),
+  });
+  const [sparar, setSparar] = useState(false);
+  const [fel, setFel] = useState('');
+  if (!a) return null;
+  const satt = (falt: keyof typeof f) => (e: { target: { value: string } }) => setF((x) => ({ ...x, [falt]: e.target.value }));
+  async function spara() {
+    setSparar(true);
+    setFel('');
+    try {
+      await a!.redigera(plats, { ...f, belopp: Number(f.belopp.replace(/\s/g, '').replace(',', '.')), momssats: Number(f.momssats) });
+      onStang();
+    } catch (err) {
+      setFel(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSparar(false);
+    }
+  }
+  const falt = 'border border-slate-300 rounded px-2 py-1 text-sm text-slate-900 bg-white';
+  const etikett = 'flex flex-col gap-0.5 text-xs text-slate-500';
+  return (
+    <div className="basis-full space-y-2 rounded border border-blue-200 bg-blue-50/40 p-2">
+      <div className="grid gap-2 grid-cols-2 sm:grid-cols-3">
+        <label className={etikett}>Datum<input type="date" value={f.datum} onChange={satt('datum')} className={falt} /></label>
+        <label className={`${etikett} col-span-2`}>Förklaring<input value={f.beskrivning} onChange={satt('beskrivning')} className={falt} /></label>
+        <label className={etikett}>Motpart<input value={f.motpart} onChange={satt('motpart')} className={falt} /></label>
+        <label className={etikett}>Belopp{t.valuta !== 'SEK' ? ` (${t.valuta})` : ''}<input inputMode="decimal" value={f.belopp} onChange={satt('belopp')} className={`${falt} tabular-nums`} /></label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className={etikett}>Konto<input inputMode="numeric" value={f.konto} onChange={satt('konto')} placeholder="t.ex. 5410" className={`${falt} tabular-nums`} /></label>
+          <label className={etikett}>Moms
+            <select value={f.momssats} onChange={satt('momssats')} className={falt}>
+              {['25', '12', '6', '0'].map((s) => <option key={s} value={s}>{s} %</option>)}
+            </select>
+          </label>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <button onClick={spara} disabled={sparar} className="bg-blue-600 text-white font-medium px-2.5 py-1 rounded disabled:opacity-40">
+          {sparar ? 'Sparar…' : 'Spara och bokför'}
+        </button>
+        <button onClick={onStang} className="text-slate-500 hover:text-slate-800">Avbryt</button>
+        <span className="text-slate-400">Bokförs direkt. Körs filen om ersätts ändringen.</span>
+        {fel && <span className="text-red-600">{fel}</span>}
+      </div>
+    </div>
+  );
+}
+
 function TxVy({ plats, underlagId, t, gammal, onGodkann }:{ plats: Plats; underlagId: string; t: Tx; gammal: Gammal | null; onGodkann: (val: boolean) => Promise<void> }) {
   const jamforelse = useContext(ArJamforelse);
+  const a = useContext(Anteckningar);
   const [sparar, setSparar] = useState(false);
   const [godkannFel, setGodkannFel] = useState('');
+  const [redigerar, setRedigerar] = useState(false);
+  // Bara egna transaktioner i bokföringen går att ändra — inte en jämförelse eller en dubblett
+  const kanRedigera = !!a && !jamforelse && !!t.transaktionId && t.dublett.status !== 'dublett';
   async function satt(val: boolean) {
     setSparar(true);
     setGodkannFel('');
@@ -1072,8 +1152,9 @@ function TxVy({ plats, underlagId, t, gammal, onGodkann }:{ plats: Plats; underl
                 <KontoLank key={konto} konto={konto} className="text-slate-700 text-xs">{konto}</KontoLank>
               ))}
               <span className="text-slate-500 text-xs">säkerhet {SAKERHET[k.sakerhet] ?? k.sakerhet}</span>
-              {o && !t.godkand && <span className={`text-xs ${k.omdome === 'gron' ? 'text-emerald-700' : k.omdome === 'rod' ? 'text-red-600' : 'text-amber-700'}`}>{o.text}</span>}
+              {o && !t.godkand && !t.andrad && <span className={`text-xs ${k.omdome === 'gron' ? 'text-emerald-700' : k.omdome === 'rod' ? 'text-red-600' : 'text-amber-700'}`}>{o.text}</span>}
               {t.godkand && <span className="text-xs text-emerald-700 font-medium" title="Bokförd som verifikation när den godkändes">✓ Godkänd av byrån</span>}
+              {t.andrad && <span className="text-xs text-emerald-700 font-medium" title="Ändrad och bokförd med byråns val">✎ Ändrad av byrån</span>}
               {k.omdome === 'gul' && !t.godkand && !jamforelse && (
                 <button onClick={() => satt(true)} disabled={sparar} className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-2 py-0.5 disabled:opacity-40">
                   {sparar ? 'Sparar…' : 'Godkänn'}
@@ -1107,7 +1188,12 @@ function TxVy({ plats, underlagId, t, gammal, onGodkann }:{ plats: Plats; underl
         )}
         {t.antaganden && <p className="text-xs text-slate-500">Antaganden: {t.antaganden}</p>}
         {t.anteckning && <p className="text-xs text-slate-500">Anteckning: {t.anteckning}</p>}
-        <Anteckna underlagId={underlagId} t={t} />
+        {redigerar ? <Redigera plats={plats} t={t} onStang={() => setRedigerar(false)} /> : (
+          <div className="flex flex-wrap items-center gap-x-4">
+            {kanRedigera && <button onClick={() => setRedigerar(true)} className="text-xs text-blue-700 hover:underline">Redigera</button>}
+            <Anteckna underlagId={underlagId} t={t} />
+          </div>
+        )}
         <details className="text-xs text-slate-500">
           <summary className="cursor-pointer select-none">Verifikation och uppgifter</summary>
           {t.verifikation && (

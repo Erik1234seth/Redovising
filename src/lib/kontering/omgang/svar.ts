@@ -55,6 +55,8 @@ export interface ResultatTransaktion {
   fel: string | null;
   /** Byrån har godkänt en gul kontering som den är. */
   godkand?: { at: string } | null;
+  /** Byrån har ändrat transaktionen i Flöde och bokfört den med sitt val (./prov redigeraProv). */
+  andrad?: { at: string } | null;
   /** Transaktionen i bokföringen, när svaret skrivits dit (./skriv). */
   transaktionId?: string;
   /** Samma affär som något som redan finns: filen kopplades dit i stället för att bli en egen transaktion (./skriv). */

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { anvandJamforelse, godkannProv, raderaProv, raderaTransaktioner, startaProv, underlagAttKora, uppdateraProv, type Provrad } from '@/lib/kontering/omgang/prov';
+import { anvandJamforelse, godkannProv, raderaProv, raderaTransaktioner, redigeraProv, startaProv, underlagAttKora, uppdateraProv, type Provrad, type Redigering } from '@/lib/kontering/omgang/prov';
 import { FLODESMODELLER, arFlodesmodell, type Flodesmodell } from '@/lib/kontering/omgang/leverantor';
 import type { Resultat } from '@/lib/kontering/omgang/svar';
 
@@ -21,6 +21,8 @@ import type { Resultat } from '@/lib/kontering/omgang/svar';
  *           anteckning som kontext på underlagen och kör om dem.
  *   PATCH   godkänn en gul kontering, eller ångra. { anvand: korning } bokför en jämförelse i stället.
  *           { radera: [{ id, fil, nr }] } raderar transaktionerna ur bokföringen.
+ *           { id, fil, nr, redigera: { datum, beskrivning, motpart, belopp, konto, momssats } }
+ *           ändrar transaktionen och bokför den med byråns val.
  *   DELETE  ta bort en körning ur listan (det bokförda ligger kvar)
  */
 
@@ -173,9 +175,10 @@ export async function POST(request: NextRequest) {
 /**
  * Godkänn en gul kontering, eller ångra: { userId, id, fil, nr, godkand }. Bokför en jämförelse: { userId, anvand }.
  * Radera transaktioner: { userId, radera: [{ id, fil, nr }] }.
+ * Ändra en transaktion: { userId, id, fil, nr, redigera }.
  */
 export async function PATCH(request: NextRequest) {
-  let body: { userId?: string; id?: string; fil?: string; nr?: number; godkand?: boolean; anvand?: string; radera?: { id?: unknown; fil?: unknown; nr?: unknown }[] };
+  let body: { userId?: string; id?: string; fil?: string; nr?: number; godkand?: boolean; anvand?: string; redigera?: Redigering; radera?: { id?: unknown; fil?: unknown; nr?: unknown }[] };
   try {
     body = await request.json();
   } catch {
@@ -202,6 +205,14 @@ export async function PATCH(request: NextRequest) {
     }
   }
   if (!body.userId || !body.id || !body.fil || typeof body.nr !== 'number') return fel('userId, id, fil och nr krävs', 400);
+  if (body.redigera) {
+    try {
+      await redigeraProv(getSupabase(), body.userId, body.id, body.fil, body.nr, body.redigera);
+      return NextResponse.json({ ok: true });
+    } catch (err) {
+      return fel(err, 400);
+    }
+  }
   try {
     await godkannProv(getSupabase(), body.userId, body.id, body.fil, body.nr, body.godkand !== false);
     return NextResponse.json({ ok: true });
