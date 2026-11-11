@@ -1637,6 +1637,7 @@ export default function PersonPage() {
                   verifikationer={verifikationer}
                   showSource
                   period={verPeriod}
+                  kundnamn={person.name ?? person.key}
                   onRaderade={(ids) => {
                     const borta = new Set(ids);
                     setVerifikationer((vs) => vs?.filter((v) => !v.id || !borta.has(v.id)) ?? null);

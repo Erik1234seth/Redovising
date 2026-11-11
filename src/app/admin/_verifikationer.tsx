@@ -54,6 +54,36 @@ function matches(v: Ver, q: string): boolean {
 
 const giltiga = (v: Ver) => v.transaktioner.filter((t) => !t.borttagen && !t.tillagd);
 
+/** Belopp som svenska Excel läser som tal: decimalkomma, ingen tusentalsavgränsare. */
+const tal = (n: number) => (n ? n.toFixed(2).replace('.', ',') : '');
+/** Tab och radbrytning skulle dela fältet — de blir mellanslag. */
+const falt = (s: string | null | undefined) => (s ?? '').replace(/[\t\r\n]+/g, ' ').trim();
+
+/**
+ * Det som visas som TSV: en rad per konteringsrad, bara de som gäller (inte
+ * tillagda eller borttagna i efterhand), så att filen går att summera i Excel.
+ */
+function laddaNerTsv(vers: Ver[], filnamn: string) {
+  const rader = [['Serie', 'Nr', 'Datum', 'Text', 'Konto', 'Kontonamn', 'Debet', 'Kredit', 'Radtext', 'Källa', 'Fil'].join('\t')];
+  for (const v of vers) {
+    for (const t of giltiga(v)) {
+      rader.push([
+        v.serie, v.nummer, v.datum, v.text, t.konto, t.kontonamn,
+        tal(t.belopp > 0 ? t.belopp : 0), tal(t.belopp < 0 ? -t.belopp : 0),
+        t.text, v.kalla ? (KALLA[v.kalla] ?? v.kalla) : '', v.fileName,
+      ].map(falt).join('\t'));
+    }
+  }
+  // BOM, så att Excel läser filen som UTF-8 och å, ä, ö blir rätt
+  const blob = new Blob([String.fromCharCode(0xfeff) + rader.join('\r\n') + '\r\n'], { type: 'text/tab-separated-values;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filnamn;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 type Sort = 'datum' | 'nummer';
 
 // Nummer är text — "10" ska ändå komma efter "9"
@@ -76,8 +106,10 @@ function compare(sort: Sort) {
   };
 }
 
-export function VerifikationLista({ verifikationer: alla, showSource = false, period, onRaderade }: {
+export function VerifikationLista({ verifikationer: alla, showSource = false, period, onRaderade, kundnamn }: {
   verifikationer: Ver[];
+  /** Med i filnamnet när listan laddas ner. */
+  kundnamn?: string;
   showSource?: boolean;
   /** Visar bara verifikationer i perioden — sökningen också. Ersätter årsvalet. */
   period?: { fran: string; tom: string };
@@ -249,6 +281,18 @@ export function VerifikationLista({ verifikationer: alla, showSource = false, pe
             <input type="checkbox" checked={onlyUnbalanced} onChange={(e) => setOnlyUnbalanced(e.target.checked)} />
             Bara obalanserade
           </label>
+        )}
+        {filtered.length > 0 && (
+          <button
+            onClick={() => {
+              const nar = period ? `${period.fran}–${period.tom}` : year || 'alla';
+              laddaNerTsv(filtered, `${['Verifikationer', kundnamn, nar].filter(Boolean).join(' ').replace(/[\\/:*?"<>|]/g, '')}.tsv`);
+            }}
+            title="Det som visas, en rad per konteringsrad"
+            className="px-3 py-2 border border-slate-300 hover:bg-slate-50 rounded-lg text-sm text-slate-700"
+          >
+            Ladda ner TSV
+          </button>
         )}
       </div>
 
