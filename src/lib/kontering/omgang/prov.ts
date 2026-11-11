@@ -62,8 +62,8 @@ async function raderaFiler(modell: string, filer: Filpost[]) {
  * skickat något nytt sedan dess. Inte övriga filer, sidor av ett annat
  * underlag, filer vars verifikationer redan lästs in (SIE, verifikationslistor,
  * Plocka verif) eller filtyper AI:n inte läser. Det Flöde själv bokfört hindrar
- * inte — det ersätts när filen körs om. Med `alla` tas även de som redan körts
- * (Kör om alla).
+ * inte — det ersätts när filen körs om. Med `alla` tas allt som redan körts,
+ * också sidorna (Kör om alla).
  */
 export async function underlagAttKora(supabase: SupabaseClient, userId: string, alla = false): Promise<string[]> {
   const { data, error } = await supabase.from('bokforing_underlag')
@@ -72,7 +72,7 @@ export async function underlagAttKora(supabase: SupabaseClient, userId: string, 
   if (error) throw new Error(`Kunde inte läsa underlagen: ${error.message}`);
   const kandidater = (data ?? []).filter((u) =>
     (!u.sortering || u.sortering === 'underlag')
-    && !u.del_av
+    && (alla || !u.del_av)
     && !u.verifikationer_inlagda_at
     && kanSkickas(u)
     && (alla || !u.flode_at || (!!u.kund_svar_at && u.kund_svar_at > u.flode_at)));
@@ -88,14 +88,26 @@ export async function underlagAttKora(supabase: SupabaseClient, userId: string, 
   return ids.filter((id) => !bokforda.has(id));
 }
 
+/** Lägger till sidorna som hör till underlagen, så att dokumenten läses hela. */
+async function medSidor(supabase: SupabaseClient, userId: string, ids: string[]): Promise<string[]> {
+  const alla = new Set(ids);
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await supabase.from('bokforing_underlag').select('id')
+      .eq('user_id', userId).in('del_av', ids.slice(i, i + 200)).is('verifikationer_inlagda_at', null);
+    for (const u of data ?? []) alla.add(u.id as string);
+  }
+  return [...alla];
+}
+
 /**
- * Startar en körning med modellen. Svarar med körningens id när alla delar är
+ * Startar en körning med modellen. Sidor som hör till underlagen följer med. Svarar med körningens id när alla delar är
  * skickade. Med `jamforMed` blir det en jämförelse med den körningen.
  */
 export async function startaProv(
   supabase: SupabaseClient, userId: string, underlagIds: string[],
   o: { modell: Flodesmodell; korning?: string; jamforMed?: string | null },
 ): Promise<string> {
+  underlagIds = await medSidor(supabase, userId, underlagIds);
   const korning = o.korning ?? crypto.randomUUID();
   const lev = leverantor(o.modell);
   const bas = { modell: lev.modell, jamfor_med: o.jamforMed ?? null };
