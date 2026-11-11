@@ -8,11 +8,13 @@ import type { Resultat } from '@/lib/kontering/omgang/svar';
  * Flöde i personkortet — konteringen (@/lib/kontering/omgang). Körningarna
  * sparas i kontering_prov, och svaren skrivs till transaktioner och konteringar.
  *
- *   GET     kundens underlag att välja bland, de som Kör Flöde tar (attKora) och
+ *   GET     kundens underlag att välja bland, de som Kör Flöde tar (attKora), de som
+ *           Kör om alla tar (allaAttKora) och
  *           kundens körningar. Delar som är skickade frågas efter hos leverantören,
  *           och klara svar prövas och skrivs. Underlag som körts om syns bara i
  *           den senaste körningen (utanOmkorda).
- *   POST    starta en körning: { nya: true } tar allt som inte körts, annars underlagIds.
+ *   POST    starta en körning: { nya: true } tar allt som inte körts, { alla: true } allt
+ *           som går att köra (Kör om alla), annars underlagIds.
  *           modell: 'gpt-6.1-sol' | 'claude-opus-5-5' (GPT om inget anges), och
  *           jamfor: true kör samma underlag med den andra modellen som jämförelse.
  *           { anteckning, transaktioner: [{ underlagId, vilken }] } sparar byråns
@@ -82,11 +84,12 @@ export async function GET(request: NextRequest) {
     await Promise.all(((vantande ?? []) as Provrad[]).map((r) => uppdateraProv(supabase, r).catch((err) =>
       console.error(`[admin/kontering-prov] ${r.id}:`, err instanceof Error ? err.message : err))));
 
-    const [{ data: rader, error }, { data: underlag, error: uFel }, attKora] = await Promise.all([
+    const [{ data: rader, error }, { data: underlag, error: uFel }, attKora, allaAttKora] = await Promise.all([
       supabase.from('kontering_prov').select(RAD_KOLUMNER).eq('user_id', userId).order('created_at', { ascending: false }).order('del').limit(100),
       supabase.from('bokforing_underlag').select('id, file_name, mime_type, created_at, sortering, sortering_orsak, del_av, flode_at, kund_svar_at')
         .eq('user_id', userId).order('created_at', { ascending: false }).limit(2000),
       underlagAttKora(supabase, userId),
+      underlagAttKora(supabase, userId, true),
     ]);
     if (error) throw new Error(error.message);
     if (uFel) throw new Error(uFel.message);
@@ -103,6 +106,7 @@ export async function GET(request: NextRequest) {
       korningar: utanOmkorda((rader ?? []) as Provrad[]).map(({ kontext: _k, ...r }) => r),
       underlag: (underlag ?? []).map((u) => ({ ...u, transaktioner: antal.get(u.id) ?? 0 })),
       attKora,
+      allaAttKora,
     });
   } catch (err) {
     return fel(err);
@@ -110,7 +114,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { userId?: string; underlagIds?: string[]; nya?: boolean; anteckning?: string; transaktioner?: { underlagId?: string; vilken?: string }[]; modell?: string; jamfor?: boolean };
+  let body: { userId?: string; underlagIds?: string[]; nya?: boolean; alla?: boolean; anteckning?: string; transaktioner?: { underlagId?: string; vilken?: string }[]; modell?: string; jamfor?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -154,11 +158,11 @@ export async function POST(request: NextRequest) {
       const korning = await kor(ids);
       return NextResponse.json({ ok: true, korning });
     }
-    // Kör Flöde: allt som inte körts, eller där kunden skickat något nytt
-    const ids = body.nya
-      ? await underlagAttKora(supabase, body.userId)
+    // Kör Flöde: allt som inte körts, eller där kunden skickat något nytt. Kör om alla: allt som går att köra
+    const ids = body.nya || body.alla
+      ? await underlagAttKora(supabase, body.userId, !!body.alla)
       : [...new Set((body.underlagIds ?? []).filter((x) => typeof x === 'string'))];
-    if (!ids.length) return fel(body.nya ? 'Inget nytt att köra' : 'Välj minst ett underlag', 400);
+    if (!ids.length) return fel(body.alla ? 'Inget underlag att köra' : body.nya ? 'Inget nytt att köra' : 'Välj minst ett underlag', 400);
     const korning = await kor(ids);
     return NextResponse.json({ ok: true, korning });
   } catch (err) {

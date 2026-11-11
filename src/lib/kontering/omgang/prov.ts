@@ -60,9 +60,10 @@ async function raderaFiler(modell: string, filer: Filpost[]) {
  * skickat något nytt sedan dess. Inte övriga filer, sidor av ett annat
  * underlag, filer vars verifikationer redan lästs in (SIE, verifikationslistor,
  * Plocka verif) eller filtyper AI:n inte läser. Det Flöde själv bokfört hindrar
- * inte — det ersätts när filen körs om.
+ * inte — det ersätts när filen körs om. Med `alla` tas även de som redan körts
+ * (Kör om alla).
  */
-export async function underlagAttKora(supabase: SupabaseClient, userId: string): Promise<string[]> {
+export async function underlagAttKora(supabase: SupabaseClient, userId: string, alla = false): Promise<string[]> {
   const { data, error } = await supabase.from('bokforing_underlag')
     .select('id, file_name, mime_type, sortering, del_av, flode_at, kund_svar_at, verifikationer_inlagda_at')
     .eq('user_id', userId).limit(5000);
@@ -72,7 +73,7 @@ export async function underlagAttKora(supabase: SupabaseClient, userId: string):
     && !u.del_av
     && !u.verifikationer_inlagda_at
     && kanSkickas(u)
-    && (!u.flode_at || (!!u.kund_svar_at && u.kund_svar_at > u.flode_at)));
+    && (alla || !u.flode_at || (!!u.kund_svar_at && u.kund_svar_at > u.flode_at)));
   if (!kandidater.length) return [];
 
   // Verifikationer på filen som inte kommer från en transaktion (SIE, Plocka verif)

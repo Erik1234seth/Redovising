@@ -256,6 +256,9 @@ function gamlaKonton(g: Gammal): string[] {
 export function Flode({ userId }: { userId: string }) {
   const [underlag, setUnderlag] = useState<Underlag[] | null>(null);
   const [attKora, setAttKora] = useState<string[]>([]);
+  const [allaAttKora, setAllaAttKora] = useState<string[]>([]);
+  // Kör om alla ersätter allt Flöde bokfört, även det som godkänts — kräver ett andra klick
+  const [korOmAllaBekrafta, setKorOmAllaBekrafta] = useState(false);
   const [rader, setRader] = useState<Provrad[]>([]);
   const [laddfel, setLaddfel] = useState('');
   const [valda, setValda] = useState<string[]>([]);
@@ -290,6 +293,7 @@ export function Flode({ userId }: { userId: string }) {
       if (data.error) throw new Error(data.error);
       setUnderlag(data.underlag);
       setAttKora(data.attKora ?? []);
+      setAllaAttKora(data.allaAttKora ?? []);
       setRader(data.korningar);
       setLaddfel('');
     } catch (err) {
@@ -326,15 +330,16 @@ export function Flode({ userId }: { userId: string }) {
     return ut;
   }, [rader]);
 
-  /** Kör Flöde (nya) tar allt som inte körts; annars de valda. */
-  async function starta(nya: boolean) {
+  /** Kör Flöde (nya) tar allt som inte körts, Kör om alla (alla) allt som går att köra; annars de valda. */
+  async function starta(vad: 'nya' | 'alla' | 'valda') {
     setStartar(true);
     setStartfel('');
+    setKorOmAllaBekrafta(false);
     try {
       const res = await fetch('/api/admin/kontering-prov', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nya ? { userId, nya: true, ...modellval } : { userId, underlagIds: valda, ...modellval }),
+        body: JSON.stringify(vad === 'valda' ? { userId, underlagIds: valda, ...modellval } : { userId, [vad]: true, ...modellval }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -469,13 +474,29 @@ export function Flode({ userId }: { userId: string }) {
           {(Object.keys(VAL) as Val[]).map((v) => <option key={v} value={v}>{VAL[v].text}</option>)}
         </select>
         <button
-          onClick={() => starta(true)}
+          onClick={() => starta('nya')}
           disabled={!attKora.length || startar}
           className="bg-blue-600 text-white font-medium px-4 py-2 rounded disabled:opacity-40"
         >
           {startar ? 'Förbereder och skickar…' : attKora.length ? `Kör Flöde · ${attKora.length} underlag` : 'Inget nytt att köra'}
         </button>
         {attKora.length > 0 && !startar && <span className="text-sm text-slate-500">ca {prisFor(val, attKora.length)} kr</span>}
+        {allaAttKora.length > 0 && !startar && (korOmAllaBekrafta ? (
+          <span className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-slate-700">
+              Kör om alla {allaAttKora.length} underlag, ca {prisFor(val, allaAttKora.length)} kr? Det Flöde bokfört från dem ersätts, även det du godkänt.
+            </span>
+            <button onClick={() => starta('alla')} className="bg-blue-600 text-white font-medium px-3 py-1.5 rounded">Ja, kör om alla</button>
+            <button onClick={() => setKorOmAllaBekrafta(false)} className="border border-slate-300 text-slate-700 px-3 py-1.5 rounded">Avbryt</button>
+          </span>
+        ) : (
+          <button
+            onClick={() => setKorOmAllaBekrafta(true)}
+            className="border border-blue-600 text-blue-700 text-sm font-medium px-3 py-2 rounded"
+          >
+            Kör om alla · {allaAttKora.length} underlag
+          </button>
+        ))}
         {startfel && <span className="text-sm text-red-600">{startfel}</span>}
       </div>
 
@@ -499,7 +520,7 @@ export function Flode({ userId }: { userId: string }) {
             {valda.length} valda{valda.length ? ` · ca ${prisFor(val, valda.length)} kr` : ''}
           </span>
           <button
-            onClick={() => starta(false)}
+            onClick={() => starta('valda')}
             disabled={!valda.length || startar}
             className="border border-blue-600 text-blue-700 text-sm font-medium px-3 py-1.5 rounded disabled:opacity-40"
           >
