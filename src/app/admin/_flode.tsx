@@ -244,6 +244,7 @@ const Anteckningar = createContext<{
   markera: (nyckel: string, m: Markerad | null) => void;
   korOm: (text: string, tx: Markerad[]) => Promise<void>;
   redigera: (plats: Plats, r: Redigering) => Promise<void>;
+  radera: (plats: Plats) => Promise<void>;
 } | null>(null);
 
 /** Den gamla transaktionen som är samma affär: samma riktning och nästan samma belopp. */
@@ -388,7 +389,20 @@ export function Flode({ userId }: { userId: string }) {
     await ladda();
   }, [userId, ladda]);
 
-  const anteckningar = useMemo(() => ({ markerade, markera, korOm, redigera }), [markerade, markera, korOm, redigera]);
+  /** Raderar en transaktion ur bokföringen. Felet kastas till knappen. */
+  const radera = useCallback(async (plats: Plats) => {
+    const res = await fetch('/api/admin/kontering-prov', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, radera: [plats] }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    markera(platsNyckel(plats), null);
+    await ladda();
+  }, [userId, ladda, markera]);
+
+  const anteckningar = useMemo(() => ({ markerade, markera, korOm, redigera, radera }), [markerade, markera, korOm, redigera, radera]);
 
   async function korOmMarkerade() {
     setKorOmStartar(true);
@@ -1100,6 +1114,21 @@ function TxVy({ plats, underlagId, t, gammal, onGodkann }:{ plats: Plats; underl
   const [redigerar, setRedigerar] = useState(false);
   // Bara egna transaktioner i bokföringen går att ändra — inte en jämförelse eller en dubblett
   const kanRedigera = !!a && !jamforelse && !!t.transaktionId && t.dublett.status !== 'dublett';
+  // Som kryssrutan: inte en jämförelse eller en rad som kopplats till något som redan fanns
+  const kanRadera = !!a && !jamforelse && !!t.transaktionId && !t.kopplad?.startsWith('Kopplad');
+  const [raderaFraga, setRaderaFraga] = useState(false);
+  const [raderar, setRaderar] = useState(false);
+  const [raderaFel, setRaderaFel] = useState('');
+  async function raderaDen() {
+    setRaderar(true);
+    setRaderaFel('');
+    try {
+      await a!.radera(plats);
+    } catch (err) {
+      setRaderaFel(err instanceof Error ? err.message : String(err));
+      setRaderar(false);
+    }
+  }
   async function satt(val: boolean) {
     setSparar(true);
     setGodkannFel('');
@@ -1191,6 +1220,16 @@ function TxVy({ plats, underlagId, t, gammal, onGodkann }:{ plats: Plats; underl
         {redigerar ? <Redigera plats={plats} t={t} onStang={() => setRedigerar(false)} /> : (
           <div className="flex flex-wrap items-center gap-x-4">
             {kanRedigera && <button onClick={() => setRedigerar(true)} className="text-xs text-blue-700 hover:underline">Redigera</button>}
+            {kanRadera && (raderaFraga ? (
+              <span className="flex items-center gap-2 text-xs">
+                <span className="text-slate-700">Radera ur bokföringen?</span>
+                <button onClick={raderaDen} disabled={raderar} className="bg-red-600 text-white font-medium px-2 py-0.5 rounded disabled:opacity-40">{raderar ? 'Raderar…' : 'Ja, radera'}</button>
+                <button onClick={() => { setRaderaFraga(false); setRaderaFel(''); }} disabled={raderar} className="text-slate-500 hover:text-slate-800">Avbryt</button>
+                {raderaFel && <span className="text-red-600">{raderaFel}</span>}
+              </span>
+            ) : (
+              <button onClick={() => setRaderaFraga(true)} className="text-xs text-red-600 hover:underline">Radera</button>
+            ))}
             <Anteckna underlagId={underlagId} t={t} />
           </div>
         )}
