@@ -1080,9 +1080,9 @@ function Redigera({ plats, t, onStang }: { plats: Plats; t: Tx; onStang: () => v
   const etikett = 'flex flex-col gap-0.5 text-xs text-slate-500';
   return (
     <div className="basis-full space-y-2 rounded border border-blue-200 bg-blue-50/40 p-2">
-      <div className="grid gap-2 grid-cols-2 sm:grid-cols-3">
-        <label className={etikett}>Datum<input type="date" value={f.datum} onChange={satt('datum')} className={falt} /></label>
+      <div className="grid gap-2 grid-cols-2">
         <label className={`${etikett} col-span-2`}>Förklaring<input value={f.beskrivning} onChange={satt('beskrivning')} className={falt} /></label>
+        <label className={etikett}>Datum<input type="date" value={f.datum} onChange={satt('datum')} className={falt} /></label>
         <label className={etikett}>Motpart<input value={f.motpart} onChange={satt('motpart')} className={falt} /></label>
         <label className={etikett}>Belopp{t.valuta !== 'SEK' ? ` (${t.valuta})` : ''}<input inputMode="decimal" value={f.belopp} onChange={satt('belopp')} className={`${falt} tabular-nums`} /></label>
         <div className="grid grid-cols-2 gap-2">
