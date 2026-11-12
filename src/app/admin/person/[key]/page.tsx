@@ -73,6 +73,8 @@ export default function PersonPage() {
   // Filerna som är ikryssade för AI-avläsning, och vilken som läses just nu
   const [valda, setValda] = useState<string[]>([]);
   const [laser, setLaser] = useState<string | null>(null);
+  // Ladda ner alla: hur långt zip-filen kommit, eller felet
+  const [laddarNer, setLaddarNer] = useState('');
   const [mail, setMail] = useState<AdminMailMessage[]>([]);
   const [bokslut, setBokslut] = useState<BokslutData | null>(null);
   const [abonnemang, setAbonnemang] = useState<Abonnemang | null>(null);
@@ -593,6 +595,55 @@ export default function PersonPage() {
   // övrigt — NE-bilagor, avtal, filer vi själva skickat — har en egen flik.
   // Osorterade filer står bland underlagen tills avläsningen sorterat dem.
   const bokforingsfiler = underlag.filter((f) => f.sortering !== 'ovrigt');
+
+  /** Packar underlagen (de markerade, annars alla) i en zip som laddas ner. Filerna hämtas direkt från lagringen. */
+  async function laddaNerAlla() {
+    const ids = valda.length ? valda : bokforingsfiler.map((f) => f.id);
+    setLaddarNer('Hämtar länkar…');
+    try {
+      const res = await fetch('/api/admin/underlag/lankar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const filer = data.filer as { namn: string; url: string }[];
+      if (!filer.length) throw new Error('Inga filer att ladda ner');
+
+      const { default: JSZip } = await import('jszip');
+      const mapp = (person?.name || person?.email || 'Underlag').replace(/[\\/:*?"<>|]/g, '').trim() || 'Underlag';
+      const zip = new JSZip();
+      const dir = zip.folder(mapp)!;
+      const tagna = new Set<string>();
+      const misslyckade: string[] = [];
+      for (let i = 0; i < filer.length; i++) {
+        const f = filer[i];
+        setLaddarNer(`Hämtar ${i + 1} av ${filer.length}…`);
+        // Samma filnamn två gånger får (2), (3) …
+        let namn = f.namn;
+        for (let n = 2; tagna.has(namn.toLowerCase()); n++) namn = f.namn.replace(/(\.[^.]*)?$/, (ext) => ` (${n})${ext}`);
+        tagna.add(namn.toLowerCase());
+        try {
+          const r = await fetch(f.url);
+          if (!r.ok) throw new Error(String(r.status));
+          dir.file(namn, await r.blob());
+        } catch {
+          misslyckade.push(f.namn);
+        }
+      }
+      setLaddarNer('Packar…');
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${mapp}.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+      setLaddarNer(misslyckade.length ? `Klart, men ${misslyckade.length} kunde inte hämtas: ${misslyckade.join(', ')}` : '');
+    } catch (err) {
+      setLaddarNer(`Kunde inte ladda ner: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
   const ovrigaFiler = underlag.filter((f) => f.sortering === 'ovrigt');
 
   // SIE-filer läses med kod och hör hemma bland verifikationerna. De går att
@@ -1388,6 +1439,16 @@ export default function PersonPage() {
                     {laser ? 'Läser…' : `Läs av med AI${valdaLasbara ? ` (${valdaLasbara})` : ''}`}
                   </button>
                 )}
+                {bokforingsfiler.length > 0 && (
+                  <button
+                    onClick={laddaNerAlla}
+                    disabled={laddarNer.endsWith('…')}
+                    title="Packar filerna i en zip-mapp med sina ursprungliga namn"
+                    className="px-3 py-1.5 text-xs bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 rounded-lg transition disabled:opacity-40"
+                  >
+                    {laddarNer.endsWith('…') ? laddarNer : valda.length ? `Ladda ner markerade (${valda.length})` : `Ladda ner alla (${bokforingsfiler.length})`}
+                  </button>
+                )}
                 <input
                   ref={fileInput}
                   type="file"
@@ -1407,6 +1468,9 @@ export default function PersonPage() {
 
               {uploading && (
                 <p className="text-blue-700 text-xs mb-3">Laddar upp {uploading}…</p>
+              )}
+              {laddarNer && !laddarNer.endsWith('…') && (
+                <p className="text-red-600 text-xs mb-3">{laddarNer}</p>
               )}
 
               {laser && (
