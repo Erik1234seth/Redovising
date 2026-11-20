@@ -182,8 +182,21 @@ async function synkaKonto(supabase: SupabaseClient, userId: string, konto: { kon
   return rader.length;
 }
 
-/** Hämtar alla aktiva kopplingar för en kund. Svarar med antal transaktioner. */
+async function antalBankrader(supabase: SupabaseClient, userId: string): Promise<number | null> {
+  const { count, error } = await supabase
+    .from('bank_transaktioner')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId);
+  return error ? null : count;
+}
+
+/**
+ * Hämtar alla aktiva kopplingar för en kund. Svarar med hur många rader som
+ * hämtades (överlappet räknas med), hur många av dem som var nya och hur många
+ * kunden har totalt. nya och totalt är null om de inte gick att räkna.
+ */
 export async function synkaBank(supabase: SupabaseClient, userId: string) {
+  const fore = await antalBankrader(supabase, userId);
   const { data: kopplingar, error } = await supabase
     .from('bank_kopplingar')
     .select('session_id, giltig_till')
@@ -226,7 +239,9 @@ export async function synkaBank(supabase: SupabaseClient, userId: string) {
   } catch (err) {
     fel.push(err instanceof Error ? err.message : String(err));
   }
-  return { transaktioner, fel };
+  const totalt = await antalBankrader(supabase, userId);
+  const nya = fore !== null && totalt !== null ? Math.max(0, totalt - fore) : null;
+  return { transaktioner, nya, totalt, fel };
 }
 
 export async function synkaAllaBanker(supabase: SupabaseClient) {

@@ -480,6 +480,17 @@ const BANK_RESULTAT: Record<string, { text: string; ok: boolean }> = {
   fel: { text: 'Något gick fel när banken skulle kopplas. Försök igen.', ok: false },
 };
 
+/**
+ * Varje hämtning tar om de senaste dagarna, så antalet hämtade säger inte hur
+ * mycket som är nytt. Visa nya och totalt i stället.
+ */
+function synkMeddelande(data: { transaktioner?: number; nya?: number | null; totalt?: number | null }) {
+  const tal = (n: number) => n.toLocaleString('sv-SE');
+  if (data.nya == null || data.totalt == null) return `Klart! Banken är hämtad (${tal(data.transaktioner ?? 0)} transaktioner kontrollerade).`;
+  const nya = data.nya === 0 ? 'Inga nya transaktioner' : data.nya === 1 ? '1 ny transaktion' : `${tal(data.nya)} nya transaktioner`;
+  return `Klart! ${nya}. Totalt ${tal(data.totalt)} transaktioner från banken.`;
+}
+
 function formatBelopp(ore: number, valuta: string) {
   return (ore / 100).toLocaleString('sv-SE', { style: 'currency', currency: valuta || 'SEK' });
 }
@@ -531,7 +542,7 @@ function BankKort({ meddela }: { meddela: Meddela }) {
         ? { text: data.error ?? 'Hämtningen misslyckades.', ok: false }
         : data.fel?.length
           ? { text: data.fel.join(' '), ok: false }
-          : { text: `Klart! ${data.transaktioner} transaktioner hämtade.`, ok: true });
+          : { text: synkMeddelande(data), ok: true });
     } catch {
       meddela({ text: 'Hämtningen misslyckades.', ok: false });
     }
