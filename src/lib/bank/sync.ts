@@ -31,16 +31,18 @@ function tillOre(amount: string): number {
 }
 
 /**
- * Transaktionens id. Bankens referens när den finns; annars ett hash av
- * innehållet plus löpnummer, så två likadana köp samma dag blir två rader.
- * Hämtningen börjar alltid vid ett dygnsskifte, så löpnumret blir detsamma
- * varje gång samma dag hämtas.
+ * Transaktionens id. Bankens referens (entry_reference) när den finns; annars
+ * ett hash av innehållet plus löpnummer, så två likadana köp samma dag blir två
+ * rader. Hämtningen börjar alltid vid ett dygnsskifte, så löpnumret blir
+ * detsamma varje gång samma dag hämtas.
+ *
+ * transaction_id används inte: enligt Enable Banking är det inte unikt och kan
+ * ändras mellan hämtningar, vilket gav dubbletter när överlappet hämtades om.
  */
 function idn(transaktioner: EbTransaktion[]): string[] {
   const antal = new Map<string, number>();
   return transaktioner.map((t) => {
-    const ref = t.entry_reference || t.transaction_id;
-    if (ref) return `ref:${ref}`;
+    if (t.entry_reference) return `ref:${t.entry_reference}`;
     const nyckel = createHash('sha256')
       .update(JSON.stringify([
         t.booking_date ?? t.value_date,

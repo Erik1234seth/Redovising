@@ -415,9 +415,63 @@ interface BankKoppling {
   konton: { konto_hash: string; iban: string | null; namn: string | null; valuta: string | null }[];
 }
 
+interface BankTransaktion {
+  transaktion_id: string;
+  konto_hash: string;
+  bokforingsdag: string;
+  belopp_ore: number;
+  valuta: string;
+  text: string | null;
+  motpart: string | null;
+  /** Det banken skickat utöver det vanliga; bara det som finns är med */
+  falt: {
+    kopdag?: string;
+    ocr?: string;
+    utlandskt_belopp?: { belopp: number; valuta: string; kurs?: number };
+    motpart_konto?: string;
+    motpart_namn?: string;
+    typ?: string;
+    branschkod?: string;
+  };
+}
+
 interface BankStatus {
   kopplingar: BankKoppling[];
-  senaste: { transaktion_id: string; bokforingsdag: string; belopp_ore: number; valuta: string; text: string | null; motpart: string | null }[];
+  senaste: BankTransaktion[];
+}
+
+/** De uppgifter banken skickat om transaktionen, i en rad under den. */
+function bankDetaljer(t: BankTransaktion, kontonamn: string | null): string[] {
+  const f = t.falt;
+  const ub = f.utlandskt_belopp;
+  return [
+    f.kopdag && f.kopdag !== t.bokforingsdag ? `Köpdag ${f.kopdag}` : null,
+    f.typ ?? null,
+    t.motpart && t.text && t.text !== t.motpart ? t.text : null,
+    f.motpart_konto ? `Konto ${f.motpart_konto}` : null,
+    f.ocr ? `OCR ${f.ocr}` : null,
+    ub ? `${ub.belopp.toLocaleString('sv-SE', { style: 'currency', currency: ub.valuta })}${ub.kurs ? ` (kurs ${ub.kurs.toLocaleString('sv-SE')})` : ''}` : null,
+    f.branschkod ? `Branschkod ${f.branschkod}` : null,
+    kontonamn,
+  ].filter((x): x is string => !!x);
+}
+
+function BankRad({ t, kontonamn }: { t: BankTransaktion; kontonamn: string | null }) {
+  const detaljer = bankDetaljer(t, kontonamn);
+  return (
+    <li className="py-2">
+      <div className="flex items-baseline gap-3">
+        <span className="text-slate-400 tabular-nums flex-shrink-0">{t.bokforingsdag}</span>
+        <span className="text-slate-600 truncate flex-1">{t.motpart || t.text || '–'}</span>
+        <span className={`tabular-nums flex-shrink-0 ${t.belopp_ore < 0 ? 'text-slate-700' : 'text-emerald-700'}`}>
+          {formatBelopp(t.belopp_ore, t.valuta)}
+        </span>
+      </div>
+      {detaljer.length > 0 && (
+        <p className="mt-0.5 text-xs text-slate-400 break-words sm:pl-[6.5rem]">{detaljer.join(' · ')}</p>
+      )}
+    </li>
+  );
 }
 
 const BANK_RESULTAT: Record<string, { text: string; ok: boolean }> = {
@@ -437,12 +491,36 @@ function BankKort({ meddela }: { meddela: Meddela }) {
   const [psuType, setPsuType] = useState<'business' | 'personal'>('business');
   const [visaVal, setVisaVal] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [alla, setAlla] = useState<BankTransaktion[] | null>(null);
+  const [visaAlla, setVisaAlla] = useState(false);
   const startad = useRef(false);
+
+  const laddaAlla = useCallback(async () => {
+    const res = await api('/api/bank?alla=1');
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) setAlla(data.transaktioner ?? []);
+    else meddela({ text: data.error ?? 'Kunde inte hämta transaktionerna.', ok: false });
+    return res.ok;
+  }, [meddela]);
 
   const laddaStatus = useCallback(async () => {
     const res = await api('/api/bank');
     if (res.ok) setBank(await res.json());
+    // En öppen lista över alla följer med när nya transaktioner hämtats
+    setAlla(null);
+    setVisaAlla(false);
   }, []);
+
+  async function vaxlaAlla() {
+    if (visaAlla) { setVisaAlla(false); return; }
+    if (!alla) {
+      setBusy('alla');
+      const ok = await laddaAlla();
+      setBusy(null);
+      if (!ok) return;
+    }
+    setVisaAlla(true);
+  }
 
   const synka = useCallback(async () => {
     setBusy('synka');
@@ -517,6 +595,10 @@ function BankKort({ meddela }: { meddela: Meddela }) {
 
   const aktiva = bank?.kopplingar.filter((k) => k.status === 'aktiv') ?? [];
   const valdaBanken = banker?.find((b) => b.name === valdBank);
+  // Kontots namn på varje rad, men bara när kunden har fler än ett konto
+  const allaKonton = bank?.kopplingar.flatMap((k) => k.konton) ?? [];
+  const kontonamn = (hash: string) =>
+    allaKonton.length > 1 ? allaKonton.find((a) => a.konto_hash === hash)?.namn ?? null : null;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6">
@@ -629,16 +711,22 @@ function BankKort({ meddela }: { meddela: Meddela }) {
 
           {!!bank?.senaste.length && (
             <div className="mt-5">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Senaste transaktioner</p>
-              <ul className="mt-2 divide-y divide-slate-100 text-sm">
-                {bank.senaste.map((t) => (
-                  <li key={t.transaktion_id} className="py-2 flex items-baseline gap-3">
-                    <span className="text-slate-400 tabular-nums flex-shrink-0">{t.bokforingsdag}</span>
-                    <span className="text-slate-600 truncate flex-1">{t.motpart || t.text || '–'}</span>
-                    <span className={`tabular-nums flex-shrink-0 ${t.belopp_ore < 0 ? 'text-slate-700' : 'text-emerald-700'}`}>
-                      {formatBelopp(t.belopp_ore, t.valuta)}
-                    </span>
-                  </li>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                  {visaAlla && alla ? `Alla transaktioner (${alla.length})` : 'Senaste transaktioner'}
+                </p>
+                <button
+                  onClick={vaxlaAlla}
+                  disabled={busy === 'alla'}
+                  className="text-sm font-semibold hover:underline disabled:opacity-60"
+                  style={{ color: NAV_BG }}
+                >
+                  {busy === 'alla' ? 'Hämtar…' : visaAlla ? 'Visa färre' : 'Visa alla'}
+                </button>
+              </div>
+              <ul className={`mt-2 divide-y divide-slate-100 text-sm ${visaAlla ? 'max-h-[32rem] overflow-y-auto pr-1' : ''}`}>
+                {(visaAlla && alla ? alla : bank.senaste).map((t) => (
+                  <BankRad key={`${t.konto_hash}:${t.transaktion_id}`} t={t} kontonamn={kontonamn(t.konto_hash)} />
                 ))}
               </ul>
             </div>

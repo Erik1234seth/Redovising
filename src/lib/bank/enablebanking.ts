@@ -152,7 +152,23 @@ export interface EbTransaktion {
   remittance_information?: string[] | null;
   creditor?: { name?: string | null } | null;
   debtor?: { name?: string | null } | null;
+  creditor_account?: EbKontoId | null;
+  debtor_account?: EbKontoId | null;
+  reference_number?: string | null;
+  bank_transaction_code?: { description?: string | null; code?: string | null; sub_code?: string | null } | null;
+  merchant_category_code?: string | null;
+  exchange_rate?: {
+    exchange_rate?: string | null;
+    unit_currency?: string | null;
+    instructed_amount?: { amount: string; currency: string } | null;
+  } | null;
+  balance_after_transaction?: { amount: string; currency: string } | null;
   note?: string | null;
+}
+
+interface EbKontoId {
+  iban?: string | null;
+  other?: { identification?: string | null } | null;
 }
 
 /** Bokförda transaktioner från och med ett datum, alla sidor. */
