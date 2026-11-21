@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
 import { BankradLista, type Bankrad, kortIban } from '@/components/Bankrader';
+import BankHamtar from '@/components/BankHamtar';
 
 const NAV_BG = '#173b57';
 
@@ -65,12 +66,18 @@ export default function BankkontoPage() {
   async function hamtaNu() {
     setHamtar(true);
     setMeddelande(null);
-    const res = await api('/api/bank', { method: 'POST' });
-    const data = await res.json().catch(() => ({}));
-    setHamtar(false);
-    if (!res.ok || data.fel?.length) { setMeddelande(data.error ?? data.fel?.join(' ') ?? 'Hämtningen misslyckades.'); return; }
-    setMeddelande(data.nya ? `${data.nya} nya transaktioner.` : 'Inga nya transaktioner.');
-    ladda();
+    try {
+      const res = await api('/api/bank', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.fel?.length) { setMeddelande(data.error ?? data.fel?.join(' ') ?? 'Hämtningen misslyckades.'); return; }
+      setMeddelande(data.nya ? `${data.nya} nya transaktioner.` : 'Inga nya transaktioner.');
+      // Rutan står kvar tills de nya raderna syns i listan
+      await ladda();
+    } catch {
+      setMeddelande('Hämtningen misslyckades. Försök igen om en stund.');
+    } finally {
+      setHamtar(false);
+    }
   }
 
   const antal = useMemo(() => ({
@@ -135,7 +142,8 @@ export default function BankkontoPage() {
             {konto.status === 'borttagen' && (
               <p className="mt-4 text-sm text-slate-500">Kontot är inte kopplat längre. Transaktionerna som redan hämtats finns kvar här.</p>
             )}
-            {meddelande && <p className="mt-3 text-sm text-slate-600">{meddelande}</p>}
+            {hamtar && <div className="mt-4"><BankHamtar /></div>}
+            {meddelande && !hamtar && <p className="mt-3 text-sm text-slate-600">{meddelande}</p>}
 
             <section className="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
               <div className="flex items-center gap-2 flex-wrap">

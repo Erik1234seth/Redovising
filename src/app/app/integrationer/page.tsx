@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
 import BankKoppla from '@/components/BankKoppla';
+import BankHamtar from '@/components/BankHamtar';
 
 const NAV_BG = '#173b57';
 const CORAL = '#E95C63';
@@ -502,6 +503,8 @@ function BankKort({ meddela }: { meddela: Meddela }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [alla, setAlla] = useState<BankTransaktion[] | null>(null);
   const [visaAlla, setVisaAlla] = useState(false);
+  /** Första hämtningen efter en ny koppling, som går längre bakåt och tar längre tid. */
+  const [forstaHamtning, setForstaHamtning] = useState(false);
   const startad = useRef(false);
 
   const laddaAlla = useCallback(async () => {
@@ -544,8 +547,10 @@ function BankKort({ meddela }: { meddela: Meddela }) {
     } catch {
       meddela({ text: 'Hämtningen misslyckades.', ok: false });
     }
+    // Rutan om hämtningen står kvar tills de nya raderna syns
+    await laddaStatus();
     setBusy(null);
-    laddaStatus();
+    setForstaHamtning(false);
   }, [laddaStatus, meddela]);
 
   useEffect(() => {
@@ -557,6 +562,7 @@ function BankKort({ meddela }: { meddela: Meddela }) {
       window.history.replaceState(null, '', window.location.pathname);
       meddela(BANK_RESULTAT[resultat]);
       if (resultat === 'kopplad') {
+        setForstaHamtning(true);
         laddaStatus().then(synka);
         return;
       }
@@ -662,6 +668,8 @@ function BankKort({ meddela }: { meddela: Meddela }) {
               </button>
             )}
           </div>
+
+          {busy === 'synka' && <div className="mt-4"><BankHamtar forsta={forstaHamtning} /></div>}
 
           {!!bank?.senaste.length && (
             <div className="mt-5">

@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase';
 import { useMainSiteUrl } from '@/lib/useMainSiteUrl';
 import { BankradLista, type Bankrad, formatKr, kortIban } from '@/components/Bankrader';
 import BankKoppla from '@/components/BankKoppla';
+import BankHamtar from '@/components/BankHamtar';
 
 const NAV_BG = '#173b57';
 
@@ -153,12 +154,14 @@ function Checklista({ punkter, onOmbud, onKopplaBank }: { punkter: Checkpunkt[];
 
 // ---------- Bankkonton ----------
 
-function Bankkonton({ konton, senaste, kopplaOppen, setKopplaOppen, meddelande, onFel }: {
+function Bankkonton({ konton, senaste, kopplaOppen, setKopplaOppen, meddelande, hamtar, onFel }: {
   konton: Bankkonto[];
   senaste: Bankrad[];
   kopplaOppen: boolean;
   setKopplaOppen: (v: boolean) => void;
   meddelande: { text: string; ok: boolean } | null;
+  /** Första hämtningen efter en ny koppling pågår. */
+  hamtar: boolean;
   onFel: (text: string) => void;
 }) {
   return (
@@ -172,7 +175,9 @@ function Bankkonton({ konton, senaste, kopplaOppen, setKopplaOppen, meddelande, 
         )}
       </div>
 
-      {meddelande && (
+      {hamtar && <div className="mt-4"><BankHamtar forsta /></div>}
+
+      {meddelande && !hamtar && (
         <p className={`mt-3 text-sm ${meddelande.ok ? 'text-emerald-700' : 'text-rose-600'}`}>{meddelande.text}</p>
       )}
 
@@ -304,6 +309,7 @@ export default function HomePage() {
 
   const [kopplaOppen, setKopplaOppen] = useState(false);
   const [bankMeddelande, setBankMeddelande] = useState<{ text: string; ok: boolean } | null>(null);
+  const [hamtarBank, setHamtarBank] = useState(false);
   const kopplingsfel = useCallback((text: string) => setBankMeddelande({ text, ok: false }), []);
 
   // Tillbaka från banken: visa utfallet, rensa adressraden och gör första hämtningen
@@ -320,14 +326,16 @@ export default function HomePage() {
         : { text: 'Något gick fel när banken skulle kopplas. Försök igen.', ok: false });
       return;
     }
-    setBankMeddelande({ text: 'Banken är kopplad. Vi hämtar transaktionerna nu…', ok: true });
+    setBankMeddelande(null);
+    setHamtarBank(true);
     api('/api/bank', { method: 'POST' })
       .then((res) => res.json().catch(() => ({})))
       .then((d) => setBankMeddelande(d.fel?.length
         ? { text: d.fel.join(' '), ok: false }
         : { text: `Banken är kopplad. ${d.totalt != null ? `${Number(d.totalt).toLocaleString('sv-SE')} transaktioner hämtade.` : ''}`.trim(), ok: true }))
       .catch(() => setBankMeddelande({ text: 'Banken är kopplad, men hämtningen misslyckades. Försök igen med Hämta nu på kontot.', ok: false }))
-      .finally(ladda);
+      // Rutan står kvar tills de nya kontona och raderna syns på sidan
+      .finally(() => ladda().finally(() => setHamtarBank(false)));
   }, [user, ladda]);
 
   function oppnaKoppla() {
@@ -375,6 +383,7 @@ export default function HomePage() {
               kopplaOppen={kopplaOppen}
               setKopplaOppen={setKopplaOppen}
               meddelande={bankMeddelande}
+              hamtar={hamtarBank}
               onFel={kopplingsfel}
             />
             <AretHittills ar={data.ar} />
