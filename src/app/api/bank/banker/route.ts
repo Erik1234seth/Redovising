@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { userFromRequest } from '@/lib/auth-user';
 import { listaBanker } from '@/lib/bank/enablebanking';
+import { BANKERNA_FEL } from '@/lib/bank/kundfel';
 
 /** Svenska banker som går att koppla, för valet på integrationssidan. */
 export async function GET(request: Request) {
@@ -16,6 +17,6 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     console.error('[bank/banker]', err);
-    return NextResponse.json({ error: `Kunde inte hämta bankerna: ${err instanceof Error ? err.message : err}` }, { status: 500 });
+    return NextResponse.json({ error: BANKERNA_FEL }, { status: 500 });
   }
 }

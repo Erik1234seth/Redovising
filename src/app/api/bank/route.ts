@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase-server';
 import { synkaBank } from '@/lib/bank/sync';
 import { bankFalt } from '@/lib/bank/falt';
 import type { EbTransaktion } from '@/lib/bank/enablebanking';
+import { HAMTA_FEL, kundfel } from '@/lib/bank/kundfel';
 
 /**
  * GET: kundens bankkopplingar, konton och de senaste transaktionerna.
@@ -92,6 +93,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     kopplingar: (kopplingar.data ?? []).map((k) => ({
       ...k,
+      senaste_fel: kundfel(k.senaste_fel),
       konton: (konton.data ?? []).filter((a) => a.session_id === k.session_id),
     })),
     senaste: ((senaste.data ?? []) as Rad[]).map((r) => utRad(r, egnaKonton(konton.data))),
@@ -103,9 +105,12 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Inte inloggad' }, { status: 401 });
 
   try {
-    return NextResponse.json(await synkaBank(createServerClient(), user.id));
+    const svar = await synkaBank(createServerClient(), user.id);
+    // Felen sparas i senaste_fel för byrån; kunden får en kort förklaring utan teknik
+    if (svar.fel.length) console.error('[bank] synk', user.id, svar.fel);
+    return NextResponse.json({ ...svar, fel: [...new Set(svar.fel.map(kundfel).filter(Boolean))] });
   } catch (err) {
     console.error('[bank] synk', err);
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Hämtningen misslyckades' }, { status: 500 });
+    return NextResponse.json({ error: HAMTA_FEL }, { status: 500 });
   }
 }

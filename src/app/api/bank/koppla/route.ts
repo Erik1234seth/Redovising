@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { userFromRequest } from '@/lib/auth-user';
 import { createServerClient } from '@/lib/supabase-server';
 import { avslutaSession, listaBanker, startaAuth } from '@/lib/bank/enablebanking';
+import { KOPPLA_FEL } from '@/lib/bank/kundfel';
 
 /**
  * POST { bank, psu_type } startar kopplingen: sparar en engångsnyckel (state)
@@ -16,6 +17,8 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const psuType = body.psu_type === 'personal' ? 'personal' : 'business';
+  // Bara våra egna sidor, så att ingen kan skickas vidare någon annanstans
+  const tillbaka = body.tillbaka === '/' ? '/' : '/integrationer';
 
   try {
     const aspsp = (await listaBanker('SE')).find((b) => b.name === body.bank);
@@ -30,13 +33,16 @@ export async function POST(request: Request) {
     await supabase.from('bank_oauth_states').delete().lt('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString());
     const { error } = await supabase
       .from('bank_oauth_states')
-      .insert({ state, user_id: user.id, aspsp_name: aspsp.name, aspsp_country: aspsp.country });
-    if (error) return NextResponse.json({ error: 'Kunde inte starta kopplingen' }, { status: 500 });
+      .insert({ state, user_id: user.id, aspsp_name: aspsp.name, aspsp_country: aspsp.country, tillbaka });
+    if (error) {
+      console.error('[bank/koppla] state', error);
+      return NextResponse.json({ error: KOPPLA_FEL }, { status: 500 });
+    }
 
     return NextResponse.json({ url: await startaAuth({ aspsp, psuType, state }) });
   } catch (err) {
     console.error('[bank/koppla]', err);
-    return NextResponse.json({ error: `Kunde inte starta bankkopplingen: ${err instanceof Error ? err.message : err}` }, { status: 500 });
+    return NextResponse.json({ error: KOPPLA_FEL }, { status: 500 });
   }
 }
 

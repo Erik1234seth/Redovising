@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase';
+import BankKoppla from '@/components/BankKoppla';
 
 const NAV_BG = '#173b57';
 const CORAL = '#E95C63';
@@ -497,9 +498,6 @@ function formatBelopp(ore: number, valuta: string) {
 
 function BankKort({ meddela }: { meddela: Meddela }) {
   const [bank, setBank] = useState<BankStatus | null>(null);
-  const [banker, setBanker] = useState<{ name: string; psu_types: string[] }[] | null>(null);
-  const [valdBank, setValdBank] = useState('');
-  const [psuType, setPsuType] = useState<'business' | 'personal'>('business');
   const [visaVal, setVisaVal] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [alla, setAlla] = useState<BankTransaktion[] | null>(null);
@@ -566,30 +564,7 @@ function BankKort({ meddela }: { meddela: Meddela }) {
     laddaStatus();
   }, [laddaStatus, synka, meddela]);
 
-  async function oppnaVal() {
-    setVisaVal(true);
-    if (banker) return;
-    const res = await api('/api/bank/banker');
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) setBanker(data.banker);
-    else meddela({ text: data.error ?? 'Kunde inte hämta bankerna.', ok: false });
-  }
-
-  async function koppla() {
-    setBusy('koppla');
-    const res = await api('/api/bank/koppla', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bank: valdBank, psu_type: psuType }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.url) {
-      window.location.href = data.url;
-      return;
-    }
-    meddela({ text: data.error ?? 'Kunde inte starta kopplingen.', ok: false });
-    setBusy(null);
-  }
+  const kopplingsfel = useCallback((text: string) => meddela({ text, ok: false }), [meddela]);
 
   async function kopplaBort(k: BankKoppling) {
     if (!window.confirm(`Koppla bort ${k.aspsp_name}? Transaktioner som redan hämtats ligger kvar.`)) return;
@@ -605,7 +580,6 @@ function BankKort({ meddela }: { meddela: Meddela }) {
   }
 
   const aktiva = bank?.kopplingar.filter((k) => k.status === 'aktiv') ?? [];
-  const valdaBanken = banker?.find((b) => b.name === valdBank);
   // Kontots namn på varje rad, men bara när kunden har fler än ett konto
   const allaKonton = bank?.kopplingar.flatMap((k) => k.konton) ?? [];
   const kontonamn = (hash: string) =>
@@ -661,46 +635,15 @@ function BankKort({ meddela }: { meddela: Meddela }) {
           ))}
 
           {visaVal && (
-            <div className="mt-4 flex flex-col gap-3">
-              <select
-                value={valdBank}
-                onChange={(e) => setValdBank(e.target.value)}
-                disabled={!banker}
-                // Listan ritas av webbläsaren och följer annars datorns mörka läge
-                style={{ colorScheme: 'light' }}
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200"
-              >
-                <option value="" className="bg-white text-slate-500">{banker ? 'Välj bank' : 'Hämtar banker…'}</option>
-                {banker?.map((b) => <option key={b.name} value={b.name} className="bg-white text-slate-800">{b.name}</option>)}
-              </select>
-              <div className="flex gap-2 text-sm">
-                {(['business', 'personal'] as const).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setPsuType(t)}
-                    disabled={!!valdaBanken?.psu_types.length && !valdaBanken.psu_types.includes(t)}
-                    className={`px-4 py-2 rounded-xl font-semibold border transition disabled:opacity-40 ${psuType === t ? 'border-slate-700 text-slate-800' : 'border-slate-200 text-slate-400'}`}
-                  >
-                    {t === 'business' ? 'Företagskonto' : 'Privatkonto'}
-                  </button>
-                ))}
-              </div>
+            <div className="mt-4">
+              <BankKoppla tillbaka="/integrationer" onAvbryt={() => setVisaVal(false)} onFel={kopplingsfel} />
             </div>
           )}
 
           <div className="mt-4 flex flex-wrap gap-2">
-            {visaVal ? (
+            {!visaVal && (
               <button
-                onClick={koppla}
-                disabled={busy !== null || !valdBank}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60 transition hover:opacity-90"
-                style={{ backgroundColor: CORAL }}
-              >
-                {busy === 'koppla' ? 'Skickar dig till banken…' : 'Fortsätt till banken'}
-              </button>
-            ) : (
-              <button
-                onClick={oppnaVal}
+                onClick={() => setVisaVal(true)}
                 disabled={busy !== null || bank === null}
                 className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60 transition hover:opacity-90"
                 style={{ backgroundColor: CORAL }}
