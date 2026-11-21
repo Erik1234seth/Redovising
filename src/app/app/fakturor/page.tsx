@@ -27,7 +27,56 @@ const STATUS_LABEL: Record<string, { label: string; bg: string; color: string }>
   betald:   { label: 'Betald',   bg: '#DCFCE7', color: '#166534' },
   forsenad: { label: 'Försenad', bg: '#FEE2E2', color: '#991B1B' },
   offert:   { label: 'Offert',   bg: '#E0E7FF', color: '#3730A3' },
+  delbetald: { label: 'Delbetald', bg: '#FFEDD5', color: '#9A3412' },
+  mojlig:   { label: 'Möjligen betald', bg: '#E0F2FE', color: '#075985' },
 };
+
+/** En betalning banken visar för fakturan (betalningskopplingar). */
+interface Betalning {
+  faktura_id: string;
+  bank_datum: string;
+  belopp: number;
+  del: 'betalning' | 'skatteverket';
+  typ: 'hel' | 'delbetalning' | 'overbetalning' | 'samlad';
+  sakerhet: 'saker' | 'trolig' | 'forslag';
+  kommentar: string | null;
+}
+
+async function api(path: string, init: RequestInit = {}) {
+  const { data } = await createClient().auth.getSession();
+  return fetch(path, {
+    ...init,
+    headers: { ...init.headers, Authorization: `Bearer ${data.session?.access_token ?? ''}` },
+  });
+}
+
+const kr = (n: number) => n.toLocaleString('sv-SE', { maximumFractionDigits: 2 });
+
+/**
+ * Vad banken säger om fakturan: betald, delbetald eller möjligen betald
+ * (ett förslag som ingen tittat på), med datum. Null när banken inte visar
+ * någon betalning — då gäller fakturans egen status.
+ */
+function bankStatus(f: Faktura, betalningar: Betalning[]) {
+  const egna = betalningar.filter((b) => b.del === 'betalning');
+  const skv = betalningar.filter((b) => b.del === 'skatteverket');
+  const skvText = skv.length ? `Skatteverket betalade ${kr(skv.reduce((s, b) => s + Number(b.belopp), 0))} kr ${skv[skv.length - 1].bank_datum}` : null;
+  if (!egna.length) return skvText ? { nyckel: null, rad: skvText, titel: null } : null;
+
+  const senast = egna[egna.length - 1].bank_datum;
+  const titel = egna.map((b) => [`${b.bank_datum}: ${kr(Number(b.belopp))} kr`, b.kommentar].filter(Boolean).join(' — ')).join('\n');
+  if (egna.every((b) => b.sakerhet === 'forslag')) {
+    return { nyckel: 'mojlig', rad: [`Bankrad ${senast} kan vara betalningen`, skvText].filter(Boolean).join(' · '), titel };
+  }
+  const attBetala = Number(f.husavdrag?.att_betala ?? f.belopp_inkl_moms);
+  const betalt = egna.reduce((s, b) => s + Number(b.belopp), 0);
+  const sek = !f.valuta || f.valuta.toUpperCase() === 'SEK';
+  const delvis = egna.some((b) => b.typ === 'delbetalning') && (!sek || betalt < attBetala - 5);
+  if (delvis) {
+    return { nyckel: 'delbetald', rad: [sek ? `${kr(betalt)} av ${kr(attBetala)} kr, senast ${senast}` : `Delbetalning ${senast}`, skvText].filter(Boolean).join(' · '), titel };
+  }
+  return { nyckel: 'betald', rad: [`Enligt banken ${senast}`, skvText].filter(Boolean).join(' · '), titel };
+}
 
 export default function FakturorPage() {
   const { user, loading } = useAuth();
@@ -36,10 +85,20 @@ export default function FakturorPage() {
   const [fakturor, setFakturor] = useState<Faktura[]>([]);
   const [fetching, setFetching] = useState(true);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [betalningar, setBetalningar] = useState<Betalning[]>([]);
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login');
   }, [user, loading, router]);
+
+  // Matchar fakturorna mot bankraderna. Listan visas direkt; betalningarna fylls i när de kommer.
+  useEffect(() => {
+    if (!user) return;
+    api('/api/fakturor/betalningar', { method: 'POST' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data?.kopplingar) setBetalningar(data.kopplingar); })
+      .catch(() => {});
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -119,7 +178,7 @@ export default function FakturorPage() {
             <>
               <div
                 className="grid px-6 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100"
-                style={{ gridTemplateColumns: '110px 1fr 170px 150px 120px 80px' }}
+                style={{ gridTemplateColumns: '110px 1fr 170px 150px 210px 80px' }}
               >
                 <span>Nummer</span>
                 <span>Kund</span>
@@ -130,14 +189,18 @@ export default function FakturorPage() {
               </div>
 
               {fakturor.map(f => {
-                const st = STATUS_LABEL[f.status] ?? STATUS_LABEL.obetald;
-                const forfallen = f.status === 'obetald' && new Date(f.forfallo_datum) < new Date();
+                const bank = f.status === 'offert' ? null : bankStatus(f, betalningar.filter((b) => b.faktura_id === f.id));
+                // Kundens egen markering gäller först; annars det banken visar
+                const nyckel = f.status === 'betald' || f.status === 'offert' ? f.status : bank?.nyckel ?? f.status;
+                const st = STATUS_LABEL[nyckel] ?? STATUS_LABEL.obetald;
+                const forfallen = nyckel === 'obetald' && new Date(f.forfallo_datum) < new Date();
                 const effectiveSt = forfallen ? STATUS_LABEL.forsenad : st;
+                const betaldEnligtBanken = nyckel === 'betald';
                 return (
                   <div
                     key={f.id}
                     className="grid px-6 py-4 items-center border-b border-slate-50 hover:bg-slate-50 transition-colors group"
-                    style={{ gridTemplateColumns: '110px 1fr 170px 150px 120px 80px' }}
+                    style={{ gridTemplateColumns: '110px 1fr 170px 150px 210px 80px' }}
                   >
                     <span className="text-sm font-semibold text-slate-700">{f.faktura_nr}</span>
                     <span className="text-sm text-slate-600 truncate">{f.kund_namn}</span>
@@ -148,14 +211,16 @@ export default function FakturorPage() {
                     <span className="text-sm text-slate-500 pl-4">
                       {new Date(f.forfallo_datum).toLocaleDateString('sv-SE')}
                     </span>
-                    <div className="flex items-center gap-2 pl-4">
+                    <div className="pl-4 min-w-0">
+                    <div className="flex items-center gap-2">
                       <span
                         className="px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap"
                         style={{ backgroundColor: effectiveSt.bg, color: effectiveSt.color }}
+                        title={bank?.titel ?? undefined}
                       >
                         {forfallen ? 'Försenad' : effectiveSt.label}
                       </span>
-                      {f.status === 'offert' ? null : f.status === 'betald' ? (
+                      {f.status === 'offert' ? null : f.status === 'betald' || betaldEnligtBanken ? (
                         <span className="w-7 h-7 rounded-full flex items-center justify-center text-green-600 border-2 border-green-400 bg-green-50">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -172,6 +237,8 @@ export default function FakturorPage() {
                           </svg>
                         </button>
                       )}
+                    </div>
+                    {bank?.rad && <p className="mt-1 text-[11px] text-slate-400 leading-snug" title={bank.titel ?? undefined}>{bank.rad}</p>}
                     </div>
                     <div className="flex items-center justify-end gap-1">
                       <button

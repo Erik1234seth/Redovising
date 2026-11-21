@@ -46,6 +46,8 @@ export interface Arsrad {
   kalla: string;
   underlag_id: string | null;
   vald_kontering: ValdKontering | null;
+  bank_konto_hash?: string | null;
+  bank_transaktion_id?: string | null;
 }
 
 export interface Arslista {
@@ -76,7 +78,7 @@ export async function hamtaArslista(
   const rader: Arsrad[] = [];
   for (let fran = 0; rader.length < MAX_RADER; fran += 1000) {
     const { data, error } = await supabase.from('transaktioner')
-      .select('id, datum, riktning, belopp, moms, valuta, motpart, beskrivning, kalla, underlag_id, vald_kontering')
+      .select('id, datum, riktning, belopp, moms, valuta, motpart, beskrivning, kalla, underlag_id, vald_kontering, bank_konto_hash, bank_transaktion_id')
       .eq('user_id', userId).is('dublett_av', null)
       .order('datum', { ascending: false, nullsFirst: false }).order('id')
       .range(fran, fran + 999);
@@ -99,15 +101,45 @@ export async function hamtaArslista(
   const lista = rader.filter((r) => !r.underlag_id || (!sidor.has(r.underlag_id) && !utanUnderlag.has(r.underlag_id))).slice(0, MAX_RADER).reverse();
 
   const konton = medKonton ? await kontonFor(supabase, lista.map((r) => r.id).filter((id) => !utanKontoFor.has(id))) : new Map<string, string>();
+  const betalningar = await fakturabetalningar(supabase, userId);
   const nummer = new Map(lista.map((r, i) => [r.id, i + 1]));
   const text = lista.map((r, i) => {
     const vald = utanKontoFor.has(r.id) ? ''
       : konton.has(r.id) ? ` → ${konton.get(r.id)}`
       : r.vald_kontering?.konto ? ` · byrån valde ${r.vald_kontering.konto} ${slaUppKonto(r.vald_kontering.konto)?.namn ?? ''}`.trimEnd() : '';
     const kalla = r.kalla === 'bank' ? 'bankrad' : r.kalla === 'woocommerce' ? 'webbutik' : filnamn.get(r.underlag_id ?? '') ?? 'fil';
-    return `K${i + 1} ${r.datum ?? 'okänt datum'} ${r.riktning === 'in' ? 'IN ' : 'UT '} ${Number(r.belopp)} ${r.valuta || 'SEK'} · ${r.motpart || '—'} · ${(r.beskrivning ?? '').slice(0, 80)} · ${kalla.slice(0, 40)}${vald}`;
+    const betalar = r.bank_konto_hash && r.bank_transaktion_id ? betalningar.get(`${r.bank_konto_hash}|${r.bank_transaktion_id}`) : undefined;
+    return `K${i + 1} ${r.datum ?? 'okänt datum'} ${r.riktning === 'in' ? 'IN ' : 'UT '} ${Number(r.belopp)} ${r.valuta || 'SEK'} · ${r.motpart || '—'} · ${(r.beskrivning ?? '').slice(0, 80)} · ${kalla.slice(0, 40)}${betalar ? ` · ${betalar}` : ''}${vald}`;
   }).join('\n');
   return { rader: lista, nummer, text, filnamn };
+}
+
+const SAKERHET_TEXT = { saker: 'säker', trolig: 'trolig', forslag: 'osäker' } as const;
+
+/**
+ * Bankrader som betalar en av kundens egna fakturor (betalningskopplingar),
+ * som text per bankrad: "betalar egen faktura 2026-003 till Kund AB (säker)".
+ * Tom om tabellen saknas eller inget är kopplat — listan fungerar som förut.
+ */
+async function fakturabetalningar(supabase: SupabaseClient, userId: string): Promise<Map<string, string>> {
+  const { data, error } = await supabase
+    .from('betalningskopplingar')
+    .select('konto_hash, bank_transaktion_id, del, typ, sakerhet, belopp, fakturor(faktura_nr, kund_namn)')
+    .eq('user_id', userId).not('faktura_id', 'is', null).neq('status', 'avvisad');
+  if (error || !data) return new Map();
+  const perRad = new Map<string, string[]>();
+  for (const k of data as unknown as {
+    konto_hash: string; bank_transaktion_id: string; del: string; typ: string; sakerhet: keyof typeof SAKERHET_TEXT; belopp: number;
+    fakturor: { faktura_nr: string; kund_namn: string | null } | null;
+  }[]) {
+    if (!k.fakturor) continue;
+    const vad = k.del === 'skatteverket' ? 'Skatteverkets ROT/RUT-del för egen faktura' : k.typ === 'delbetalning' ? 'delbetalar egen faktura' : 'betalar egen faktura';
+    const del = k.typ === 'samlad' ? ` med ${Number(k.belopp)} kr` : '';
+    const text = `${vad} ${k.fakturor.faktura_nr}${k.fakturor.kund_namn ? ` till ${k.fakturor.kund_namn}` : ''}${del} (${SAKERHET_TEXT[k.sakerhet] ?? k.sakerhet})`;
+    const nyckel = `${k.konto_hash}|${k.bank_transaktion_id}`;
+    perRad.set(nyckel, [...(perRad.get(nyckel) ?? []), text]);
+  }
+  return new Map([...perRad].map(([k, v]) => [k, v.join('; ')]));
 }
 
 /**

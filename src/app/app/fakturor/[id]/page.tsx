@@ -494,6 +494,12 @@ function FakturaInnehall({
                   <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{faktura.betalningsinfo}</div>
                 );
               })()}
+              {faktura.dokumenttyp !== 'offert' && (
+                // Så att betalningen går att koppla till fakturan på kontoutdraget
+                <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.6, marginTop: 4 }}>
+                  Ange fakturanummer <span style={{ fontWeight: 700, color: '#1e293b' }}>{faktura.faktura_nr}</span> som meddelande vid betalning.
+                </div>
+              )}
             </div>
           )}
           {faktura.meddelande && (

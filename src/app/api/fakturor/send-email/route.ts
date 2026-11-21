@@ -186,7 +186,7 @@ export async function POST(request: Request) {
         <!-- Betalningsinfo -->
         <tr><td style="background:#eff6ff;padding:16px 40px;border-top:1px solid #e2e8f0;">
           <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Betalningsinfo</div>
-          <div style="font-size:13px;color:#1e40af;line-height:1.7;white-space:pre-line;">${betalningsinfo}</div>
+          <div style="font-size:13px;color:#1e40af;line-height:1.7;white-space:pre-line;">${betalningsinfo}${offert ? '' : `\nAnge fakturanummer <strong>${fakturaInfo.faktura_nr}</strong> som meddelande vid betalning.`}</div>
         </td></tr>` : ''}
 
         <!-- Footer -->
