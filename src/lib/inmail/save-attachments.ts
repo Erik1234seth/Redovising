@@ -36,10 +36,7 @@ export interface MailFileInfo {
   fileName: string;
   size: number;
   mimeType?: string;
-  /**
-   * Kunden, när det är vi som skickat filen (sync-mail.gs). Filen hamnar då
-   * hos kunden som vår fil: kontext till AI:n, aldrig underlag att bokföra.
-   */
+  /** Kunden, när det är vi som skickat filen (sync-mail.gs). Sådana filer sparas inte längre. */
   customerEmail?: string;
 }
 
@@ -55,14 +52,14 @@ function normalize(info: MailFileInfo) {
 }
 
 /**
- * Kontot filen hör till. Kundens filer kopplas via avsändaren. Våra egna
- * kopplas via kunden, och bara när kunden har ett konto — en bilaga till ett
- * lead eller en leverantör är inget vi behöver spara.
+ * Kontot filen hör till, via avsändaren. Bilagor i mejl vi själva skickat
+ * sparas inte (Eriks beslut 2026-11-21): de är våra egna filer, och hos kunden
+ * såg de ut som dubbletter av underlagen. sync-mail.gs skickar dem fortfarande
+ * hit med customerEmail, och får 'skipped' tillbaka.
  */
 async function agareFor(supabase: SupabaseClient, info: ReturnType<typeof normalize>): Promise<{ userId: string | null; spara: boolean }> {
-  if (!arVarAdress(info.email)) return { userId: await resolveUserId(supabase, info.email), spara: true };
-  const userId = info.customerEmail ? await resolveUserId(supabase, info.customerEmail) : null;
-  return { userId, spara: !!userId };
+  if (arVarAdress(info.email)) return { userId: null, spara: false };
+  return { userId: await resolveUserId(supabase, info.email), spara: true };
 }
 
 export async function resolveUserId(supabase: SupabaseClient, email: string): Promise<string | null> {
