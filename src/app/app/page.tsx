@@ -17,7 +17,7 @@ const NAV_BG = '#173b57';
  * byrån bokfört. Allt annat finns i vänstermenyn.
  */
 
-interface Checkpunkt { id: 'foretag' | 'bank' | 'ombud' | 'underlag' | 'kassa'; klar: boolean; valfri?: boolean }
+interface Checkpunkt { id: 'bank' | 'ombud' | 'underlag' | 'kassa'; klar: boolean; valfri?: boolean }
 
 interface Bankkonto {
   kontoHash: string;
@@ -77,7 +77,6 @@ function Checklista({ punkter, onOmbud, onKopplaBank }: { punkter: Checkpunkt[];
   const mainSite = useMainSiteUrl();
   const [visaOmbud, setVisaOmbud] = useState(false);
   const TEXT: Record<Checkpunkt['id'], { titel: string; text: string; knapp: string; href?: string }> = {
-    foretag: { titel: 'Fyll i företagsuppgifter', text: 'Verksamhet, momsperiod och bokföringsmetod', knapp: 'Fyll i', href: '/konto' },
     bank: { titel: 'Koppla ditt bankkonto', text: 'Transaktionerna hämtas varje morgon, så slipper du kontoutdrag', knapp: 'Koppla' },
     ombud: { titel: 'Registrera oss som ombud hos Skatteverket', text: 'Så kan vi lämna moms och deklaration åt dig', knapp: 'Visa hur' },
     underlag: { titel: 'Skicka in ditt första underlag', text: 'Mejla kvitton och fakturor till erik@enklabokslut.se eller ladda upp dem', knapp: 'Ladda upp', href: '/underlag' },

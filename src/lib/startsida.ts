@@ -292,14 +292,14 @@ export async function arsoversikt(supabase: SupabaseClient, userId: string, idag
 // ---------- Checklistan ----------
 
 export interface Checkpunkt {
-  id: 'foretag' | 'bank' | 'ombud' | 'underlag' | 'kassa';
+  id: 'bank' | 'ombud' | 'underlag' | 'kassa';
   klar: boolean;
   valfri?: boolean;
 }
 
 export async function checklista(supabase: SupabaseClient, userId: string): Promise<Checkpunkt[]> {
   const [profil, bank, underlag, zettle, shopify, woo] = await Promise.all([
-    supabase.from('profiles').select('verksamhet, moms_period, redovisningsmetod, org_nr, ombud_klart_at').eq('id', userId).maybeSingle(),
+    supabase.from('profiles').select('ombud_klart_at').eq('id', userId).maybeSingle(),
     supabase.from('bank_kopplingar').select('session_id', { count: 'exact', head: true }).eq('user_id', userId),
     supabase.from('bokforing_underlag').select('id', { count: 'exact', head: true }).eq('user_id', userId),
     supabase.from('zettle_kopplingar').select('user_id', { count: 'exact', head: true }).eq('user_id', userId),
@@ -308,7 +308,6 @@ export async function checklista(supabase: SupabaseClient, userId: string): Prom
   ]);
   const p = profil.data;
   return [
-    { id: 'foretag', klar: !!(p?.verksamhet && p?.moms_period && p?.redovisningsmetod) },
     { id: 'bank', klar: (bank.count ?? 0) > 0 },
     { id: 'ombud', klar: !!p?.ombud_klart_at },
     { id: 'underlag', klar: (underlag.count ?? 0) > 0 },
