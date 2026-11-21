@@ -479,12 +479,12 @@ function FakturaInnehall({
       )}
 
       {/* Betalning + meddelande */}
-      {(faktura.betalningsinfo || faktura.meddelande) && (
-        <div style={{ display: 'grid', gridTemplateColumns: faktura.betalningsinfo && faktura.meddelande ? '1fr 1fr' : '1fr', gap: 16, borderTop: '1px solid #E2E8F0', paddingTop: 16 }}>
-          {faktura.betalningsinfo && (
+      {(faktura.betalningsinfo || faktura.meddelande || faktura.dokumenttyp !== 'offert') && (
+        <div style={{ display: 'grid', gridTemplateColumns: (faktura.betalningsinfo || faktura.dokumenttyp !== 'offert') && faktura.meddelande ? '1fr 1fr' : '1fr', gap: 16, borderTop: '1px solid #E2E8F0', paddingTop: 16 }}>
+          {(faktura.betalningsinfo || faktura.dokumenttyp !== 'offert') && (
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>Betalningsinfo</div>
-              {(() => {
+              {faktura.betalningsinfo && (() => {
                 const m = faktura.betalningsinfo?.match(/^([^:\n]+):\s*([\s\S]*)$/);
                 return m ? (
                   <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.6 }}>

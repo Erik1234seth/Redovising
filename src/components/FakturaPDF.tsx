@@ -311,10 +311,16 @@ export function FakturaPDF({ data }: { data: FakturaPDFData }) {
 
         {/* Betalning + meddelande */}
         <View style={s.footer}>
-          {data.betalningsinfo && (
+          {(data.betalningsinfo || !offert) && (
             <View style={s.footerBox}>
               <Text style={s.footerLabel}>Betalningsinfo</Text>
-              <Text style={s.footerText}>{data.betalningsinfo}</Text>
+              {data.betalningsinfo && <Text style={s.footerText}>{data.betalningsinfo}</Text>}
+              {/* Så att betalningen går att koppla till fakturan på kontoutdraget */}
+              {!offert && (
+                <Text style={[s.footerText, data.betalningsinfo ? { marginTop: 3 } : {}]}>
+                  Ange fakturanummer <Text style={{ fontFamily: 'Helvetica-Bold' }}>{data.faktura_nr}</Text> som meddelande vid betalning.
+                </Text>
+              )}
             </View>
           )}
           {data.meddelande && (

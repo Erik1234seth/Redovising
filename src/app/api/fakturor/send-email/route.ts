@@ -182,11 +182,11 @@ export async function POST(request: Request) {
           <div style="font-size:13px;color:#065f46;line-height:1.7;white-space:pre-line;">Du betalar ${fmt(husavdrag.att_betala)}. Resterande ${fmt(husavdrag.avdrag)} begärs från Skatteverket.${husavdrag.info ? `\n${husavdrag.info}` : ''}</div>
         </td></tr>` : ''}
 
-        ${betalningsinfo ? `
+        ${betalningsinfo || !offert ? `
         <!-- Betalningsinfo -->
         <tr><td style="background:#eff6ff;padding:16px 40px;border-top:1px solid #e2e8f0;">
           <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Betalningsinfo</div>
-          <div style="font-size:13px;color:#1e40af;line-height:1.7;white-space:pre-line;">${betalningsinfo}${offert ? '' : `\nAnge fakturanummer <strong>${fakturaInfo.faktura_nr}</strong> som meddelande vid betalning.`}</div>
+          <div style="font-size:13px;color:#1e40af;line-height:1.7;white-space:pre-line;">${[betalningsinfo, offert ? '' : `Ange fakturanummer <strong>${fakturaInfo.faktura_nr}</strong> som meddelande vid betalning.`].filter(Boolean).join('\n')}</div>
         </td></tr>` : ''}
 
         <!-- Footer -->
