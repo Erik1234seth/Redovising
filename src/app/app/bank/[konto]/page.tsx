@@ -153,7 +153,7 @@ export default function BankkontoPage() {
                   value={sok}
                   onChange={(e) => setSok(e.target.value)}
                   placeholder="Sök text eller belopp"
-                  className="ml-auto w-full sm:w-56 text-sm px-3 py-1.5 rounded-xl border border-slate-200 focus:outline-none focus:border-slate-400"
+                  className="ml-auto w-full sm:w-56 text-sm px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-400"
                 />
               </div>
 
