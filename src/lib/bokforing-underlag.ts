@@ -58,7 +58,10 @@ export async function uploadUnderlag(files: File[], onFile?: (name: string) => v
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
       .upload(path, file, { contentType, upsert: false });
-    if (uploadError) throw new Error(`Kunde inte ladda upp ${file.name}: ${uploadError.message}`);
+    if (uploadError) {
+      console.error('[underlag] uppladdning', file.name, uploadError);
+      throw new Error(`Det gick inte att ladda upp ${file.name}. Försök igen om en stund.`);
+    }
 
     const { error: dbError } = await supabase.from('bokforing_underlag').insert({
       user_id: user.id,
@@ -67,7 +70,10 @@ export async function uploadUnderlag(files: File[], onFile?: (name: string) => v
       file_size: file.size,
       mime_type: contentType,
     });
-    if (dbError) throw new Error(`Kunde inte spara ${file.name}: ${dbError.message}`);
+    if (dbError) {
+      console.error('[underlag] spara', file.name, dbError);
+      throw new Error(`Det gick inte att spara ${file.name}. Försök igen om en stund.`);
+    }
   }
 
   // Ber servern sortera de nya underlagen efter reglerna och packa upp zip-arkiv.
