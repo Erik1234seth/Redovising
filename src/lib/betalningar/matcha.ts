@@ -52,6 +52,18 @@ export interface MatchFaktura {
   avdrag: number;
   /** 'in' för kundfakturor, 'ut' för leverantörsfakturor. */
   riktning: 'in' | 'ut';
+  /** OCR-numret, när fakturan har ett. Räknas som fakturanumret. */
+  ocr?: string;
+  /** Betaldatumet om fakturan själv visar det. Används i stället för förfallodagen för att välja mellan kandidater. */
+  betaldatum?: string;
+}
+
+/** Dagen betalningen väntas: betaldatumet om fakturan visar det, annars förfallodagen. */
+const vantadDag = (f: MatchFaktura) => f.betaldatum ?? f.forfallodatum;
+
+/** Står fakturanumret eller OCR-numret i bankens text? */
+function harReferens(f: MatchFaktura, text: string) {
+  return harFakturanummer(f.nr, text) || (!!f.ocr && harFakturanummer(f.ocr, text));
 }
 
 export interface MatchBankrad {
@@ -244,7 +256,7 @@ export function matcha(fakturor: MatchFaktura[], bank: MatchBankrad[], beslut: B
   for (const b of bank) {
     if (upptagenBank.has(bankNyckel(b))) continue;
     const oppna = fakturor.filter((f) => !stangd.has(f.id) && !betalt.has(f.id) && iRiktning(f, b) && b.datum >= fonster(f).fran && b.datum <= fonster(f).till
-      && harFakturanummer(f.nr, b.text) && !avvisade.has(nyckel(f.id, b.kontoHash, b.id, 'betalning')));
+      && harReferens(f, b.text) && !avvisade.has(nyckel(f.id, b.kontoHash, b.id, 'betalning')));
     if (oppna.length < 2 || oppna.length > SAMLAD_MAX) continue;
     const summa = oppna.reduce((s, f) => s + f.belopp, 0);
     const valutor = new Set(oppna.map((f) => f.valuta.toUpperCase()));
@@ -258,7 +270,7 @@ export function matcha(fakturor: MatchFaktura[], bank: MatchBankrad[], beslut: B
   for (const f of fakturor) {
     const { fran, till } = fonster(f);
     const rader = bank
-      .filter((b) => iRiktning(f, b) && b.datum >= fran && b.datum <= till && harFakturanummer(f.nr, b.text))
+      .filter((b) => iRiktning(f, b) && b.datum >= fran && b.datum <= till && harReferens(f, b.text))
       .sort((a, b) => a.datum.localeCompare(b.datum));
     // Det som är kvar att betala, i fakturans valuta. Bekräftade betalningar
     // räknas av när fakturan är i kronor; i utländsk valuta går det inte exakt.
@@ -304,7 +316,7 @@ export function matcha(fakturor: MatchFaktura[], bank: MatchBankrad[], beslut: B
       const namn = harNamn(f.motpart, b.text);
       // Avgiften godtas bara när namnet stämmer; bara belopp kräver exakt
       if (p.slag === 'exakt' || (p.slag === 'avgift' && namn)) {
-        kandidater.push({ f, b, grund: namn ? 'namn' : 'belopp', p, avstand: Math.abs(dagar(b.datum, f.forfallodatum)) });
+        kandidater.push({ f, b, grund: namn ? 'namn' : 'belopp', p, avstand: Math.abs(dagar(b.datum, vantadDag(f))) });
       }
     }
   }

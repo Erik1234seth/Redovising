@@ -103,43 +103,72 @@ export async function hamtaArslista(
   const konton = medKonton ? await kontonFor(supabase, lista.map((r) => r.id).filter((id) => !utanKontoFor.has(id))) : new Map<string, string>();
   const betalningar = await fakturabetalningar(supabase, userId);
   const nummer = new Map(lista.map((r, i) => [r.id, i + 1]));
+  // Bankradernas K-nummer, så att en faktura kan peka ut raden som betalade den
+  const bankNummer = new Map(lista.filter((r) => r.bank_konto_hash && r.bank_transaktion_id).map((r) => [`${r.bank_konto_hash}|${r.bank_transaktion_id}`, nummer.get(r.id)!]));
   const text = lista.map((r, i) => {
     const vald = utanKontoFor.has(r.id) ? ''
       : konton.has(r.id) ? ` → ${konton.get(r.id)}`
       : r.vald_kontering?.konto ? ` · byrån valde ${r.vald_kontering.konto} ${slaUppKonto(r.vald_kontering.konto)?.namn ?? ''}`.trimEnd() : '';
     const kalla = r.kalla === 'bank' ? 'bankrad' : r.kalla === 'woocommerce' ? 'webbutik' : filnamn.get(r.underlag_id ?? '') ?? 'fil';
-    const betalar = r.bank_konto_hash && r.bank_transaktion_id ? betalningar.get(`${r.bank_konto_hash}|${r.bank_transaktion_id}`) : undefined;
-    return `K${i + 1} ${r.datum ?? 'okänt datum'} ${r.riktning === 'in' ? 'IN ' : 'UT '} ${Number(r.belopp)} ${r.valuta || 'SEK'} · ${r.motpart || '—'} · ${(r.beskrivning ?? '').slice(0, 80)} · ${kalla.slice(0, 40)}${betalar ? ` · ${betalar}` : ''}${vald}`;
+    const betalning = betalningText(r, betalningar, nummer, bankNummer);
+    return `K${i + 1} ${r.datum ?? 'okänt datum'} ${r.riktning === 'in' ? 'IN ' : 'UT '} ${Number(r.belopp)} ${r.valuta || 'SEK'} · ${r.motpart || '—'} · ${(r.beskrivning ?? '').slice(0, 80)} · ${kalla.slice(0, 40)}${betalning ? ` · ${betalning}` : ''}${vald}`;
   }).join('\n');
   return { rader: lista, nummer, text, filnamn };
 }
 
 const SAKERHET_TEXT = { saker: 'säker', trolig: 'trolig', forslag: 'osäker' } as const;
 
-/**
- * Bankrader som betalar en av kundens egna fakturor (betalningskopplingar),
- * som text per bankrad: "betalar egen faktura 2026-003 till Kund AB (säker)".
- * Tom om tabellen saknas eller inget är kopplat — listan fungerar som förut.
- */
-async function fakturabetalningar(supabase: SupabaseClient, userId: string): Promise<Map<string, string>> {
+interface Fakturabetalning {
+  konto_hash: string;
+  bank_transaktion_id: string;
+  bank_datum: string;
+  bank_belopp: number;
+  transaktion_id: string | null;
+  del: string;
+  typ: string;
+  sakerhet: keyof typeof SAKERHET_TEXT;
+  belopp: number;
+  fakturor: { faktura_nr: string; kund_namn: string | null } | null;
+}
+
+/** Kundens kopplingar mellan fakturor och bankrader (betalningskopplingar). Tom om tabellen saknas. */
+async function fakturabetalningar(supabase: SupabaseClient, userId: string): Promise<Fakturabetalning[]> {
   const { data, error } = await supabase
     .from('betalningskopplingar')
-    .select('konto_hash, bank_transaktion_id, del, typ, sakerhet, belopp, fakturor(faktura_nr, kund_namn)')
-    .eq('user_id', userId).not('faktura_id', 'is', null).neq('status', 'avvisad');
-  if (error || !data) return new Map();
-  const perRad = new Map<string, string[]>();
-  for (const k of data as unknown as {
-    konto_hash: string; bank_transaktion_id: string; del: string; typ: string; sakerhet: keyof typeof SAKERHET_TEXT; belopp: number;
-    fakturor: { faktura_nr: string; kund_namn: string | null } | null;
-  }[]) {
-    if (!k.fakturor) continue;
-    const vad = k.del === 'skatteverket' ? 'Skatteverkets ROT/RUT-del för egen faktura' : k.typ === 'delbetalning' ? 'delbetalar egen faktura' : 'betalar egen faktura';
-    const del = k.typ === 'samlad' ? ` med ${Number(k.belopp)} kr` : '';
-    const text = `${vad} ${k.fakturor.faktura_nr}${k.fakturor.kund_namn ? ` till ${k.fakturor.kund_namn}` : ''}${del} (${SAKERHET_TEXT[k.sakerhet] ?? k.sakerhet})`;
-    const nyckel = `${k.konto_hash}|${k.bank_transaktion_id}`;
-    perRad.set(nyckel, [...(perRad.get(nyckel) ?? []), text]);
+    .select('konto_hash, bank_transaktion_id, bank_datum, bank_belopp, transaktion_id, del, typ, sakerhet, belopp, fakturor(faktura_nr, kund_namn)')
+    .eq('user_id', userId).neq('status', 'avvisad');
+  return error || !data ? [] : (data as unknown as Fakturabetalning[]);
+}
+
+/**
+ * Vad kopplingarna säger om en rad i listan:
+ * - en bankrad: "betalar egen faktura 2026-003 till Kund AB (säker)" eller
+ *   "betalar fakturan K12 (trolig)"
+ * - en inskickad faktura: "betald enligt bankraden K340 2026-11-14 (säker)"
+ */
+function betalningText(r: Arsrad, kopplingar: Fakturabetalning[], nummer: Map<string, number>, bankNummer: Map<string, number>): string {
+  const sak = (k: Fakturabetalning) => SAKERHET_TEXT[k.sakerhet] ?? k.sakerhet;
+  const delText = (k: Fakturabetalning) => (k.typ === 'samlad' ? ` med ${Number(k.belopp)} kr av ${Math.abs(Number(k.bank_belopp))} kr` : '');
+  const delar: string[] = [];
+  if (r.bank_konto_hash && r.bank_transaktion_id) {
+    for (const k of kopplingar) {
+      if (k.konto_hash !== r.bank_konto_hash || k.bank_transaktion_id !== r.bank_transaktion_id) continue;
+      if (k.fakturor) {
+        const vad = k.del === 'skatteverket' ? 'Skatteverkets ROT/RUT-del för egen faktura' : k.typ === 'delbetalning' ? 'delbetalar egen faktura' : 'betalar egen faktura';
+        delar.push(`${vad} ${k.fakturor.faktura_nr}${k.fakturor.kund_namn ? ` till ${k.fakturor.kund_namn}` : ''}${delText(k)} (${sak(k)})`);
+      } else if (k.transaktion_id) {
+        const n = nummer.get(k.transaktion_id);
+        delar.push(`${k.typ === 'delbetalning' ? 'delbetalar' : 'betalar'} fakturan ${n ? `K${n}` : 'i en annan fil'}${delText(k)} (${sak(k)})`);
+      }
+    }
   }
-  return new Map([...perRad].map(([k, v]) => [k, v.join('; ')]));
+  for (const k of kopplingar) {
+    if (k.transaktion_id !== r.id) continue;
+    const n = bankNummer.get(`${k.konto_hash}|${k.bank_transaktion_id}`);
+    const vad = k.typ === 'delbetalning' ? 'delbetald' : k.typ === 'overbetalning' ? 'överbetald' : 'betald';
+    delar.push(`${vad} enligt bankraden ${n ? `K${n} ` : ''}${k.bank_datum}, ${Math.abs(Number(k.belopp))} kr (${sak(k)})`);
+  }
+  return delar.join('; ');
 }
 
 /**

@@ -9,8 +9,11 @@ import { MANADER_EFTER_FORFALLO, SKATTEVERKET_MANADER, DAGAR_FORE_FAKTURADATUM, 
  * 'avvisad') står kvar och styr matchningen: en avvisad koppling föreslås inte
  * igen, och en bekräftad räknas som betald.
  *
- * Just nu kundens egna fakturor (scenario A). Inskickade fakturor (B och C)
- * använder samma matchning med transaktion_id i stället för faktura_id.
+ * Två sorters fakturor matchas i samma körning, så att en bankrad bara kan
+ * betala en av dem:
+ *   A  kundens egna fakturor (fakturor)            → faktura_id
+ *   B  inskickade leverantörsfakturor (transaktioner, riktning ut) → transaktion_id
+ *   C  inskickade kundfakturor från andra system (transaktioner, riktning in)
  */
 
 interface FakturaRad {
@@ -34,7 +37,48 @@ interface BankRad {
   motpart: string | null;
 }
 
+interface TransaktionRad {
+  id: string;
+  datum: string | null;
+  belopp: number;
+  valuta: string | null;
+  riktning: 'in' | 'ut';
+  motpart: string | null;
+  uppgifter: Record<string, unknown> | null;
+  kalla: string;
+}
+
 const ISO = (d: Date) => d.toISOString().slice(0, 10);
+const DATUM = /^\d{4}-\d{2}-\d{2}$/;
+const datumUr = (v: unknown) => (typeof v === 'string' && DATUM.test(v.trim()) ? v.trim() : undefined);
+const textUr = (v: unknown) => (typeof v === 'string' || typeof v === 'number' ? String(v).trim() || undefined : undefined);
+
+/**
+ * En inskickad faktura som AI:n läst ut. Fakturadatumet ur underlaget, annars
+ * transaktionens datum; förfallodagen ur underlaget, annars fakturadatumet
+ * (då slutar fönstret en månad efter fakturadatumet). Null utan datum eller
+ * belopp — då finns inget att matcha mot.
+ */
+function franTransaktion(t: TransaktionRad): MatchFaktura | null {
+  const u = t.uppgifter ?? {};
+  const fakturadatum = datumUr(u.fakturadatum) ?? datumUr(t.datum);
+  const belopp = Number(t.belopp);
+  if (!fakturadatum || !(belopp > 0)) return null;
+  const forfallo = datumUr(u.forfallodatum);
+  return {
+    id: t.id,
+    nr: textUr(u.fakturanummer) ?? '',
+    ocr: textUr(u.ocr),
+    motpart: t.motpart ?? '',
+    fakturadatum,
+    forfallodatum: forfallo && forfallo >= fakturadatum ? forfallo : fakturadatum,
+    betaldatum: datumUr(u.betaldatum),
+    belopp,
+    valuta: t.valuta || 'SEK',
+    avdrag: 0,
+    riktning: t.riktning === 'in' ? 'in' : 'ut',
+  };
+}
 
 function tillMatchFaktura(f: FakturaRad): MatchFaktura {
   const avdrag = Number(f.husavdrag?.avdrag ?? 0);
@@ -89,20 +133,32 @@ async function kurser(supabase: SupabaseClient, valutor: string[], fran: string,
 }
 
 export async function matchaBetalningar(supabase: SupabaseClient, userId: string): Promise<{ kopplingar: number }> {
-  const fakturor = (await allaSidor<FakturaRad>((a, b) =>
+  const egna = (await allaSidor<FakturaRad>((a, b) =>
     supabase.from('fakturor')
       .select('id, faktura_nr, kund_namn, faktura_datum, forfallo_datum, belopp_inkl_moms, husavdrag, valuta, status')
       .eq('user_id', userId).eq('dokumenttyp', 'faktura').order('id').range(a, b)))
     .filter((f) => f.faktura_datum)
     .map(tillMatchFaktura);
+  const egnaIdn = new Set(egna.map((f) => f.id));
+
+  // Inskickade fakturor (B och C): transaktioner som AI:n läst ur kundens underlag
+  const inskickade = (await allaSidor<TransaktionRad>((a, b) =>
+    supabase.from('transaktioner')
+      .select('id, datum, belopp, valuta, riktning, motpart, uppgifter, kalla')
+      .eq('user_id', userId).is('dublett_av', null).not('kalla', 'in', '(bank,woocommerce)')
+      .ilike('uppgifter->>dokumenttyp', '%faktura%')
+      .order('id').range(a, b)))
+    .map(franTransaktion)
+    .filter((f): f is MatchFaktura => !!f);
+  const fakturor = [...egna, ...inskickade];
 
   const { data: beslutRader, error: beslutFel } = await supabase
     .from('betalningskopplingar')
-    .select('faktura_id, konto_hash, bank_transaktion_id, del, belopp, status')
-    .eq('user_id', userId).not('faktura_id', 'is', null).in('status', ['bekraftad', 'avvisad']);
+    .select('faktura_id, transaktion_id, konto_hash, bank_transaktion_id, del, belopp, status')
+    .eq('user_id', userId).in('status', ['bekraftad', 'avvisad']);
   if (beslutFel) throw new Error(`Kunde inte läsa betalningskopplingarna: ${beslutFel.message}`);
   const beslut: Beslut[] = (beslutRader ?? []).map((r) => ({
-    fakturaId: r.faktura_id, kontoHash: r.konto_hash, bankId: r.bank_transaktion_id, del: r.del, belopp: Number(r.belopp), status: r.status,
+    fakturaId: r.faktura_id ?? r.transaktion_id, kontoHash: r.konto_hash, bankId: r.bank_transaktion_id, del: r.del, belopp: Number(r.belopp), status: r.status,
   }));
 
   let kopplingar: Koppling[] = [];
@@ -134,7 +190,7 @@ export async function matchaBetalningar(supabase: SupabaseClient, userId: string
 
   // Byråns beslut står kvar; allt automatiskt ersätts
   const { error: delFel } = await supabase.from('betalningskopplingar')
-    .delete().eq('user_id', userId).eq('status', 'auto').not('faktura_id', 'is', null);
+    .delete().eq('user_id', userId).eq('status', 'auto');
   if (delFel) throw new Error(`Kunde inte rensa betalningskopplingarna: ${delFel.message}`);
 
   const beslutade = new Set(beslut.map((b) => `${b.fakturaId}|${b.kontoHash}|${b.bankId}|${b.del}`));
@@ -142,7 +198,8 @@ export async function matchaBetalningar(supabase: SupabaseClient, userId: string
     .filter((k) => !beslutade.has(`${k.fakturaId}|${k.kontoHash}|${k.bankId}|${k.del}`))
     .map((k) => ({
       user_id: userId,
-      faktura_id: k.fakturaId,
+      faktura_id: egnaIdn.has(k.fakturaId) ? k.fakturaId : null,
+      transaktion_id: egnaIdn.has(k.fakturaId) ? null : k.fakturaId,
       konto_hash: k.kontoHash,
       bank_transaktion_id: k.bankId,
       bank_datum: k.bankDatum,
