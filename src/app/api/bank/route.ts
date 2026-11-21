@@ -14,6 +14,9 @@ import { HAMTA_FEL, kundfel } from '@/lib/bank/kundfel';
 
 export const maxDuration = 300;
 
+/** Så långt bakåt Hämta nu går. */
+const HAMTA_NU_DAGAR = 90;
+
 const KOLUMNER = 'transaktion_id, konto_hash, bokforingsdag, belopp_ore, valuta, text, motpart, data';
 
 interface Rad {
@@ -105,7 +108,8 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Inte inloggad' }, { status: 401 });
 
   try {
-    const svar = await synkaBank(createServerClient(), user.id);
+    // Hämta nu går 90 dagar bakåt; morgonens synk bara några dagar före förra hämtningen
+    const svar = await synkaBank(createServerClient(), user.id, { dagarBakat: HAMTA_NU_DAGAR });
     // Felen sparas i senaste_fel för byrån; kunden får en kort förklaring utan teknik
     if (svar.fel.length) console.error('[bank] synk', user.id, svar.fel);
     return NextResponse.json({ ...svar, fel: [...new Set(svar.fel.map(kundfel).filter(Boolean))] });

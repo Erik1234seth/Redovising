@@ -138,11 +138,17 @@ export async function sparaSession(
   if (gamlaIdn.length) await supabase.from('bank_kopplingar').delete().in('session_id', gamlaIdn);
 }
 
-async function synkaKonto(supabase: SupabaseClient, userId: string, konto: { konto_hash: string; uid: string; synkad_till: string | null }) {
+async function synkaKonto(
+  supabase: SupabaseClient,
+  userId: string,
+  konto: { konto_hash: string; uid: string; synkad_till: string | null },
+  dagarBakat?: number,
+) {
   let fran = konto.synkad_till ?? forstaDatum();
   if (konto.synkad_till) {
-    const d = new Date(`${konto.synkad_till}T00:00:00Z`);
-    d.setUTCDate(d.getUTCDate() - OVERLAPP_DAGAR);
+    // Hämta nu går längre bakåt än morgonens synk (se synkaBank)
+    const d = dagarBakat ? new Date() : new Date(`${konto.synkad_till}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - (dagarBakat ?? OVERLAPP_DAGAR));
     fran = datum(d);
   }
 
@@ -195,8 +201,15 @@ async function antalBankrader(supabase: SupabaseClient, userId: string): Promise
  * Hämtar alla aktiva kopplingar för en kund. Svarar med hur många rader som
  * hämtades (överlappet räknas med), hur många av dem som var nya och hur många
  * kunden har totalt. nya och totalt är null om de inte gick att räkna.
+ *
+ * dagarBakat: hämta så många dagar bakåt från i dag i stället för några dagar
+ * före förra hämtningen. Hämta nu använder 90 dagar, eftersom vissa banker
+ * (Södra Hestra Sparbank) skickar fler uppgifter vid korta hämtningar än i den
+ * långa första. Ett konto som aldrig hämtats får ändå den långa första hämtningen.
+ * Obs: raderna som redan finns i den långa hämtningens format sparas då en
+ * gång till, eftersom de får ett annat id — det är inte löst än.
  */
-export async function synkaBank(supabase: SupabaseClient, userId: string) {
+export async function synkaBank(supabase: SupabaseClient, userId: string, { dagarBakat }: { dagarBakat?: number } = {}) {
   const fore = await antalBankrader(supabase, userId);
   const { data: kopplingar, error } = await supabase
     .from('bank_kopplingar')
@@ -218,7 +231,7 @@ export async function synkaBank(supabase: SupabaseClient, userId: string) {
         .select('konto_hash, uid, synkad_till')
         .eq('session_id', k.session_id);
       for (const konto of konton ?? []) {
-        if (konto.uid) transaktioner += await synkaKonto(supabase, userId, konto);
+        if (konto.uid) transaktioner += await synkaKonto(supabase, userId, konto, dagarBakat);
       }
       await supabase
         .from('bank_kopplingar')
