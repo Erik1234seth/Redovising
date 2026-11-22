@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { laddaK1Andringar } from './k1-andringar';
 import { tolkaBetalsatt, type Betalsatt } from './betalsatt';
 import { TRANSAKTION_KOLUMNER, bokfor, type ValdKontering } from './kontera';
 import { rensaMomsdelar, sammaMoms, tolkaOmvand, type Momsdel, type Omvand } from './momsdelar';
@@ -72,6 +73,8 @@ export async function bokforForfallna(
   supabase: SupabaseClient,
   { userId, underlagId, transaktionIds, nu = false }: { userId?: string; underlagId?: string; transaktionIds?: string[]; nu?: boolean } = {},
 ): Promise<{ bokforda: number; fel: string[] }> {
+  // Byråns kontoplan, så att konton den lagt till (t.ex. 2890) går att bokföra
+  await laddaK1Andringar(supabase);
   const grans = new Date(Date.now() - PRELIMINAR_DAGAR * DAG).toISOString();
   const rader: Rad[] = [];
   for (let fran = 0; ; fran += 1000) {

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { konteringUrBeslut, planeradeVerifikationer, OMVAND_KONTONAMN, type Beslut, type Kontering, type Transaktion } from '../kontera';
+import { KORTSKULD, KORTSKULD_NAMN, konteringUrBeslut, planeradeVerifikationer, OMVAND_KONTONAMN, type Beslut, type Kontering, type Transaktion } from '../kontera';
 import { laddaK1Andringar as laddK1Andringar } from '../k1-andringar';
 import { iKronor, raknaOmTillKronor, type Kronor } from '../kronor';
 import { slaUppKonto, type Flagga } from '../regelverk';
@@ -99,7 +99,7 @@ export interface Resultat {
 }
 
 const ore = (n: number) => Math.round(n * 100) / 100;
-const kontonamn = (k: string) => slaUppKonto(k)?.namn ?? OMVAND_KONTONAMN[k] ?? '';
+const kontonamn = (k: string) => slaUppKonto(k)?.namn ?? OMVAND_KONTONAMN[k] ?? (k === KORTSKULD ? KORTSKULD_NAMN : '');
 
 /** Fälten modellen lämnade tomma tas bort, så att uppgifterna ser ut som förut. */
 function rensaUppgifter(u: Record<string, unknown>): Record<string, unknown> {
@@ -116,7 +116,7 @@ function valutakod(v: string | null | undefined): string {
 }
 
 /** Betal- och momskonton säger inget om vad affären är. */
-const BETAL_OCH_MOMS = /^(1930|2013|2017|2440|1500|26\d\d)$/;
+const BETAL_OCH_MOMS = /^(1930|2013|2017|2890|2440|1500|26\d\d)$/;
 
 /** Det som redan finns för underlagen: transaktionerna, förslagen, valet och bokföringen. */
 export async function gamlaKonteringar(supabase: SupabaseClient, underlagIds: string[]): Promise<Map<string, GammalTransaktion[]>> {

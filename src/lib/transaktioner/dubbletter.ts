@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { DAGAR_FORE_FAKTURADATUM, MANADER_EFTER_FORFALLO } from '../betalningar/matcha';
 
 /**
  * Flaggar banktransaktioner som troligen redan finns på annat håll.
@@ -9,10 +10,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * får bara dublett_av (den andra transaktionen) eller dublett_orsak (texten om
  * dagskassan), så att den som konterar ser det.
  *
- * Matchningen är belopp, valuta och riktning exakt, och datum inom några dagar
- * eftersom kortköp bokförs på kontot ett par dagar efter kvittot. Varje
- * underlagsrad kan bara matcha en bankrad. Allt räknas om varje gång, så en
- * rad som raderats eller lästs om tappar sin flagga.
+ * Matchningen är belopp, valuta och riktning exakt, och datum inom ett fönster:
+ * - ett kvitto: några dagar åt båda håll, eftersom kortköp bokförs på kontot
+ *   ett par dagar efter kvittot
+ * - en faktura: från en vecka före fakturadatumet till en månad efter
+ *   förfallodagen, samma fönster som betalningsmatchningen (../betalningar/matcha).
+ *   Närmast betaldagen (betaldatumet, annars förfallodagen) vinner.
+ * Varje underlagsrad kan bara matcha en bankrad. Allt räknas om varje gång, så
+ * en rad som raderats eller lästs om tappar sin flagga.
  */
 
 const MAX_DAGAR = 5;
@@ -27,6 +32,36 @@ interface Rad {
   riktning: string;
   dublett_av: string | null;
   dublett_orsak: string | null;
+  uppgifter: Record<string, unknown> | null;
+}
+
+const DATUM = /^\d{4}-\d{2}-\d{2}$/;
+const datumUr = (v: unknown) => (typeof v === 'string' && DATUM.test(v.trim()) ? v.trim() : null);
+
+function plusDagar(d: string, n: number): string {
+  return new Date(Date.parse(`${d}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+}
+
+function plusManader(d: string, n: number): string {
+  const x = new Date(`${d}T00:00:00Z`);
+  x.setUTCMonth(x.getUTCMonth() + n);
+  return x.toISOString().slice(0, 10);
+}
+
+/** Datumen en bankrad får ha för att betala underlagsraden, och dagen den helst ska ligga nära. */
+function fonster(u: Rad): { fran: string; till: string; mal: string } {
+  const uppg = u.uppgifter ?? {};
+  if (/faktura/i.test(String(uppg.dokumenttyp ?? ''))) {
+    const fakturadatum = datumUr(uppg.fakturadatum) ?? u.datum!;
+    const ff = datumUr(uppg.forfallodatum);
+    const forfallo = ff && ff > fakturadatum ? ff : fakturadatum;
+    return {
+      fran: plusDagar(fakturadatum, -DAGAR_FORE_FAKTURADATUM),
+      till: plusManader(forfallo, MANADER_EFTER_FORFALLO),
+      mal: datumUr(uppg.betaldatum) ?? forfallo,
+    };
+  }
+  return { fran: plusDagar(u.datum!, -MAX_DAGAR), till: plusDagar(u.datum!, MAX_DAGAR), mal: u.datum! };
 }
 
 function dagar(a: string, b: string): number {
@@ -42,7 +77,7 @@ async function lasRader(supabase: SupabaseClient, userId: string): Promise<Rad[]
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from('transaktioner')
-      .select('id, kalla, datum, belopp, valuta, riktning, dublett_av, dublett_orsak')
+      .select('id, kalla, datum, belopp, valuta, riktning, dublett_av, dublett_orsak, uppgifter')
       .eq('user_id', userId)
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`Kunde inte läsa transaktionerna: ${error.message}`);
@@ -80,15 +115,19 @@ export async function markeraDubbletter(supabase: SupabaseClient, userId: string
   if (bank.length === 0) return 0;
 
   const underlag = rader.filter((r) => r.kalla !== 'bank' && r.datum);
+  const fonstret = new Map(underlag.map((u) => [u.id, fonster(u)]));
   const upptagna = new Set<string>();
   const onskat = new Map<string, { dublett_av: string | null; dublett_orsak: string | null }>();
 
   for (const b of bank) {
     let basta: Rad | null = null;
+    let bastaAvstand = Infinity;
     for (const u of underlag) {
       if (upptagna.has(u.id) || u.valuta !== b.valuta || u.riktning !== b.riktning || !sammaBelopp(u.belopp, b.belopp)) continue;
-      const d = dagar(u.datum!, b.datum!);
-      if (d <= MAX_DAGAR && (!basta || d < dagar(basta.datum!, b.datum!))) basta = u;
+      const f = fonstret.get(u.id)!;
+      if (b.datum! < f.fran || b.datum! > f.till) continue;
+      const d = dagar(f.mal, b.datum!);
+      if (d < bastaAvstand) { basta = u; bastaAvstand = d; }
     }
     if (basta) upptagna.add(basta.id);
     onskat.set(b.id, { dublett_av: basta?.id ?? null, dublett_orsak: null });

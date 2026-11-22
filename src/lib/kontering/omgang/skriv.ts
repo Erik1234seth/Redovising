@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { FLYTTAD_FOR_HAND } from '@/lib/underlag/sortering';
 import { valjKonto } from '../kontera';
 import { bokforForfallna } from '../preliminar';
+import { markeraDubbletter } from '@/lib/transaktioner/dubbletter';
+import { matchaBetalningar } from '@/lib/betalningar/kor';
 import { MODELL } from './anrop';
 import type { Filpost } from './forbered';
 import type { Resultat, ResultatFil, ResultatTransaktion } from './svar';
@@ -120,6 +122,14 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
       f.skrivet = `${f.skrivet ?? ''} Kunde inte bokföras: ${err instanceof Error ? err.message : String(err)}`.trim();
     }
   }
+
+  // De nya transaktionerna kan vara köp och fakturor som redan syns i banken.
+  // Matcha dem nu, i stället för vid nästa banksynk. Ett fel här stoppar inte
+  // körningen — matchningen räknas om från början nästa gång.
+  if (skrivna.size) {
+    await markeraDubbletter(supabase, userId).catch((err) => console.error('[flode] dubblettmatchningen mot banken misslyckades:', err));
+    await matchaBetalningar(supabase, userId).catch((err) => console.error('[flode] betalningsmatchningen misslyckades:', err));
+  }
 }
 
 interface Mal { transaktion_id?: string; verifikation_id?: string; malFil?: string }
@@ -188,8 +198,45 @@ async function kopplaUnderlag(
     }
     if (!rader.size) continue;
     const { error } = await supabase.from('underlag_kopplingar').insert([...rader.values()]);
-    if (error) f.skrivet = `${f.skrivet ?? ''} Kopplingarna kunde inte sparas: ${error.message}`.trim();
+    if (error) { f.skrivet = `${f.skrivet ?? ''} Kopplingarna kunde inte sparas: ${error.message}`.trim(); continue; }
+
+    // En rad på en kreditkortsfaktura som kopplats till ett kvitto: kvittot betalades med kreditkortet
+    const kortkop = f.transaktioner
+      .filter((t) => t.uppgifter?.kreditkort === true && kopplingar.get(t)?.transaktion_id && t.kopplad?.startsWith('Kopplad'))
+      .map((t) => kopplingar.get(t)!.transaktion_id!);
+    if (kortkop.length) {
+      try {
+        const flyttade = await markeraKortkop(supabase, userId, kortkop);
+        if (flyttade) f.skrivet = `${f.skrivet ?? ''} ${flyttade} kvitto${flyttade === 1 ? '' : 'n'} bokfört mot 2890 i stället, betalt med kreditkortet.`.trim();
+      } catch (err) {
+        f.skrivet = `${f.skrivet ?? ''} Kunde inte flytta kvittona till 2890: ${err instanceof Error ? err.message : String(err)}`.trim();
+      }
+    }
   }
+}
+
+/**
+ * Transaktioner som visat sig vara betalda med kreditkort får
+ * `uppgifter.kreditkort`, och deras verifikation görs om mot 2890 i stället
+ * för betalkontot (@/lib/kontering/kontera, KORTSKULD). Svarar med hur många
+ * som ändrades.
+ */
+async function markeraKortkop(supabase: SupabaseClient, userId: string, ids: string[]): Promise<number> {
+  const { data, error } = await supabase.from('transaktioner').select('id, uppgifter').eq('user_id', userId).in('id', [...new Set(ids)]);
+  if (error) throw new Error(error.message);
+  const andras = (data ?? []).filter((t) => (t.uppgifter as Record<string, unknown> | null)?.kreditkort !== true);
+  for (const t of andras) {
+    const { error: uFel } = await supabase.from('transaktioner')
+      .update({ uppgifter: { ...((t.uppgifter as Record<string, unknown> | null) ?? {}), kreditkort: true } }).eq('id', t.id);
+    if (uFel) throw new Error(uFel.message);
+  }
+  if (!andras.length) return 0;
+  const andrade = andras.map((t) => t.id as string);
+  const { error: vFel } = await supabase.from('verifikationer').delete().in('transaktion_id', andrade).eq('user_id', userId).eq('kalla', 'ai');
+  if (vFel) throw new Error(vFel.message);
+  const { fel } = await bokforForfallna(supabase, { userId, transaktionIds: andrade, nu: true });
+  if (fel.length) throw new Error(fel.join(' · '));
+  return andrade.length;
 }
 
 /**

@@ -203,6 +203,9 @@ Allmänna regler:
 - Kontot väljs utifrån K1-kontoplanen och kontobeskrivningarna — byråns egen dokumentation. Hur kunden, byrån eller andra kunder bokfört liknande tidigare är en ledtråd om vad affären är, inte om vilket konto som är rätt: tidigare bokföringar kan vara gjorda i ett annat program, med BAS-underkonton, eller vara fel. Det gäller också "byrån valde" i kundens lista.
 - Använd kundens verksamhet för att avgöra vad ett köp är till för. Har kunden i ett mejl förklarat vad ett köp eller en inbetalning avser, väger det tyngre än en gissning — säg det i motiveringen.
 - Står det en instruktion från byrån i anteckningen följer du den. Den väger tyngst av allt. Står det BYRÅNS KONTEXT vid transaktionen följer du den på samma sätt.
+- En bankrad (källa: rad på kontoutdrag, inget kvitto) är i sig inget underlag. Gissa aldrig vad en bankrad är.
+  - Betalar kunden via företagskontot används kontot bara i företaget. Kontera bankraden när det går att avgöra konto och moms ändå: kundens mejl, kundkontexten, byråns kontext, kundreglerna eller K1-reglerna säger vad affären är — till exempel bankavgifter, ränta, inbetalningar till skattekontot, egna insättningar och uttag, eller en återkommande post som kunden förklarat. Räcker det inte — en betalning till en leverantör utan kvitto eller faktura, en inbetalning från en kund utan faktura — sätt granskning_kravs true och säg i motiveringen att underlag saknas.
+  - Betalar kunden via privatkontot, eller både privat- och företagskonto, används kontot också privat. Där konteras en bankrad bara efter byråns instruktion eller kontext om just den — inte bankavgifter eller annat som bara kan härledas ur regler. Följ instruktionen.
 - Bokföringen sker i kronor. Är underlaget i en annan valuta har vi redan räknat om transaktionen: beloppet och momsen står i kronor, och inom parentes står originalbeloppet och kursen — kronbeloppet eller kursen på underlaget när de finns, annars Riksbankens dagskurs. Kontera på kronbeloppet och ange delarnas belopp och moms i kronor. Räkna inte om transaktionen själv, och se inte omräkningen som ett problem eller som skäl till granskning. Originalet, avskriften och filens rader (F1, F2 …) står kvar i originalvalutan — tar du belopp ur underlagets rader räknar du om dem med samma kurs. Momsen på ett utländskt underlag är oftast utländsk moms, och den ger aldrig avdrag för svensk ingående moms — bara svensk moms från en svensk säljare gör det.
 
 ${byransPrinciper()}
@@ -284,11 +287,21 @@ function transaktionText(t: Transaktion, betalsatt: Betalsatt): string {
     `Källa: ${t.kalla === 'bank' ? 'rad på kontoutdrag (inget kvitto)'
       : t.kalla === 'woocommerce' ? 'order eller återbetalning i kundens webbutik (WooCommerce), hämtad direkt från butiken'
       : 'utläst ur kundens underlag'}`,
-    `Betalas via: ${betalsatt === 'privatkonto' ? 'privatkonto' : betalsatt === 'foretagskonto' ? 'företagskonto' : 'okänt'}`,
+    arKortkop(t) ? `Betalas via: kreditkort — bokförs mot ${KORTSKULD} ${KORTSKULD_NAMN}` : `Betalas via: ${betalsatt === 'privatkonto' ? 'privatkonto' : betalsatt === 'foretagskonto' ? 'företagskonto' : 'okänt'}`,
   ].filter(Boolean).join('\n');
 }
 
 // ---------- kunden ----------
+
+/**
+ * Köp med kreditkort bokförs mot 2890 Övriga kortfristiga skulder i stället
+ * för betalkontot, och betalningen av kreditkortsfakturan avräknas sedan mot
+ * 2890 (Eriks beslut 2026-11-22). Flöde markerar köpen med
+ * `uppgifter.kreditkort` (@/lib/kontering/omgang/anrop, KREDITKORT).
+ */
+export const KORTSKULD = '2890';
+export const KORTSKULD_NAMN = 'Övriga kortfristiga skulder';
+export const arKortkop = (t: Pick<Transaktion, 'uppgifter'>) => t.uppgifter?.kreditkort === true;
 
 /** Kontot pengarna går via. Vid "båda" vet vi inte — då väljer Erik. */
 function betalkonto(betalsatt: Betalsatt, riktning: 'in' | 'ut'): string | null {
@@ -553,7 +566,7 @@ function byggKontering(
 
   // Det som gör en rad osäker oavsett konto
   const slutdelar = slaIhopDelar(forstaDelar);
-  const motkonto = betalkonto(betalsatt, t.riktning);
+  const motkonto = arKortkop(t) ? KORTSKULD : betalkonto(betalsatt, t.riktning);
   if (!motkonto) flaggor.push({ typ: 'betalsatt', allvar: 'granskning', text: 'Kunden betalar via både företags- och privatkonto — välj betalkonto.' });
   if (motkonto && slutdelar.some((d) => d.konto === motkonto)) flaggor.push({ typ: 'samma-konto', allvar: 'stopp', text: `${motkonto} är också betalkontot.` });
   if (!t.datum) flaggor.push({ typ: 'datum', allvar: 'granskning', text: 'Transaktionen saknar datum.' });
@@ -732,10 +745,22 @@ export async function konteraTransaktioner(
   });
   const allaRegler = reglerFor(instruktioner, userId);
 
+  // Ett blandat konto (privatkonto, eller både privat- och företagskonto) har
+  // privata rader. Där konteras en bankrad utan underlag bara när byrån sagt
+  // vad den är — inte ens bankavgifter, och den skickas inte till granskning.
+  const blandat = betalsatt !== 'foretagskonto';
+  const utanUnderlag = (t: Transaktion) => blandat && t.kalla === 'bank' && !t.anteckning?.trim() && !kontextFor(instruktioner, t);
+  const hoppade: Utfall[] = kvar.filter(utanUnderlag).map((t) => ({
+    transaktionId: t.id, konteringar: [],
+    fel: 'Bankrad på ett konto som används både privat och i företaget — den konteras inte utan underlag eller byråns kontext.',
+  }));
+  const attKontera = kvar.filter((t) => !utanUnderlag(t));
+  if (!attKontera.length) return hoppade;
+
   // Kunden: samma för alla transaktioner, och cachas därför i systemprompten
   const [kundbild, arslista, mejl, bokfort] = await Promise.all([
     hamtaKundbild(supabase, userId),
-    hamtaArslista(supabase, userId, { medKonton: true, utanKontoFor: new Set(kvar.map((t) => t.id)) }),
+    hamtaArslista(supabase, userId, { medKonton: true, utanKontoFor: new Set(attKontera.map((t) => t.id)) }),
     byggMejlkontext(supabase, { userId, emails: [(profil as unknown as Kund | null)?.email] }),
     verifikationsSammanfattning(supabase, userId),
   ]);
@@ -767,7 +792,7 @@ export async function konteraTransaktioner(
     return nr ? [[nr, r] as const] : [];
   }));
 
-  return iKo(kvar, SAMTIDIGA, async (t): Promise<Utfall> => {
+  const utfall = await iKo(attKontera, SAMTIDIGA, async (t): Promise<Utfall> => {
     const kontext = kontextFor(instruktioner, t);
     try {
       if (kontext && !torrkorning) t = await rattaEfterKontext(supabase, t, betalsatt, kontext);
@@ -788,6 +813,7 @@ export async function konteraTransaktioner(
       return { transaktionId: t.id, konteringar: [], fel: err instanceof Error ? err.message : String(err) };
     }
   });
+  return [...utfall, ...hoppade];
 }
 
 /**
@@ -900,16 +926,17 @@ export async function valjKonto(
     .from('transaktioner').select(`${TRANSAKTION_KOLUMNER}, dublett_av, dublett_orsak`).eq('id', transaktionId).eq('user_id', userId).maybeSingle();
   if (error) throw new Error(`Kunde inte läsa transaktionen: ${error.message}`);
   if (!t) throw new Error('Transaktionen finns inte');
+  await laddaK1Andringar(supabase);
   const { data: profil } = await supabase.from('profiles').select('har_foretagskonto, redovisningsmetod').eq('id', userId).maybeSingle();
   const betalsatt = tolkaBetalsatt(profil?.har_foretagskonto ?? null);
   if (!betalsatt) throw new Error('Välj först om kunden betalar via företagskonto eller privatkonto');
-  if (motkonto && !['1930', '2013', '2017'].includes(motkonto)) throw new Error(`${motkonto} är inget betalkonto`);
+  if (motkonto && !['1930', '2013', '2017', KORTSKULD].includes(motkonto)) throw new Error(`${motkonto} är inget betalkonto`);
   if (![0, 6, 12, 25].includes(momssats)) throw new Error('Momssatsen måste vara 0, 6, 12 eller 25');
   if (!slaUppKonto(konto)) throw new Error(`${konto} finns inte bland K1-kontona`);
   for (const d of momsdelar ?? []) {
     if (d.konto && !slaUppKonto(d.konto)) throw new Error(`${d.konto} finns inte bland K1-kontona`);
   }
-  if (!motkonto && !betalkonto(betalsatt, (t as Transaktion).riktning)) throw new Error('Kunden betalar från båda hållen — välj betalkonto');
+  if (!motkonto && !arKortkop(t as Transaktion) && !betalkonto(betalsatt, (t as Transaktion).riktning)) throw new Error('Kunden betalar från båda hållen — välj betalkonto');
   const nu = new Date().toISOString();
   const vald: ValdKontering = { konto, momssats, momsdelar: rensaMomsdelar(momsdelar), omvand: omvand ?? null, motkonto: motkonto ?? null, at: nu };
   const { error: uFel } = await supabase.from('transaktioner').update({ vald_kontering: vald, preliminar_at: nu }).eq('id', transaktionId);
@@ -1063,7 +1090,7 @@ export function verifikationsrader(
   t = iKronor(t);
   if (arUtlandsk(t)) throw new Error(`Beloppet är i ${t.valuta} och har inte räknats om till kronor — kontera om transaktionen`);
   if (!slaUppKonto(konto)) throw new Error(`${konto} finns inte bland K1-kontona`);
-  const motkonto = motkontoOverride ?? betalkonto(betalsatt, t.riktning);
+  const motkonto = motkontoOverride ?? (arKortkop(t) ? KORTSKULD : betalkonto(betalsatt, t.riktning));
   if (!motkonto) throw new Error('Betalkonto saknas');
   const uppdelad = rensaMomsdelar(momsdelar);
   for (const d of uppdelad ?? []) {
@@ -1097,7 +1124,8 @@ export function fakturametod(
   metod: string | null | undefined,
   motkontoOverride?: string,
 ): { fakturadatum: string; betaldag: string; skuldkonto: string } | null {
-  if (metod !== 'faktureringsmetoden' || motkontoOverride) return null;
+  // Ett kreditkortsköp är redan en skuld (2890) — det blir en verifikation, som vid kontantmetoden
+  if (metod !== 'faktureringsmetoden' || motkontoOverride || arKortkop(t)) return null;
   const u = t.uppgifter ?? {};
   if (!/faktura/i.test(String(u.dokumenttyp ?? ''))) return null;
   const fakturadatum = datumUr(u.fakturadatum);
