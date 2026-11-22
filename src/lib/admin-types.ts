@@ -726,3 +726,16 @@ export interface AdminVarning {
   /** Misslyckade utskick kan markeras som hanterade. */
   utskick?: { channel: 'mejl' | 'sms'; id: string };
 }
+
+/** En kund i Flöde i toppmenyn (/api/admin/flode). */
+export interface FlodeKund {
+  userId: string;
+  /** Nyckel till personkortet, e:<adress>. */
+  key: string | null;
+  namn: string;
+  epost: string | null;
+  underlag: number;
+  /** Underlag som "Kör nya" skulle köra: aldrig körda, eller nytt från kunden sedan dess. */
+  nya: number;
+  senast: string;
+}

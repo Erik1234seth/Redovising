@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { Arende, InkorgKonversation } from '@/lib/admin-types';
+import type { Arende, FlodeKund, InkorgKonversation } from '@/lib/admin-types';
 
 /**
  * Huvudsidorna, som vanliga länkar i menyraden — ingen dropdown.
@@ -16,10 +16,12 @@ import type { Arende, InkorgKonversation } from '@/lib/admin-types';
  * - Inkorg: olästa konversationer
  * - Ärenden: öppna ärenden för idag och försenade
  * - Kalender: det som står i kalendern idag, med möten
+ * - Flöde: kunder med nya underlag att köra
  * Röd när något är försenat. En siffra som inte gick att hämta visas inte alls.
  */
 
 const ITEMS: { href: string; label: string }[] = [
+  { href: '/admin/flode', label: 'Flöde' },
   { href: '/admin/inkorg', label: 'Inkorg' },
   { href: '/admin/ringlista', label: 'Ringlista' },
   { href: '/admin/arenden', label: 'Ärenden' },
@@ -41,7 +43,8 @@ const hamta = <T,>(url: string, valj: (d: Record<string, unknown>) => T): Promis
 
 async function raknaAlla(): Promise<Raknare> {
   const idag = new Date().toLocaleDateString('sv-SE');
-  const [inkorg, arenden, kalender] = await Promise.all([
+  const [flode, inkorg, arenden, kalender] = await Promise.all([
+    hamta('/api/admin/flode', (d) => (d.kunder as FlodeKund[]).filter((k) => k.nya > 0).length),
     hamta('/api/admin/inkorg', (d) => d.konversationer as InkorgKonversation[]),
     hamta('/api/admin/arenden', (d) => d.arenden as Arende[]),
     hamta(`/api/admin/kalender?fran=${idag}&tom=${idag}`, (d) => ((d.handelser as unknown[]).length + (d.moten as unknown[]).length)),
@@ -50,6 +53,7 @@ async function raknaAlla(): Promise<Raknare> {
   const oppna = (arenden ?? []).filter((a) => a.status === 'oppen' && a.datum && a.datum <= idag);
 
   return {
+    '/admin/flode': flode !== null ? { antal: flode, bradskande: false } : null,
     '/admin/inkorg': inkorg ? { antal: inkorg.filter((k) => k.olast).length, bradskande: false } : null,
     '/admin/arenden': arenden ? { antal: oppna.length, bradskande: oppna.some((a) => a.datum! < idag) } : null,
     '/admin/kalender': kalender !== null ? { antal: kalender, bradskande: false } : null,
@@ -83,7 +87,7 @@ export default function NavMenu() {
             key={item.href}
             href={item.href}
             className={`relative text-sm transition hover:text-blue-700 ${
-              pathname?.startsWith(item.href) ? 'text-slate-900 font-medium' : 'text-slate-600'
+              (pathname === item.href || pathname?.startsWith(`${item.href}/`)) ? 'text-slate-900 font-medium' : 'text-slate-600'
             }`}
           >
             {item.label}

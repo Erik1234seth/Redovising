@@ -86,12 +86,15 @@ export async function GET(request: NextRequest) {
     await Promise.all(((vantande ?? []) as Provrad[]).map((r) => uppdateraProv(supabase, r).catch((err) =>
       console.error(`[admin/kontering-prov] ${r.id}:`, err instanceof Error ? err.message : err))));
 
-    const [{ data: rader, error }, { data: underlag, error: uFel }, attKora, allaAttKora] = await Promise.all([
+    const [{ data: rader, error }, { data: underlag, error: uFel }, attKora, allaAttKora, { data: kopplingar }] = await Promise.all([
       supabase.from('kontering_prov').select(RAD_KOLUMNER).eq('user_id', userId).order('created_at', { ascending: false }).order('del').limit(100),
       supabase.from('bokforing_underlag').select('id, file_name, mime_type, created_at, sortering, sortering_orsak, del_av, flode_at, kund_svar_at')
         .eq('user_id', userId).order('created_at', { ascending: false }).limit(2000),
       underlagAttKora(supabase, userId),
       underlagAttKora(supabase, userId, true),
+      // Filer som kopplats till en befintlig transaktion som extra underlag (@/lib/kontering/omgang/skriv)
+      supabase.from('underlag_kopplingar').select('underlag_id, transaktion_id')
+        .eq('user_id', userId).not('transaktion_id', 'is', null).limit(5000),
     ]);
     if (error) throw new Error(error.message);
     if (uFel) throw new Error(uFel.message);
@@ -109,6 +112,7 @@ export async function GET(request: NextRequest) {
       underlag: (underlag ?? []).map((u) => ({ ...u, transaktioner: antal.get(u.id) ?? 0 })),
       attKora,
       allaAttKora,
+      kopplingar: kopplingar ?? [],
     });
   } catch (err) {
     return fel(err);
