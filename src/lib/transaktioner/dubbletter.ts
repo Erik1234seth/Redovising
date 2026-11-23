@@ -16,8 +16,18 @@ import { DAGAR_FORE_FAKTURADATUM, MANADER_EFTER_FORFALLO } from '../betalningar/
  * - en faktura: från en vecka före fakturadatumet till en månad efter
  *   förfallodagen, samma fönster som betalningsmatchningen (../betalningar/matcha).
  *   Närmast betaldagen (betaldatumet, annars förfallodagen) vinner.
- * Varje underlagsrad kan bara matcha en bankrad. Allt räknas om varje gång, så
- * en rad som raderats eller lästs om tappar sin flagga.
+ * Visar underlaget betaldatumet räcker fönstret alltid till några dagar efter
+ * det, så att en sen betalning ändå kopplas.
+ * Varje underlagsrad kan bara matcha en bankrad.
+ *
+ * Före beloppsmatchningen gäller betalningsmatchningen (../betalningar/kor):
+ * betalar en bankrad en inskickad faktura — på fakturanummer, OCR, del av
+ * beloppet eller i en annan valuta — pekar den på fakturans transaktion. Den
+ * bokförs då aldrig för sig, eftersom fakturan redan är bokförd med sin
+ * betalning. Kör därför betalningsmatchningen först.
+ *
+ * Allt räknas om varje gång, så en rad som raderats eller lästs om tappar sin
+ * flagga.
  */
 
 const MAX_DAGAR = 5;
@@ -33,6 +43,8 @@ interface Rad {
   dublett_av: string | null;
   dublett_orsak: string | null;
   uppgifter: Record<string, unknown> | null;
+  bank_konto_hash: string | null;
+  bank_transaktion_id: string | null;
 }
 
 const DATUM = /^\d{4}-\d{2}-\d{2}$/;
@@ -41,6 +53,9 @@ const datumUr = (v: unknown) => (typeof v === 'string' && DATUM.test(v.trim()) ?
 function plusDagar(d: string, n: number): string {
   return new Date(Date.parse(`${d}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 }
+
+const tidigast = (a: string, b: string) => (a < b ? a : b);
+const senast = (a: string, b: string) => (a > b ? a : b);
 
 function plusManader(d: string, n: number): string {
   const x = new Date(`${d}T00:00:00Z`);
@@ -51,17 +66,26 @@ function plusManader(d: string, n: number): string {
 /** Datumen en bankrad får ha för att betala underlagsraden, och dagen den helst ska ligga nära. */
 function fonster(u: Rad): { fran: string; till: string; mal: string } {
   const uppg = u.uppgifter ?? {};
+  const betaldatum = datumUr(uppg.betaldatum);
+  let f: { fran: string; till: string; mal: string };
   if (/faktura/i.test(String(uppg.dokumenttyp ?? ''))) {
     const fakturadatum = datumUr(uppg.fakturadatum) ?? u.datum!;
     const ff = datumUr(uppg.forfallodatum);
     const forfallo = ff && ff > fakturadatum ? ff : fakturadatum;
-    return {
+    f = {
       fran: plusDagar(fakturadatum, -DAGAR_FORE_FAKTURADATUM),
       till: plusManader(forfallo, MANADER_EFTER_FORFALLO),
-      mal: datumUr(uppg.betaldatum) ?? forfallo,
+      mal: betaldatum ?? forfallo,
     };
+  } else {
+    f = { fran: plusDagar(u.datum!, -MAX_DAGAR), till: plusDagar(u.datum!, MAX_DAGAR), mal: betaldatum ?? u.datum! };
   }
-  return { fran: plusDagar(u.datum!, -MAX_DAGAR), till: plusDagar(u.datum!, MAX_DAGAR), mal: u.datum! };
+  // Betaldatumet på underlaget gäller: banken bokför betalningen samma dag eller några dagar senare
+  if (betaldatum) {
+    f.fran = tidigast(f.fran, plusDagar(betaldatum, -MAX_DAGAR));
+    f.till = senast(f.till, plusDagar(betaldatum, MAX_DAGAR));
+  }
+  return f;
 }
 
 function dagar(a: string, b: string): number {
@@ -77,7 +101,7 @@ async function lasRader(supabase: SupabaseClient, userId: string): Promise<Rad[]
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from('transaktioner')
-      .select('id, kalla, datum, belopp, valuta, riktning, dublett_av, dublett_orsak, uppgifter')
+      .select('id, kalla, datum, belopp, valuta, riktning, dublett_av, dublett_orsak, uppgifter, bank_konto_hash, bank_transaktion_id')
       .eq('user_id', userId)
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`Kunde inte läsa transaktionerna: ${error.message}`);
@@ -85,6 +109,26 @@ async function lasRader(supabase: SupabaseClient, userId: string): Promise<Rad[]
     if ((data ?? []).length < PAGE) break;
   }
   return out;
+}
+
+/** Bankrader som betalningsmatchningen kopplat till en inskickad faktura: bankraden → fakturans transaktion. */
+async function lasBetalningar(supabase: SupabaseClient, userId: string): Promise<Map<string, string>> {
+  const ut = new Map<string, string>();
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('betalningskopplingar')
+      .select('transaktion_id, konto_hash, bank_transaktion_id, status')
+      .eq('user_id', userId).not('transaktion_id', 'is', null).neq('status', 'avvisad')
+      .order('id').range(from, from + PAGE - 1);
+    if (error) throw new Error(`Kunde inte läsa betalningskopplingarna: ${error.message}`);
+    for (const k of data ?? []) {
+      const nyckel = `${k.konto_hash}|${k.bank_transaktion_id}`;
+      // Byråns bekräftade koppling går före en automatisk
+      if (!ut.has(nyckel) || k.status === 'bekraftad') ut.set(nyckel, k.transaktion_id as string);
+    }
+    if ((data ?? []).length < PAGE) break;
+  }
+  return ut;
 }
 
 /** Bankinsättningar som redan är bokförda i en Zettle- eller Shopify-dagskassa. */
@@ -119,7 +163,18 @@ export async function markeraDubbletter(supabase: SupabaseClient, userId: string
   const upptagna = new Set<string>();
   const onskat = new Map<string, { dublett_av: string | null; dublett_orsak: string | null }>();
 
+  // Bankrader som betalar en inskickad faktura hör till fakturans transaktion
+  const betalningar = await lasBetalningar(supabase, userId);
+  const finns = new Set(underlag.map((u) => u.id));
   for (const b of bank) {
+    const mal = betalningar.get(`${b.bank_konto_hash}|${b.bank_transaktion_id}`);
+    if (!mal || !finns.has(mal)) continue;
+    onskat.set(b.id, { dublett_av: mal, dublett_orsak: null });
+    upptagna.add(mal);
+  }
+
+  for (const b of bank) {
+    if (onskat.has(b.id)) continue;
     let basta: Rad | null = null;
     let bastaAvstand = Infinity;
     for (const u of underlag) {

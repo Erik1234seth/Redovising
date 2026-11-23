@@ -248,17 +248,18 @@ export async function synkaBank(supabase: SupabaseClient, userId: string, { daga
     }
   }
 
-  try {
-    await markeraDubbletter(supabase, userId);
-  } catch (err) {
-    fel.push(err instanceof Error ? err.message : String(err));
-  }
   // Nya bankrader kan betala kundens fakturor. Ett fel här stoppar inte
   // synken och visas inte för kunden — kopplingarna räknas om nästa gång.
+  // Den körs före dubblettmarkeringen, som kopplar betalningen till fakturans transaktion.
   try {
     await matchaBetalningar(supabase, userId);
   } catch (err) {
     console.error('[bank] betalningsmatchningen misslyckades för', userId, err);
+  }
+  try {
+    await markeraDubbletter(supabase, userId);
+  } catch (err) {
+    fel.push(err instanceof Error ? err.message : String(err));
   }
   const totalt = await antalBankrader(supabase, userId);
   const nya = fore !== null && totalt !== null ? Math.max(0, totalt - fore) : null;

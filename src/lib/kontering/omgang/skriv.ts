@@ -127,8 +127,9 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
   // Matcha dem nu, i stället för vid nästa banksynk. Ett fel här stoppar inte
   // körningen — matchningen räknas om från början nästa gång.
   if (skrivna.size) {
-    await markeraDubbletter(supabase, userId).catch((err) => console.error('[flode] dubblettmatchningen mot banken misslyckades:', err));
+    // Betalningsmatchningen först: en bankrad som betalar en faktura kopplas till fakturans transaktion
     await matchaBetalningar(supabase, userId).catch((err) => console.error('[flode] betalningsmatchningen misslyckades:', err));
+    await markeraDubbletter(supabase, userId).catch((err) => console.error('[flode] dubblettmatchningen mot banken misslyckades:', err));
   }
 }
 
