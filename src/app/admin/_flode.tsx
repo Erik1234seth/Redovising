@@ -604,6 +604,19 @@ export function Flode({ userId }: { userId: string }) {
               </button>
               {startfel && <span className="text-sm text-red-600 basis-full">{startfel}</span>}
             </div>
+            {filer.length > 0 && (() => {
+              // Markerar alla som syns, alltså de som matchar sökningen
+              const allaValda = filer.every((u) => valda.includes(u.id));
+              const ids = new Set(filer.map((u) => u.id));
+              return (
+                <label className="flex items-center gap-3 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-50 border-b border-slate-200 cursor-pointer select-none">
+                  <input type="checkbox" checked={allaValda} className="accent-blue-600"
+                    onChange={() => setValda((l) => (allaValda ? l.filter((id) => !ids.has(id)) : [...new Set([...l, ...ids])]))} />
+                  {allaValda ? 'Avmarkera alla' : 'Markera alla'}
+                  <span className="text-xs font-normal text-slate-400">{filer.length} {filsok ? 'som matchar sökningen' : 'underlag'}</span>
+                </label>
+              );
+            })()}
             <ul className="divide-y divide-slate-100">
               {filer.map((u) => (
                 <li key={u.id}>
