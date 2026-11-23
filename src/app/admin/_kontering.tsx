@@ -8,7 +8,7 @@ import { kr } from './_verifikationer';
 /**
  * Konteringen av kundens transaktioner enligt K1.
  *
- * Båda modellerna (GPT-6.1 Sol och Claude Opus 5.5) konterar varje transaktion.
+ * Båda modellerna (GPT-6.2 Sol och Claude Opus 5.5) konterar varje transaktion.
  * När båda är gröna och har valt samma konto och moms är den klar; annars blir
  * det förslag, och här väljer Erik ett av dem eller ett eget konto. Det som är
  * klart bokförs direkt (se `@/lib/kontering/preliminar`).
@@ -26,6 +26,7 @@ type Status = 'okonterad' | 'forslag' | 'preliminar' | 'bokford';
 type Filter = Status | 'alla';
 
 const MODELLNAMN: Record<string, string> = {
+  'gpt-6.2-sol': 'GPT-6.2 Sol',
   'gpt-6.1-sol': 'GPT-6.1 Sol',
   'gpt-6-astra': 'GPT-6 Astra',
   'gpt-5.5': 'GPT-5.5',

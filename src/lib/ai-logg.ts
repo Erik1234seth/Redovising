@@ -22,6 +22,7 @@ export interface Anropsinfo {
  * svaret en och en halv gång.
  */
 const PRISER: Record<string, { indata: number; cacheLast: number; cacheSkriv?: number; utdata: number; lang?: { over: number; indata: number; utdata: number } }> = {
+  'gpt-6.2-sol': { indata: 2, cacheLast: 0.1, utdata: 10, lang: { over: 272_000, indata: 2, utdata: 1.5 } },
   'gpt-6.1-sol': { indata: 2, cacheLast: 0.1, utdata: 10, lang: { over: 272_000, indata: 2, utdata: 1.5 } },
   'gpt-6-luna': { indata: 0.1, cacheLast: 0.01, utdata: 0.5 },
   'text-embedding-3-small': { indata: 0.02, cacheLast: 0, utdata: 0 },

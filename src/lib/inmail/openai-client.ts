@@ -7,7 +7,7 @@ export async function callOpenAI(options: {
   messages: Array<{ role: string; content: unknown }>;
   responseFormat?: { type: 'json_object' | 'text' };
   maxTokens?: number;
-  /** Anges alltid — utan den tänker gpt-6.1-sol inte alls, inte ens på svåra frågor. */
+  /** Anges alltid — utan den tänker gpt-6.2-sol inte alls, inte ens på svåra frågor. */
   effort: 'low' | 'medium' | 'high';
   /** Vilket steg anropet hör till, för kostnadsloggen. */
   anrop: Anropsinfo;

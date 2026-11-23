@@ -23,7 +23,7 @@ import { iKo, openaiFetch } from '@/lib/ai-anrop';
  * regler från flödesschemat följer med (instruktioner.ts).
  */
 
-const MODELL = 'gpt-6.1-sol';
+const MODELL = 'gpt-6.2-sol';
 const PER_ANROP = 8;
 const SAMTIDIGA = 3;
 

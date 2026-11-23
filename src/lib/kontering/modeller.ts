@@ -17,11 +17,13 @@ import { loggaClaude, loggaOpenAI, type Anropsinfo } from '@/lib/ai-logg';
  */
 
 /**
- * Bara GPT-6.1 Sol sedan 2026-11-07: Claude Opus 5.5 är avstängd, och
+ * GPT-6.2 Sol ersatte GPT-6.1 Sol rakt av 2026-11-23, till samma pris.
+ *
+ * Bara GPT Sol sedan 2026-11-07: Claude Opus 5.5 är avstängd, och
  * konteringen görs i Flöde (@/lib/kontering/omgang). Den här listan används
  * när byrån konterar om en enstaka transaktion.
  */
-export const MODELLER = ['gpt-6.1-sol'] as const;
+export const MODELLER = ['gpt-6.2-sol'] as const;
 /** Konteringens modeller, och de andra som går genom samma anrop (kundbilden och helhetskontrollen). */
 export type Modell = (typeof MODELLER)[number] | 'claude-opus-5-5' | 'claude-sonnet-5-5';
 

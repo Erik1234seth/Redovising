@@ -74,7 +74,7 @@ Ange rätt BAS-konton för debet och kredit. Debetera kostnadskontot och kredite
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-6.1-sol',
+        model: 'gpt-6.2-sol',
         reasoning_effort: 'medium',
         response_format: { type: 'json_object' },
         messages: [

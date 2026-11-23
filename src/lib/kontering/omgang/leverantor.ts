@@ -9,7 +9,7 @@ import type { Svarsstatus } from './openai';
  * schemat och prövningen av svaret är desamma; det som skiljer är hur filerna
  * laddas upp och hur anropet skickas och hämtas.
  *
- *   gpt-6.1-sol      OpenAI, bakgrundsläget (fullpris, svar på några minuter)
+ *   gpt-6.2-sol      OpenAI, bakgrundsläget (fullpris, svar på några minuter)
  *   claude-opus-5-5  Claude, Batch-API:t (halva priset, svar när batchen körts)
  */
 
@@ -17,6 +17,9 @@ export const FLODESMODELLER = [MODELL, claude.CLAUDE_MODELL] as const;
 export type Flodesmodell = (typeof FLODESMODELLER)[number];
 
 export const arFlodesmodell = (m: unknown): m is Flodesmodell => FLODESMODELLER.includes(m as Flodesmodell);
+
+/** Modeller Flöde kört med förut. Deras konteringar finns kvar och gäller tills filen körs om. */
+export const TIDIGARE_FLODESMODELLER = ['gpt-6.1-sol'] as const;
 
 export interface Leverantor {
   modell: Flodesmodell;

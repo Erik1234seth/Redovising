@@ -10,7 +10,7 @@ import { slaUppKonto } from '../regelverk';
 
 /**
  * Flöde: konteringen sedan 2026-11-07. Omgången körs på valda underlag med
- * GPT-6.1 Sol eller Claude Opus 5.5 (./leverantor). Svaret prövas i kod och
+ * GPT-6.2 Sol eller Claude Opus 5.5 (./leverantor). Svaret prövas i kod och
  * skrivs till bokföringen (./skriv) — transaktioner och konteringar — och
  * körningen sparas i `kontering_prov` så att den syns i fliken Flöde.
  *

@@ -19,7 +19,7 @@ import { build, locate, type Built } from '@/lib/personer';
  * Fel loggas och sväljs per person, så en trasig person stoppar inte resten.
  */
 
-const MODELL = 'gpt-6.1-sol';
+const MODELL = 'gpt-6.2-sol';
 
 /** Per meddelande och totalt i det AI:n får läsa om en person. */
 const MEDDELANDE_MAX_TECKEN = 1500;

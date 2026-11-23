@@ -27,7 +27,7 @@ import { cleanBody } from '@/lib/inmail/clean-body';
  * köras om med kundens svar.
  */
 
-const MODELL = 'gpt-6.1-sol';
+const MODELL = 'gpt-6.2-sol';
 /** AI:ns svar när underlaget är komplett och kunden inte frågar något. Då skrivs inget utkast. */
 const INGET_SVAR = 'INGET_SVAR';
 

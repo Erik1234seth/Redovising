@@ -271,7 +271,7 @@ SMS klarar bara enkla tecken.
 
   const answer = await callOpenAI({
     anrop: { steg: 'sms-svar' },
-    model: 'gpt-6.1-sol',
+    model: 'gpt-6.2-sol',
     effort: 'low',
     messages: [
       { role: 'system', content: systemPrompt + anteckningar },

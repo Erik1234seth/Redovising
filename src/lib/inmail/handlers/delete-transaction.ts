@@ -74,7 +74,7 @@ Om du är osäker: sätt transaction_indices: [] och förklara i replyMessage.`;
 
   const raw = await callOpenAI({
     anrop: { steg: 'mejl-radera-transaktion', userId: profile.id },
-    model: 'gpt-6.1-sol',
+    model: 'gpt-6.2-sol',
     effort: 'medium',
     messages: [
       { role: 'system', content: systemPrompt },

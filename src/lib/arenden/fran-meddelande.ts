@@ -11,7 +11,7 @@ import { callOpenAI, parseJSON } from '@/lib/inmail/openai-client';
  * och sväljs.
  */
 
-const MODELL = 'gpt-6.1-sol';
+const MODELL = 'gpt-6.2-sol';
 
 interface Forslag { titel: string; beskrivning?: string; datum?: string | null }
 

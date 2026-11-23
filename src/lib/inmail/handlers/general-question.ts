@@ -152,7 +152,7 @@ export async function handleGeneralQuestion(params: {
   const userContent = [smsKontext, mejl, underlagKontext].filter(Boolean).join('\n\n');
 
   const answer = await callOpenAI({
-    model: 'gpt-6.1-sol',
+    model: 'gpt-6.2-sol',
     effort: 'medium',
     anrop: { steg: params.steg ?? 'mejl-svar', userId: profile.id },
     messages: [

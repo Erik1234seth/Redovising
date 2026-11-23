@@ -123,7 +123,7 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-6.1-sol',
+        model: 'gpt-6.2-sol',
         reasoning_effort: 'high',
         response_format: { type: 'json_object' },
         messages: [

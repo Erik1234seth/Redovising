@@ -42,7 +42,7 @@ Returnera JSON:
 
   const raw = await callOpenAI({
     anrop: { steg: 'mejl-onboarding' },
-    model: 'gpt-6.1-sol',
+    model: 'gpt-6.2-sol',
     effort: 'low',
     messages: [
       { role: 'system', content: systemPrompt },

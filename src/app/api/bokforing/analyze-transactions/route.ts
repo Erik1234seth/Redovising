@@ -56,7 +56,7 @@ async function analyzeContent(userContent: unknown, apiKey: string, fileName: st
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'gpt-6.1-sol',
+      model: 'gpt-6.2-sol',
       reasoning_effort: 'medium',
       response_format: { type: 'json_object' },
       messages: [

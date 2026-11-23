@@ -667,7 +667,7 @@ function byggKontering(
  * moms, gränsprövningar och flaggor som i samtalet.
  */
 export function konteringUrBeslut(t: Transaktion, betalsatt: Betalsatt, beslut: Beslut, regelIdn: string[]): Kontering {
-  return byggKontering('gpt-6.1-sol', t, betalsatt, beslut, regelIdn, new Set(['gpt-6.1-sol']), {
+  return byggKontering('gpt-6.2-sol', t, betalsatt, beslut, regelIdn, new Set(['gpt-6.2-sol']), {
     analys: String(beslut.analys ?? ''), lasta: [], sokningar: new Set(), filer: new Set(), tidSlut: false,
   });
 }
@@ -879,7 +879,7 @@ async function rattaEfterKontext(supabase: SupabaseClient, t: Transaktion, betal
   const { data: r } = await fraga<{
     datum: string | null; belopp: number | null; moms: number | null;
     valuta: string | null; riktning: 'in' | 'ut' | null; kommentar: string;
-  }>('gpt-6.1-sol', {
+  }>('gpt-6.2-sol', {
     system: { fast: RATTELSE_FAST, kund: '' },
     user: `TRANSAKTIONEN:\n${transaktionText(t, betalsatt)}\n\nBYRÅNS INSTRUKTION:\n${kontext}`,
     namn: 'rattelse',
@@ -1102,7 +1102,7 @@ export async function konteraMedInstruktion(
   const { data: r } = await fraga<{
     datum: string | null; belopp: number | null; moms: number | null;
     valuta: string | null; riktning: 'in' | 'ut' | null; kommentar: string;
-  }>('gpt-6.1-sol', {
+  }>('gpt-6.2-sol', {
     system: { fast: RATTELSE_FAST, kund: '' },
     user: `TRANSAKTIONEN:\n${transaktionText(t, betalsatt)}\n\nBYRÅNS INSTRUKTION:\n${instruktion}`,
     namn: 'rattelse',

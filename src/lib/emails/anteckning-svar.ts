@@ -59,7 +59,7 @@ Returnera JSON:
   try {
     const raw = await callOpenAI({
       anrop: { steg: 'svar-pa-anteckning' },
-      model: 'gpt-6.1-sol',
+      model: 'gpt-6.2-sol',
       effort: 'low',
       messages: [
         { role: 'system', content: systemPrompt },

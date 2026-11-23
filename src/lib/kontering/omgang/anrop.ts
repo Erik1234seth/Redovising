@@ -20,8 +20,8 @@ import { allaKonton, kontoBlock } from '../regelverk';
  * som förut (../kontera).
  */
 
-export const MODELL = 'gpt-6.1-sol';
-/** Svarets tak hos gpt-6.1-sol. Tänkandet räknas in. */
+export const MODELL = 'gpt-6.2-sol';
+/** Svarets tak hos gpt-6.2-sol. Tänkandet räknas in. */
 const MAX_UTDATA = 128_000;
 
 /** Hela regeltexten för varje konto — modellen har inga verktyg att slå upp med. */

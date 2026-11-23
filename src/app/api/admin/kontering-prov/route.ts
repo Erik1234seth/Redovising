@@ -17,7 +17,7 @@ import { korOmPending, pendingInfo } from '@/lib/kontering/pending';
  *           mer information, med om frågan skickats (@/lib/kontering/pending).
  *   POST    starta en körning: { nya: true } tar allt som inte körts, { alla: true } allt
  *           som går att köra (Kör om alla), annars underlagIds.
- *           modell: 'gpt-6.1-sol' | 'claude-opus-5-5' (GPT om inget anges), och
+ *           modell: 'gpt-6.2-sol' | 'claude-opus-5-5' (GPT om inget anges), och
  *           jamfor: true kör samma underlag med den andra modellen som jämförelse.
  *           { anteckning, transaktioner: [{ underlagId, vilken }] } sparar byråns
  *           anteckning som kontext på underlagen och kör om dem.

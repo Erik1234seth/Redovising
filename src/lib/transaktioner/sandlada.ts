@@ -19,7 +19,7 @@ import {
  * gjorde, som sparas på underlaget och syns i panelen.
  */
 
-const MODELL = 'gpt-6.1-sol';
+const MODELL = 'gpt-6.2-sol';
 const UTFIL = 'resultat.json';
 
 const INSTRUKTION = `Du läser underlag åt en svensk bokföringsbyrå. Den bifogade filen är ett kalkylblad, en textlista eller en PDF ur ett bokförings- eller kassasystem.

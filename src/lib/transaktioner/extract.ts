@@ -36,9 +36,9 @@ export type { ExtraheradTransaktion, ExtraheradVerifikation };
  * SIE-filer går ingen av vägarna. De tolkas med kod i `@/lib/sie/parse`.
  */
 
-const MODELL = 'gpt-6.1-sol';
+const MODELL = 'gpt-6.2-sol';
 
-// Taket för ett svar hos gpt-6.1-sol. Filen delas inte upp, så hela avskriften
+// Taket för ett svar hos gpt-6.2-sol. Filen delas inte upp, så hela avskriften
 // ska få plats i ett svar — och modellens eget tänkande ryms i samma budget.
 const MAX_TOKENS = 100000;
 
