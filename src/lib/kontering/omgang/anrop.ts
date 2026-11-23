@@ -123,6 +123,7 @@ Vad mer som behövs i särskilda fall — VAT-nummer, ROT och RUT, representatio
 Det kunden redan svarat på i mejlen saknas inte. Ett underlag behöver inte uppfylla alla formella krav — visar det vad som köpts, beloppet och momsen räcker det. Gör hellre ett rimligt antagande än att fråga om sådant som inte spelar någon roll: fråga bara när ett fel antagande ger fel moms, fel avdrag eller fel skatt.
 Be inte om en rättad eller ny faktura för formfel när affären ändå går att bokföra — ett organisations- eller momsnummer som inte stämmer, öresavrundning, ett namn som avviker. Gör ett antagande och skriv det i "antaganden". Hellre en fråga kunden svarar på med ett ord ("Var det en kundmiddag?") än ett nytt dokument, och en fråga för det som har samma svar.
 - "saknas": en rad per sak, "vad" kort och så att kunden förstår ("momsbeloppet", "vilka som deltog och syftet"), "varfor" en mening till byrån. Tom lista när det räcker.
+- "preliminara_konton": när "saknas" inte är tom väntar transaktionen på svar, och då står här de konton affären kan hamna på beroende på svaret — kontot du valt i "kontering" först. "nar" är vilket svar som leder dit, t.ex. {"konto": "6071", "nar": "om det var en kundmiddag"}. Transaktionen konteras om med dem när kunden svarat eller nya bankrader kommit. Tom lista när inget saknas.
 - "antaganden": de antaganden konteringen bygger på, t.ex. "Utgår från att datorn används i verksamheten." Inte att konteringen är preliminär eller väntar på svar. Tom sträng när inget.
 
 KONTERING
@@ -197,7 +198,7 @@ export function schema(regelIdn: string[]) {
     type: 'object',
     additionalProperties: false,
     required: ['datum', 'beskrivning', 'motpart', 'belopp', 'moms', 'valuta', 'riktning', 'vat_nummer', 'anteckning', 'uppgifter',
-      'dublett', 'saknas', 'antaganden', 'kontering'],
+      'dublett', 'saknas', 'preliminara_konton', 'antaganden', 'kontering'],
     properties: {
       datum: text,
       beskrivning: text,
@@ -218,6 +219,10 @@ export function schema(regelIdn: string[]) {
       saknas: {
         type: 'array',
         items: { type: 'object', additionalProperties: false, required: ['vad', 'varfor'], properties: { vad: text, varfor: text } },
+      },
+      preliminara_konton: {
+        type: 'array',
+        items: { type: 'object', additionalProperties: false, required: ['konto', 'nar'], properties: { konto: text, nar: text } },
       },
       antaganden: text,
       kontering: {
@@ -291,6 +296,8 @@ export interface SvarTransaktion {
   uppgifter: Record<string, unknown>;
   dublett: { status: 'unik' | 'tveksam' | 'dublett'; ref: string; motivering: string };
   saknas: { vad: string; varfor: string }[];
+  /** Saknas i svar från före 2026-11-23. */
+  preliminara_konton?: { konto: string; nar: string }[];
   antaganden: string;
   kontering: {
     delar: { konto: string; momssats: 0 | 6 | 12 | 25; belopp: number; moms: number | null }[];

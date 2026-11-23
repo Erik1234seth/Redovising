@@ -59,6 +59,10 @@ interface Tx {
   /** transaktionId: den befintliga transaktionen raden pekar på, när den gick att slå upp. */
   dublett: { status: 'unik' | 'tveksam' | 'dublett'; ref: string; refText?: string; motivering: string; transaktionId?: string | null };
   saknas: { vad: string; varfor: string }[];
+  /** Pending: kontona affären kan hamna på beroende på svaret. */
+  preliminara?: { konto: string; kontonamn: string; nar: string }[];
+  /** Pending-transaktionen har konterats om med ny information (@/lib/kontering/pending). */
+  omkord?: { at: string; antal: number; lost: boolean };
   antaganden: string;
   kontering: {
     konto: string | null;
@@ -208,6 +212,15 @@ type Rad = Post[];
 
 interface Koppling { underlag_id: string; transaktion_id: string }
 
+/** En transaktion som väntar på mer information (@/lib/kontering/pending). */
+interface PendingInfo { fragaSkickad: string | null; utkast: boolean; provadAt: string | null; omkorningar: number }
+
+/** Pending-transaktionerna, efter transaktionens id. */
+const Pending = createContext<Record<string, PendingInfo>>({});
+
+const DAGEN = new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'short' });
+const dagar = (d: string) => Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000);
+
 /** En fil i Övrigt: sorterades bort, gav inga transaktioner eller kördes inte. */
 interface OvrigFil { id: string; namn: string; typ: string; orsak: string; varning: boolean }
 
@@ -229,6 +242,9 @@ function fragan(t: Tx): string | null {
 
 type Flik = 'transaktioner' | 'granska' | 'ovrigt' | 'underlag';
 
+/** Granska: allt, det som väntar på mer information, eller det som byrån själv ska avgöra. */
+type GranskaVy = 'alla' | 'pending' | 'avgora';
+
 const Atgarder = createContext<{
   godkann: (plats: Plats, val: boolean) => Promise<void>;
   korOm: (text: string, underlagId: string, vilken: string) => Promise<void>;
@@ -242,6 +258,8 @@ export function Flode({ userId }: { userId: string }) {
   const [attKora, setAttKora] = useState<string[]>([]);
   const [rader, setRader] = useState<Provrad[]>([]);
   const [kopplingar, setKopplingar] = useState<Koppling[]>([]);
+  const [pending, setPending] = useState<Record<string, PendingInfo>>({});
+  const [granskaVy, setGranskaVy] = useState<GranskaVy>('alla');
   const [laddfel, setLaddfel] = useState('');
   const [flik, setFlik] = useState<Flik | null>(null);
   const [sok, setSok] = useState('');
@@ -260,6 +278,7 @@ export function Flode({ userId }: { userId: string }) {
       setAttKora(data.attKora ?? []);
       setRader(data.korningar);
       setKopplingar(data.kopplingar ?? []);
+      setPending(data.pending ?? {});
       setLaddfel('');
     } catch (err) {
       setLaddfel(err instanceof Error ? err.message : String(err));
@@ -463,6 +482,14 @@ export function Flode({ userId }: { userId: string }) {
       .some((x) => x?.toLowerCase().includes(q));
   };
   const passar = (r: Rad) => r.some(passarPost);
+  const arPending = (r: Rad) => r.some((p) => !arKlar(p.t) && !!p.t.transaktionId && !!pending[p.t.transaktionId]);
+  const pendingRader = granskaRader.filter(arPending);
+  const visadeGranska = granskaRader.filter((r) => granskaVy === 'alla' || (granskaVy === 'pending') === arPending(r));
+  const VYER: { id: GranskaVy; namn: string; antal: number }[] = [
+    { id: 'alla', namn: 'Alla', antal: antal(granskaRader) },
+    { id: 'pending', namn: 'Väntar på information', antal: antal(pendingRader) },
+    { id: 'avgora', namn: 'Att avgöra', antal: antal(granskaRader) - antal(pendingRader) },
+  ];
 
   const filer = (underlag ?? []).filter((u) => u.sortering !== 'ovrigt' && (!filsok || u.file_name.toLowerCase().includes(filsok.toLowerCase())));
   const nyaSet = new Set(attKora);
@@ -494,6 +521,7 @@ export function Flode({ userId }: { userId: string }) {
 
   return (
     <Atgarder.Provider value={atgarder}>
+     <Pending.Provider value={pending}>
       <div>
         <div className="flex gap-6 border-b border-slate-200 mb-4">
           {FLIKAR.map((f) => (
@@ -519,8 +547,19 @@ export function Flode({ userId }: { userId: string }) {
         {vald === 'granska' && (
           <>
             <OsakraMejl userId={userId} uppdaterad={rader} />
+            {pendingRader.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {VYER.map((v) => (
+                  <button key={v.id} onClick={() => setGranskaVy(v.id)}
+                    className={`text-xs rounded-full px-3 py-1 border transition ${granskaVy === v.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-300 text-slate-700 hover:border-slate-400'}`}>
+                    {v.namn} <span className="tabular-nums opacity-70">{v.antal}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {granskaRader.length > 0 && filterRad}
-            <Lista rader={granskaRader.filter(passar)} granska tom={granskaRader.length ? 'Inget matchar sökningen.' : 'Inget att granska.'} />
+            <Lista rader={visadeGranska.filter(passar)} granska
+              tom={!granskaRader.length ? 'Inget att granska.' : visadeGranska.length ? 'Inget matchar sökningen.' : granskaVy === 'pending' ? 'Inget väntar på information.' : 'Inget att avgöra.'} />
             {(kontroller.length > 0 || anteckningar.length > 0) && (
               <details className="mt-4 text-sm bg-slate-50 border border-slate-200 rounded-xl group">
                 <summary className="px-4 py-2.5 font-medium text-slate-700 cursor-pointer select-none list-none flex items-center gap-2">
@@ -579,7 +618,26 @@ export function Flode({ userId }: { userId: string }) {
           </div>
         )}
       </div>
+     </Pending.Provider>
     </Atgarder.Provider>
+  );
+}
+
+/** Pending-märket: att transaktionen väntar på information, och om frågan skickats till kunden. */
+function PendingMarke({ info }: { info: PendingInfo }) {
+  const gammal = !!info.fragaSkickad && dagar(info.fragaSkickad) >= 7;
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+      <span className="font-medium text-sky-800 bg-sky-100 rounded-full px-2 py-px whitespace-nowrap">Väntar på information</span>
+      {info.fragaSkickad ? (
+        <span className={`whitespace-nowrap ${gammal ? 'text-orange-700' : 'text-slate-600'}`}>
+          ✉ Fråga skickad {DAGEN.format(new Date(info.fragaSkickad))}{gammal ? ` · ${dagar(info.fragaSkickad)} dagar utan svar` : ''}
+        </span>
+      ) : (
+        <span className="text-slate-500 whitespace-nowrap">{info.utkast ? 'Frågan ligger som utkast, inte skickad' : 'Ingen fråga skickad'}</span>
+      )}
+      {info.provadAt && <span className="text-slate-400 whitespace-nowrap">Prövad igen {DAGEN.format(new Date(info.provadAt))}</span>}
+    </span>
   );
 }
 
@@ -630,6 +688,8 @@ function TxKort({ post: p, granska, oppen, onKlick }: { post: Post; granska: boo
   const [godkannFel, setGodkannFel] = useState('');
   const fraga = granska ? fragan(t) : null;
   const kanGodkanna = !kopplad && k?.omdome === 'gul' && !t.godkand;
+  const pending = useContext(Pending);
+  const vantar = granska && t.transaktionId ? pending[t.transaktionId] : undefined;
 
   async function godkann(val: boolean) {
     setSparar(true);
@@ -657,17 +717,26 @@ function TxKort({ post: p, granska, oppen, onKlick }: { post: Post; granska: boo
               {k && <span className="text-slate-400 text-xs whitespace-nowrap">{momsText(k.momssats, k.momsdelar, k.omvand)}</span>}
               {t.godkand && <span className="text-xs text-emerald-700">✓ Godkänd</span>}
               {t.andrad && <span className="text-xs text-emerald-700">✎ Ändrad</span>}
+              {!granska && t.omkord?.lost && <span className="text-xs text-emerald-700 whitespace-nowrap">Löst med ny information</span>}
             </>
           )}
           <span className="ml-auto text-xs text-slate-400 truncate max-w-[40%]">
             {p.filnamn}{p.filer.length > 1 && <span className="ml-1 text-slate-500">+{p.filer.length - 1}</span>}
           </span>
         </div>
+        {vantar && (
+          <div className="flex items-center gap-3 mt-2">
+            <span className="w-20 shrink-0" />
+            <PendingMarke info={vantar} />
+          </div>
+        )}
         {(fraga || kanGodkanna) && (
           <div className="flex items-center gap-3 mt-2 text-sm">
             <span className="w-20 shrink-0" />
             {fraga && <span className="text-amber-800 text-xs flex-1 line-clamp-2">{fraga}</span>}
-            {kanGodkanna && (
+            {/* Pending väntar på information: Godkänn finns i det utfällda kortet, bredvid Redigera */}
+            {vantar && <span className="ml-auto text-xs font-medium text-sky-800 bg-sky-100 rounded-lg px-3 py-1">Pending</span>}
+            {kanGodkanna && !vantar && (
               <button onClick={(e) => { e.stopPropagation(); godkann(true); }} disabled={sparar}
                 className="ml-auto text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg px-3 py-1 disabled:opacity-40">
                 {sparar ? 'Sparar…' : 'Godkänn'}
@@ -677,13 +746,14 @@ function TxKort({ post: p, granska, oppen, onKlick }: { post: Post; granska: boo
         )}
         {godkannFel && <p className="mt-1 text-xs text-red-600">{godkannFel}</p>}
       </div>
-      {oppen && <TxDetaljer post={p} onAngra={t.godkand ? () => godkann(false) : undefined} sparar={sparar} />}
+      {oppen && <TxDetaljer post={p} onAngra={t.godkand ? () => godkann(false) : undefined}
+        onGodkann={vantar && kanGodkanna ? () => godkann(true) : undefined} sparar={sparar} />}
     </div>
   );
 }
 
 /** Det utfällda kortet: AI:ns resonemang, verifikationen och åtgärderna. */
-function TxDetaljer({ post: p, onAngra, sparar }: { post: Post; onAngra?: () => void; sparar: boolean }) {
+function TxDetaljer({ post: p, onAngra, onGodkann, sparar }: { post: Post; onAngra?: () => void; onGodkann?: () => void; sparar: boolean }) {
   const a = useContext(Atgarder)!;
   const { t, gammal } = p;
   const k = t.kontering;
@@ -706,6 +776,26 @@ function TxDetaljer({ post: p, onAngra, sparar }: { post: Post; onAngra?: () => 
           <p className="text-slate-700 leading-relaxed">{k.motivering}</p>
           {t.antaganden && <p className="text-slate-500 mt-1.5">Antaganden: {t.antaganden}</p>}
           {k.regler.length > 0 && <p className="text-slate-500 mt-1">Kundregler: {k.regler.join(', ')}</p>}
+          {t.omkord && (
+            <p className="text-slate-500 mt-1">
+              Konterad igen med ny information {DAGEN.format(new Date(t.omkord.at))}{t.omkord.lost ? ' — det räckte, och den bokfördes.' : ' — det räckte inte än.'}
+            </p>
+          )}
+        </section>
+      )}
+
+      {!arKlar(t) && (t.preliminara?.length ?? 0) > 0 && (
+        <section>
+          <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Preliminära konton</h4>
+          <ul className="space-y-0.5">
+            {t.preliminara!.map((pk) => (
+              <li key={pk.konto} className="text-slate-700">
+                <KontoLank konto={pk.konto} className="font-medium text-slate-800">{pk.konto} {pk.kontonamn}</KontoLank>
+                {pk.nar && <span className="text-slate-500"> — {pk.nar}</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-slate-400 mt-1">Följer med när den konteras om i kväll, om kunden svarat eller nya bankrader kommit.</p>
         </section>
       )}
 
@@ -775,6 +865,12 @@ function TxDetaljer({ post: p, onAngra, sparar }: { post: Post; onAngra?: () => 
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <button onClick={() => setLage('anteckna')} className="border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-medium px-3 py-1.5 rounded-lg">Anteckna och kör om</button>
           {kanRedigera && <button onClick={() => setLage('redigera')} className="border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-medium px-3 py-1.5 rounded-lg">Redigera</button>}
+          {onGodkann && (
+            <button onClick={onGodkann} disabled={sparar}
+              className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg disabled:opacity-40">
+              {sparar ? 'Sparar…' : 'Godkänn'}
+            </button>
+          )}
           {onAngra && <button onClick={onAngra} disabled={sparar} className="text-xs text-slate-500 hover:text-slate-800 px-2 disabled:opacity-40">Ångra godkännandet</button>}
           {kanRadera && <button onClick={() => setLage('radera')} className="ml-auto text-xs font-medium text-red-600 hover:text-red-700 px-2">Radera</button>}
         </div>

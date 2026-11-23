@@ -105,6 +105,9 @@ export interface Beslut {
   regler: string[];
   brutna_regler: string[];
   granskning_kravs: boolean;
+  /** Bara när en pending transaktion konteras om (./pending): det som fortfarande saknas. */
+  saknas?: { vad: string; varfor: string }[];
+  preliminara_konton?: { konto: string; nar: string }[];
 }
 
 export interface Kontering {
@@ -143,6 +146,8 @@ export interface Kontering {
   } | null;
   flaggor: Flagga[];
   omdome: Omdome;
+  /** En pending transaktion som konterats om (./pending): det som fortfarande saknas och de preliminära kontona. */
+  pending?: { saknas: { vad: string; varfor: string }[]; preliminara: { konto: string; nar: string }[] };
 }
 
 export interface Utfall {
@@ -154,7 +159,7 @@ export interface Utfall {
 // ---------- prompter ----------
 
 /** Reglerna att välja bland skiljer mellan kunder, så schemat byggs per kund. */
-const beslutSchema = (regelIdn: string[]) => ({
+const grundSchema = (regelIdn: string[]) => ({
   type: 'object',
   additionalProperties: false,
   required: ['analys', 'delar', 'momshantering', 'omvand_typ', 'sakerhet', 'motivering', 'regler', 'brutna_regler', 'granskning_kravs'],
@@ -184,6 +189,47 @@ const beslutSchema = (regelIdn: string[]) => ({
     granskning_kravs: { type: 'boolean' },
   },
 });
+
+/** Det en pending transaktion svarar med utöver konteringen (./pending). */
+const PENDING_FALT = {
+  saknas: {
+    type: 'array',
+    description: 'Det som fortfarande saknas för att kunna bokföra, en rad per sak. Tom lista när det vi nu har räcker.',
+    items: { type: 'object', additionalProperties: false, required: ['vad', 'varfor'], properties: { vad: { type: 'string' }, varfor: { type: 'string' } } },
+  },
+  preliminara_konton: {
+    type: 'array',
+    description: 'När något fortfarande saknas: kontona affären kan hamna på beroende på svaret, kontot i delar först, med vilket svar som leder dit. Tom lista när inget saknas.',
+    items: { type: 'object', additionalProperties: false, required: ['konto', 'nar'], properties: { konto: { type: 'string' }, nar: { type: 'string' } } },
+  },
+};
+
+const beslutSchema = (regelIdn: string[], pending = false) => {
+  const s = grundSchema(regelIdn);
+  return pending ? { ...s, required: [...s.required, 'saknas', 'preliminara_konton'], properties: { ...s.properties, ...PENDING_FALT } } : s;
+};
+
+/**
+ * En pending transaktion som konterats om: det som fortfarande saknas gör
+ * konteringen gul, så att den inte bokförs förrän svaret finns.
+ */
+function medPending(k: Kontering, b: Beslut): Kontering {
+  const saknas = (Array.isArray(b.saknas) ? b.saknas : [])
+    .filter((s) => typeof s?.vad === 'string' && s.vad.trim())
+    .map((s) => ({ vad: s.vad.trim(), varfor: String(s.varfor ?? '').trim() }));
+  const preliminara = saknas.length
+    ? (Array.isArray(b.preliminara_konton) ? b.preliminara_konton : [])
+      .map((p) => ({ konto: String(p?.konto ?? '').trim(), nar: String(p?.nar ?? '').trim() }))
+      .filter((p) => /^\d{4}$/.test(p.konto))
+    : [];
+  if (!saknas.length) return { ...k, pending: { saknas, preliminara } };
+  return {
+    ...k,
+    flaggor: [...k.flaggor, { typ: 'saknas', allvar: 'granskning', text: `Saknas: ${saknas.map((s) => s.vad).join(', ')}` }],
+    omdome: k.omdome === 'gron' ? 'gul' : k.omdome,
+    pending: { saknas, preliminara },
+  };
+}
 
 const GEMENSAMT = () => `Du konterar transaktioner åt en svensk enskild näringsidkare som upprättar förenklat årsbokslut (K1) och bokför enligt kontantmetoden eller faktureringsmetoden — vilken står i kundprofilen.
 
@@ -500,6 +546,8 @@ interface Underlagsfraga {
   /** Transaktionen som konteras, och byråns kontext. */
   user: string;
   regelIdn: string[];
+  /** En pending transaktion som konteras om med ny information (./pending): svaret säger också vad som fortfarande saknas. */
+  pending?: boolean;
   /** Ny läsare av kundens andra underlag, en per samtal: den minns vad modellen redan öppnat. */
   nyLasare: () => (rader: string[]) => Promise<Underlagssvar>;
 }
@@ -637,7 +685,7 @@ async function konteraMedModell(modell: Modell, t: Transaktion, betalsatt: Betal
     delat: f.delat,
     user: f.user,
     namn: 'kontering',
-    schema: beslutSchema(f.regelIdn),
+    schema: beslutSchema(f.regelIdn, f.pending),
     anrop: { steg: 'konteras', userId: t.user_id, underlagId: t.underlag_id },
     // Gränsprövningarna räknas ut på hela beloppet
     lasKonto: (konto) => kontoBlock(provaKonto({ konto, netto, brutto, datum: t.datum })),
@@ -646,9 +694,10 @@ async function konteraMedModell(modell: Modell, t: Transaktion, betalsatt: Betal
     mjukGrans: startad + TID_SVAR,
     hardGrans: startad + TID_STOPP,
   });
-  return byggKontering(modell, t, betalsatt, samtal.data, f.regelIdn, samtal.svarade, {
+  const k = byggKontering(modell, t, betalsatt, samtal.data, f.regelIdn, samtal.svarade, {
     analys: String(samtal.data.analys ?? ''), lasta: lastaKonton(samtal), sokningar: samtal.sokningar, filer: samtal.filer, tidSlut: samtal.tidSlut,
   });
+  return f.pending ? medPending(k, samtal.data) : k;
 }
 
 // ---------- flera transaktioner ----------
@@ -704,12 +753,15 @@ export async function konteraTransaktioner(
     torrkorning = false,
     medBokforda = false,
     startad = Date.now(),
+    pending,
   }: {
     torrkorning?: boolean;
     /** När anropet började: tidsgränserna räknas härifrån. */
     startad?: number;
     /** Kör om alla: bokförda konteras också, och verifikationen ersätts om konteringen ändrats (se ./ersatt). */
     medBokforda?: boolean;
+    /** Pending transaktioner som konteras om (./pending): vad som saknades, de preliminära kontona och det nya, per transaktion. */
+    pending?: Map<string, string>;
   } = {},
 ): Promise<Utfall[]> {
   // Byråns ändringar i kontobeskrivningarna gäller också här
@@ -805,8 +857,9 @@ export async function konteraTransaktioner(
       return konteraEn(supabase, t, betalsatt, {
         kund,
         delat: fil.delat,
-        user: [`TRANSAKTIONEN ATT KONTERA${var_ ? ` (${var_})` : ''}:\n${transaktionText(t, betalsatt)}`, kontext].filter(Boolean).join('\n\n'),
+        user: [`TRANSAKTIONEN ATT KONTERA${var_ ? ` (${var_})` : ''}:\n${transaktionText(t, betalsatt)}`, kontext, pending?.get(t.id)].filter(Boolean).join('\n\n'),
         regelIdn: allaRegler.map((r) => r.id),
+        pending: pending?.has(t.id),
         nyLasare: () => underlagsLasare(radPerNummer, arslista.filnamn, filen, t.underlag_id),
       }, torrkorning, startad);
     } catch (err) {

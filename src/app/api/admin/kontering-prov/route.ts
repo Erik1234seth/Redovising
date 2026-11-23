@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { anvandJamforelse, godkannProv, raderaProv, raderaTransaktioner, redigeraProv, startaProv, underlagAttKora, uppdateraProv, type Provrad, type Redigering } from '@/lib/kontering/omgang/prov';
 import { FLODESMODELLER, arFlodesmodell, type Flodesmodell } from '@/lib/kontering/omgang/leverantor';
 import type { Resultat } from '@/lib/kontering/omgang/svar';
+import { korOmPending, pendingInfo } from '@/lib/kontering/pending';
 
 /**
  * Flöde i personkortet — konteringen (@/lib/kontering/omgang). Körningarna
@@ -12,13 +13,16 @@ import type { Resultat } from '@/lib/kontering/omgang/svar';
  *           Kör om alla tar (allaAttKora) och
  *           kundens körningar. Delar som är skickade frågas efter hos leverantören,
  *           och klara svar prövas och skrivs. Underlag som körts om syns bara i
- *           den senaste körningen (utanOmkorda).
+ *           den senaste körningen (utanOmkorda). pending: transaktionerna som väntar på
+ *           mer information, med om frågan skickats (@/lib/kontering/pending).
  *   POST    starta en körning: { nya: true } tar allt som inte körts, { alla: true } allt
  *           som går att köra (Kör om alla), annars underlagIds.
  *           modell: 'gpt-6.1-sol' | 'claude-opus-5-5' (GPT om inget anges), och
  *           jamfor: true kör samma underlag med den andra modellen som jämförelse.
  *           { anteckning, transaktioner: [{ underlagId, vilken }] } sparar byråns
  *           anteckning som kontext på underlagen och kör om dem.
+ *           { pending: true } konterar om kundens pending transaktioner som fått ny
+ *           information, som kvällsjobbet gör (alla: true tar alla, torrkorning: true sparar inget).
  *   PATCH   godkänn en gul kontering, eller ångra. { anvand: korning } bokför en jämförelse i stället.
  *           { radera: [{ id, fil, nr }] } raderar transaktionerna ur bokföringen.
  *           { id, fil, nr, redigera: { datum, beskrivning, motpart, belopp, konto, momssats } }
@@ -86,7 +90,7 @@ export async function GET(request: NextRequest) {
     await Promise.all(((vantande ?? []) as Provrad[]).map((r) => uppdateraProv(supabase, r).catch((err) =>
       console.error(`[admin/kontering-prov] ${r.id}:`, err instanceof Error ? err.message : err))));
 
-    const [{ data: rader, error }, { data: underlag, error: uFel }, attKora, allaAttKora, { data: kopplingar }] = await Promise.all([
+    const [{ data: rader, error }, { data: underlag, error: uFel }, attKora, allaAttKora, { data: kopplingar }, pending] = await Promise.all([
       supabase.from('kontering_prov').select(RAD_KOLUMNER).eq('user_id', userId).order('created_at', { ascending: false }).order('del').limit(100),
       supabase.from('bokforing_underlag').select('id, file_name, mime_type, created_at, sortering, sortering_orsak, del_av, flode_at, kund_svar_at')
         .eq('user_id', userId).order('created_at', { ascending: false }).limit(2000),
@@ -95,6 +99,7 @@ export async function GET(request: NextRequest) {
       // Filer som kopplats till en befintlig transaktion som extra underlag (@/lib/kontering/omgang/skriv)
       supabase.from('underlag_kopplingar').select('underlag_id, transaktion_id')
         .eq('user_id', userId).not('transaktion_id', 'is', null).limit(5000),
+      pendingInfo(supabase, userId),
     ]);
     if (error) throw new Error(error.message);
     if (uFel) throw new Error(uFel.message);
@@ -113,6 +118,7 @@ export async function GET(request: NextRequest) {
       attKora,
       allaAttKora,
       kopplingar: kopplingar ?? [],
+      pending,
     });
   } catch (err) {
     return fel(err);
@@ -120,13 +126,21 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { userId?: string; underlagIds?: string[]; nya?: boolean; alla?: boolean; anteckning?: string; transaktioner?: { underlagId?: string; vilken?: string }[]; modell?: string; jamfor?: boolean };
+  let body: { userId?: string; underlagIds?: string[]; nya?: boolean; alla?: boolean; anteckning?: string; transaktioner?: { underlagId?: string; vilken?: string }[]; modell?: string; jamfor?: boolean; pending?: boolean; torrkorning?: boolean };
   try {
     body = await request.json();
   } catch {
     return fel('Ogiltig JSON', 400);
   }
   if (!body.userId) return fel('userId saknas', 400);
+  // Kvällens omkörning av pending, för hand (se /api/cron/pending)
+  if (body.pending) {
+    try {
+      return NextResponse.json(await korOmPending(getSupabase(), body.userId, { alla: !!body.alla, torrkorning: !!body.torrkorning }));
+    } catch (err) {
+      return fel(err);
+    }
+  }
   if (body.modell !== undefined && !arFlodesmodell(body.modell)) return fel(`Okänd modell: ${body.modell}`, 400);
   const modell: Flodesmodell = arFlodesmodell(body.modell) ? body.modell : FLODESMODELLER[0];
   const supabase = getSupabase();

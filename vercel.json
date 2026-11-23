@@ -19,11 +19,18 @@
     {
       "path": "/api/cron/valutakurser",
       "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/cron/pending",
+      "schedule": "0 19 * * *"
     }
   ],
   "functions": {
     "src/app/api/queues/underlagsflode/route.ts": {
       "experimentalTriggers": [{ "type": "queue/v2beta", "topic": "underlagsflode" }]
+    },
+    "src/app/api/queues/pending/route.ts": {
+      "experimentalTriggers": [{ "type": "queue/v2beta", "topic": "pending" }]
     }
   }
 }

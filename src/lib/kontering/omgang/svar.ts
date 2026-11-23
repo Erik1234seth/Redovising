@@ -40,6 +40,13 @@ export interface ResultatTransaktion {
   /** refText är dubbletten som byrån ser den — datum, belopp och motpart, eller filens namn. */
   dublett: SvarTransaktion['dublett'] & { transaktionId: string | null; refText: string; verifikationId?: string | null };
   saknas: SvarTransaktion['saknas'];
+  /**
+   * Pending: när något saknas, kontona affären kan hamna på beroende på
+   * svaret. Följer med när transaktionen konteras om (@/lib/kontering/pending).
+   */
+  preliminara?: Preliminart[];
+  /** Pending-transaktionen har konterats om med ny information (@/lib/kontering/pending). */
+  omkord?: { at: string; antal: number; lost: boolean };
   antaganden: string;
   kontering: (Pick<Kontering, 'konto' | 'momssats' | 'momsdelar' | 'omvand' | 'motivering' | 'regler' | 'flaggor' | 'omdome' | 'granskning'> & {
     kontonamn: string;
@@ -61,6 +68,22 @@ export interface ResultatTransaktion {
   transaktionId?: string;
   /** Samma affär som något som redan finns: filen kopplades dit i stället för att bli en egen transaktion (./skriv). */
   kopplad?: string;
+}
+
+export interface Preliminart { konto: string; kontonamn: string; nar: string }
+
+/** De preliminära kontona som går att bokföra på, en gång var. Tom när inget saknas. */
+export function preliminaraKonton(saknas: unknown[], konton: { konto?: unknown; nar?: unknown }[] | null | undefined): Preliminart[] {
+  if (!saknas.length) return [];
+  const ut: Preliminart[] = [];
+  for (const p of Array.isArray(konton) ? konton : []) {
+    const konto = String(p?.konto ?? '').trim();
+    if (!/^\d{4}$/.test(konto) || ut.some((x) => x.konto === konto)) continue;
+    const namn = kontonamn(konto);
+    if (!namn) continue;
+    ut.push({ konto, kontonamn: namn, nar: String(p?.nar ?? '').trim() });
+  }
+  return ut;
 }
 
 export interface GammalTransaktion {
@@ -99,7 +122,7 @@ export interface Resultat {
 }
 
 const ore = (n: number) => Math.round(n * 100) / 100;
-const kontonamn = (k: string) => slaUppKonto(k)?.namn ?? OMVAND_KONTONAMN[k] ?? (k === KORTSKULD ? KORTSKULD_NAMN : '');
+export const kontonamn = (k: string) => slaUppKonto(k)?.namn ?? OMVAND_KONTONAMN[k] ?? (k === KORTSKULD ? KORTSKULD_NAMN : '');
 
 /** Fälten modellen lämnade tomma tas bort, så att uppgifterna ser ut som förut. */
 function rensaUppgifter(u: Record<string, unknown>): Record<string, unknown> {
@@ -180,6 +203,7 @@ async function provaTransaktion(
     uppgifter,
     dublett: { ...s.dublett, transaktionId: ref?.transaktionId ?? null, verifikationId: ref?.verifikationId ?? null, refText: '' },
     saknas: s.saknas ?? [],
+    preliminara: preliminaraKonton(s.saknas ?? [], s.preliminara_konton),
     antaganden: s.antaganden,
   };
 

@@ -398,7 +398,8 @@ function transaktionsrad(t: ResultatTransaktion, id: string, u: UnderlagRad, ema
     dublett_av: d.status === 'dublett' ? d.transaktionId : null,
     // Orsaken står alltid: pekar dublett_av på en rad som senare ersätts blir den null, och då ska raden ändå inte bokföras
     dublett_orsak: d.status === 'dublett' ? `Dubblett av ${d.refText || 'ett annat underlag'}` : null,
-    tillrackligt: { status: saknas.length ? 'saknar' : 'tillrackligt', saknas, antaganden: t.antaganden, modell },
+    // Pending: det som saknas och de preliminära kontona följer med när den konteras om (@/lib/kontering/pending)
+    tillrackligt: { status: saknas.length ? 'saknar' : 'tillrackligt', saknas, antaganden: t.antaganden, modell, preliminara: saknas.length ? t.preliminara ?? [] : [] },
     fraga_utkast_id: saknas.length ? fragad : null,
     preliminar_at: t.kontering ? nu : null,
   };
