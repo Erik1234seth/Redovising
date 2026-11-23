@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { anvandJamforelse, godkannProv, raderaProv, raderaTransaktioner, redigeraProv, startaProv, underlagAttKora, uppdateraProv, type Provrad, type Redigering } from '@/lib/kontering/omgang/prov';
 import { FLODESMODELLER, arFlodesmodell, type Flodesmodell } from '@/lib/kontering/omgang/leverantor';
-import type { Resultat } from '@/lib/kontering/omgang/svar';
+import { utanOmkorda } from '@/lib/kontering/omgang/korningar';
 import { korOmPending, pendingInfo } from '@/lib/kontering/pending';
 
 /**
@@ -27,6 +27,8 @@ import { korOmPending, pendingInfo } from '@/lib/kontering/pending';
  *           { radera: [{ id, fil, nr }] } raderar transaktionerna ur bokföringen.
  *           { id, fil, nr, redigera: { datum, beskrivning, motpart, belopp, konto, momssats } }
  *           ändrar transaktionen och bokför den med byråns val.
+ *           { hanterad: { underlagIds } } räknar underlagen som körda utan att läsa dem,
+ *           och svarar med vad de hade förut; { aterstall: [{ id, flode_at }] } ångrar det.
  *   DELETE  ta bort en körning ur listan (det bokförda ligger kvar)
  */
 
@@ -44,38 +46,6 @@ function fel(err: unknown, status = 500) {
   const message = err instanceof Error ? err.message : String(err);
   console.error('[admin/kontering-prov]', message);
   return NextResponse.json({ error: message }, { status });
-}
-
-/**
- * En ny körning ersätter de äldre för samma underlag: filer som körts om
- * senare tas bort ur den äldre körningen, och en del där allt körts om visas
- * inte alls. En körning som inte gick att skicka eller blev fel ersätter
- * inget, och inte heller en jämförelse — den är inte bokförd. Raderna i
- * databasen ändras inte.
- */
-function utanOmkorda(rader: Provrad[]): Provrad[] {
-  // Raderna kommer nyast först; delarna i en körning hålls ihop
-  const korningar = new Map<string, Provrad[]>();
-  for (const r of rader) korningar.set(r.korning, [...(korningar.get(r.korning) ?? []), r]);
-
-  const senare = new Set<string>();
-  const ut: Provrad[] = [];
-  for (const delar of korningar.values()) {
-    for (const r of delar) {
-      const ids = r.underlag_ids ?? [];
-      const kvar = ids.filter((id) => !senare.has(id));
-      if (kvar.length === ids.length) { ut.push(r); continue; }
-      if (!kvar.length) continue;
-      const res = r.resultat as Resultat | null;
-      ut.push({
-        ...r,
-        underlag_ids: kvar,
-        resultat: res?.filer ? { ...res, filer: res.filer.filter((f) => !senare.has(f.underlagId)) } : r.resultat,
-      });
-    }
-    for (const r of delar) if (r.status !== 'fel' && !r.jamfor_med && r.filer?.length) for (const id of r.underlag_ids ?? []) senare.add(id);
-  }
-  return ut;
 }
 
 const RAD_KOLUMNER = 'id, created_at, user_id, korning, del, delar, status, modell, jamfor_med, underlag_ids, filer, varningar, openai_id, kontext, resultat, usage, kostnad_usd, uppskattade_tokens, fel, klar_at';
@@ -195,12 +165,64 @@ export async function POST(request: NextRequest) {
  * Radera transaktioner: { userId, radera: [{ id, fil, nr }] }.
  * Ändra en transaktion: { userId, id, fil, nr, redigera }.
  */
+/**
+ * Byrån har sett underlagen och vill inte köra dem: de räknas som lästa i
+ * Flöde (flode_at), så att Kör nya inte tar dem och de inte står som nya.
+ * Inget läses eller bokförs. Svarar med det de hade förut, för Ångra.
+ */
+async function markeraHanterade(supabase: SupabaseClient, userId: string, ids: string[]) {
+  const { data, error } = await supabase.from('bokforing_underlag').select('id, flode_at, transaktioner_notering').eq('user_id', userId).in('id', ids);
+  if (error) throw new Error(error.message);
+  const nu = new Date().toISOString();
+  for (const u of data ?? []) {
+    const { error: uFel } = await supabase.from('bokforing_underlag').update({
+      flode_at: nu,
+      // En fil som aldrig lästs får en notering om varför den inte har några transaktioner
+      ...(u.transaktioner_notering ? {} : { transaktioner_notering: 'Markerad som körd av byrån, utan att läsas' }),
+    }).eq('id', u.id);
+    if (uFel) throw new Error(uFel.message);
+  }
+  return (data ?? []).map((u) => ({ id: u.id as string, flode_at: (u.flode_at as string | null) ?? null }));
+}
+
 export async function PATCH(request: NextRequest) {
-  let body: { userId?: string; id?: string; fil?: string; nr?: number; godkand?: boolean; anvand?: string; redigera?: Redigering; radera?: { id?: unknown; fil?: unknown; nr?: unknown }[] };
+  let body: {
+    userId?: string; id?: string; fil?: string; nr?: number; godkand?: boolean; anvand?: string; redigera?: Redigering;
+    radera?: { id?: unknown; fil?: unknown; nr?: unknown }[];
+    hanterad?: { underlagIds?: unknown };
+    aterstall?: { id?: unknown; flode_at?: unknown }[];
+  };
   try {
     body = await request.json();
   } catch {
     return fel('Ogiltig JSON', 400);
+  }
+  // Underlag som byrån inte vill köra räknas som körda: de står inte längre som nya
+  if (body.userId && body.hanterad) {
+    const ids = (Array.isArray(body.hanterad.underlagIds) ? body.hanterad.underlagIds : []).filter((x): x is string => typeof x === 'string');
+    if (!ids.length) return fel('Välj minst ett underlag', 400);
+    try {
+      return NextResponse.json({ ok: true, fore: await markeraHanterade(getSupabase(), body.userId, ids) });
+    } catch (err) {
+      return fel(err);
+    }
+  }
+  // Ångra: underlagen får tillbaka det de hade
+  if (body.userId && body.aterstall) {
+    const lista = (Array.isArray(body.aterstall) ? body.aterstall : [])
+      .filter((x) => typeof x.id === 'string' && (x.flode_at === null || (typeof x.flode_at === 'string' && !Number.isNaN(Date.parse(x.flode_at)))))
+      .map((x) => ({ id: x.id as string, flode_at: x.flode_at as string | null }));
+    if (!lista.length) return fel('Inget att ångra', 400);
+    try {
+      const supabase = getSupabase();
+      for (const x of lista) {
+        const { error } = await supabase.from('bokforing_underlag').update({ flode_at: x.flode_at }).eq('id', x.id).eq('user_id', body.userId);
+        if (error) throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    } catch (err) {
+      return fel(err);
+    }
   }
   if (body.userId && body.radera) {
     const valda = (Array.isArray(body.radera) ? body.radera : [])

@@ -737,5 +737,7 @@ export interface FlodeKund {
   underlag: number;
   /** Underlag som "Kör nya" skulle köra: aldrig körda, eller nytt från kunden sedan dess. */
   nya: number;
+  /** Transaktioner i fliken Granska i Flöde. */
+  granska: number;
   senast: string;
 }

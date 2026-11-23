@@ -104,6 +104,11 @@ function FlodeSida() {
                       {k.nya}
                     </span>
                   )}
+                  {k.granska > 0 && (
+                    <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold leading-5 text-center tabular-nums" title="Transaktioner att granska">
+                      {k.granska}
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs text-slate-400 mt-0.5">
                   {k.underlag} underlag · senast {DATUM.format(new Date(k.senast))}

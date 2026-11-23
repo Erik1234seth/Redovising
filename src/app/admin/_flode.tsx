@@ -434,6 +434,50 @@ export function Flode({ userId }: { userId: string }) {
     await ladda();
   }, [userId, ladda]);
 
+  /** Underlag som byrån räknat som körda utan att köra dem, med vad de hade förut — för Ångra. */
+  const [hanterade, setHanterade] = useState<Record<string, string | null>>({});
+  const [hanterar, setHanterar] = useState('');
+
+  async function markeraHanterad(id: string) {
+    setHanterar(id);
+    setStartfel('');
+    try {
+      const res = await fetch('/api/admin/kontering-prov', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, hanterad: { underlagIds: [id] } }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const fore = (data.fore ?? []) as { id: string; flode_at: string | null }[];
+      setHanterade((h) => ({ ...h, ...Object.fromEntries(fore.map((f) => [f.id, f.flode_at])) }));
+      setValda((l) => l.filter((x) => x !== id));
+      await ladda();
+    } catch (err) {
+      setStartfel(err instanceof Error ? err.message : String(err));
+    } finally {
+      setHanterar('');
+    }
+  }
+
+  async function angraHanterad(id: string) {
+    setHanterar(id);
+    setStartfel('');
+    try {
+      const res = await fetch('/api/admin/kontering-prov', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, aterstall: [{ id, flode_at: hanterade[id] ?? null }] }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setHanterade((h) => Object.fromEntries(Object.entries(h).filter(([k]) => k !== id)));
+      await ladda();
+    } catch (err) {
+      setStartfel(err instanceof Error ? err.message : String(err));
+    } finally {
+      setHanterar('');
+    }
+  }
+
   const korOmFiler = useCallback(async (ids: string[]) => {
     const res = await fetch('/api/admin/kontering-prov', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -627,6 +671,20 @@ export function Flode({ userId }: { userId: string }) {
                     {u.del_av && <span className="text-slate-400 text-xs">sida</span>}
                     <span className="ml-auto flex items-center gap-3 shrink-0">
                       {u.transaktioner > 0 && <span className="text-xs text-slate-400 tabular-nums">{u.transaktioner} tx</span>}
+                      {u.id in hanterade && (
+                        <span className="text-xs text-slate-500">
+                          Räknas som körd ·{' '}
+                          <button type="button" disabled={hanterar === u.id} onClick={(e) => { e.preventDefault(); e.stopPropagation(); angraHanterad(u.id); }}
+                            className="text-blue-700 hover:underline disabled:opacity-40">Ångra</button>
+                        </span>
+                      )}
+                      {(nyttFranKunden(u) || nyaSet.has(u.id)) && (
+                        <button type="button" disabled={hanterar === u.id} title="Räkna som körd utan att köra den"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); markeraHanterad(u.id); }}
+                          className="text-xs font-medium text-slate-600 border border-slate-300 hover:border-emerald-500 hover:text-emerald-700 rounded-full px-2 py-px disabled:opacity-40">
+                          {hanterar === u.id ? '…' : '✓ Klar'}
+                        </button>
+                      )}
                       {nyttFranKunden(u)
                         ? <span className="text-xs font-medium text-amber-800 bg-amber-100 rounded-full px-2 py-px">Nytt från kunden</span>
                         : nyaSet.has(u.id)
