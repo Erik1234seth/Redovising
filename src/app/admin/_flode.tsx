@@ -142,7 +142,7 @@ interface Provrad {
 }
 
 /** Modellen som kör om filer härifrån. Valet av modell togs bort ur vyn 2026-11-22. */
-const MODELLVAL = { modell: 'gpt-6.1-sol', jamfor: false } as const;
+const MODELLVAL = { modell: 'gpt-6.2-sol', jamfor: false } as const;
 
 const VANTANDE = new Set(['forbereder', 'skickad', 'tar-emot']);
 const TID = new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -202,6 +202,8 @@ interface Post {
   filer: { id: string; namn: string }[];
   t: Tx;
   gammal: Gammal | null;
+  /** Med i den senaste körningen: står i fet stil. */
+  ny: boolean;
 }
 
 /**
@@ -222,7 +224,7 @@ const DAGEN = new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'short' 
 const dagar = (d: string) => Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000);
 
 /** En fil i Övrigt: sorterades bort, gav inga transaktioner eller kördes inte. */
-interface OvrigFil { id: string; namn: string; typ: string; orsak: string; varning: boolean }
+interface OvrigFil { id: string; namn: string; typ: string; orsak: string; varning: boolean; ny?: boolean }
 
 const arKopplad = (t: Tx) => !!t.kopplad?.startsWith('Kopplad');
 /** Klar: grön, godkänd, ändrad av byrån, eller kopplad till det som redan fanns. */
@@ -298,6 +300,13 @@ export function Flode({ userId }: { userId: string }) {
   // Jämförelser bokförs inte och visas inte
   const egna = useMemo(() => rader.filter((r) => !r.jamfor_med), [rader]);
 
+  /** Den senaste klara körningen: det som var med i den står i fet stil, som olästa mejl. Raderna kommer nyast först. */
+  const senaste = useMemo(() => egna.find((r) => r.status === 'klar')?.korning ?? null, [egna]);
+  const senastesUnderlag = useMemo(
+    () => new Set(egna.filter((r) => r.korning === senaste).flatMap((r) => r.underlag_ids ?? [])),
+    [egna, senaste],
+  );
+
   /**
    * Transaktionerna, en gång var. En fil som kopplats till en befintlig
    * transaktion blir ingen egen rad: den listas bland transaktionens filer.
@@ -316,6 +325,7 @@ export function Flode({ userId }: { userId: string }) {
         filer: [{ id: f.underlagId, namn: f.namn }],
         t,
         gammal: sammaGamla(t, f.gammalt),
+        ny: r.korning === senaste,
       });
     }
     const perTx = new Map(alla.filter((p) => p.t.transaktionId).map((p) => [p.t.transaktionId!, p]));
@@ -338,7 +348,7 @@ export function Flode({ userId }: { userId: string }) {
       ut.push(p);
     }
     return ut.sort((a, b) => (b.t.datum ?? '').localeCompare(a.t.datum ?? ''));
-  }, [egna, kopplingar, underlag]);
+  }, [egna, kopplingar, underlag, senaste]);
 
   /**
    * Möjliga dubbletter läggs ihop med transaktionen de pekar på: den
@@ -382,7 +392,7 @@ export function Flode({ userId }: { userId: string }) {
         if (!f.transaktioner.length && (f.sort === 'underlag' || f.sort === 'kontoutdrag') && !f.vad && !varning) continue;
         m.set(f.underlagId, {
           id: f.underlagId, namn: f.namn, typ: f.sort ? SORT[f.sort] ?? f.sort : 'Inget svar',
-          orsak: [f.vad, varning ? f.skrivet : ''].filter(Boolean).join(' — '), varning,
+          orsak: [f.vad, varning ? f.skrivet : ''].filter(Boolean).join(' — '), varning, ny: r.korning === senaste,
         });
       }
       for (const h of r.resultat?.hoppade ?? r.varningar ?? []) {
@@ -393,7 +403,7 @@ export function Flode({ userId }: { userId: string }) {
       if (u.sortering === 'ovrigt' && !m.has(u.id)) m.set(u.id, { id: u.id, namn: u.file_name, typ: 'Övrigt', orsak: u.sortering_orsak ?? '', varning: false });
     }
     return [...m.values()];
-  }, [egna, underlag]);
+  }, [egna, underlag, senaste]);
 
   const anteckningar = egna.flatMap((r) => r.resultat?.anteckningar ?? []);
   const kontroller = egna.flatMap((r) => r.resultat?.kontroller ?? []);
@@ -600,7 +610,7 @@ export function Flode({ userId }: { userId: string }) {
                   <label className={`flex items-center gap-3 px-4 py-2.5 text-sm cursor-pointer ${valda.includes(u.id) ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
                     <input type="checkbox" checked={valda.includes(u.id)} className="accent-blue-600"
                       onChange={(e) => setValda((l) => (e.target.checked ? [...l, u.id] : l.filter((id) => id !== u.id)))} />
-                    <a href={filLank(u.id)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-blue-700 hover:underline truncate">{u.file_name}</a>
+                    <a href={filLank(u.id)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={`text-blue-700 hover:underline truncate ${senastesUnderlag.has(u.id) ? 'font-bold' : ''}`}>{u.file_name}</a>
                     {u.del_av && <span className="text-slate-400 text-xs">sida</span>}
                     <span className="ml-auto flex items-center gap-3 shrink-0">
                       {u.transaktioner > 0 && <span className="text-xs text-slate-400 tabular-nums">{u.transaktioner} tx</span>}
@@ -702,8 +712,8 @@ function TxKort({ post: p, granska, oppen, onKlick }: { post: Post; granska: boo
       <div role="button" tabIndex={0} onClick={onKlick} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onKlick(); } }}
         className="px-4 py-3 cursor-pointer select-none">
         <div className="flex items-baseline gap-3">
-          <span className="text-xs text-slate-500 tabular-nums w-20 shrink-0">{t.datum ?? 'utan datum'}</span>
-          <span className="font-medium text-slate-900 truncate">{t.motpart || t.beskrivning || '—'}</span>
+          <span className={`text-xs tabular-nums w-20 shrink-0 ${p.ny ? 'font-bold text-slate-900' : 'text-slate-500'}`}>{t.datum ?? 'utan datum'}</span>
+          <span className={`truncate ${p.ny ? 'font-bold text-slate-950' : 'font-normal text-slate-700'}`}>{t.motpart || t.beskrivning || '—'}</span>
           <Belopp t={t} />
         </div>
         <div className="flex items-center gap-2 mt-1 text-sm">
@@ -1021,7 +1031,7 @@ function FilKort({ fil: f }: { fil: OvrigFil }) {
       <div role="button" tabIndex={0} onClick={() => setOppen((o) => !o)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOppen((o) => !o); } }}
         className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none text-sm">
         <span className="text-slate-400" aria-hidden>▤</span>
-        <span className="font-medium text-slate-900 truncate">{f.namn}</span>
+        <span className={`truncate ${f.ny ? 'font-bold text-slate-950' : 'font-normal text-slate-700'}`}>{f.namn}</span>
         <span className={`ml-auto text-xs rounded-full px-2 py-px whitespace-nowrap ${f.varning ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>{f.typ}</span>
       </div>
       {oppen && (
