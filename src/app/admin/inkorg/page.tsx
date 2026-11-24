@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { RAKNA_OM } from '../_nav-menu';
 import type {
-  AiAnteckning, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgSkickat, InkorgTrad, InkorgUtkast, MejlBilaga,
+  AiAnteckning, InkorgFil, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgSkickat, InkorgTrad, InkorgUtkast, MejlBilaga,
 } from '@/lib/admin-types';
 
 /**
@@ -41,6 +41,7 @@ const IKONER = {
   x: ['M18 6 6 18', 'm6 6 12 12'],
   minus: ['M5 12h14'],
   papperskorg: ['M3 6h18', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'],
+  ladda: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M7 10l5 5 5-5', 'M12 15V3'],
   gem: ['m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48'],
   ai: ['m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z'],
   panel: ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z', 'M15 3v18'],
@@ -718,7 +719,7 @@ function Meddelande({ m, kundNamn, titel, oppen, onVaxla }: {
         <span className="w-36 md:w-44 shrink-0 truncate text-sm font-semibold text-slate-800">{avsandare}</span>
         {m.kanal === 'sms' && <SmsChip />}
         <span className="flex-1 min-w-0 truncate text-sm text-slate-500">{m.text.replace(/\s+/g, ' ') || '(tomt)'}</span>
-        {!!m.bilagor?.length && <Ikon namn="gem" className="w-4 h-4 text-slate-400 shrink-0" />}
+        {!!(m.bilagor?.length || m.filer?.length) && <Ikon namn="gem" className="w-4 h-4 text-slate-400 shrink-0" />}
         <span className="shrink-0 text-xs text-slate-500 tabular-nums">{tidKort(m.at)}</span>
       </button>
     );
@@ -753,17 +754,139 @@ function Meddelande({ m, kundNamn, titel, oppen, onVaxla }: {
             {hel ? 'Visa mindre' : 'Visa hela'}
           </button>
         )}
-        {!!m.bilagor?.length && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {m.bilagor.map((b) => (
-              <span key={b} className="inline-flex items-center gap-1.5 max-w-[260px] h-8 px-3 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700">
-                <Ikon namn="gem" className="w-3.5 h-3.5 text-slate-400 shrink-0" /><span className="truncate">{b}</span>
-              </span>
-            ))}
-          </div>
-        )}
+        <Bilagor filer={m.filer ?? []} namn={m.bilagor ?? []} />
       </div>
     </article>
+  );
+}
+
+const filUrl = (id: string, visa = true) => `/api/admin/underlag/${id}/ladda-ner${visa ? '?visa' : ''}`;
+/** HEIC och TIFF visar inte webbläsaren, de laddas ned i stället. */
+const arBild = (f: InkorgFil) => (!!f.typ?.startsWith('image/') && !/heic|heif|tiff/i.test(f.typ)) || /\.(png|jpe?g|gif|webp)$/i.test(f.namn);
+const arPdf = (f: InkorgFil) => f.typ === 'application/pdf' || /\.pdf$/i.test(f.namn);
+const kanVisas = (f: InkorgFil) => arBild(f) || arPdf(f) || f.typ === 'text/plain';
+const storlekText = (b: number | null) => (b == null ? ''
+  : b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} kB` : `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} MB`);
+
+/** Filändelsen som en färgad etikett: röd PDF, grön Excel, blå Word … */
+function FilEtikett({ f, liten }: { f: InkorgFil; liten?: boolean }) {
+  const ext = (f.namn.match(/\.([a-z0-9]{1,5})$/i)?.[1] ?? 'fil').toUpperCase();
+  const farg = arPdf(f) ? 'bg-red-600' : arBild(f) ? 'bg-sky-600'
+    : /^(XLSX?|CSV|SIE|SE|NUMBERS)$/.test(ext) ? 'bg-emerald-600'
+      : /^(DOCX?|PAGES|RTF)$/.test(ext) ? 'bg-blue-600' : ext === 'ZIP' ? 'bg-amber-600' : 'bg-slate-500';
+  return (
+    <span className={`shrink-0 inline-flex items-center justify-center rounded font-bold text-white tracking-tight ${farg} ${liten ? 'w-8 h-5 text-[9px]' : 'min-w-[36px] px-2 h-7 text-xs'}`}>
+      {ext.slice(0, 4)}
+    </span>
+  );
+}
+
+/**
+ * Bilagorna i ett mejl, som kort under texten. De som finns sparade hos oss
+ * öppnas i en förhandsvisning. Resten sparades aldrig (äldre mejl) och finns
+ * bara i Gmail, så där står bara namnet.
+ */
+function Bilagor({ filer, namn }: { filer: InkorgFil[]; namn: string[] }) {
+  const [visad, setVisad] = useState<number | null>(null);
+  const sparade = new Set(filer.map((f) => f.namn.trim().toLowerCase()));
+  const baraIGmail = namn.filter((n) => !sparade.has(n.trim().toLowerCase()));
+  const antal = filer.length + baraIGmail.length;
+  if (!antal) return null;
+  return (
+    <div className="mt-4 pt-3 border-t border-slate-100">
+      <p className="text-xs font-medium text-slate-500 mb-2">{antal} {antal === 1 ? 'bilaga' : 'bilagor'}</p>
+      <div className="flex flex-wrap gap-2">
+        {filer.map((f, i) => (
+          <div key={f.id} className="group relative w-44 rounded-lg border border-slate-200 bg-white overflow-hidden hover:shadow-md hover:border-slate-300 transition">
+            <button type="button" onClick={() => setVisad(i)} title={`Visa ${f.namn}`} className="block w-full text-left">
+              <span className="block h-24 bg-slate-50 border-b border-slate-100 overflow-hidden">
+                {arBild(f)
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={filUrl(f.id)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                  : <span className="w-full h-full flex items-center justify-center"><FilEtikett f={f} /></span>}
+              </span>
+              <span className="flex items-center gap-2 px-2.5 py-2">
+                <FilEtikett f={f} liten />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-medium text-slate-800">{f.namn}</span>
+                  {f.storlek != null && <span className="block text-[11px] text-slate-500">{storlekText(f.storlek)}</span>}
+                </span>
+              </span>
+            </button>
+            <a href={filUrl(f.id, false)} title="Ladda ner" aria-label={`Ladda ner ${f.namn}`}
+              className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full bg-white/95 shadow flex items-center justify-center text-slate-600 hover:text-slate-900 opacity-0 group-hover:opacity-100 focus:opacity-100 transition">
+              <Ikon namn="ladda" className="w-4 h-4" />
+            </a>
+          </div>
+        ))}
+        {baraIGmail.map((n, i) => (
+          <span key={`${n}-${i}`} title="Filen sparades aldrig hos oss och finns bara i Gmail"
+            className="inline-flex items-center gap-1.5 max-w-[260px] h-8 self-end px-3 rounded-lg border border-dashed border-slate-300 text-xs text-slate-500">
+            <Ikon namn="gem" className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{n}</span><span className="shrink-0 text-slate-400">· i Gmail</span>
+          </span>
+        ))}
+      </div>
+      {visad !== null && <Forhandsvisning filer={filer} start={visad} onStang={() => setVisad(null)} />}
+    </div>
+  );
+}
+
+const morkKnapp = 'w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition';
+
+/** En bilaga över hela fönstret: bilder och PDF:er visas direkt, annat laddas ned. Pilarna bläddrar. */
+function Forhandsvisning({ filer, start, onStang }: { filer: InkorgFil[]; start: number; onStang: () => void }) {
+  const [i, setI] = useState(start);
+  const f = filer[i];
+
+  useEffect(() => {
+    // Fångas före inkorgens kortkommandon, så att Esc bara stänger förhandsvisningen
+    const tangent = (e: KeyboardEvent) => {
+      e.stopPropagation();
+      if (e.key === 'Escape') onStang();
+      else if (e.key === 'ArrowLeft') setI((x) => Math.max(0, x - 1));
+      else if (e.key === 'ArrowRight') setI((x) => Math.min(filer.length - 1, x + 1));
+    };
+    window.addEventListener('keydown', tangent, true);
+    return () => window.removeEventListener('keydown', tangent, true);
+  }, [filer.length, onStang]);
+
+  const stopp = (e: React.MouseEvent) => e.stopPropagation();
+  return (
+    <div className="fixed inset-0 z-[70] flex flex-col bg-slate-950/90 backdrop-blur-sm" onClick={onStang} role="dialog" aria-label={f.namn}>
+      <div className="h-14 shrink-0 flex items-center gap-3 pl-4 pr-2 text-white" onClick={stopp}>
+        <FilEtikett f={f} />
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{f.namn}</span>
+        {filer.length > 1 && <span className="text-xs text-white/60 tabular-nums">{i + 1} av {filer.length}</span>}
+        <a href={filUrl(f.id)} target="_blank" rel="noreferrer" title="Öppna i ny flik" className={morkKnapp}><Ikon namn="extern" /></a>
+        <a href={filUrl(f.id, false)} title="Ladda ner" className={morkKnapp}><Ikon namn="ladda" /></a>
+        <button type="button" onClick={onStang} title="Stäng (Esc)" className={morkKnapp}><Ikon namn="x" /></button>
+      </div>
+      <div className="relative flex-1 min-h-0 flex items-center justify-center px-4 pb-4 md:px-16">
+        {arBild(f) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={f.id} src={filUrl(f.id)} alt={f.namn} onClick={stopp} className="max-w-full max-h-full object-contain rounded shadow-2xl bg-white" />
+        ) : kanVisas(f) ? (
+          <iframe key={f.id} src={filUrl(f.id)} title={f.namn} className="w-full h-full max-w-5xl rounded bg-white shadow-2xl" />
+        ) : (
+          <div onClick={stopp} className="bg-white rounded-2xl p-8 text-center max-w-sm shadow-2xl">
+            <FilEtikett f={f} />
+            <p className="mt-3 text-sm font-medium text-slate-900 break-words">{f.namn}</p>
+            <p className="mt-1 text-xs text-slate-500">Den här filtypen går inte att visa här.</p>
+            <a href={filUrl(f.id, false)} className={`${skickaKnapp} mt-4 inline-flex items-center gap-2`}>
+              <Ikon namn="ladda" className="w-4 h-4" /> Ladda ner{f.storlek != null ? ` (${storlekText(f.storlek)})` : ''}
+            </a>
+          </div>
+        )}
+        {i > 0 && (
+          <button type="button" onClick={(e) => { stopp(e); setI(i - 1); }} title="Föregående (←)"
+            className={`${morkKnapp} absolute left-2 md:left-4 top-1/2 -translate-y-1/2 bg-white/10`}><Ikon namn="vanster" /></button>
+        )}
+        {i < filer.length - 1 && (
+          <button type="button" onClick={(e) => { stopp(e); setI(i + 1); }} title="Nästa (→)"
+            className={`${morkKnapp} absolute right-2 md:right-4 top-1/2 -translate-y-1/2 bg-white/10`}><Ikon namn="hoger" /></button>
+        )}
+      </div>
+    </div>
   );
 }
 

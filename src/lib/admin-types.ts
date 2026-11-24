@@ -536,10 +536,23 @@ export interface InkorgMeddelande {
   /** Kundens adress i mejlet. Kan vara en kopplad adress, inte den på kontot. */
   adress?: string;
   bilagor?: string[];
+  /** Bilagorna som finns sparade hos oss och går att öppna. Resten finns bara i Gmail. */
+  filer?: InkorgFil[];
   /** SMS-status för utgående: sent, failed … */
   status?: string | null;
   /** Ett fast utskick (välkomst-SMS, påminnelse, mejlnotis) — inget någon skrivit. */
   automatisk?: boolean;
+}
+
+/**
+ * En bilaga i ett mejl, sparad i bokforing_underlag. Öppnas via
+ * /api/admin/underlag/{id}/ladda-ner (?visa för att visa den i stället för att ladda ned).
+ */
+export interface InkorgFil {
+  id: string;
+  namn: string;
+  typ: string | null;
+  storlek: number | null;
 }
 
 /** En fil som bifogas ett mejl från inkorgen. Ligger i lagringen under mejlbilagor/. */

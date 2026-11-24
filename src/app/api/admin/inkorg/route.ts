@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { build, emailKey, locate, phoneKey, summary, type Built } from '@/lib/personer';
 import type {
-  AiAnteckning, Arende, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgSkickat, InkorgTrad, InkorgUtkast, MejlBilaga,
+  AiAnteckning, Arende, InkorgFil, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgSkickat, InkorgTrad, InkorgUtkast, MejlBilaga,
 } from '@/lib/admin-types';
 import { callScript, scriptetKanBilagor } from '@/lib/emails/send-via-gmail';
 import { UNDERLAG_BUCKET } from '@/lib/inmail/save-attachments';
@@ -140,6 +140,35 @@ function grupperaPerPerson(people: Map<string, Built>, data: Awaited<ReturnType<
   return per;
 }
 
+/** Mejlen i en tråd vars sparade bilagor hämtas. De senaste räcker. */
+const MAX_MEJL_MED_FILER = 300;
+
+/**
+ * Kopplar bilagorna som sparats i lagringen (save-attachments.gs) till mejlet
+ * de kom med, så att de går att öppna i tråden. Ett zip-arkiv har sina
+ * uppackade filer på samma mejl. Går det inte visas bara namnen, som förut.
+ */
+async function bifogaFiler(supabase: Supabase, meddelanden: InkorgMeddelande[]) {
+  const ids = [...new Set(meddelanden.filter((m) => m.kanal === 'mejl' && m.gmailMessageId).map((m) => m.gmailMessageId!))]
+    .slice(-MAX_MEJL_MED_FILER);
+  if (!ids.length) return;
+  const { data, error } = await supabase.from('bokforing_underlag')
+    .select('id, gmail_message_id, file_name, mime_type, file_size')
+    .in('gmail_message_id', ids).not('file_path', 'is', null).order('created_at');
+  if (error) { console.error('[admin/inkorg] bilagorna:', error.message); return; }
+
+  const perMejl = new Map<string, InkorgFil[]>();
+  for (const r of data ?? []) {
+    const lista = perMejl.get(r.gmail_message_id) ?? [];
+    lista.push({ id: r.id, namn: r.file_name || 'bilaga', typ: r.mime_type, storlek: r.file_size });
+    perMejl.set(r.gmail_message_id, lista);
+  }
+  for (const m of meddelanden) {
+    const filer = m.gmailMessageId ? perMejl.get(m.gmailMessageId) : undefined;
+    if (filer) m.filer = filer;
+  }
+}
+
 const MAX_SKICKADE = 500;
 /** Kroppen kan vara upp till 50 000 tecken. Det räcker att läsa början i listan. */
 const SKICKAT_MAX_TEXT = 20_000;
@@ -237,10 +266,13 @@ export async function GET(request: NextRequest) {
         .select('id, titel, beskrivning, datum, status, person_key, person_namn, kalla, created_at, klar_at')
         .eq('status', 'oppen').in('person_key', nycklar).order('datum');
 
+      const meddelanden = v?.meddelanden ?? [];
+      await bifogaFiler(supabase, meddelanden);
+
       const trad: InkorgTrad = {
         person: summary(p),
         kategori: kategori(p, klara),
-        meddelanden: v?.meddelanden ?? [],
+        meddelanden,
         utkast: v?.utkast ?? [],
         arenden: (arenden ?? []).map((r): Arende => ({
           id: r.id, titel: r.titel, beskrivning: r.beskrivning, datum: r.datum, status: r.status,
