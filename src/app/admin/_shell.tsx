@@ -154,10 +154,13 @@ function CodeGate({ onUnlock }: { onUnlock: () => void }) {
 }
 
 /** Sidor med lista till vänster och detaljer till höger behöver hela bredden. */
-const BREDA = ['/admin/kalender', '/admin/inkorg', '/admin/flode'];
+const BREDA = ['/admin/kalender', '/admin/flode'];
 
 /** Flödesschemat ritas över hela fönstrets bredd. */
-const HELA_FONSTRET = ['/admin/flodesschema'];
+const HELA_FONSTRET = ['/admin/flodesschema', '/admin/inkorg'];
+
+/** Sidor som är en egen app, som inkorgen: hela fönstret under menyn, utan marginaler. */
+const APPAR = ['/admin/inkorg'];
 
 /** Översikten är startsidan och får också hela bredden — men bara på exakt /admin. */
 const BRED_EXAKT = ['/admin'];
@@ -206,7 +209,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           </div>
         </div>
       </nav>
-      <main className={`${bredd} mx-auto px-4 sm:px-6 py-8`}>{children}</main>
+      <main className={APPAR.some((b) => pathname?.startsWith(b)) ? '' : `${bredd} mx-auto px-4 sm:px-6 py-8`}>{children}</main>
     </div>
   );
 }
