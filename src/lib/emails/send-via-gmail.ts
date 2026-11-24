@@ -120,6 +120,25 @@ export async function callScript(payload: Record<string, unknown>): Promise<Gmai
   }
 }
 
+/**
+ * Om den publicerade versionen av send-mail.gs kan bifoga filer. Inget
+ * skickas. En äldre version känner inte till frågan och svarar att to,
+ * subject och html krävs. `fel` är satt när scriptet inte gick att fråga alls.
+ */
+export async function scriptetKanBilagor(): Promise<{ kan: boolean; fel?: string }> {
+  const url = process.env.GMAIL_SCRIPT_URL;
+  const secret = process.env.GMAIL_SCRIPT_SECRET;
+  if (!url || !secret) return { kan: false, fel: 'GMAIL_SCRIPT_URL eller GMAIL_SCRIPT_SECRET saknas' };
+  try {
+    const svar: Record<string, unknown> = await post(url, { secret, action: 'formagor' }, SEND_TIMEOUT_MS);
+    if (svar.ok && svar.bilagor === true) return { kan: true };
+    const fel = typeof svar.error === 'string' ? svar.error : '';
+    return /krävs/i.test(fel) ? { kan: false } : { kan: false, fel: fel || 'oväntat svar' };
+  } catch (err) {
+    return { kan: false, fel: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 /** Frågar scriptet hur det gick med ett utskick vars svar vi tappade. */
 async function recover(url: string, secret: string, ref: string, lost: string): Promise<GmailResult> {
   console.warn(`[gmail] tappade svaret (${lost}), frågar scriptet om ${ref}`);

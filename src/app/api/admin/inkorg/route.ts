@@ -4,7 +4,7 @@ import { build, emailKey, locate, phoneKey, summary, type Built } from '@/lib/pe
 import type {
   AiAnteckning, Arende, InkorgKategori, InkorgKonversation, InkorgMeddelande, InkorgSkickat, InkorgTrad, InkorgUtkast, MejlBilaga,
 } from '@/lib/admin-types';
-import { callScript } from '@/lib/emails/send-via-gmail';
+import { callScript, scriptetKanBilagor } from '@/lib/emails/send-via-gmail';
 import { UNDERLAG_BUCKET } from '@/lib/inmail/save-attachments';
 import { identifySender } from '@/lib/sms/identify';
 import { generateSmsReply } from '@/lib/sms/answer';
@@ -324,6 +324,20 @@ async function skickaMejl(supabase: Supabase, id: string, text: string, amne?: s
       return fel(`Bilagan ${b.namn} gick inte att hämta: ${lankFel?.message ?? 'okänt fel'}`, 500);
     }
     attachments.push({ url: data.signedUrl, name: b.namn });
+  }
+
+  // En äldre version av send-mail.gs skickar mejlet men hoppar över bilagorna.
+  // Fråga först, så att kunden aldrig får ett mejl utan filen.
+  if (attachments.length) {
+    const kan = await scriptetKanBilagor();
+    if (!kan.kan) {
+      const meddelande = kan.fel
+        ? `Mejlet skickades inte: kunde inte kontrollera att Gmail-scriptet kan bifoga filer (${kan.fel}).`
+        : 'Mejlet skickades inte: send-mail.gs i Apps Script är en äldre version som inte kan bifoga filer. '
+          + 'Klistra in den nya versionen och publicera om: Distribuera → Hantera distributioner → pennan → Version: Ny version.';
+      await supabase.from('mejl_utkast').update({ status: 'draft', fel: meddelande }).eq('id', id);
+      return fel(meddelande, 502);
+    }
   }
 
   const res = await callScript(claimed.svar_pa_message_id

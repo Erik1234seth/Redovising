@@ -56,6 +56,12 @@ function doPost(e) {
       return json(lookupSendResult(payload.ref));
     }
 
+    // Vad den här versionen kan. Servern frågar innan den skickar ett mejl med
+    // bilagor, så att det aldrig går iväg utan dem från en äldre version.
+    if (payload.action === 'formagor') {
+      return json({ ok: true, bilagor: true });
+    }
+
     // Svar och nya mejl från inkorgen i adminpanelen. Signaturen läggs på här,
     // med samma funktioner som mail-AI:ns utkast använde (check-inbox.gs).
     if (payload.action === 'reply' || payload.action === 'compose') {

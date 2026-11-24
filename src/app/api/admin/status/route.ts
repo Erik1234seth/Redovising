@@ -1,3 +1,4 @@
+import { scriptetKanBilagor } from '@/lib/emails/send-via-gmail';
 import { NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { StatusCheck, StatusGroup, StatusReport } from '@/lib/admin-types';
@@ -89,7 +90,16 @@ async function checkGmailScript(): Promise<StatusCheck> {
 
     const error = parsed.error ?? '';
     if (/krävs/i.test(error)) {
-      return { ...base, level: 'ok', detail: 'Webbappen svarar och hemligheten stämmer.' };
+      // Bilagorna kom med i send-mail.gs senare. Publiceras inte den versionen
+      // går mejlen från inkorgen iväg, men utan filerna.
+      const kan = await scriptetKanBilagor();
+      if (!kan.kan && !kan.fel) {
+        return {
+          ...base, level: 'fail', detail: 'Webbappen svarar, men den publicerade versionen av send-mail.gs kan inte bifoga filer.',
+          hint: 'Klistra in apps-script/send-mail.gs i Apps Script och publicera om: Distribuera → Hantera distributioner → pennan → Version: Ny version.',
+        };
+      }
+      return { ...base, level: 'ok', detail: kan.kan ? 'Webbappen svarar, hemligheten stämmer och bilagor stöds.' : 'Webbappen svarar och hemligheten stämmer.' };
     }
     if (/unauthorized|hemlighet/i.test(error)) {
       return { ...base, level: 'fail', detail: 'Scriptet nekade hemligheten.', hint: 'GMAIL_SCRIPT_SECRET i Vercel och GMAIL_SCRIPT_SECRET i Script Properties måste vara samma sträng.' };
