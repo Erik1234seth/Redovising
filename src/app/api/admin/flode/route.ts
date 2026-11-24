@@ -11,7 +11,8 @@ export const maxDuration = 60;
 /**
  * Kunderna till Flöde i toppmenyn: alla med ett konto som skickat in underlag.
  *
- * GET → { kunder: FlodeKund[] }, de med nya underlag först. `nya` räknas som
+ * GET → { kunder: FlodeKund[] }, sorterade på flest nya underlag, sedan flest
+ * att granska, sedan senast inskickat underlag. `nya` räknas som
  * knappen "Kör nya" i Flöde gör (`underlagAttKora`): filer som aldrig körts,
  * eller där kunden skickat något nytt sedan senaste körningen. `granska` är
  * transaktionerna i fliken Granska, räknade ur samma körningar som Flöde visar
@@ -78,7 +79,7 @@ export async function GET() {
         senast: perKund.get(userId)!.senast,
       };
     });
-    kunder.sort((a, b) => Number(b.nya > 0) - Number(a.nya > 0) || b.senast.localeCompare(a.senast));
+    kunder.sort((a, b) => b.nya - a.nya || b.granska - a.granska || b.senast.localeCompare(a.senast));
     return NextResponse.json({ kunder });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Internt fel' }, { status: 500 });
