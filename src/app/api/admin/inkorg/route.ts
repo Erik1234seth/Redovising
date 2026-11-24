@@ -419,9 +419,11 @@ export async function POST(request: NextRequest) {
             if (leadFel) return fel(leadFel.message, 500);
           }
         }
+        // 'egen': ett mejl vi skriver och skickar direkt. Det slänger inte AI:ns
+        // väntande utkast, som andra nya utkast gör (supabase/ett-mejlutkast-per-konversation.sql)
         const { data, error } = await supabase.from('mejl_utkast').insert({
           till_email: till, amne: String(body.amne ?? '').trim() || null, text,
-          svar_pa_message_id: body.svarPa || null, kalla: 'manuell', bilagor: lasBilagor(body.bilagor),
+          svar_pa_message_id: body.svarPa || null, kalla: 'egen', bilagor: lasBilagor(body.bilagor),
         }).select('id').single();
         if (error) return fel(error.message, 500);
         return skickaMejl(supabase, data.id, text);

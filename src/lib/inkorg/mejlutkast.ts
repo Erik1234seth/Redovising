@@ -15,6 +15,10 @@ import { isNoReplyAddress } from '@/lib/inmail/no-reply';
  * i inkorgen direkt och inte först när Gmail-synken går (en gång i timmen).
  * Synken gör upsert på samma id och skriver då över med Gmails egna uppgifter.
  *
+ * Har kunden mejlat flera gånger i rad slänger databasen de äldre utkasten,
+ * så att bara svaret på det senaste mejlet ligger kvar
+ * (supabase/ett-mejlutkast-per-konversation.sql).
+ *
  * `request` måste vara en oläst kopia.
  */
 export async function sparaMejlutkast(request: Request, response: Response): Promise<Response> {
