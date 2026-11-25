@@ -144,7 +144,8 @@ interface Koppling { user_id: string; underlag_id: string; transaktion_id: strin
  * rad i en annan fil i körningen kan pekas på.
  *
  * Går dubbletten inte att peka ut — en fil i ett annat anrop, en rad som
- * ersatts — sparas den som förut: en transaktion som inte bokförs.
+ * ersatts — sparas den inte heller som en egen transaktion. Raden står kvar i
+ * Flöde som "Kunde inte kopplas" (skrivFil).
  */
 function planeraKopplingar(resultat: Resultat, skrivs: (f: ResultatFil) => boolean): Map<ResultatTransaktion, Mal> {
   const mal = new Map<ResultatTransaktion, Mal>();
@@ -158,18 +159,14 @@ function planeraKopplingar(resultat: Resultat, skrivs: (f: ResultatFil) => boole
   }
   for (const f of filer) for (const t of f.transaktioner) if (!mal.has(t)) t.transaktionId = randomUUID();
 
-  // En annan fil i samma körning: raden med samma belopp, eller filens enda rad
-  const perNr = new Map(filer.map((f) => [f.fil.toUpperCase(), f]));
+  // En transaktion i en annan fil i samma körning: den rad AI:n pekade ut ("F3.2")
   for (const f of filer) {
     for (const t of f.transaktioner) {
-      if (t.dublett.status !== 'dublett' || mal.has(t)) continue;
-      const malFil = perNr.get(t.dublett.ref.trim().toUpperCase());
-      if (!malFil || malFil === f) continue;
-      const kandidater = malFil.transaktioner.filter((x) => !mal.has(x) && x.dublett.status !== 'dublett' && x.transaktionId);
-      const vald = kandidater.find((x) => Math.abs(x.belopp - t.belopp) < 1 && x.riktning === t.riktning)
-        ?? (kandidater.length === 1 ? kandidater[0] : undefined);
+      if (t.dublett.status !== 'dublett' || mal.has(t) || !t.dublett.refUnderlag || t.dublett.refUnderlag === f.underlagId) continue;
+      const vald = filer.find((x) => x.underlagId === t.dublett.refUnderlag)?.transaktioner
+        .find((x) => x.nr === t.dublett.refNr && !mal.has(x) && x.dublett.status !== 'dublett' && x.transaktionId);
       if (!vald) continue;
-      mal.set(t, { transaktion_id: vald.transaktionId, malFil: malFil.underlagId });
+      mal.set(t, { transaktion_id: vald.transaktionId, malFil: t.dublett.refUnderlag });
       t.transaktionId = undefined;
     }
   }
@@ -324,7 +321,13 @@ async function skrivFil(
   const email = u.sender_email?.trim().toLowerCase() || null;
   // Det som är samma affär som något som redan finns kopplas dit efteråt (kopplaUnderlag)
   const kopplade = f.transaktioner.filter((t) => kopplingar.has(t)).length;
-  const nya = f.transaktioner.filter((t) => !kopplingar.has(t)).map((t) => ({ t, id: t.transaktionId ?? randomUUID() }));
+  // En dubblett blir aldrig en egen transaktion. Gick den inte att koppla står den kvar i Flöde så att byrån ser den.
+  const okopplade = f.transaktioner.filter((t) => !kopplingar.has(t) && t.dublett.status === 'dublett');
+  for (const t of okopplade) {
+    t.transaktionId = undefined;
+    t.kopplad = `Kunde inte kopplas — hittade ingen rad i ${t.dublett.refText || 'det den är dubblett av'} att koppla till.`;
+  }
+  const nya = f.transaktioner.filter((t) => !kopplingar.has(t) && t.dublett.status !== 'dublett').map((t) => ({ t, id: t.transaktionId ?? randomUUID() }));
   const rows = nya.map(({ t, id }) => transaktionsrad(t, id, u, email, fragad, nu, modell));
   if (rows.length) {
     const { error } = await supabase.from('transaktioner').insert(rows);
@@ -361,11 +364,12 @@ async function skrivFil(
     transaktioner_antal: rows.length,
     transaktioner_notering: f.vad || null,
     // Ett komplement behöver inte ha egna transaktioner
-    transaktioner_fel: rows.length || kopplade || f.sort === 'komplement' ? null : 'AI:n hittade inga transaktioner i filen',
+    transaktioner_fel: rows.length || kopplade || okopplade.length || f.sort === 'komplement' ? null : 'AI:n hittade inga transaktioner i filen',
   });
   const delar = [
     rows.length ? `${rows.length} ${rows.length === 1 ? 'transaktion sparad' : 'transaktioner sparade'}` : '',
     kopplade ? `${kopplade} kopplad${kopplade === 1 ? '' : 'e'} till det som redan fanns` : '',
+    okopplade.length ? `${okopplade.length} ${okopplade.length === 1 ? 'dubblett kunde' : 'dubbletter kunde'} inte kopplas` : '',
   ].filter(Boolean);
   return delar.length ? `${delar.join(', ')}.` : f.sort === 'komplement' ? 'Komplement utan egna transaktioner.' : 'Inga transaktioner i filen.';
 }

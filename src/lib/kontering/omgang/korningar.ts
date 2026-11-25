@@ -47,9 +47,9 @@ const arKlar = (t: ResultatTransaktion) => arKopplad(t) || !!t.godkand || !!t.an
  * inte är klara, och en klar transaktion som en möjlig dubblett står ihop med.
  */
 export function antalIGranska(rader: Pick<Provrad, 'korning' | 'status' | 'jamfor_med' | 'underlag_ids' | 'filer' | 'resultat'>[]): number {
-  const poster: { t: ResultatTransaktion; fil: string }[] = [];
+  const poster: { t: ResultatTransaktion; underlagId: string }[] = [];
   for (const r of utanOmkorda(rader.filter((x) => !x.jamfor_med))) {
-    for (const f of (r.resultat as Resultat | null)?.filer ?? []) for (const t of f.transaktioner) poster.push({ t, fil: f.namn });
+    for (const f of (r.resultat as Resultat | null)?.filer ?? []) for (const t of f.transaktioner) poster.push({ t, underlagId: f.underlagId });
   }
   const perTx = new Map(poster.filter((p) => p.t.transaktionId).map((p) => [p.t.transaktionId!, p]));
   const raknade = new Set<(typeof poster)[number]>();
@@ -58,9 +58,9 @@ export function antalIGranska(rader: Pick<Provrad, 'korning' | 'status' | 'jamfo
     raknade.add(p);
     // En möjlig dubblett står i Granska tillsammans med transaktionen den pekar på
     if (p.t.dublett.status === 'unik') continue;
-    const refFil = p.t.dublett.refText?.startsWith('filen ') ? p.t.dublett.refText.slice(6) : null;
-    const mal = (p.t.dublett.transaktionId ? perTx.get(p.t.dublett.transaktionId) : undefined)
-      ?? (refFil ? poster.find((x) => x !== p && x.fil === refFil && x.t.riktning === p.t.riktning && Math.abs(x.t.belopp - p.t.belopp) < 1) : undefined);
+    const { transaktionId, refUnderlag, refNr } = p.t.dublett;
+    const mal = (transaktionId ? perTx.get(transaktionId) : undefined)
+      ?? (refUnderlag ? poster.find((x) => x !== p && x.underlagId === refUnderlag && x.t.nr === refNr) : undefined);
     if (mal) raknade.add(mal);
   }
   return raknade.size;

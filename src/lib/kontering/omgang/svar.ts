@@ -37,8 +37,14 @@ export interface ResultatTransaktion {
   uppgifter: Record<string, unknown>;
   /** Omräkningen när underlaget är i en annan valuta. */
   kronor: Kronor | null;
-  /** refText är dubbletten som byrån ser den — datum, belopp och motpart, eller filens namn. */
-  dublett: SvarTransaktion['dublett'] & { transaktionId: string | null; refText: string; verifikationId?: string | null };
+  /**
+   * refText är dubbletten som byrån ser den — datum, belopp och motpart, eller filens namn.
+   * refUnderlag och refNr är transaktionen i en annan fil i omgången som AI:n pekade ut ("F3.2").
+   */
+  dublett: SvarTransaktion['dublett'] & {
+    transaktionId: string | null; refText: string; verifikationId?: string | null;
+    refUnderlag?: string | null; refNr?: number | null;
+  };
   saknas: SvarTransaktion['saknas'];
   /**
    * Pending: när något saknas, kontona affären kan hamna på beroende på
@@ -356,7 +362,10 @@ export async function provaSvar(
 
   const finns = (ref: string) => {
     if (/^K\d+$/.test(ref)) return { ok: ref in kontext.kNummer, transaktionId: kontext.kNummer[ref] ?? null };
-    if (/^[FG]\d+$/.test(ref)) return { ok: perFil.has(ref), transaktionId: null };
+    if (/^G\d+$/.test(ref)) return { ok: perFil.has(ref), transaktionId: null };
+    // En transaktion i en annan fil i omgången: "F3.2"
+    const rad = /^(F\d+)\.\d+$/.exec(ref);
+    if (rad) return { ok: perFil.has(rad[1]) && !perFil.get(rad[1])!.granne, transaktionId: null };
     if (/^BOK\d+$/.test(ref)) return { ok: ref in (kontext.vNummer ?? {}), transaktionId: null, verifikationId: kontext.vId?.[ref] ?? null };
     return { ok: false, transaktionId: null };
   };
@@ -396,11 +405,18 @@ export async function provaSvar(
     if (t.dublett.status === 'unik') continue;
     const r = t.dublett.transaktionId ? refPer.get(t.dublett.transaktionId) : null;
     const ref = t.dublett.ref.trim().toUpperCase();
-    const fil = perFil.get(ref);
+    const [filNr, radNr] = ref.split('.');
+    const fil = perFil.get(filNr);
     const verifikation = kontext.vNummer?.[ref];
+    // En transaktion i en annan fil i omgången: just den raden, inte filen
+    const malRad = radNr && fil && !fil.granne
+      ? resultat.find((x) => x.underlagId === fil.underlagId)?.transaktioner.find((x) => x.nr === Number(radNr))
+      : undefined;
+    if (malRad && fil) { t.dublett.refUnderlag = fil.underlagId; t.dublett.refNr = malRad.nr; }
     t.dublett.refText = r
       ? `${r.datum ?? 'okänt datum'} ${Number(r.belopp)} ${r.valuta || 'SEK'} ${r.motpart || r.beskrivning || ''}`.trim()
-      : fil ? `filen ${fil.namn}` : verifikation ? `verifikation ${verifikation}` : 'okänd rad';
+      : malRad && fil ? `${malRad.datum ?? 'okänt datum'} ${malRad.belopp} ${malRad.valuta || 'SEK'} ${malRad.motpart || malRad.beskrivning || ''} i filen ${fil.namn}`.replace(/\s+/g, ' ')
+        : fil ? `filen ${fil.namn}` : verifikation ? `verifikation ${verifikation}` : 'okänd rad';
   }
 
   return { filer: resultat, anteckningar: (svar.anteckningar ?? []).filter((a) => String(a).trim()), kontroller, hoppade };

@@ -68,24 +68,46 @@ async function kundensFiler(supabase: SupabaseClient, userId: string, { medOvrig
   return ((data ?? []) as FilRad[]).filter((f) => !arVarAdress(f.sender_email) && (medOvriga || f.sortering !== 'ovrigt'));
 }
 
+/** En transaktion Flöde läst ur en fil, där vi väntar på något från kunden. */
+interface OppenPost {
+  datum: string | null;
+  beskrivning: string | null;
+  motpart: string | null;
+  belopp: number | null;
+  valuta: string | null;
+  saknas: string[];
+}
+
 /**
  * Filer som inte är klara: inte lästa i Flöde än, eller där Flöde sa att
- * något saknas. Med det som saknas, så att sorteringen ser vad vi väntar på.
+ * något saknas. Med transaktionerna som väntar på något, så att sorteringen
+ * ser vad filen innehåller och vad vi väntar på.
  */
-async function oppna(supabase: SupabaseClient, userId: string, filer: FilRad[]): Promise<(FilRad & { saknas: string[] })[]> {
-  const { data } = await supabase.from('transaktioner').select('underlag_id, tillrackligt')
+async function oppna(supabase: SupabaseClient, userId: string, filer: FilRad[]): Promise<(FilRad & { poster: OppenPost[] })[]> {
+  const { data } = await supabase.from('transaktioner').select('underlag_id, datum, beskrivning, motpart, belopp, valuta, tillrackligt')
     .eq('user_id', userId).eq('tillrackligt->>status', 'saknar').not('underlag_id', 'is', null).limit(2000);
-  const saknas = new Map<string, string[]>();
+  const poster = new Map<string, OppenPost[]>();
   for (const t of data ?? []) {
-    const vad = ((t.tillrackligt as { saknas?: { vad?: string }[] } | null)?.saknas ?? []).map((x) => String(x.vad ?? '')).filter(Boolean);
-    saknas.set(t.underlag_id as string, [...(saknas.get(t.underlag_id as string) ?? []), ...vad]);
+    const saknas = ((t.tillrackligt as { saknas?: { vad?: string }[] } | null)?.saknas ?? []).map((x) => String(x.vad ?? '')).filter(Boolean);
+    const post: OppenPost = {
+      datum: t.datum as string | null, beskrivning: t.beskrivning as string | null, motpart: t.motpart as string | null,
+      belopp: t.belopp === null ? null : Number(t.belopp), valuta: t.valuta as string | null, saknas: [...new Set(saknas)],
+    };
+    poster.set(t.underlag_id as string, [...(poster.get(t.underlag_id as string) ?? []), post]);
   }
   return filer.filter((f) => !arBokford(f)
     && kanLasasAvAi(f.file_name, f.mime_type) && !isSieFile(f.file_name)
     // Sidor som läses med en annan, och dokument som väntar på en sida, frågas om för sig
     && !f.del_av && !f.sidor_saknas?.length
-    && (!f.flode_at || saknas.has(f.id)))
-    .map((f) => ({ ...f, saknas: [...new Set(saknas.get(f.id) ?? [])] }));
+    && (!f.flode_at || poster.has(f.id)))
+    .map((f) => ({ ...f, poster: f.flode_at ? poster.get(f.id) ?? [] : [] }));
+}
+
+/** En rad per transaktion: vad den är och vad vi väntar på. */
+function beskrivPost(p: OppenPost): string {
+  const belopp = p.belopp === null ? null : `${p.belopp.toLocaleString('sv-SE')} ${p.valuta || 'SEK'}`;
+  const vad = [p.datum, p.beskrivning, p.motpart && p.motpart !== p.beskrivning ? p.motpart : null, belopp].filter(Boolean).join(', ');
+  return `${vad || 'okänd transaktion'} — vi väntar på: ${p.saknas.length ? p.saknas.join(', ') : 'svar från kunden'}`;
 }
 
 /** Ämnet på mejlet varje fil kom med, så att AI:n ser vilket mejl som handlar om vilken fil. */
@@ -142,18 +164,20 @@ Underlag är det också när det inte finns någon bilaga, till exempel:
 - kunden förklarar vad ett köp eller en insättning gällde
 - kunden säger att underlaget kommer, eller att något underlag saknas
 
-Handlar mejlet om underlag: peka ut vilka av kundens tidigare inskickade filer i listan det gäller. Ett svar handlar ofta om en fil som kom i ett annat mejl, så läs historiken. Kan du inte avgöra vilka filer det gäller, sätt "alla" till true. Handlar det bara om underlag som kommer senare, eller om bilagorna i just det här mejlet, är listan tom.
+Handlar mejlet om underlag: peka ut vilka av kundens öppna filer i listan mejlet ger ny information om. En fil räknas bara när det kunden skriver passar ihop med det filen innehåller eller det vi väntar på: samma köp, motpart, belopp eller datum, eller ett svar på det vi frågat om. Ett svar handlar ofta om en fil som kom i ett annat mejl, så läs historiken. Går det kunden skriver inte att knyta till en viss fil är listan tom. Mejlet sparas ändå och läses när filerna konteras. Handlar det bara om underlag som kommer senare, eller om bilagorna i just det här mejlet, är listan också tom.
 
-Svara med JSON: {"underlag": true eller false, "filer": ["F1", ...], "alla": true eller false, "varfor": "kort förklaring"}`,
+Svara med JSON: {"underlag": true eller false, "filer": ["F1", ...], "varfor": "kort förklaring"}`,
         },
         {
           role: 'user',
           content: [
             lista.length
-              ? `Kundens inskickade filer som inte är klara:\n${lista.map((f, i) => {
-                const status = f.saknas.length ? `vi väntar på svar om: ${f.saknas.join(', ')}` : 'inte genomgången än';
+              ? `Kundens öppna filer:\n${lista.map((f, i) => {
                 const mejl = f.gmail_message_id ? `kom med mejlet "${amnen.get(f.gmail_message_id) ?? '?'}"` : 'uppladdad';
-                return `F${i + 1}: ${f.file_name} — ${String(f.created_at).slice(0, 10)}, ${mejl}, ${status}`;
+                const rad = `F${i + 1}: ${f.file_name} — inskickad ${String(f.created_at).slice(0, 10)}, ${mejl}`;
+                return f.poster.length
+                  ? [rad, ...f.poster.map((p) => `   - ${beskrivPost(p)}`)].join('\n')
+                  : `${rad}, inte läst än`;
               }).join('\n')}`
               : 'Kunden har inga inskickade filer som inte är klara.',
             historik || '',
@@ -162,11 +186,9 @@ Svara med JSON: {"underlag": true eller false, "filer": ["F1", ...], "alla": tru
         },
       ],
     });
-    const svar = parseJSON<{ underlag?: boolean; filer?: string[]; alla?: boolean; varfor?: string }>(raw);
+    const svar = parseJSON<{ underlag?: boolean; filer?: string[]; varfor?: string }>(raw);
     const underlag = opts.harBilagor || svar.underlag === true;
-    const valda = !underlag ? []
-      : svar.alla ? lista.map((f) => f.id)
-        : (svar.filer ?? []).map((r) => ref.get(r)).filter((x): x is string => !!x);
+    const valda = !underlag ? [] : (svar.filer ?? []).map((r) => ref.get(r)).filter((x): x is string => !!x);
     console.log(`[underlag-kontroll] ${opts.profil.email}: ${underlag ? `underlag, ${valda.length} tidigare filer` : 'annat'} — ${svar.varfor ?? ''}`);
     return { underlag, filer: valda };
   } catch (err) {

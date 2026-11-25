@@ -57,7 +57,11 @@ interface Tx {
   uppgifter: Record<string, unknown>;
   kronor: { belopp: number; moms: number | null; kurs: number } | null;
   /** transaktionId: den befintliga transaktionen raden pekar på, när den gick att slå upp. */
-  dublett: { status: 'unik' | 'tveksam' | 'dublett'; ref: string; refText?: string; motivering: string; transaktionId?: string | null };
+  dublett: {
+    status: 'unik' | 'tveksam' | 'dublett'; ref: string; refText?: string; motivering: string; transaktionId?: string | null;
+    /** Transaktionen i en annan fil i omgången som AI:n pekade ut ("F3.2"). */
+    refUnderlag?: string | null; refNr?: number | null;
+  };
   saknas: { vad: string; varfor: string }[];
   /** Pending: kontona affären kan hamna på beroende på svaret. */
   preliminara?: { konto: string; kontonamn: string; nar: string }[];
@@ -309,9 +313,9 @@ export function Flode({ userId }: { userId: string }) {
 
   /**
    * Transaktionerna, en gång var. En fil som kopplats till en befintlig
-   * transaktion blir ingen egen rad: den listas bland transaktionens filer.
-   * Gick det inte att se vart den kopplades (t.ex. en bankrad utanför Flöde)
-   * står den kvar som egen rad.
+   * transaktion blir ingen egen rad: den listas bland transaktionens filer
+   * (underlag_kopplingar). Kopplades den till något utanför Flöde, som en
+   * bankrad, syns filen bara i fliken Underlag.
    */
   const poster = useMemo<Post[]>(() => {
     const namn = new Map((underlag ?? []).map((u) => [u.id, u.file_name]));
@@ -336,23 +340,13 @@ export function Flode({ userId }: { userId: string }) {
       const mal = perTx.get(k.transaktion_id);
       if (mal) laggTill(mal, k.underlag_id);
     }
-    const ut: Post[] = [];
-    for (const p of alla) {
-      if (arKopplad(p.t)) {
-        const malId = p.t.dublett.transaktionId
-          ?? kopplingar.find((k) => k.underlag_id === p.underlagId && perTx.has(k.transaktion_id)
-            && Math.abs(perTx.get(k.transaktion_id)!.t.belopp - p.t.belopp) < 1)?.transaktion_id;
-        const mal = malId ? perTx.get(malId) : undefined;
-        if (mal && mal !== p) { laggTill(mal, p.underlagId); continue; }
-      }
-      ut.push(p);
-    }
-    return ut.sort((a, b) => (b.t.datum ?? '').localeCompare(a.t.datum ?? ''));
+    // En kopplad rad är ingen egen transaktion: filen syns bland underlagen på den den kopplades till
+    return alla.filter((p) => !arKopplad(p.t)).sort((a, b) => (b.t.datum ?? '').localeCompare(a.t.datum ?? ''));
   }, [egna, kopplingar, underlag, senaste]);
 
   /**
    * Möjliga dubbletter läggs ihop med transaktionen de pekar på: den
-   * befintliga transaktionen, annars raden med samma belopp i filen de pekar på.
+   * befintliga transaktionen, eller raden AI:n pekade ut i en annan fil.
    * Gruppen hamnar i Granska om någon i den behöver granskas.
    */
   const { klaraRader, granskaRader } = useMemo(() => {
@@ -361,9 +355,9 @@ export function Flode({ userId }: { userId: string }) {
     const iGrupp = new Set<string>();
     for (const p of poster) {
       if (p.t.dublett.status === 'unik' || arKopplad(p.t)) continue;
-      const refFil = p.t.dublett.refText?.startsWith('filen ') ? p.t.dublett.refText.slice(6) : null;
-      const mal = (p.t.dublett.transaktionId ? perTx.get(p.t.dublett.transaktionId) : undefined)
-        ?? (refFil ? poster.find((x) => x !== p && x.filnamn === refFil && x.t.riktning === p.t.riktning && Math.abs(x.t.belopp - p.t.belopp) < 1) : undefined);
+      const { transaktionId, refUnderlag, refNr } = p.t.dublett;
+      const mal = (transaktionId ? perTx.get(transaktionId) : undefined)
+        ?? (refUnderlag ? poster.find((x) => x !== p && x.underlagId === refUnderlag && x.t.nr === refNr) : undefined);
       if (!mal || mal === p || iGrupp.has(p.nyckel)) continue;
       // Pekar målet själv på en annan, går gruppen dit
       const rot = [...grupp.entries()].find(([, g]) => g.includes(mal))?.[0] ?? mal.nyckel;
@@ -849,7 +843,7 @@ function TxDetaljer({ post: p, onAngra, onGodkann, sparar }: { post: Post; onAng
 
   return (
     <div className="border-t border-slate-200 px-4 py-4 space-y-4 text-sm">
-      {kopplad && <p className="text-slate-600">{t.kopplad}</p>}
+      {t.kopplad && <p className={kopplad ? 'text-slate-600' : 'text-amber-700'}>{t.kopplad}</p>}
 
       {k && (
         <section>
