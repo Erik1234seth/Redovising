@@ -1,0 +1,285 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { type SupabaseClient } from '@supabase/supabase-js';
+import { testKlient } from '@/lib/testflode/klient';
+import { anvandJamforelse, godkannProv, raderaProv, raderaTransaktioner, redigeraProv, startaProv, underlagAttKora, uppdateraProv, type Provrad, type Redigering } from '@/lib/testflode/omgang/prov';
+import { FLODESMODELLER, arFlodesmodell, type Flodesmodell } from '@/lib/testflode/omgang/leverantor';
+import { utanOmkorda } from '@/lib/testflode/omgang/korningar';
+import { korOmPending, pendingInfo } from '@/lib/kontering/pending';
+
+/**
+ * TESTFLÖDE — en kopia av /api/admin/kontering-prov som använder koden i
+ * @/lib/testflode och skriver till test_-tabellerna (@/lib/testflode/klient).
+ * Kundernas riktiga bokföring rörs inte.
+ *
+ *   POST { userId, kopiera: true } kopierar kundens riktiga läge till testtabellerna
+ *        (det som fanns i testet för kunden ersätts).
+ *
+ * Resten fungerar som i Flöde:
+ *
+ * Flöde i personkortet — konteringen (@/lib/kontering/omgang). Körningarna
+ * sparas i kontering_prov, och svaren skrivs till transaktioner och konteringar.
+ *
+ *   GET     kundens underlag att välja bland, de som Kör Flöde tar (attKora), de som
+ *           Kör om alla tar (allaAttKora) och
+ *           kundens körningar. Delar som är skickade frågas efter hos leverantören,
+ *           och klara svar prövas och skrivs. Underlag som körts om syns bara i
+ *           den senaste körningen (utanOmkorda). pending: transaktionerna som väntar på
+ *           mer information, med om frågan skickats (@/lib/kontering/pending).
+ *   POST    starta en körning: { nya: true } tar allt som inte körts, { alla: true } allt
+ *           som går att köra (Kör om alla), annars underlagIds.
+ *           modell: 'gpt-6.2-sol' | 'claude-opus-5-5' (GPT om inget anges), och
+ *           jamfor: true kör samma underlag med den andra modellen som jämförelse.
+ *           { anteckning, transaktioner: [{ underlagId, vilken }] } sparar byråns
+ *           anteckning som kontext på underlagen och kör om dem.
+ *           { pending: true } konterar om kundens pending transaktioner som fått ny
+ *           information, som kvällsjobbet gör (alla: true tar alla, torrkorning: true sparar inget).
+ *   PATCH   godkänn en gul kontering, eller ångra. { anvand: korning } bokför en jämförelse i stället.
+ *           { radera: [{ id, fil, nr }] } raderar transaktionerna ur bokföringen.
+ *           { id, fil, nr, redigera: { datum, beskrivning, motpart, belopp, konto, momssats } }
+ *           ändrar transaktionen och bokför den med byråns val.
+ *           { hanterad: { underlagIds } } räknar underlagen som körda utan att läsa dem,
+ *           och svarar med vad de hade förut; { aterstall: [{ id, flode_at }] } ångrar det.
+ *   DELETE  ta bort en körning ur listan (det bokförda ligger kvar)
+ */
+
+export const maxDuration = 300;
+
+/** Testtabellerna: samma tabellnamn i koden, test_-tabellerna i databasen. */
+const getSupabase = testKlient;
+
+function fel(err: unknown, status = 500) {
+  const message = err instanceof Error ? err.message : String(err);
+  console.error('[admin/testflode]', message);
+  return NextResponse.json({ error: message }, { status });
+}
+
+const RAD_KOLUMNER = 'id, created_at, user_id, korning, del, delar, status, modell, jamfor_med, underlag_ids, filer, varningar, openai_id, kontext, resultat, usage, kostnad_usd, uppskattade_tokens, fel, klar_at';
+
+export async function GET(request: NextRequest) {
+  const userId = request.nextUrl.searchParams.get('userId');
+  if (!userId) return fel('userId saknas', 400);
+  const supabase = getSupabase();
+  try {
+    // Klara svar hämtas först, så att listan nedan visar dem
+    const { data: vantande } = await supabase.from('kontering_prov').select(RAD_KOLUMNER).eq('user_id', userId).eq('status', 'skickad');
+    await Promise.all(((vantande ?? []) as Provrad[]).map((r) => uppdateraProv(supabase, r).catch((err) =>
+      console.error(`[admin/testflode] ${r.id}:`, err instanceof Error ? err.message : err))));
+
+    const [{ data: rader, error }, { data: underlag, error: uFel }, attKora, allaAttKora, { data: kopplingar }, pending] = await Promise.all([
+      supabase.from('kontering_prov').select(RAD_KOLUMNER).eq('user_id', userId).order('created_at', { ascending: false }).order('del').limit(100),
+      supabase.from('bokforing_underlag').select('id, file_name, mime_type, created_at, sortering, sortering_orsak, del_av, flode_at, kund_svar_at')
+        .eq('user_id', userId).order('created_at', { ascending: false }).limit(2000),
+      underlagAttKora(supabase, userId),
+      underlagAttKora(supabase, userId, true),
+      // Filer som kopplats till en befintlig transaktion som extra underlag (@/lib/testflode/omgang/skriv)
+      supabase.from('underlag_kopplingar').select('underlag_id, transaktion_id')
+        .eq('user_id', userId).not('transaktion_id', 'is', null).limit(5000),
+      pendingInfo(supabase, userId),
+    ]);
+    if (error) throw new Error(error.message);
+    if (uFel) throw new Error(uFel.message);
+
+    // Hur många transaktioner varje underlag har fått förut
+    const antal = new Map<string, number>();
+    const ids = (underlag ?? []).map((u) => u.id);
+    for (let i = 0; i < ids.length; i += 300) {
+      const { data } = await supabase.from('transaktioner').select('underlag_id').in('underlag_id', ids.slice(i, i + 300));
+      for (const t of data ?? []) antal.set(t.underlag_id, (antal.get(t.underlag_id) ?? 0) + 1);
+    }
+
+    return NextResponse.json({
+      korningar: utanOmkorda((rader ?? []) as Provrad[]).map(({ kontext: _k, ...r }) => r),
+      underlag: (underlag ?? []).map((u) => ({ ...u, transaktioner: antal.get(u.id) ?? 0 })),
+      attKora,
+      allaAttKora,
+      kopplingar: kopplingar ?? [],
+      pending,
+    });
+  } catch (err) {
+    return fel(err);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  let body: { userId?: string; underlagIds?: string[]; nya?: boolean; alla?: boolean; anteckning?: string; transaktioner?: { underlagId?: string; vilken?: string }[]; modell?: string; jamfor?: boolean; pending?: boolean; torrkorning?: boolean; kopiera?: boolean };
+  try {
+    body = await request.json();
+  } catch {
+    return fel('Ogiltig JSON', 400);
+  }
+  if (!body.userId) return fel('userId saknas', 400);
+  // Kundens riktiga läge kopieras till testtabellerna (supabase/testflode.sql)
+  if (body.kopiera) {
+    const { error } = await getSupabase().rpc('testflode_kopiera', { p_user: body.userId });
+    if (error) return fel(`Kunde inte kopiera kunden till testet: ${error.message}`);
+    return NextResponse.json({ ok: true });
+  }
+  // Kvällens omkörning av pending, för hand (se /api/cron/pending)
+  if (body.pending) {
+    try {
+      return NextResponse.json(await korOmPending(getSupabase(), body.userId, { alla: !!body.alla, torrkorning: !!body.torrkorning }));
+    } catch (err) {
+      return fel(err);
+    }
+  }
+  if (body.modell !== undefined && !arFlodesmodell(body.modell)) return fel(`Okänd modell: ${body.modell}`, 400);
+  const modell: Flodesmodell = arFlodesmodell(body.modell) ? body.modell : FLODESMODELLER[0];
+  const supabase = getSupabase();
+  const userId = body.userId;
+  /** Kör med modellen, och samtidigt med den andra som jämförelse om det valts. */
+  const kor = async (ids: string[]) => {
+    const korning = crypto.randomUUID();
+    const andra = FLODESMODELLER.find((m) => m !== modell)!;
+    // Båda får köra klart, även om den ena inte gick att skicka
+    const [huvud, jamforelse] = await Promise.allSettled([
+      startaProv(supabase, userId, ids, { modell, korning }),
+      body.jamfor ? startaProv(supabase, userId, ids, { modell: andra, jamforMed: korning }) : Promise.resolve(null),
+    ]);
+    if (huvud.status === 'rejected') throw huvud.reason;
+    if (jamforelse.status === 'rejected') throw new Error(`Huvudkörningen startade, men inte jämförelsen: ${jamforelse.reason instanceof Error ? jamforelse.reason.message : jamforelse.reason}`);
+    return korning;
+  };
+  try {
+    // Byråns anteckning på en eller flera transaktioner: sparas som kontext på
+    // underlaget och följer med när filerna körs om, nu och senare
+    if (body.anteckning !== undefined) {
+      const text = String(body.anteckning).trim().slice(0, 4000);
+      const tx = (body.transaktioner ?? []).filter((t) => typeof t.underlagId === 'string' && t.underlagId);
+      if (!text) return fel('Skriv anteckningen', 400);
+      if (!tx.length) return fel('Välj minst en transaktion', 400);
+      const ids = [...new Set(tx.map((t) => t.underlagId!))];
+      const { data: egna, error: uFel } = await supabase.from('bokforing_underlag').select('id').eq('user_id', body.userId).in('id', ids);
+      if (uFel) throw new Error(uFel.message);
+      if ((egna ?? []).length !== ids.length) return fel('Ett av underlagen hör inte till kunden', 400);
+      const { error: iFel } = await supabase.from('flodes_instruktioner').insert(tx.map((t) => ({
+        typ: 'kontext', omfang: 'underlag', steg: 'konteras', user_id: body.userId, underlag_id: t.underlagId, transaktion_id: null,
+        text: `Gäller transaktionen ${String(t.vilken ?? '').trim().slice(0, 300) || 'i filen'}: ${text}`,
+      })));
+      if (iFel) throw new Error(`Kunde inte spara anteckningen: ${iFel.message}`);
+      const korning = await kor(ids);
+      return NextResponse.json({ ok: true, korning });
+    }
+    // Kör Flöde: allt som inte körts, eller där kunden skickat något nytt. Kör om alla: allt som går att köra
+    const ids = body.nya || body.alla
+      ? await underlagAttKora(supabase, body.userId, !!body.alla)
+      : [...new Set((body.underlagIds ?? []).filter((x) => typeof x === 'string'))];
+    if (!ids.length) return fel(body.alla ? 'Inget underlag att köra' : body.nya ? 'Inget nytt att köra' : 'Välj minst ett underlag', 400);
+    const korning = await kor(ids);
+    return NextResponse.json({ ok: true, korning });
+  } catch (err) {
+    return fel(err);
+  }
+}
+
+/**
+ * Godkänn en gul kontering, eller ångra: { userId, id, fil, nr, godkand }. Bokför en jämförelse: { userId, anvand }.
+ * Radera transaktioner: { userId, radera: [{ id, fil, nr }] }.
+ * Ändra en transaktion: { userId, id, fil, nr, redigera }.
+ */
+/**
+ * Byrån har sett underlagen och vill inte köra dem: de räknas som lästa i
+ * Flöde (flode_at), så att Kör nya inte tar dem och de inte står som nya.
+ * Inget läses eller bokförs. Svarar med det de hade förut, för Ångra.
+ */
+async function markeraHanterade(supabase: SupabaseClient, userId: string, ids: string[]) {
+  const { data, error } = await supabase.from('bokforing_underlag').select('id, flode_at, transaktioner_notering').eq('user_id', userId).in('id', ids);
+  if (error) throw new Error(error.message);
+  const nu = new Date().toISOString();
+  for (const u of data ?? []) {
+    const { error: uFel } = await supabase.from('bokforing_underlag').update({
+      flode_at: nu,
+      // En fil som aldrig lästs får en notering om varför den inte har några transaktioner
+      ...(u.transaktioner_notering ? {} : { transaktioner_notering: 'Markerad som körd av byrån, utan att läsas' }),
+    }).eq('id', u.id);
+    if (uFel) throw new Error(uFel.message);
+  }
+  return (data ?? []).map((u) => ({ id: u.id as string, flode_at: (u.flode_at as string | null) ?? null }));
+}
+
+export async function PATCH(request: NextRequest) {
+  let body: {
+    userId?: string; id?: string; fil?: string; nr?: number; godkand?: boolean; anvand?: string; redigera?: Redigering;
+    radera?: { id?: unknown; fil?: unknown; nr?: unknown }[];
+    hanterad?: { underlagIds?: unknown };
+    aterstall?: { id?: unknown; flode_at?: unknown }[];
+  };
+  try {
+    body = await request.json();
+  } catch {
+    return fel('Ogiltig JSON', 400);
+  }
+  // Underlag som byrån inte vill köra räknas som körda: de står inte längre som nya
+  if (body.userId && body.hanterad) {
+    const ids = (Array.isArray(body.hanterad.underlagIds) ? body.hanterad.underlagIds : []).filter((x): x is string => typeof x === 'string');
+    if (!ids.length) return fel('Välj minst ett underlag', 400);
+    try {
+      return NextResponse.json({ ok: true, fore: await markeraHanterade(getSupabase(), body.userId, ids) });
+    } catch (err) {
+      return fel(err);
+    }
+  }
+  // Ångra: underlagen får tillbaka det de hade
+  if (body.userId && body.aterstall) {
+    const lista = (Array.isArray(body.aterstall) ? body.aterstall : [])
+      .filter((x) => typeof x.id === 'string' && (x.flode_at === null || (typeof x.flode_at === 'string' && !Number.isNaN(Date.parse(x.flode_at)))))
+      .map((x) => ({ id: x.id as string, flode_at: x.flode_at as string | null }));
+    if (!lista.length) return fel('Inget att ångra', 400);
+    try {
+      const supabase = getSupabase();
+      for (const x of lista) {
+        const { error } = await supabase.from('bokforing_underlag').update({ flode_at: x.flode_at }).eq('id', x.id).eq('user_id', body.userId);
+        if (error) throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    } catch (err) {
+      return fel(err);
+    }
+  }
+  if (body.userId && body.radera) {
+    const valda = (Array.isArray(body.radera) ? body.radera : [])
+      .filter((v) => typeof v.id === 'string' && typeof v.fil === 'string' && typeof v.nr === 'number')
+      .map((v) => ({ id: v.id as string, fil: v.fil as string, nr: v.nr as number }));
+    if (!valda.length) return fel('Välj minst en transaktion', 400);
+    try {
+      const raderade = await raderaTransaktioner(getSupabase(), body.userId, valda);
+      return NextResponse.json({ ok: true, raderade });
+    } catch (err) {
+      return fel(err);
+    }
+  }
+  if (body.userId && body.anvand) {
+    try {
+      await anvandJamforelse(getSupabase(), body.userId, body.anvand);
+      return NextResponse.json({ ok: true });
+    } catch (err) {
+      return fel(err);
+    }
+  }
+  if (!body.userId || !body.id || !body.fil || typeof body.nr !== 'number') return fel('userId, id, fil och nr krävs', 400);
+  if (body.redigera) {
+    try {
+      await redigeraProv(getSupabase(), body.userId, body.id, body.fil, body.nr, body.redigera);
+      return NextResponse.json({ ok: true });
+    } catch (err) {
+      return fel(err, 400);
+    }
+  }
+  try {
+    await godkannProv(getSupabase(), body.userId, body.id, body.fil, body.nr, body.godkand !== false);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return fel(err);
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const userId = request.nextUrl.searchParams.get('userId');
+  const korning = request.nextUrl.searchParams.get('korning');
+  if (!userId || !korning) return fel('userId och korning krävs', 400);
+  try {
+    await raderaProv(getSupabase(), userId, korning);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return fel(err);
+  }
+}

@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { Arende, FlodeKund, InkorgKonversation } from '@/lib/admin-types';
 
 /**
- * Huvudsidorna, som vanliga länkar i menyraden — ingen dropdown.
+ * Huvudsidorna, som vanliga länkar i menyraden. Ringlista, Kalender,
+ * Flödesschema och Testflöde ligger i dropdownen Mer (sedan 2026-11-25).
  *
  * SMS-utkast, Underlag, Möten och Systemstatus togs bort härifrån 2026-10-10.
  * Sidorna finns kvar på sina adresser tills Inkorgen, Ärenden och Översikten
@@ -23,13 +24,33 @@ import type { Arende, FlodeKund, InkorgKonversation } from '@/lib/admin-types';
 const ITEMS: { href: string; label: string }[] = [
   { href: '/admin/flode', label: 'Flöde' },
   { href: '/admin/inkorg', label: 'Inkorg' },
-  { href: '/admin/ringlista', label: 'Ringlista' },
   { href: '/admin/arenden', label: 'Ärenden' },
-  { href: '/admin/kalender', label: 'Kalender' },
-  { href: '/admin/flodesschema', label: 'Flödesschema' },
   { href: '/admin/kontoplan/lopande', label: 'Löpande bokföring' },
   { href: '/admin/kontoplan/bokslut', label: 'Bokslut' },
 ];
+
+/** Under Mer. */
+const MER: { href: string; label: string }[] = [
+  { href: '/admin/ringlista', label: 'Ringlista' },
+  { href: '/admin/kalender', label: 'Kalender' },
+  { href: '/admin/flodesschema', label: 'Flödesschema' },
+  { href: '/admin/testflode', label: 'Testflöde' },
+];
+
+const arAktiv = (pathname: string | null, href: string) => pathname === href || !!pathname?.startsWith(`${href}/`);
+
+function Siffra({ r }: { r: { antal: number; bradskande: boolean } | null | undefined }) {
+  if (!r || r.antal <= 0) return null;
+  return (
+    <span
+      className={`absolute -top-2 -right-3.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold leading-[18px] text-center text-white tabular-nums ${
+        r.bradskande ? 'bg-red-600' : 'bg-blue-600'
+      }`}
+    >
+      {r.antal > 99 ? '99+' : r.antal}
+    </span>
+  );
+}
 
 const POLL_MS = 60_000;
 
@@ -80,29 +101,76 @@ export default function NavMenu() {
 
   return (
     <div className="flex items-center gap-5">
-      {ITEMS.map((item) => {
-        const r = raknare[item.href];
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`relative text-sm transition hover:text-blue-700 ${
-              (pathname === item.href || pathname?.startsWith(`${item.href}/`)) ? 'text-slate-900 font-medium' : 'text-slate-600'
-            }`}
-          >
-            {item.label}
-            {r && r.antal > 0 && (
-              <span
-                className={`absolute -top-2 -right-3.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold leading-[18px] text-center text-white tabular-nums ${
-                  r.bradskande ? 'bg-red-600' : 'bg-blue-600'
-                }`}
+      {ITEMS.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          className={`relative text-sm transition hover:text-blue-700 ${arAktiv(pathname, item.href) ? 'text-slate-900 font-medium' : 'text-slate-600'}`}
+        >
+          {item.label}
+          <Siffra r={raknare[item.href]} />
+        </Link>
+      ))}
+      <Mer pathname={pathname} raknare={raknare} />
+    </div>
+  );
+}
+
+/** Dropdownen Mer. Siffrorna på sidorna i den summeras på knappen. */
+function Mer({ pathname, raknare }: { pathname: string | null; raknare: Raknare }) {
+  const [oppen, setOppen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Stängs vid sidbyte, klick utanför och Escape
+  useEffect(() => { setOppen(false); }, [pathname]);
+  useEffect(() => {
+    if (!oppen) return;
+    const klick = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOppen(false); };
+    const tangent = (e: KeyboardEvent) => { if (e.key === 'Escape') setOppen(false); };
+    document.addEventListener('mousedown', klick);
+    document.addEventListener('keydown', tangent);
+    return () => { document.removeEventListener('mousedown', klick); document.removeEventListener('keydown', tangent); };
+  }, [oppen]);
+
+  const siffror = MER.map((m) => raknare[m.href]).filter((r): r is { antal: number; bradskande: boolean } => !!r && r.antal > 0);
+  const summa = siffror.length ? { antal: siffror.reduce((a, r) => a + r.antal, 0), bradskande: siffror.some((r) => r.bradskande) } : null;
+  const aktiv = MER.some((m) => arAktiv(pathname, m.href));
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOppen((o) => !o)}
+        aria-expanded={oppen}
+        className={`relative flex items-center gap-1 text-sm transition hover:text-blue-700 ${aktiv ? 'text-slate-900 font-medium' : 'text-slate-600'}`}
+      >
+        Mer
+        <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className={`transition ${oppen ? 'rotate-180' : ''}`}>
+          <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {!oppen && <Siffra r={summa} />}
+      </button>
+      {oppen && (
+        <div className="absolute right-0 top-full mt-2 z-50 min-w-[180px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+          {MER.map((m) => {
+            const r = raknare[m.href];
+            return (
+              <Link
+                key={m.href}
+                href={m.href}
+                className={`flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-slate-50 ${arAktiv(pathname, m.href) ? 'text-slate-900 font-medium' : 'text-slate-700'}`}
               >
-                {r.antal > 99 ? '99+' : r.antal}
-              </span>
-            )}
-          </Link>
-        );
-      })}
+                {m.label}
+                {r && r.antal > 0 && (
+                  <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold leading-[18px] text-center text-white tabular-nums ${r.bradskande ? 'bg-red-600' : 'bg-blue-600'}`}>
+                    {r.antal > 99 ? '99+' : r.antal}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

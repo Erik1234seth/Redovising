@@ -1,0 +1,423 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { KORTSKULD, KORTSKULD_NAMN, konteringUrBeslut, planeradeVerifikationer, OMVAND_KONTONAMN, type Beslut, type Kontering, type Transaktion } from '@/lib/kontering/kontera';
+import { laddaK1Andringar as laddK1Andringar } from '@/lib/kontering/k1-andringar';
+import { iKronor, raknaOmTillKronor, type Kronor } from '@/lib/kontering/kronor';
+import { slaUppKonto, type Flagga } from '@/lib/kontering/regelverk';
+import type { Svar, SvarTransaktion } from './anrop';
+import type { Filpost, Hoppad, Kontext } from './forbered';
+
+/**
+ * Svaret från omgången, prövat i kod.
+ *
+ * Modellen har valt konto och moms. Koden räknar om till kronor, räknar
+ * momsen, prövar kontona mot K1 och beloppsgränserna och bygger
+ * verifikationsraderna — samma kod som när en transaktion konteras ensam.
+ *
+ * Grön blir en transaktion när säkerheten är hög, inget saknas, den inte är
+ * en möjlig dubblett och inga kontroller slagit till. Allt annat går till
+ * Granska.
+ *
+ * Kontrollerna över hela svaret: varje fil som skickades ska ha fått svar,
+ * och hänvisningar till rader och filer ska finnas. Grannsidorna (G1, G2 …)
+ * är sammanhang ur delarna bredvid: de får inget svar här, men en sida kan
+ * vara del_av en av dem (./forbered).
+ */
+
+export interface ResultatTransaktion {
+  nr: number;
+  datum: string | null;
+  beskrivning: string;
+  motpart: string;
+  belopp: number;
+  moms: number;
+  valuta: string;
+  riktning: 'in' | 'ut';
+  vat_nummer: string;
+  anteckning: string;
+  uppgifter: Record<string, unknown>;
+  /** Omräkningen när underlaget är i en annan valuta. */
+  kronor: Kronor | null;
+  /**
+   * refText är dubbletten som byrån ser den — datum, belopp och motpart, eller filens namn.
+   * refUnderlag och refNr är transaktionen i en annan fil i omgången som AI:n pekade ut ("F3.2").
+   */
+  dublett: SvarTransaktion['dublett'] & {
+    transaktionId: string | null; refText: string; verifikationId?: string | null;
+    refUnderlag?: string | null; refNr?: number | null;
+  };
+  saknas: SvarTransaktion['saknas'];
+  /**
+   * Pending: när något saknas, kontona affären kan hamna på beroende på
+   * svaret. Följer med när transaktionen konteras om (@/lib/kontering/pending).
+   */
+  preliminara?: Preliminart[];
+  /** Pending-transaktionen har konterats om med ny information (@/lib/kontering/pending). */
+  omkord?: { at: string; antal: number; lost: boolean };
+  antaganden: string;
+  kontering: (Pick<Kontering, 'konto' | 'momssats' | 'momsdelar' | 'omvand' | 'motivering' | 'regler' | 'flaggor' | 'omdome' | 'granskning'> & {
+    kontonamn: string;
+    sakerhet: 'hog' | 'medel' | 'lag';
+    momshantering: string;
+  }) | null;
+  verifikation: { konto: string; kontonamn: string; belopp: number }[] | null;
+  /**
+   * Faktureringsmetoden: fakturan bokförs mot 2440/1500 på fakturadatumet
+   * (verifikation ovan) och betalningen för sig på betaldagen.
+   */
+  faktura?: { datum: string; betalning: { datum: string; rader: { konto: string; kontonamn: string; belopp: number }[] } } | null;
+  fel: string | null;
+  /** Byrån har godkänt en gul kontering som den är. */
+  godkand?: { at: string } | null;
+  /** Byrån har ändrat transaktionen i Flöde och bokfört den med sitt val (./prov redigeraProv). */
+  andrad?: { at: string } | null;
+  /** Transaktionen i bokföringen, när svaret skrivits dit (./skriv). */
+  transaktionId?: string;
+  /** Samma affär som något som redan finns: filen kopplades dit i stället för att bli en egen transaktion (./skriv). */
+  kopplad?: string;
+}
+
+export interface Preliminart { konto: string; kontonamn: string; nar: string }
+
+/** De preliminära kontona som går att bokföra på, en gång var. Tom när inget saknas. */
+export function preliminaraKonton(saknas: unknown[], konton: { konto?: unknown; nar?: unknown }[] | null | undefined): Preliminart[] {
+  if (!saknas.length) return [];
+  const ut: Preliminart[] = [];
+  for (const p of Array.isArray(konton) ? konton : []) {
+    const konto = String(p?.konto ?? '').trim();
+    if (!/^\d{4}$/.test(konto) || ut.some((x) => x.konto === konto)) continue;
+    const namn = kontonamn(konto);
+    if (!namn) continue;
+    ut.push({ konto, kontonamn: namn, nar: String(p?.nar ?? '').trim() });
+  }
+  return ut;
+}
+
+export interface GammalTransaktion {
+  id: string;
+  datum: string | null;
+  belopp: number;
+  valuta: string | null;
+  riktning: 'in' | 'ut';
+  motpart: string | null;
+  beskrivning: string | null;
+  dublett: boolean;
+  forslag: { modell: string; konto: string | null; momssats: number | null; omdome: string }[];
+  vald: string | null;
+  bokfort: string[];
+}
+
+export interface ResultatFil {
+  fil: string;
+  underlagId: string;
+  namn: string;
+  sort: string | null;
+  vad: string;
+  delAv: string;
+  transaktioner: ResultatTransaktion[];
+  gammalt: GammalTransaktion[];
+  /** Vad som hände med filen när svaret skrevs till bokföringen (./skriv). */
+  skrivet?: string;
+}
+
+export interface Resultat {
+  filer: ResultatFil[];
+  anteckningar: string[];
+  /** Det som inte stämde med svaret som helhet. */
+  kontroller: string[];
+  hoppade: Hoppad[];
+}
+
+const ore = (n: number) => Math.round(n * 100) / 100;
+export const kontonamn = (k: string) => slaUppKonto(k)?.namn ?? OMVAND_KONTONAMN[k] ?? (k === KORTSKULD ? KORTSKULD_NAMN : '');
+
+/** Fälten modellen lämnade tomma tas bort, så att uppgifterna ser ut som förut. */
+function rensaUppgifter(u: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(u ?? {}).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length)));
+}
+
+/**
+ * Kursen slås upp på valutakoden, så ett tecken som "$" eller "€" blir en kod.
+ * Ett ensamt dollartecken tolkas som USD — det vanligaste.
+ */
+function valutakod(v: string | null | undefined): string {
+  const s = (v || 'SEK').trim().toUpperCase();
+  return ({ $: 'USD', 'US$': 'USD', '€': 'EUR', '£': 'GBP', KR: 'SEK', 'KR.': 'SEK' } as Record<string, string>)[s] ?? s;
+}
+
+/** Betal- och momskonton säger inget om vad affären är. */
+const BETAL_OCH_MOMS = /^(1930|2013|2017|2890|2440|1500|26\d\d)$/;
+
+/** Det som redan finns för underlagen: transaktionerna, förslagen, valet och bokföringen. */
+export async function gamlaKonteringar(supabase: SupabaseClient, underlagIds: string[]): Promise<Map<string, GammalTransaktion[]>> {
+  const ut = new Map<string, GammalTransaktion[]>();
+  if (!underlagIds.length) return ut;
+  const { data: tx } = await supabase.from('transaktioner')
+    .select('id, underlag_id, radnr, datum, belopp, valuta, riktning, motpart, beskrivning, dublett_av, vald_kontering')
+    .in('underlag_id', underlagIds).order('radnr');
+  const ids = (tx ?? []).map((t) => t.id as string);
+  const [{ data: forslag }, { data: verif }] = ids.length
+    ? await Promise.all([
+      supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, omdome').in('transaktion_id', ids),
+      supabase.from('verifikationer').select('transaktion_id, verifikation_rader(konto, borttagen)').in('transaktion_id', ids),
+    ])
+    : [{ data: [] }, { data: [] }];
+  for (const t of tx ?? []) {
+    const bokfort = (verif ?? []).filter((v) => v.transaktion_id === t.id)
+      .flatMap((v) => ((v.verifikation_rader ?? []) as { konto: string; borttagen: boolean }[]).filter((r) => !r.borttagen && !BETAL_OCH_MOMS.test(r.konto)).map((r) => r.konto));
+    const rad: GammalTransaktion = {
+      id: t.id,
+      datum: t.datum,
+      belopp: Number(t.belopp),
+      valuta: t.valuta,
+      riktning: t.riktning,
+      motpart: t.motpart,
+      beskrivning: t.beskrivning,
+      dublett: !!t.dublett_av,
+      forslag: (forslag ?? []).filter((k) => k.transaktion_id === t.id).map((k) => ({ modell: k.modell, konto: k.konto, momssats: k.momssats, omdome: k.omdome })),
+      vald: (t.vald_kontering as { konto?: string } | null)?.konto ?? null,
+      bokfort: [...new Set(bokfort)],
+    };
+    ut.set(t.underlag_id, [...(ut.get(t.underlag_id) ?? []), rad]);
+  }
+  return ut;
+}
+
+/** En transaktion ur svaret, prövad som om den konterats ensam. */
+async function provaTransaktion(
+  supabase: SupabaseClient,
+  userId: string,
+  underlagId: string,
+  id: string,
+  nr: number,
+  s: SvarTransaktion,
+  kontext: Kontext,
+  finns: (ref: string) => { ok: boolean; transaktionId: string | null; verifikationId?: string | null },
+): Promise<ResultatTransaktion> {
+  const uppgifter = rensaUppgifter(s.uppgifter);
+  const ref = s.dublett.status === 'unik' ? null : finns(s.dublett.ref.trim().toUpperCase());
+  const bas = {
+    nr,
+    datum: /^\d{4}-\d{2}-\d{2}$/.test(s.datum) ? s.datum : null,
+    beskrivning: s.beskrivning,
+    motpart: s.motpart,
+    belopp: Math.abs(Number(s.belopp) || 0),
+    moms: Math.abs(Number(s.moms) || 0),
+    valuta: valutakod(s.valuta),
+    riktning: s.riktning,
+    vat_nummer: s.vat_nummer,
+    anteckning: s.anteckning,
+    uppgifter,
+    dublett: { ...s.dublett, transaktionId: ref?.transaktionId ?? null, verifikationId: ref?.verifikationId ?? null, refText: '' },
+    saknas: s.saknas ?? [],
+    preliminara: preliminaraKonton(s.saknas ?? [], s.preliminara_konton),
+    antaganden: s.antaganden,
+  };
+
+  let t: Transaktion = {
+    id,
+    user_id: userId,
+    customer_email: null,
+    underlag_id: underlagId,
+    datum: bas.datum,
+    beskrivning: bas.beskrivning || null,
+    motpart: bas.motpart || null,
+    belopp: bas.belopp,
+    moms: bas.moms || null,
+    valuta: bas.valuta,
+    riktning: bas.riktning,
+    anteckning: bas.anteckning || null,
+    detaljer: null,
+    vat_nummer: bas.vat_nummer || null,
+    uppgifter,
+    komplettering: null,
+    // En tveksam dubblett flaggas av konteringen själv
+    dublettkoll: s.dublett.status === 'tveksam' ? { status: 'tveksam', motivering: s.dublett.motivering, avFil: s.dublett.ref || null } : null,
+    tillrackligt: null,
+    kalla: 'underlag',
+    kronor: null,
+  };
+
+  if (!(bas.belopp > 0)) return { ...bas, kronor: null, kontering: null, verifikation: null, fel: 'Beloppet är 0 — inget att bokföra' };
+
+  try {
+    t = await raknaOmTillKronor(supabase, t, { spara: false });
+    const iKr = iKronor(t);
+    // Modellen gav delarna i underlagets valuta. Är transaktionen omräknad räknas de om med samma kurs.
+    const kurs = iKr.valuta === 'SEK' && t.valuta !== 'SEK' && t.kronor ? t.kronor.kurs : 1;
+    const beslut: Beslut = {
+      analys: '',
+      delar: s.kontering.delar.map((d) => ({ ...d, belopp: ore(d.belopp * kurs), moms: d.moms === null ? null : ore(d.moms * kurs) })),
+      momshantering: s.kontering.momshantering,
+      omvand_typ: s.kontering.omvand_typ,
+      sakerhet: s.kontering.sakerhet,
+      motivering: s.kontering.motivering,
+      regler: s.kontering.regler,
+      brutna_regler: s.kontering.brutna_regler,
+      granskning_kravs: s.kontering.granskning_kravs,
+    };
+    const k = konteringUrBeslut(iKr, kontext.betalsatt, beslut, kontext.regelIdn);
+
+    // Det som också hindrar grönt i omgången.
+    // Osäkerheten och granskningen blir en flagga med det modellen är osäker på, så att det syns i
+    // Flöde och följer med till mejlet om osäkra. Står osäkerheten redan under saknas behövs den inte,
+    // utom vid låg säkerhet.
+    const osakerPa = s.kontering.osaker_pa?.trim() ?? '';
+    const flaggor: Flagga[] = k.flaggor.filter((f) => f.typ !== 'osaker' && f.typ !== 'manuell-granskning');
+    const sak = s.kontering.sakerhet;
+    if ((sak !== 'hog' || s.kontering.granskning_kravs) && (osakerPa || !bas.saknas.length || sak === 'lag')) {
+      const rubrik = sak === 'lag' ? 'Modellens säkerhet: låg.' : sak === 'medel' ? 'Modellens säkerhet: medel.' : 'Kräver granskning enligt reglerna.';
+      flaggor.push({ typ: sak === 'hog' ? 'manuell-granskning' : 'osaker', allvar: 'granskning', text: osakerPa ? `${rubrik} ${osakerPa}` : rubrik });
+    }
+    if (bas.saknas.length) flaggor.push({ typ: 'saknas', allvar: 'granskning', text: `Saknas: ${bas.saknas.map((x) => x.vad).join(', ')}` });
+    if (s.dublett.status === 'dublett') flaggor.push({ typ: 'dublett', allvar: 'stopp', text: 'Samma affär som något som redan finns — filen kopplas dit och bokförs inte igen.' });
+    if (ref && !ref.ok) flaggor.push({ typ: 'dublett', allvar: 'granskning', text: 'Dubbletten pekar på en rad som inte finns.' });
+
+    let verifikation: ResultatTransaktion['verifikation'] = null;
+    let faktura: ResultatTransaktion['faktura'] = null;
+    let fel: string | null = null;
+    if (k.konto) {
+      try {
+        const plan = planeradeVerifikationer(t, k.konto, k.momssats ?? 0, kontext.betalsatt,
+          kontext.redovisningsmetod, undefined, k.momsdelar, k.omvand);
+        const visa = (rader: { konto: string; belopp: number }[]) => rader.map((r) => ({ konto: r.konto, kontonamn: kontonamn(r.konto), belopp: ore(r.belopp) }));
+        const rader = plan[0].rader;
+        verifikation = visa(rader);
+        if (plan[1]) faktura = { datum: plan[0].datum, betalning: { datum: plan[1].datum, rader: visa(plan[1].rader) } };
+        const summa = ore(rader.reduce((x, r) => x + r.belopp, 0));
+        if (Math.abs(summa) > 0.005) flaggor.push({ typ: 'balans', allvar: 'stopp', text: `Verifikationen går inte jämnt ut (${summa} kr).` });
+      } catch (err) {
+        fel = `Verifikationen gick inte att bygga: ${err instanceof Error ? err.message : err}`;
+        flaggor.push({ typ: 'verifikation', allvar: 'stopp', text: fel });
+      }
+    }
+
+    const omdome = flaggor.some((f) => f.allvar === 'stopp') ? 'rod' : flaggor.length ? 'gul' : 'gron';
+    return {
+      ...bas,
+      kronor: t.kronor,
+      kontering: {
+        konto: k.konto,
+        kontonamn: k.konto ? kontonamn(k.konto) : '',
+        momssats: k.momssats,
+        momsdelar: k.momsdelar,
+        omvand: k.omvand,
+        motivering: k.motivering,
+        regler: k.regler,
+        granskning: k.granskning,
+        flaggor,
+        omdome,
+        sakerhet: s.kontering.sakerhet,
+        momshantering: s.kontering.momshantering,
+      },
+      verifikation,
+      faktura,
+      fel,
+    };
+  } catch (err) {
+    return { ...bas, kronor: t.kronor, kontering: null, verifikation: null, fel: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Webbsökningen lägger ibland källor i texterna, som "([skatteverket.se](https://…?utm_source=openai))".
+ * De tas bort; en länk mitt i en mening blir sin text.
+ */
+function utanLankar<T>(v: T): T {
+  if (typeof v === 'string') {
+    return v
+      .replace(/\s*\(\[[^\]]*\]\([^)]*\)\)/g, '')
+      .replace(/\[([^\]]*)\]\(https?:[^)]*\)/g, '$1')
+      .replace(/\s*\(?https?:\/\/[^\s)]*[^\s).,;]\)?/g, '')
+      .trim() as T;
+  }
+  if (Array.isArray(v)) return v.map(utanLankar) as T;
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, utanLankar(x)])) as T;
+  return v;
+}
+
+/** Tolkar och prövar svaret för en del av omgången. */
+export async function provaSvar(
+  supabase: SupabaseClient,
+  userId: string,
+  filer: Filpost[],
+  svar: Svar,
+  kontext: Kontext,
+  hoppade: Hoppad[],
+): Promise<Resultat> {
+  svar = utanLankar(svar);
+  // Spärrarna i kontoreglerna prövas med byråns ändringar
+  await laddK1Andringar(supabase);
+  const kontroller: string[] = [];
+  // Grannsidorna (G1, G2 …) kan pekas på som sida eller dubblett men får inget eget svar — de läses i sin egen del
+  const perFil = new Map(filer.map((f) => [f.fil.toUpperCase(), f]));
+  const egna = filer.filter((f) => !f.granne);
+  const svarPerFil = new Map<string, Svar['filer'][number]>();
+  for (const f of svar.filer ?? []) {
+    const nr = String(f.fil ?? '').trim().toUpperCase();
+    if (perFil.get(nr)?.granne) continue;
+    if (!perFil.has(nr)) { kontroller.push(`Svaret har en fil ${f.fil} som inte skickades.`); continue; }
+    if (svarPerFil.has(nr)) { kontroller.push(`${nr} finns två gånger i svaret — den första gäller.`); continue; }
+    svarPerFil.set(nr, f);
+  }
+
+  const finns = (ref: string) => {
+    if (/^K\d+$/.test(ref)) return { ok: ref in kontext.kNummer, transaktionId: kontext.kNummer[ref] ?? null };
+    if (/^G\d+$/.test(ref)) return { ok: perFil.has(ref), transaktionId: null };
+    // En transaktion i en annan fil i omgången: "F3.2"
+    const rad = /^(F\d+)\.\d+$/.exec(ref);
+    if (rad) return { ok: perFil.has(rad[1]) && !perFil.get(rad[1])!.granne, transaktionId: null };
+    if (/^BOK\d+$/.test(ref)) return { ok: ref in (kontext.vNummer ?? {}), transaktionId: null, verifikationId: kontext.vId?.[ref] ?? null };
+    return { ok: false, transaktionId: null };
+  };
+
+  const gammalt = await gamlaKonteringar(supabase, egna.map((f) => f.underlagId));
+  const resultat: ResultatFil[] = [];
+  for (const f of egna) {
+    const s = svarPerFil.get(f.fil.toUpperCase());
+    if (!s) kontroller.push(`${f.fil} (${f.namn}) fick inget svar — skickas med nästa gång.`);
+    const delAv = (s?.del_av ?? '').trim().toUpperCase();
+    if (delAv && (!perFil.has(delAv) || delAv === f.fil.toUpperCase())) kontroller.push(`${f.fil} sägs vara en sida av ${s?.del_av}, som inte finns i omgången.`);
+    // Ett komplement (kontoutdrag, skattekontoutdrag …) kan också ge transaktioner
+    const medTx = s?.sort === 'underlag' || s?.sort === 'komplement';
+    if (s && !medTx && s.transaktioner.length) kontroller.push(`${f.fil} är sorterad som ${s.sort} men har transaktioner — de räknas inte.`);
+    if (s && delAv && s.transaktioner.length) kontroller.push(`${f.fil} är en sida av ${delAv} men har egna transaktioner — de räknas inte.`);
+
+    const tx = s && medTx && !delAv ? s.transaktioner : [];
+    const transaktioner = await Promise.all(tx.map((t, i) => provaTransaktion(supabase, userId, f.underlagId, `${f.fil}-${i + 1}`, i + 1, t, kontext, finns)));
+    resultat.push({
+      fil: f.fil,
+      underlagId: f.underlagId,
+      namn: f.namn,
+      sort: s?.sort ?? null,
+      vad: s?.vad ?? '',
+      delAv,
+      transaktioner,
+      gammalt: gammalt.get(f.underlagId) ?? [],
+    });
+  }
+  // Dubbletterna som byrån ser dem: den gamla transaktionen eller filen, inte ett radnummer
+  const refIds = [...new Set(resultat.flatMap((f) => f.transaktioner).map((t) => t.dublett.transaktionId).filter((x): x is string => !!x))];
+  const { data: refRader } = refIds.length
+    ? await supabase.from('transaktioner').select('id, datum, belopp, valuta, motpart, beskrivning').in('id', refIds)
+    : { data: [] };
+  const refPer = new Map((refRader ?? []).map((r) => [r.id as string, r]));
+  for (const t of resultat.flatMap((f) => f.transaktioner)) {
+    if (t.dublett.status === 'unik') continue;
+    const r = t.dublett.transaktionId ? refPer.get(t.dublett.transaktionId) : null;
+    const ref = t.dublett.ref.trim().toUpperCase();
+    const [filNr, radNr] = ref.split('.');
+    const fil = perFil.get(filNr);
+    const verifikation = kontext.vNummer?.[ref];
+    // En transaktion i en annan fil i omgången: just den raden, inte filen
+    const malRad = radNr && fil && !fil.granne
+      ? resultat.find((x) => x.underlagId === fil.underlagId)?.transaktioner.find((x) => x.nr === Number(radNr))
+      : undefined;
+    if (malRad && fil) { t.dublett.refUnderlag = fil.underlagId; t.dublett.refNr = malRad.nr; }
+    t.dublett.refText = r
+      ? `${r.datum ?? 'okänt datum'} ${Number(r.belopp)} ${r.valuta || 'SEK'} ${r.motpart || r.beskrivning || ''}`.trim()
+      : malRad && fil ? `${malRad.datum ?? 'okänt datum'} ${malRad.belopp} ${malRad.valuta || 'SEK'} ${malRad.motpart || malRad.beskrivning || ''} i filen ${fil.namn}`.replace(/\s+/g, ' ')
+        : fil ? `filen ${fil.namn}` : verifikation ? `verifikation ${verifikation}` : 'okänd rad';
+  }
+
+  return { filer: resultat, anteckningar: (svar.anteckningar ?? []).filter((a) => String(a).trim()), kontroller, hoppade };
+}

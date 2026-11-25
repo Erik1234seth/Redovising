@@ -1,0 +1,92 @@
+import { NextResponse } from 'next/server';
+import { createServerClient } from '@/lib/supabase-server';
+import { testKlient } from '@/lib/testflode/klient';
+import { underlagAttKora } from '@/lib/testflode/omgang/prov';
+import { antalIGranska } from '@/lib/testflode/omgang/korningar';
+import type { Provrad } from '@/lib/testflode/omgang/prov';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { FlodeKund } from '@/lib/admin-types';
+
+export const maxDuration = 60;
+
+/**
+ * TESTFLÖDE — kopia av /api/admin/flode. Samma kunder som i Flöde (de riktiga
+ * underlagen), men nya och granska räknas ur testtabellerna (@/lib/testflode/klient).
+ *
+ * Kunderna till Flöde i toppmenyn: alla med ett konto som skickat in underlag.
+ *
+ * GET → { kunder: FlodeKund[] }, sorterade på flest nya underlag, sedan flest
+ * att granska, sedan senast inskickat underlag. `nya` räknas som
+ * knappen "Kör nya" i Flöde gör (`underlagAttKora`): filer som aldrig körts,
+ * eller där kunden skickat något nytt sedan senaste körningen. `granska` är
+ * transaktionerna i fliken Granska, räknade ur samma körningar som Flöde visar
+ * (de 100 senaste raderna per kund, se /api/admin/kontering-prov).
+ */
+
+type Korningsrad = Pick<Provrad, 'korning' | 'status' | 'jamfor_med' | 'underlag_ids' | 'filer' | 'resultat'> & { user_id: string };
+
+/** Alla kunders körningar, nyast först, högst 100 rader per kund som i Flöde. */
+async function lasKorningar(supabase: SupabaseClient): Promise<Map<string, Korningsrad[]>> {
+  const ut = new Map<string, Korningsrad[]>();
+  for (let fran = 0; ; fran += 500) {
+    const { data, error } = await supabase.from('kontering_prov')
+      .select('user_id, korning, status, jamfor_med, underlag_ids, filer, resultat')
+      .is('jamfor_med', null).order('created_at', { ascending: false }).order('del').range(fran, fran + 499);
+    if (error) throw new Error(error.message);
+    for (const r of (data ?? []) as Korningsrad[]) {
+      const lista = ut.get(r.user_id) ?? [];
+      if (lista.length < 100) lista.push(r);
+      ut.set(r.user_id, lista);
+    }
+    if ((data ?? []).length < 500) return ut;
+  }
+}
+
+export async function GET() {
+  try {
+    const supabase = createServerClient();
+    const test = testKlient();
+    const { data: rader, error } = await supabase
+      .from('bokforing_underlag')
+      .select('user_id, created_at')
+      .not('user_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(20000);
+    if (error) throw new Error(error.message);
+
+    const perKund = new Map<string, { underlag: number; senast: string }>();
+    for (const r of rader ?? []) {
+      const k = perKund.get(r.user_id);
+      if (k) k.underlag += 1;
+      else perKund.set(r.user_id, { underlag: 1, senast: r.created_at });
+    }
+    const ids = [...perKund.keys()];
+    if (!ids.length) return NextResponse.json({ kunder: [] });
+
+    const [{ data: profiler }, nya, korningar] = await Promise.all([
+      supabase.from('profiles').select('id, email, full_name, company_name').in('id', ids),
+      Promise.all(ids.map((id) => underlagAttKora(test, id).then((l) => l.length).catch(() => 0))),
+      lasKorningar(test),
+    ]);
+    const profil = new Map((profiler ?? []).map((p) => [p.id, p]));
+
+    const kunder: FlodeKund[] = ids.map((userId, i) => {
+      const p = profil.get(userId);
+      const epost = p?.email?.trim().toLowerCase() || null;
+      return {
+        userId,
+        key: epost ? `e:${epost}` : null,
+        namn: p?.full_name?.trim() || p?.company_name?.trim() || epost || 'Okänd kund',
+        epost,
+        underlag: perKund.get(userId)!.underlag,
+        nya: nya[i],
+        granska: antalIGranska(korningar.get(userId) ?? []),
+        senast: perKund.get(userId)!.senast,
+      };
+    });
+    kunder.sort((a, b) => b.nya - a.nya || b.granska - a.granska || b.senast.localeCompare(a.senast));
+    return NextResponse.json({ kunder });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Internt fel' }, { status: 500 });
+  }
+}
