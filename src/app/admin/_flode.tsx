@@ -266,7 +266,11 @@ type Flik = 'transaktioner' | 'granska' | 'ovrigt' | 'underlag';
 /** Granska: allt, det som väntar på mer information, eller det som byrån själv ska avgöra. */
 type GranskaVy = 'alla' | 'pending' | 'avgora';
 
+/** Byråns egna anteckningar, efter transaktionens id. Bara för byrån — AI:n läser dem inte. */
+const Egna = createContext<Record<string, string>>({});
+
 const Atgarder = createContext<{
+  sparaAnteckning: (transaktionId: string, text: string) => Promise<void>;
   godkann: (plats: Plats, val: boolean) => Promise<void>;
   korOm: (text: string, underlagId: string, vilken: string) => Promise<void>;
   korOmFil: (underlagId: string) => Promise<void>;
@@ -281,6 +285,7 @@ export function Flode({ userId }: { userId: string }) {
   const [kopplingar, setKopplingar] = useState<Koppling[]>([]);
   const [pending, setPending] = useState<Record<string, PendingInfo>>({});
   const [gamla, setGamla] = useState<GammalFlodesTx[]>([]);
+  const [egnaAnteckningar, setAnteckningar] = useState<Record<string, string>>({});
   const [granskaVy, setGranskaVy] = useState<GranskaVy>('alla');
   const [laddfel, setLaddfel] = useState('');
   const [flik, setFlik] = useState<Flik | null>(null);
@@ -302,6 +307,7 @@ export function Flode({ userId }: { userId: string }) {
       setKopplingar(data.kopplingar ?? []);
       setPending(data.pending ?? {});
       setGamla(data.gamla ?? []);
+      setAnteckningar(data.anteckningar ?? {});
       setLaddfel('');
     } catch (err) {
       setLaddfel(err instanceof Error ? err.message : String(err));
@@ -531,7 +537,21 @@ export function Flode({ userId }: { userId: string }) {
     await ladda();
   }, [userId, ladda]);
 
-  const atgarder = useMemo(() => ({ godkann, korOm, korOmFil: (id: string) => korOmFiler([id]), redigera, radera }), [godkann, korOm, korOmFiler, redigera, radera]);
+  const sparaAnteckning = useCallback(async (transaktionId: string, text: string) => {
+    const res = await fetch('/api/admin/kontering-prov', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, egenAnteckning: { transaktionId, text } }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    setAnteckningar((e) => {
+      const ny = { ...e };
+      if (text.trim()) ny[transaktionId] = text.trim(); else delete ny[transaktionId];
+      return ny;
+    });
+  }, [userId]);
+
+  const atgarder = useMemo(() => ({ sparaAnteckning, godkann, korOm, korOmFil: (id: string) => korOmFiler([id]), redigera, radera }), [sparaAnteckning, godkann, korOm, korOmFiler, redigera, radera]);
 
   async function korValda() {
     setStartar(true);
@@ -604,6 +624,7 @@ export function Flode({ userId }: { userId: string }) {
 
   return (
     <Atgarder.Provider value={atgarder}>
+     <Egna.Provider value={egnaAnteckningar}>
      <Pending.Provider value={pending}>
       <div>
         <div className="flex gap-6 border-b border-slate-200 mb-4">
@@ -730,6 +751,7 @@ export function Flode({ userId }: { userId: string }) {
         )}
       </div>
      </Pending.Provider>
+     </Egna.Provider>
     </Atgarder.Provider>
   );
 }
@@ -791,6 +813,8 @@ function GammalKort({ post: { g, filer }, oppen, onKlick }: { post: GammalPost; 
   const a = useContext(Atgarder)!;
   const [startar, setStartar] = useState(false);
   const [fel, setFel] = useState('');
+  const [skriver, setSkriver] = useState(false);
+  const egen = useContext(Egna)[g.id];
   const konton = gamlaKonton(g);
   const status = g.bokfort.length ? 'Bokförd' : g.vald ? 'Byråns val' : g.forslag.length ? 'Förslag' : '';
 
@@ -827,6 +851,7 @@ function GammalKort({ post: { g, filer }, oppen, onKlick }: { post: GammalPost; 
             <span className="text-slate-400 text-xs">Inte konterad</span>
           )}
           {g.dublett && <span className="text-xs text-amber-700 whitespace-nowrap">Dubblett</span>}
+          {egen && <AnteckningsMarke text={egen} />}
           <span className="ml-auto text-xs text-slate-400 truncate max-w-[40%]">
             {filer[0]?.namn}{filer.length > 1 && <span className="ml-1 text-slate-500">+{filer.length - 1}</span>}
           </span>
@@ -865,12 +890,19 @@ function GammalKort({ post: { g, filer }, oppen, onKlick }: { post: GammalPost; 
               </div>
             </section>
           </div>
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button onClick={korOm} disabled={startar} className="border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-40">
-              {startar ? 'Skickar…' : 'Kör filen i Flöde'}
-            </button>
-            {fel && <span className="text-xs text-red-600">{fel}</span>}
-          </div>
+          {egen && !skriver && <EgenAnteckningText text={egen} />}
+          {skriver && <EgenAnteckning transaktionId={g.id} onStang={() => setSkriver(false)} />}
+          {!skriver && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button onClick={korOm} disabled={startar} className="border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-40">
+                {startar ? 'Skickar…' : 'Kör filen i Flöde'}
+              </button>
+              <button onClick={() => setSkriver(true)} className="border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-medium px-3 py-1.5 rounded-lg">
+                {egen ? 'Ändra anteckning' : 'Anteckning'}
+              </button>
+              {fel && <span className="text-xs text-red-600">{fel}</span>}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -902,6 +934,8 @@ function TxKort({ post: p, granska, oppen, onKlick }: { post: Post; granska: boo
   const kanGodkanna = !kopplad && k?.omdome === 'gul' && !t.godkand;
   const pending = useContext(Pending);
   const vantar = granska && t.transaktionId ? pending[t.transaktionId] : undefined;
+  const egna = useContext(Egna);
+  const egen = t.transaktionId ? egna[t.transaktionId] : undefined;
 
   async function godkann(val: boolean) {
     setSparar(true);
@@ -932,6 +966,7 @@ function TxKort({ post: p, granska, oppen, onKlick }: { post: Post; granska: boo
               {!granska && t.omkord?.lost && <span className="text-xs text-emerald-700 whitespace-nowrap">Löst med ny information</span>}
             </>
           )}
+          {egen && <AnteckningsMarke text={egen} />}
           <span className="ml-auto text-xs text-slate-400 truncate max-w-[40%]">
             {p.filnamn}{p.filer.length > 1 && <span className="ml-1 text-slate-500">+{p.filer.length - 1}</span>}
           </span>
@@ -970,8 +1005,10 @@ function TxDetaljer({ post: p, onAngra, onGodkann, sparar }: { post: Post; onAng
   const { t, gammal } = p;
   const k = t.kontering;
   const kopplad = arKopplad(t);
-  const [lage, setLage] = useState<'' | 'anteckna' | 'redigera' | 'radera'>('');
+  const [lage, setLage] = useState<'' | 'anteckna' | 'redigera' | 'radera' | 'egen'>('');
   const kanRedigera = !!t.transaktionId && !kopplad && t.dublett.status !== 'dublett';
+  const egna = useContext(Egna);
+  const egen = t.transaktionId ? egna[t.transaktionId] : undefined;
   const kanRadera = !!t.transaktionId && !kopplad;
   const gamla = gammal ? gamlaKonton(gammal) : [];
   const nyaKonton = k ? [...new Set([k.konto, ...(k.momsdelar ?? []).map((d) => d.konto)].filter((x): x is string => !!x))] : [];
@@ -1069,14 +1106,18 @@ function TxDetaljer({ post: p, onAngra, onGodkann, sparar }: { post: Post; onAng
         </section>
       </div>
 
+      {egen && lage !== 'redigera' && lage !== 'egen' && <EgenAnteckningText text={egen} />}
+
       {lage === 'anteckna' && <Anteckna post={p} onStang={() => setLage('')} />}
       {lage === 'redigera' && <Redigera post={p} onStang={() => setLage('')} />}
+      {lage === 'egen' && t.transaktionId && <EgenAnteckning transaktionId={t.transaktionId} onStang={() => setLage('')} />}
       {lage === 'radera' && <Radera plats={p.plats} radera={a.radera} onStang={() => setLage('')} />}
 
       {!lage && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <button onClick={() => setLage('anteckna')} className="border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-medium px-3 py-1.5 rounded-lg">Anteckna och kör om</button>
           {kanRedigera && <button onClick={() => setLage('redigera')} className="border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-medium px-3 py-1.5 rounded-lg">Redigera</button>}
+          {!kanRedigera && t.transaktionId && <button onClick={() => setLage('egen')} className="border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-medium px-3 py-1.5 rounded-lg">{egen ? 'Ändra anteckning' : 'Anteckning'}</button>}
           {onGodkann && (
             <button onClick={onGodkann} disabled={sparar}
               className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg disabled:opacity-40">
@@ -1148,7 +1189,8 @@ function Redigera({ post: p, onStang }: { post: Post; onStang: () => void }) {
   const a = useContext(Atgarder)!;
   const { t } = p;
   const k = t.kontering;
-  const [f, setF] = useState({
+  const egenFore = useContext(Egna)[t.transaktionId ?? ''] ?? '';
+  const [fore] = useState({
     datum: t.datum ?? '',
     beskrivning: t.beskrivning,
     motpart: t.motpart,
@@ -1156,14 +1198,20 @@ function Redigera({ post: p, onStang }: { post: Post; onStang: () => void }) {
     konto: k?.konto ?? '',
     momssats: String(Number(k?.momssats ?? k?.momsdelar?.[0]?.momssats ?? 0) || 0),
   });
+  const [f, setF] = useState(fore);
+  const [egen, setEgen] = useState(egenFore);
   const [sparar, setSparar] = useState(false);
   const [fel, setFel] = useState('');
   const satt = (falt: keyof typeof f) => (e: { target: { value: string } }) => setF((x) => ({ ...x, [falt]: e.target.value }));
+  // Bara anteckningen ändrad: den sparas, men inget bokförs om
+  const bokforingAndrad = (Object.keys(f) as (keyof typeof f)[]).some((x) => f[x] !== fore[x]);
+  const egenAndrad = egen.trim() !== egenFore.trim();
   async function spara() {
     setSparar(true);
     setFel('');
     try {
-      await a.redigera(p.plats, { ...f, belopp: Number(f.belopp.replace(/\s/g, '').replace(',', '.')), momssats: Number(f.momssats) });
+      if (egenAndrad && t.transaktionId) await a.sparaAnteckning(t.transaktionId, egen);
+      if (bokforingAndrad) await a.redigera(p.plats, { ...f, belopp: Number(f.belopp.replace(/\s/g, '').replace(',', '.')), momssats: Number(f.momssats) });
       onStang();
     } catch (err) {
       setFel(err instanceof Error ? err.message : String(err));
@@ -1187,10 +1235,65 @@ function Redigera({ post: p, onStang }: { post: Post; onStang: () => void }) {
             </select>
           </label>
         </div>
+        <label className={`${etikett} col-span-2`}>
+          Egen anteckning — bara för dig, AI:n läser den inte
+          <textarea value={egen} onChange={(e) => setEgen(e.target.value)} rows={2} className={falt} placeholder="T.ex. Kolla med kunden i januari" />
+        </label>
       </div>
       <div className="flex flex-wrap items-center gap-3 text-xs">
-        <button onClick={spara} disabled={sparar} className="bg-blue-600 text-white font-medium px-3 py-1.5 rounded-lg disabled:opacity-40">
-          {sparar ? 'Sparar…' : 'Spara och bokför'}
+        <button onClick={spara} disabled={sparar || (!bokforingAndrad && !egenAndrad)} className="bg-blue-600 text-white font-medium px-3 py-1.5 rounded-lg disabled:opacity-40">
+          {sparar ? 'Sparar…' : bokforingAndrad ? 'Spara och bokför' : 'Spara'}
+        </button>
+        <button onClick={onStang} className="text-slate-500 hover:text-slate-800">Avbryt</button>
+        {fel && <span className="text-red-600">{fel}</span>}
+      </div>
+    </div>
+  );
+}
+
+/** Märket på ett ihopfällt kort som har en egen anteckning. Texten syns när man håller över det. */
+function AnteckningsMarke({ text }: { text: string }) {
+  return <span title={text} className="text-xs text-slate-600 bg-slate-100 rounded-full px-2 py-px whitespace-nowrap">Anteckning</span>;
+}
+
+/** Den egna anteckningen i det utfällda kortet. */
+function EgenAnteckningText({ text }: { text: string }) {
+  return (
+    <section className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
+      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Egen anteckning</h4>
+      <p className="text-slate-700 whitespace-pre-wrap">{text}</p>
+    </section>
+  );
+}
+
+/** Bara den egna anteckningen, för kort som inte går att redigera (dubbletter, det gamla flödet). */
+function EgenAnteckning({ transaktionId, onStang }: { transaktionId: string; onStang: () => void }) {
+  const a = useContext(Atgarder)!;
+  const fore = useContext(Egna)[transaktionId] ?? '';
+  const [text, setText] = useState(fore);
+  const [sparar, setSparar] = useState(false);
+  const [fel, setFel] = useState('');
+  async function spara() {
+    setSparar(true);
+    setFel('');
+    try {
+      await a.sparaAnteckning(transaktionId, text);
+      onStang();
+    } catch (err) {
+      setFel(err instanceof Error ? err.message : String(err));
+      setSparar(false);
+    }
+  }
+  return (
+    <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/40 p-3">
+      <label className="flex flex-col gap-0.5 text-xs text-slate-500">
+        Egen anteckning — bara för dig, AI:n läser den inte
+        <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={2} placeholder="T.ex. Kolla med kunden i januari"
+          className="border border-slate-300 rounded-lg px-2 py-1 text-sm text-slate-900 bg-white" />
+      </label>
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <button onClick={spara} disabled={sparar || text.trim() === fore.trim()} className="bg-blue-600 text-white font-medium px-3 py-1.5 rounded-lg disabled:opacity-40">
+          {sparar ? 'Sparar…' : 'Spara'}
         </button>
         <button onClick={onStang} className="text-slate-500 hover:text-slate-800">Avbryt</button>
         {fel && <span className="text-red-600">{fel}</span>}

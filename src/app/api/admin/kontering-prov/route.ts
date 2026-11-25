@@ -16,6 +16,7 @@ import { korOmPending, pendingInfo } from '@/lib/kontering/pending';
  *           den senaste körningen (utanOmkorda). pending: transaktionerna som väntar på
  *           mer information, med om frågan skickats (@/lib/kontering/pending). gamla:
  *           transaktionerna från det gamla flödet i filer som aldrig körts i Flöde.
+ *           anteckningar: byråns egna anteckningar, efter transaktionens id.
  *   POST    starta en körning: { nya: true } tar allt som inte körts, { alla: true } allt
  *           som går att köra (Kör om alla), annars underlagIds.
  *           modell: 'gpt-6.2-sol' | 'claude-opus-5-5' (GPT om inget anges), och
@@ -30,6 +31,8 @@ import { korOmPending, pendingInfo } from '@/lib/kontering/pending';
  *           ändrar transaktionen och bokför den med byråns val.
  *           { hanterad: { underlagIds } } räknar underlagen som körda utan att läsa dem,
  *           och svarar med vad de hade förut; { aterstall: [{ id, flode_at }] } ångrar det.
+ *           { egenAnteckning: { transaktionId, text } } sparar byråns egen anteckning
+ *           på transaktionen. Den bokför inget och AI:n läser den inte; tom text tar bort den.
  *   DELETE  ta bort en körning ur listan (det bokförda ligger kvar)
  */
 
@@ -144,7 +147,7 @@ export async function GET(request: NextRequest) {
     await Promise.all(((vantande ?? []) as Provrad[]).map((r) => uppdateraProv(supabase, r).catch((err) =>
       console.error(`[admin/kontering-prov] ${r.id}:`, err instanceof Error ? err.message : err))));
 
-    const [{ data: rader, error }, { data: underlag, error: uFel }, attKora, allaAttKora, { data: kopplingar }, pending, gamla] = await Promise.all([
+    const [{ data: rader, error }, { data: underlag, error: uFel }, attKora, allaAttKora, { data: kopplingar }, pending, gamla, { data: egna, error: aFel }] = await Promise.all([
       supabase.from('kontering_prov').select(RAD_KOLUMNER).eq('user_id', userId).order('created_at', { ascending: false }).order('del').limit(100),
       supabase.from('bokforing_underlag').select('id, file_name, mime_type, created_at, sortering, sortering_orsak, del_av, flode_at, kund_svar_at')
         .eq('user_id', userId).order('created_at', { ascending: false }).limit(2000),
@@ -155,8 +158,10 @@ export async function GET(request: NextRequest) {
         .eq('user_id', userId).not('transaktion_id', 'is', null).limit(5000),
       pendingInfo(supabase, userId),
       gamlaFlodet(supabase, userId),
+      supabase.from('transaktioner').select('id, byrans_anteckning').eq('user_id', userId).not('byrans_anteckning', 'is', null).limit(5000),
     ]);
     if (error) throw new Error(error.message);
+    if (aFel) throw new Error(aFel.message);
     if (uFel) throw new Error(uFel.message);
 
     // Hur många transaktioner varje underlag har fått förut
@@ -175,6 +180,7 @@ export async function GET(request: NextRequest) {
       kopplingar: kopplingar ?? [],
       pending,
       gamla,
+      anteckningar: Object.fromEntries((egna ?? []).filter((t) => t.byrans_anteckning?.trim()).map((t) => [t.id, t.byrans_anteckning])),
     });
   } catch (err) {
     return fel(err);
@@ -277,11 +283,27 @@ export async function PATCH(request: NextRequest) {
     radera?: { id?: unknown; fil?: unknown; nr?: unknown }[];
     hanterad?: { underlagIds?: unknown };
     aterstall?: { id?: unknown; flode_at?: unknown }[];
+    egenAnteckning?: { transaktionId?: unknown; text?: unknown };
   };
   try {
     body = await request.json();
   } catch {
     return fel('Ogiltig JSON', 400);
+  }
+  // Byråns egen anteckning: sparas på transaktionen, inget annat ändras
+  if (body.userId && body.egenAnteckning) {
+    const { transaktionId, text } = body.egenAnteckning;
+    if (typeof transaktionId !== 'string' || !transaktionId) return fel('transaktionId saknas', 400);
+    const ren = typeof text === 'string' ? text.trim().slice(0, 4000) : '';
+    try {
+      const { data, error } = await getSupabase().from('transaktioner').update({ byrans_anteckning: ren || null })
+        .eq('id', transaktionId).eq('user_id', body.userId).select('id');
+      if (error) throw new Error(error.message);
+      if (!data?.length) return fel('Transaktionen finns inte längre — ladda om sidan', 404);
+      return NextResponse.json({ ok: true });
+    } catch (err) {
+      return fel(err);
+    }
   }
   // Underlag som byrån inte vill köra räknas som körda: de står inte längre som nya
   if (body.userId && body.hanterad) {

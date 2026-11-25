@@ -43,7 +43,7 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
 
   const [{ data: underlag, error: uFel }, { data: gamla, error: tFel }, { data: verUnderlag, error: vFel }] = await Promise.all([
     supabase.from('bokforing_underlag').select('id, user_id, sender_email, sortering, sortering_orsak').in('id', ids),
-    supabase.from('transaktioner').select('id, underlag_id, datum, belopp, valuta, riktning, motpart, beskrivning, fraga_utkast_id').in('underlag_id', ids),
+    supabase.from('transaktioner').select('id, underlag_id, datum, belopp, valuta, riktning, motpart, beskrivning, fraga_utkast_id, byrans_anteckning').in('underlag_id', ids),
     // Bara verifikationer som inte kommer från en transaktion — Flödes egna ersätts med transaktionerna
     supabase.from('verifikationer').select('underlag_id').in('underlag_id', ids).is('transaktion_id', null),
   ]);
@@ -110,6 +110,7 @@ export async function skrivResultat(supabase: SupabaseClient, userId: string, fi
 
   await kopplaUnderlag(supabase, userId, resultat, kopplingar, skrivna);
   await pekaOm(supabase, resultat, inkommande, gamla ?? [], kopplingar, skrivna);
+  await flyttaAnteckningar(supabase, userId, resultat, gamla ?? [], skrivna);
 
   // De gröna bokförs direkt
   for (const f of resultat.filer) {
@@ -282,6 +283,41 @@ async function sparaInstruktioner(
     await supabase.from('flodes_instruktioner').update({
       omfang: 'underlag', underlag_id: underlagId, transaktion_id: null, text: `Gäller transaktionen ${vilken}: ${i.text}`,
     }).eq('id', i.id);
+  }
+}
+
+/**
+ * Byråns egna anteckningar (transaktioner.byrans_anteckning) följer med när en
+ * fil körs om: till den nya transaktionen för samma affär — samma riktning och
+ * nästan samma belopp, som `sammaGamla` i Flöde — annars till filens första.
+ * Blev filen inga transaktioner alls finns ingenstans att lägga dem.
+ */
+async function flyttaAnteckningar(
+  supabase: SupabaseClient,
+  userId: string,
+  resultat: Resultat,
+  gamla: { id: string; underlag_id: string; belopp: number; riktning: string; byrans_anteckning: string | null }[],
+  skrivna: Set<string>,
+) {
+  const nya = new Map<string, string[]>();
+  for (const f of resultat.filer) {
+    if (!skrivna.has(f.underlagId)) continue;
+    const mal = f.transaktioner.filter((t) => t.transaktionId);
+    for (const g of gamla.filter((x) => x.underlag_id === f.underlagId && x.byrans_anteckning?.trim())) {
+      const t = mal.find((x) => x.riktning === g.riktning && Math.abs(x.belopp - Math.abs(Number(g.belopp))) <= 1) ?? mal[0];
+      if (!t) {
+        console.error(`[skriv] Anteckningen på ${g.id} fick ingen ny transaktion i ${f.namn}`);
+        continue;
+      }
+      nya.set(t.transaktionId!, [...(nya.get(t.transaktionId!) ?? []), g.byrans_anteckning!.trim()]);
+    }
+  }
+  for (const [id, texter] of nya) {
+    // En kopplad rad pekar på en transaktion som kan ha en egen anteckning sedan förut
+    const { data } = await supabase.from('transaktioner').select('byrans_anteckning').eq('id', id).eq('user_id', userId).maybeSingle();
+    const alla = [...new Set([data?.byrans_anteckning?.trim(), ...texter].filter((x): x is string => !!x))];
+    const { error } = await supabase.from('transaktioner').update({ byrans_anteckning: alla.join('\n\n') }).eq('id', id).eq('user_id', userId);
+    if (error) console.error(`[skriv] Kunde inte flytta anteckningen till ${id}:`, error.message);
   }
 }
 
