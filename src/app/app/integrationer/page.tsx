@@ -560,12 +560,14 @@ function BankKort({ meddela }: { meddela: Meddela }) {
     const resultat = new URLSearchParams(window.location.search).get('bank');
     if (resultat && BANK_RESULTAT[resultat]) {
       window.history.replaceState(null, '', window.location.pathname);
-      meddela(BANK_RESULTAT[resultat]);
       if (resultat === 'kopplad') {
+        // Rutan för första hämtningen säger att banken är kopplad, så ingen grön rad ovanpå
+        meddela(null);
         setForstaHamtning(true);
         laddaStatus().then(synka);
         return;
       }
+      meddela(BANK_RESULTAT[resultat]);
     }
     laddaStatus();
   }, [laddaStatus, synka, meddela]);
@@ -793,6 +795,8 @@ export default function IntegrationerPage() {
           </div>
         )}
 
+        <BankKort meddela={setMeddelande} />
+
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-extrabold text-lg" style={{ backgroundColor: NAV_BG }}>
@@ -866,8 +870,6 @@ export default function IntegrationerPage() {
         <ShopifyKort meddela={setMeddelande} />
 
         <WooKort meddela={setMeddelande} />
-
-        <BankKort meddela={setMeddelande} />
 
         {zettle?.kopplad && !utgangen && (
           <p className="text-xs text-slate-400 leading-relaxed px-1">
