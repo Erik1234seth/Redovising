@@ -7,7 +7,10 @@ import AppSidebar from './AppSidebar';
 import HjalpChat from './HjalpChat';
 
 // Fullskärmsflöden utan sidomeny (och utom den hårda låsningen)
-const BARE_PREFIXES = ['/auth', '/onboarding', '/betalning', '/valkommen'];
+const BARE_PREFIXES = ['/auth', '/onboarding', '/betalning', '/valkommen', '/koppla-bank'];
+// Sidor utan låsning. /koppla-bank är sidan vi länkar kunderna till om
+// bankkopplingen; den ska synas även utloggad och sköter inloggningen själv.
+const OPEN_PREFIXES = ['/auth', '/koppla-bank'];
 
 function hasActiveSubscription(status: string | null | undefined) {
   // 'invoice' = årskund som får tillgång direkt och faktureras i efterhand
@@ -28,11 +31,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
 
   const isBare = BARE_PREFIXES.some(p => pathname === p || pathname.startsWith(p + '/'));
-  const isAuthPath = pathname === '/auth' || pathname.startsWith('/auth/');
+  const isOpen = OPEN_PREFIXES.some(p => pathname === p || pathname.startsWith(p + '/'));
 
   // Hård låsning: styr obetalda/oonboardade till rätt steg
   useEffect(() => {
-    if (loading || isAuthPath) return;
+    if (loading || isOpen) return;
     if (!user) { router.replace('/auth/login'); return; }
     if (!profile) return;
 
@@ -47,7 +50,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         router.replace('/betalning');
       }
     }
-  }, [loading, isAuthPath, user, profile, pathname, router]);
+  }, [loading, isOpen, user, profile, pathname, router]);
 
   // Flödessidor renderas utan sidomeny
   if (isBare) return <>{children}</>;
