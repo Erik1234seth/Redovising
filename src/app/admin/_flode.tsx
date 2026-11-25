@@ -13,7 +13,9 @@ import { KontoLank } from './_k1-konto';
  *
  * Sedan 2026-11-22 visas resultatet i fyra flikar i stället för körning för
  * körning:
- *   Transaktioner — klart: gröna, godkända, ändrade och de som fanns förut
+ *   Transaktioner — klart: gröna, godkända, ändrade och de som fanns förut,
+ *                   och det gamla flödets transaktioner i filer som aldrig
+ *                   körts i Flöde (märkta "Gamla flödet")
  *   Granska       — det som behöver kollas, med mejlutkastet till kunden överst
  *   Övrigt        — filer som inte blev transaktioner
  *   Underlag      — alla filer, där enskilda kan köras om
@@ -107,6 +109,18 @@ interface Gammal {
   bokfort: string[];
 }
 
+/** En transaktion från det gamla flödet, ur en fil som aldrig körts i Flöde (se `gamlaFlodet` i API:t). */
+interface GammalFlodesTx extends Gammal {
+  underlagId: string;
+  valuta: string;
+  beskrivning: string;
+  motpart: string;
+  moms: number | null;
+}
+
+/** Den gamla transaktionen med sina filer: sin egen först, sedan de som Flöde kopplat dit. */
+interface GammalPost { g: GammalFlodesTx; filer: { id: string; namn: string }[] }
+
 interface Fil {
   fil: string;
   underlagId: string;
@@ -150,6 +164,7 @@ const MODELLVAL = { modell: 'gpt-6.2-sol', jamfor: false } as const;
 
 const VANTANDE = new Set(['forbereder', 'skickad', 'tar-emot']);
 const TID = new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const MODELL_NAMN: Record<string, string> = { 'gpt-6.2-sol': 'GPT-6.2 Sol', 'gpt-6.1-sol': 'GPT-6.1 Sol', 'gpt-6-astra': 'GPT-6 Astra', 'claude-opus-5-5': 'Claude Opus 5.5' };
 const SORT: Record<string, string> = { underlag: 'Underlag', kontoutdrag: 'Kontoutdrag', verifikationer: 'Redan bokfört', ovrigt: 'Övrigt', komplement: 'Komplement' };
 const OMDOME: Record<string, { prick: string; text: string }> = {
   gron: { prick: 'bg-emerald-400', text: 'Klar' },
@@ -265,6 +280,7 @@ export function Flode({ userId }: { userId: string }) {
   const [rader, setRader] = useState<Provrad[]>([]);
   const [kopplingar, setKopplingar] = useState<Koppling[]>([]);
   const [pending, setPending] = useState<Record<string, PendingInfo>>({});
+  const [gamla, setGamla] = useState<GammalFlodesTx[]>([]);
   const [granskaVy, setGranskaVy] = useState<GranskaVy>('alla');
   const [laddfel, setLaddfel] = useState('');
   const [flik, setFlik] = useState<Flik | null>(null);
@@ -285,6 +301,7 @@ export function Flode({ userId }: { userId: string }) {
       setRader(data.korningar);
       setKopplingar(data.kopplingar ?? []);
       setPending(data.pending ?? {});
+      setGamla(data.gamla ?? []);
       setLaddfel('');
     } catch (err) {
       setLaddfel(err instanceof Error ? err.message : String(err));
@@ -376,6 +393,18 @@ export function Flode({ userId }: { userId: string }) {
     }
     return { klaraRader, granskaRader };
   }, [poster]);
+
+  /** Det gamla flödets transaktioner, med filerna som Flöde kopplat till dem. */
+  const gamlaPoster = useMemo<GammalPost[]>(() => {
+    const namn = new Map((underlag ?? []).map((u) => [u.id, u.file_name]));
+    return gamla.map((g) => {
+      const filer = [{ id: g.underlagId, namn: namn.get(g.underlagId) ?? 'Fil' }];
+      for (const k of kopplingar) {
+        if (k.transaktion_id === g.id && !filer.some((f) => f.id === k.underlag_id)) filer.push({ id: k.underlag_id, namn: namn.get(k.underlag_id) ?? 'Fil' });
+      }
+      return { g, filer };
+    });
+  }, [gamla, kopplingar, underlag]);
 
   const ovriga = useMemo<OvrigFil[]>(() => {
     const m = new Map<string, OvrigFil>();
@@ -520,7 +549,7 @@ export function Flode({ userId }: { userId: string }) {
   if (laddfel && !underlag) return <p className="text-red-600 text-sm">{laddfel}</p>;
   if (!underlag) return <p className="text-slate-500 text-sm">Laddar…</p>;
 
-  const ar = [...new Set(poster.map((p) => Number(p.t.datum?.slice(0, 4))).filter((a) => a > 2000))].sort((a, b) => b - a);
+  const ar = [...new Set([...poster.map((p) => p.t.datum), ...gamla.map((g) => g.datum)].map((d) => Number(d?.slice(0, 4))).filter((a) => a > 2000))].sort((a, b) => b - a);
   const q = sok.trim().toLowerCase();
   const passarPost = (p: Post) => {
     if (period.fran && (!p.t.datum || p.t.datum < period.fran)) return false;
@@ -530,6 +559,12 @@ export function Flode({ userId }: { userId: string }) {
       .some((x) => x?.toLowerCase().includes(q));
   };
   const passar = (r: Rad) => r.some(passarPost);
+  const passarGammal = ({ g, filer: f }: GammalPost) => {
+    if (period.fran && (!g.datum || g.datum < period.fran)) return false;
+    if (period.tom && (!g.datum || g.datum > period.tom)) return false;
+    if (!q) return true;
+    return [g.beskrivning, g.motpart, f[0]?.namn, String(g.belopp), ...gamlaKonton(g)].some((x) => x?.toLowerCase().includes(q));
+  };
   const arPending = (r: Rad) => r.some((p) => !arKlar(p.t) && !!p.t.transaktionId && !!pending[p.t.transaktionId]);
   const pendingRader = granskaRader.filter(arPending);
   const visadeGranska = granskaRader.filter((r) => granskaVy === 'alla' || (granskaVy === 'pending') === arPending(r));
@@ -543,7 +578,7 @@ export function Flode({ userId }: { userId: string }) {
   const nyaSet = new Set(attKora);
 
   const FLIKAR: { id: Flik; namn: string; antal: number; farg: string }[] = [
-    { id: 'transaktioner', namn: 'Transaktioner', antal: antal(klaraRader), farg: 'bg-emerald-100 text-emerald-800' },
+    { id: 'transaktioner', namn: 'Transaktioner', antal: antal(klaraRader) + gamlaPoster.length, farg: 'bg-emerald-100 text-emerald-800' },
     { id: 'granska', namn: 'Granska', antal: antal(granskaRader), farg: 'bg-amber-100 text-amber-800' },
     { id: 'ovrigt', namn: 'Övrigt', antal: ovriga.length, farg: 'bg-slate-100 text-slate-600' },
     { id: 'underlag', namn: 'Underlag', antal: attKora.length, farg: 'bg-blue-100 text-blue-800' },
@@ -588,7 +623,8 @@ export function Flode({ userId }: { userId: string }) {
         {vald === 'transaktioner' && (
           <>
             {filterRad}
-            <Lista rader={klaraRader.filter(passar)} tom={klaraRader.length ? 'Inget matchar sökningen.' : 'Inga klara transaktioner än.'} />
+            <Lista rader={klaraRader.filter(passar)} gamla={gamlaPoster.filter(passarGammal)}
+              tom={klaraRader.length || gamlaPoster.length ? 'Inget matchar sökningen.' : 'Inga klara transaktioner än.'} />
           </>
         )}
 
@@ -721,21 +757,122 @@ function Tomt({ text }: { text: string }) {
 }
 
 /** Korten, ett i taget utfällt. Möjliga dubbletter står ihop i en ruta. */
-function Lista({ rader, granska = false, tom }: { rader: Rad[]; granska?: boolean; tom: string }) {
+function Lista({ rader, gamla = [], granska = false, tom }: { rader: Rad[]; gamla?: GammalPost[]; granska?: boolean; tom: string }) {
   const [oppen, setOppen] = useState<string | null>(null);
-  if (!rader.length) return <Tomt text={tom} />;
+  if (!rader.length && !gamla.length) return <Tomt text={tom} />;
+  const vaxla = (nyckel: string) => setOppen((o) => (o === nyckel ? null : nyckel));
   const kort = (p: Post) => (
-    <TxKort key={p.nyckel} post={p} granska={granska && !arKlar(p.t)} oppen={oppen === p.nyckel}
-      onKlick={() => setOppen((o) => (o === p.nyckel ? null : p.nyckel))} />
+    <TxKort key={p.nyckel} post={p} granska={granska && !arKlar(p.t)} oppen={oppen === p.nyckel} onKlick={() => vaxla(p.nyckel)} />
   );
-  return (
-    <div className="space-y-2">
-      {rader.map((r) => r.length === 1 ? kort(r[0]) : (
+  // Flödes egna och det gamla flödets transaktioner i samma lista, nyast först
+  const kortlista = [
+    ...rader.map((r) => ({
+      datum: r[0].t.datum ?? '',
+      el: r.length === 1 ? kort(r[0]) : (
         <div key={r[0].nyckel} className="rounded-xl border border-dashed border-amber-400 bg-amber-50/60 p-2 space-y-2">
           <p className="px-2 pt-0.5 text-xs font-medium text-amber-800">Möjlig dubblett — {r.length} rader som kan vara samma affär</p>
           {r.map(kort)}
         </div>
-      ))}
+      ),
+    })),
+    ...gamla.map((p) => ({
+      datum: p.g.datum ?? '',
+      el: <GammalKort key={`gammal|${p.g.id}`} post={p} oppen={oppen === `gammal|${p.g.id}`} onKlick={() => vaxla(`gammal|${p.g.id}`)} />,
+    })),
+  ].sort((a, b) => b.datum.localeCompare(a.datum));
+  return <div className="space-y-2">{kortlista.map((k) => k.el)}</div>;
+}
+
+/**
+ * En transaktion från det gamla flödet. Den har ingen plats i någon körning,
+ * så den går inte att godkänna eller redigera här — bara att köra om filen i Flöde.
+ */
+function GammalKort({ post: { g, filer }, oppen, onKlick }: { post: GammalPost; oppen: boolean; onKlick: () => void }) {
+  const a = useContext(Atgarder)!;
+  const [startar, setStartar] = useState(false);
+  const [fel, setFel] = useState('');
+  const konton = gamlaKonton(g);
+  const status = g.bokfort.length ? 'Bokförd' : g.vald ? 'Byråns val' : g.forslag.length ? 'Förslag' : '';
+
+  async function korOm() {
+    setStartar(true);
+    setFel('');
+    try {
+      await a.korOmFil(g.underlagId);
+    } catch (err) {
+      setFel(err instanceof Error ? err.message : String(err));
+      setStartar(false);
+    }
+  }
+
+  return (
+    <div className={`bg-white border rounded-xl transition ${oppen ? 'border-blue-300 shadow-sm' : 'border-slate-200 hover:border-slate-300'}`}>
+      <div role="button" tabIndex={0} onClick={onKlick} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onKlick(); } }}
+        className="px-4 py-3 cursor-pointer select-none">
+        <div className="flex items-baseline gap-3">
+          <span className="text-xs tabular-nums w-20 shrink-0 text-slate-500">{g.datum ?? 'utan datum'}</span>
+          <span className="truncate text-slate-700">{g.motpart || g.beskrivning || '—'}</span>
+          <Belopp t={g} />
+        </div>
+        <div className="flex items-center gap-2 mt-1 text-sm">
+          <span className="w-20 shrink-0" />
+          <span className="text-xs font-medium text-violet-800 bg-violet-100 rounded-full px-2 py-px whitespace-nowrap" title="Läst av det gamla flödet, före Flöde">Gamla flödet</span>
+          {konton.length ? (
+            <>
+              <Prick omdome={g.bokfort.length || g.vald ? 'gron' : g.forslag[0]?.omdome} />
+              <span className="text-slate-700 truncate">{konton.join(', ')}</span>
+              <span className="text-slate-400 text-xs whitespace-nowrap">{status}</span>
+            </>
+          ) : (
+            <span className="text-slate-400 text-xs">Inte konterad</span>
+          )}
+          {g.dublett && <span className="text-xs text-amber-700 whitespace-nowrap">Dubblett</span>}
+          <span className="ml-auto text-xs text-slate-400 truncate max-w-[40%]">
+            {filer[0]?.namn}{filer.length > 1 && <span className="ml-1 text-slate-500">+{filer.length - 1}</span>}
+          </span>
+        </div>
+      </div>
+      {oppen && (
+        <div className="border-t border-slate-200 px-4 py-4 space-y-4 text-sm">
+          <p className="text-slate-600">
+            Läst av det gamla flödet och aldrig körd i Flöde. Kör om filen här för att få den konterad, dubblettkollad och bokförd som de andra.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <section>
+              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Kontering i gamla flödet</h4>
+              {g.bokfort.length > 0 && <p className="text-slate-700">Bokförd på {g.bokfort.join(', ')}</p>}
+              {g.vald && <p className="text-slate-700">Byråns val: {g.vald}</p>}
+              {g.forslag.map((f, i) => (
+                <p key={i} className="flex items-center gap-2 text-slate-700">
+                  <Prick omdome={f.omdome} />
+                  {f.konto ?? 'Inget konto'}{f.momssats !== null ? ` · ${f.momssats} % moms` : ''}
+                  <span className="text-xs text-slate-400">{MODELL_NAMN[f.modell] ?? f.modell}</span>
+                </p>
+              ))}
+              {!konton.length && <p className="text-slate-400 text-xs">Inte konterad</p>}
+            </section>
+            <section className="text-slate-600 space-y-0.5">
+              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Uppgifter</h4>
+              {g.beskrivning && <p>{g.beskrivning}</p>}
+              {g.moms ? <p>Moms {kr.format(g.moms)}</p> : null}
+              <div className="pt-1">
+                <p className="text-xs text-slate-500">{filer.length === 1 ? 'Underlag' : `${filer.length} underlag`}</p>
+                <ul className="space-y-0.5">
+                  {filer.map((f) => (
+                    <li key={f.id}><a href={filLank(f.id)} target="_blank" rel="noreferrer" className="text-blue-700 hover:underline break-all">{f.namn}</a></li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button onClick={korOm} disabled={startar} className="border border-slate-300 hover:border-slate-400 text-slate-800 text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-40">
+              {startar ? 'Skickar…' : 'Kör filen i Flöde'}
+            </button>
+            {fel && <span className="text-xs text-red-600">{fel}</span>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -745,7 +882,7 @@ function Prick({ omdome }: { omdome: string | undefined }) {
   return <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${o?.prick ?? 'bg-slate-300'}`} title={o?.text} />;
 }
 
-function Belopp({ t }: { t: Tx }) {
+function Belopp({ t }: { t: Pick<Tx, 'riktning' | 'belopp' | 'valuta'> }) {
   return (
     <span className={`ml-auto tabular-nums font-medium whitespace-nowrap ${t.riktning === 'in' ? 'text-emerald-700' : 'text-slate-900'}`}>
       {t.riktning === 'in' ? '+' : '−'}{kr.format(t.belopp)}{t.valuta !== 'SEK' ? ` ${t.valuta}` : ''}

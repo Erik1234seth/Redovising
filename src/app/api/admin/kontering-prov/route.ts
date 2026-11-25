@@ -14,7 +14,8 @@ import { korOmPending, pendingInfo } from '@/lib/kontering/pending';
  *           kundens körningar. Delar som är skickade frågas efter hos leverantören,
  *           och klara svar prövas och skrivs. Underlag som körts om syns bara i
  *           den senaste körningen (utanOmkorda). pending: transaktionerna som väntar på
- *           mer information, med om frågan skickats (@/lib/kontering/pending).
+ *           mer information, med om frågan skickats (@/lib/kontering/pending). gamla:
+ *           transaktionerna från det gamla flödet i filer som aldrig körts i Flöde.
  *   POST    starta en körning: { nya: true } tar allt som inte körts, { alla: true } allt
  *           som går att köra (Kör om alla), annars underlagIds.
  *           modell: 'gpt-6.2-sol' | 'claude-opus-5-5' (GPT om inget anges), och
@@ -50,6 +51,89 @@ function fel(err: unknown, status = 500) {
 
 const RAD_KOLUMNER = 'id, created_at, user_id, korning, del, delar, status, modell, jamfor_med, underlag_ids, filer, varningar, openai_id, kontext, resultat, usage, kostnad_usd, uppskattade_tokens, fel, klar_at';
 
+/** Betalkonton och moms: de säger inget om vad affären bokförts som. */
+const BETAL_OCH_MOMS = /^(1930|2013|2017|2890|2440|1500|26\d\d)$/;
+
+/** En transaktion som det gamla flödet läste ut, ur en fil som aldrig körts i Flöde. */
+interface GammalFlodesTx {
+  id: string;
+  underlagId: string;
+  datum: string | null;
+  beskrivning: string;
+  motpart: string;
+  belopp: number;
+  moms: number | null;
+  valuta: string;
+  riktning: 'in' | 'ut';
+  dublett: boolean;
+  forslag: { modell: string; konto: string | null; momssats: number | null; omdome: string }[];
+  vald: string | null;
+  /** Kontona på verifikationen, utan betalkonto och moms. Tom om den inte bokförts. */
+  bokfort: string[];
+}
+
+/**
+ * Transaktionerna från det gamla flödet (flödesschemat, före 2026-11-07), så
+ * att de syns i Flöde bredvid de nya. Bara filer som aldrig körts klart i
+ * Flöde: när en fil körs där ersätts dess transaktioner av Flödes egna.
+ */
+async function gamlaFlodet(supabase: SupabaseClient, userId: string): Promise<GammalFlodesTx[]> {
+  const { data: korningar, error: kFel } = await supabase.from('kontering_prov').select('underlag_ids')
+    .eq('user_id', userId).eq('status', 'klar').is('jamfor_med', null).limit(5000);
+  if (kFel) throw new Error(kFel.message);
+  const korda = new Set((korningar ?? []).flatMap((k) => (k.underlag_ids ?? []) as string[]));
+
+  const tx: Record<string, unknown>[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from('transaktioner')
+      .select('id, underlag_id, datum, beskrivning, motpart, belopp, moms, valuta, riktning, dublett_av, vald_kontering')
+      .eq('user_id', userId).not('underlag_id', 'is', null)
+      .order('datum', { ascending: false }).order('id').range(from, from + 999);
+    if (error) throw new Error(error.message);
+    tx.push(...(data ?? []).filter((t) => !korda.has(t.underlag_id as string)));
+    if ((data ?? []).length < 1000) break;
+  }
+
+  const forslag = new Map<string, GammalFlodesTx['forslag']>();
+  const bokfort = new Map<string, Set<string>>();
+  const ids = tx.map((t) => t.id as string);
+  for (let i = 0; i < ids.length; i += 200) {
+    const del = ids.slice(i, i + 200);
+    const [{ data: k, error: kErr }, { data: v, error: vErr }] = await Promise.all([
+      supabase.from('konteringar').select('transaktion_id, modell, konto, momssats, omdome').in('transaktion_id', del),
+      supabase.from('verifikationer').select('transaktion_id, verifikation_rader(konto, borttagen)').in('transaktion_id', del),
+    ]);
+    if (kErr) throw new Error(kErr.message);
+    if (vErr) throw new Error(vErr.message);
+    for (const r of k ?? []) {
+      forslag.set(r.transaktion_id, [...(forslag.get(r.transaktion_id) ?? []), { modell: r.modell, konto: r.konto, momssats: r.momssats, omdome: r.omdome }]);
+    }
+    for (const r of v ?? []) {
+      const konton = bokfort.get(r.transaktion_id) ?? new Set<string>();
+      for (const rad of (r.verifikation_rader ?? []) as { konto: string; borttagen: boolean }[]) {
+        if (!rad.borttagen && !BETAL_OCH_MOMS.test(rad.konto)) konton.add(rad.konto);
+      }
+      bokfort.set(r.transaktion_id, konton);
+    }
+  }
+
+  return tx.map((t) => ({
+    id: t.id as string,
+    underlagId: t.underlag_id as string,
+    datum: (t.datum as string | null) ?? null,
+    beskrivning: (t.beskrivning as string | null) ?? '',
+    motpart: (t.motpart as string | null) ?? '',
+    belopp: Math.abs(Number(t.belopp) || 0),
+    moms: t.moms === null ? null : Number(t.moms),
+    valuta: (t.valuta as string | null) ?? 'SEK',
+    riktning: t.riktning === 'in' ? 'in' : 'ut',
+    dublett: !!t.dublett_av,
+    forslag: forslag.get(t.id as string) ?? [],
+    vald: (t.vald_kontering as { konto?: string } | null)?.konto ?? null,
+    bokfort: [...(bokfort.get(t.id as string) ?? [])],
+  }));
+}
+
 export async function GET(request: NextRequest) {
   const userId = request.nextUrl.searchParams.get('userId');
   if (!userId) return fel('userId saknas', 400);
@@ -60,7 +144,7 @@ export async function GET(request: NextRequest) {
     await Promise.all(((vantande ?? []) as Provrad[]).map((r) => uppdateraProv(supabase, r).catch((err) =>
       console.error(`[admin/kontering-prov] ${r.id}:`, err instanceof Error ? err.message : err))));
 
-    const [{ data: rader, error }, { data: underlag, error: uFel }, attKora, allaAttKora, { data: kopplingar }, pending] = await Promise.all([
+    const [{ data: rader, error }, { data: underlag, error: uFel }, attKora, allaAttKora, { data: kopplingar }, pending, gamla] = await Promise.all([
       supabase.from('kontering_prov').select(RAD_KOLUMNER).eq('user_id', userId).order('created_at', { ascending: false }).order('del').limit(100),
       supabase.from('bokforing_underlag').select('id, file_name, mime_type, created_at, sortering, sortering_orsak, del_av, flode_at, kund_svar_at')
         .eq('user_id', userId).order('created_at', { ascending: false }).limit(2000),
@@ -70,6 +154,7 @@ export async function GET(request: NextRequest) {
       supabase.from('underlag_kopplingar').select('underlag_id, transaktion_id')
         .eq('user_id', userId).not('transaktion_id', 'is', null).limit(5000),
       pendingInfo(supabase, userId),
+      gamlaFlodet(supabase, userId),
     ]);
     if (error) throw new Error(error.message);
     if (uFel) throw new Error(uFel.message);
@@ -89,6 +174,7 @@ export async function GET(request: NextRequest) {
       allaAttKora,
       kopplingar: kopplingar ?? [],
       pending,
+      gamla,
     });
   } catch (err) {
     return fel(err);
