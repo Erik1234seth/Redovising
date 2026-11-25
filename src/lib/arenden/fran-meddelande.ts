@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, parseJSON } from '@/lib/inmail/openai-client';
+import { arendenAiAv } from './brytare';
 
 /**
  * Läser ett inkommande mejl eller SMS och skapar ärenden för det vi behöver
@@ -47,6 +48,9 @@ export async function skapaArendenFranMeddelande(opts: {
   historik?: string;
   vartSvar?: string | null;
 }): Promise<void> {
+  // Avstängt: Claude skapar ärendena i stället, se brytare.ts
+  if (arendenAiAv()) return;
+
   try {
     const idag = new Date().toISOString().slice(0, 10);
     const delar = [

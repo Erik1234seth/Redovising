@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { callOpenAI, parseJSON } from '@/lib/inmail/openai-client';
 import { REPLY_RULES } from '@/lib/inmail/reply-rules';
 import { build, locate, type Built } from '@/lib/personer';
+import { arendenAiAv } from './brytare';
 
 /**
  * Kollar om öppna ärenden redan är gjorda, utifrån allt som hänt med personen
@@ -78,6 +79,9 @@ export async function kollaArenden(opts: {
 }): Promise<{ kollade: number; klara: number; osakra: number; mejl: number }> {
   const { supabase, skrivMejl = false } = opts;
   const resultat = { kollade: 0, klara: 0, osakra: 0, mejl: 0 };
+
+  // Avstängt: Claude kollar ärendena i stället, se brytare.ts
+  if (arendenAiAv()) return resultat;
 
   const { data: oppna, error } = await supabase.from('arenden')
     .select('id, titel, beskrivning, datum, person_key, created_at, ai_kollad_at, ai_utkast_id')
