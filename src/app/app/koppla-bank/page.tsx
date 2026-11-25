@@ -32,10 +32,30 @@ function Bock() {
   );
 }
 
+function LoggaIn({ text }: { text: string }) {
+  return (
+    <>
+      <p className="text-sm text-slate-500 mb-4">{text}</p>
+      <Link
+        href={`/auth/login?redirect=${encodeURIComponent(SIDAN)}`}
+        className="flex w-full items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm text-white transition hover:opacity-90"
+        style={{ backgroundColor: CORAL, boxShadow: `0 8px 20px ${CORAL}40` }}
+      >
+        Logga in och koppla
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </Link>
+    </>
+  );
+}
+
 function Koppla() {
   const [fel, setFel] = useState<string | null>(null);
   const [kopplade, setKopplade] = useState<string[]>([]);
-  const onFel = useCallback((text: string) => setFel(text), []);
+  const [utloggad, setUtloggad] = useState(false);
+  // En session som gått ut ser inloggad ut i webbläsaren men nekas av servern
+  const onFel = useCallback((text: string) => (text === 'Inte inloggad' ? setUtloggad(true) : setFel(text)), []);
 
   // Har kunden redan en bank kopplad säger vi det, så att ingen kopplar samma två gånger
   useEffect(() => {
@@ -43,6 +63,7 @@ function Koppla() {
     (async () => {
       const { data } = await createClient().auth.getSession();
       const res = await fetch('/api/bank', { headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` } });
+      if (res.status === 401 && !avbruten) setUtloggad(true);
       if (!res.ok || avbruten) return;
       const json = await res.json().catch(() => ({}));
       const namn = (json.kopplingar ?? []).map((k: { aspsp_name: string }) => k.aspsp_name);
@@ -51,8 +72,11 @@ function Koppla() {
     return () => { avbruten = true; };
   }, []);
 
+  if (utloggad) return <LoggaIn text="Du behöver logga in igen innan du kan välja bank." />;
+
   return (
     <div className="flex flex-col gap-4">
+      <p className="text-sm text-slate-500">Välj din bank och om det är ett företags- eller privatkonto.</p>
       {kopplade.length > 0 && (
         <p className="text-sm text-slate-600 rounded-xl px-4 py-3" style={{ backgroundColor: `${NAV_BG}08`, border: `1px solid ${NAV_BG}18` }}>
           Du har redan kopplat {kopplade.join(', ')}. Du kan koppla fler banker här eller se dina kopplingar under{' '}
@@ -108,24 +132,9 @@ export default function KopplaBankPage() {
                 <div className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : user ? (
-              <>
-                <p className="text-sm text-slate-500 mb-4">Välj din bank och om det är ett företags- eller privatkonto.</p>
-                <Koppla />
-              </>
+              <Koppla />
             ) : (
-              <>
-                <p className="text-sm text-slate-500 mb-4">Logga in på ditt konto hos oss först, så kommer du tillbaka hit och kan välja bank.</p>
-                <Link
-                  href={`/auth/login?redirect=${encodeURIComponent(SIDAN)}`}
-                  className="flex w-full items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm text-white transition hover:opacity-90"
-                  style={{ backgroundColor: CORAL, boxShadow: `0 8px 20px ${CORAL}40` }}
-                >
-                  Logga in och koppla
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </Link>
-              </>
+              <LoggaIn text="Logga in på ditt konto hos oss först, så kommer du tillbaka hit och kan välja bank." />
             )}
           </div>
 

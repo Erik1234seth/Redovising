@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
 import HjalpChat from './HjalpChat';
+
+const NAV_BG = '#173b57';
+const CORAL = '#E95C63';
 
 // Fullskärmsflöden utan sidomeny (och utom den hårda låsningen)
 const BARE_PREFIXES = ['/auth', '/onboarding', '/betalning', '/valkommen', '/koppla-bank'];
@@ -29,6 +32,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, profile, loading } = useAuth();
+  const [menyOppen, setMenyOppen] = useState(false);
 
   const isBare = BARE_PREFIXES.some(p => pathname === p || pathname.startsWith(p + '/'));
   const isOpen = OPEN_PREFIXES.some(p => pathname === p || pathname.startsWith(p + '/'));
@@ -60,8 +64,41 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (!profile.onboarding_done || !hasActiveSubscription(profile.subscription_status)) return <Loader />;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
-      <AppSidebar />
+    <div className="flex flex-col md:flex-row h-dvh overflow-hidden bg-slate-50">
+      {/* På mobilen ligger menyn bakom en knapp i en list överst */}
+      <header className="md:hidden flex items-center justify-between px-4 h-14 flex-shrink-0" style={{ backgroundColor: NAV_BG }}>
+        <span className="flex items-center gap-2.5">
+          <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: CORAL }}>
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </span>
+          <span className="text-[15px] leading-none tracking-tight">
+            <span className="text-white/55 font-medium">Enkla </span>
+            <span className="text-white font-extrabold">Bokslut</span>
+          </span>
+        </span>
+        <button
+          onClick={() => setMenyOppen(true)}
+          aria-label="Öppna menyn"
+          className="w-10 h-10 -mr-2 flex items-center justify-center rounded-lg text-white/80 hover:bg-white/10"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </header>
+
+      {menyOppen && <div className="md:hidden fixed inset-0 z-40 bg-black/40" onClick={() => setMenyOppen(false)} />}
+
+      {/* Ett klick på en länk i menyn stänger den på mobilen */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 flex transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${menyOppen ? 'translate-x-0' : '-translate-x-full'}`}
+        onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenyOppen(false); }}
+      >
+        <AppSidebar />
+      </div>
+
       <main className="flex-1 overflow-auto">
         {children}
       </main>

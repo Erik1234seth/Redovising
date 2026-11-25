@@ -782,13 +782,13 @@ export default function IntegrationerPage() {
 
   return (
     <div className="flex flex-col min-h-full bg-slate-50">
-      <div className="px-8 pt-12 pb-6">
+      <div className="px-4 sm:px-8 pt-8 sm:pt-12 pb-6">
         <p className="text-sm font-medium text-slate-400 mb-1">Integrationer</p>
         <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Koppla dina system</h1>
         <p className="text-slate-400 text-sm mt-2">Koppla din kassa, webbutik eller bank så hämtar vi uppgifterna automatiskt varje morgon.</p>
       </div>
 
-      <div className="px-8 pb-12 max-w-2xl flex flex-col gap-5">
+      <div className="px-4 sm:px-8 pb-12 max-w-2xl flex flex-col gap-5">
         {meddelande && (
           <div className={`rounded-xl px-4 py-3 text-sm font-medium ${meddelande.ok ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
             {meddelande.text}

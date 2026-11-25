@@ -38,7 +38,7 @@ export default function AppSidebar() {
 
   return (
     <aside
-      className="flex flex-col h-screen flex-shrink-0 overflow-x-hidden"
+      className="flex flex-col flex-shrink-0 overflow-x-hidden"
       style={{ width: '240px', backgroundColor: NAV_BG }}
     >
       {/* Logo */}
