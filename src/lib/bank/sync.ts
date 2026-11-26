@@ -96,13 +96,20 @@ function transaktionsrad(r: ReturnType<typeof rad>) {
   };
 }
 
-/** Sparar en ny session och dess konton. En äldre koppling mot samma bank ersätts. */
+/**
+ * Sparar en ny session och dess konton. En äldre koppling mot samma bank ersätts.
+ *
+ * Banken lämnar ofta ut alla kundens konton, så kunden väljer själv hos oss
+ * vilka vi läser. Ett konto vi sett förut behåller sitt val; ett nytt konto är
+ * valt bara om det är bankens enda. Svarar med antalet nya konton som väntar
+ * på kundens val.
+ */
 export async function sparaSession(
   supabase: SupabaseClient,
   userId: string,
   aspsp: { name: string; country: string },
   session: EbSession,
-) {
+): Promise<{ attValja: number }> {
   const { data: gamla } = await supabase
     .from('bank_kopplingar')
     .select('session_id')
@@ -128,14 +135,90 @@ export async function sparaSession(
     namn: k.name || k.details || k.product || null,
     valuta: k.currency ?? null,
   }));
+  let attValja = 0;
   if (konton.length) {
-    // synkad_till lämnas orörd, så ett omkopplat konto fortsätter där det var
-    const { error: kontoFel } = await supabase.from('bank_konton').upsert(konton);
-    if (kontoFel) throw new Error(`Kunde inte spara bankkontona: ${kontoFel.message}`);
+    const { data: kanda } = await supabase
+      .from('bank_konton')
+      .select('konto_hash')
+      .eq('user_id', userId)
+      .in('konto_hash', konton.map((k) => k.konto_hash));
+    const kandaHash = new Set((kanda ?? []).map((k) => k.konto_hash));
+    const nya = konton.filter((k) => !kandaHash.has(k.konto_hash));
+    const gamlaKonton = konton.filter((k) => kandaHash.has(k.konto_hash));
+
+    // synkad_till och vald lämnas orörda, så ett omkopplat konto fortsätter där det var
+    if (gamlaKonton.length) {
+      const { error: kontoFel } = await supabase.from('bank_konton').upsert(gamlaKonton);
+      if (kontoFel) throw new Error(`Kunde inte spara bankkontona: ${kontoFel.message}`);
+    }
+    if (nya.length) {
+      const ensamt = konton.length === 1;
+      const { error: kontoFel } = await supabase.from('bank_konton').insert(nya.map((k) => ({ ...k, vald: ensamt })));
+      if (kontoFel) throw new Error(`Kunde inte spara bankkontona: ${kontoFel.message}`);
+      if (!ensamt) attValja = nya.length;
+    }
   }
 
   const gamlaIdn = (gamla ?? []).map((g) => g.session_id);
   if (gamlaIdn.length) await supabase.from('bank_kopplingar').delete().in('session_id', gamlaIdn);
+  return { attValja };
+}
+
+/**
+ * Kunden väljer bort eller till ett konto. Bortvalt konto läses inte längre;
+ * med rensa tas dess hämtade rader bort också, utom de som redan bokförts
+ * (en verifikation raderas annars med raden).
+ */
+export async function valjKonto(
+  supabase: SupabaseClient,
+  userId: string,
+  kontoHash: string,
+  vald: boolean,
+  rensa = false,
+): Promise<{ borttagna: number; kvar: number }> {
+  const { data, error } = await supabase
+    .from('bank_konton')
+    .update({ vald })
+    .eq('user_id', userId)
+    .eq('konto_hash', kontoHash)
+    .select('konto_hash')
+    .maybeSingle();
+  if (error) throw new Error(`Kunde inte spara valet: ${error.message}`);
+  if (!data) throw new Error('Kontot finns inte');
+  if (vald || !rensa) return { borttagna: 0, kvar: 0 };
+
+  const ids: string[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data: rader, error: fel } = await supabase
+      .from('transaktioner')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('kalla', 'bank')
+      .eq('bank_konto_hash', kontoHash)
+      .range(from, from + 999);
+    if (fel) throw new Error(`Kunde inte läsa transaktionerna: ${fel.message}`);
+    ids.push(...(rader ?? []).map((r) => r.id));
+    if (!rader || rader.length < 1000) break;
+  }
+
+  const bokforda = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data: ver } = await supabase.from('verifikationer').select('transaktion_id').in('transaktion_id', ids.slice(i, i + 200));
+    for (const v of ver ?? []) if (v.transaktion_id) bokforda.add(v.transaktion_id);
+  }
+
+  const bort = ids.filter((id) => !bokforda.has(id));
+  for (let i = 0; i < bort.length; i += 200) {
+    const { error: fel } = await supabase.from('transaktioner').delete().in('id', bort.slice(i, i + 200));
+    if (fel) throw new Error(`Kunde inte ta bort transaktionerna: ${fel.message}`);
+  }
+  // Råraderna från banken behövs inte när inga bokförda rader finns kvar
+  if (!bokforda.size) {
+    await supabase.from('bank_transaktioner').delete().eq('user_id', userId).eq('konto_hash', kontoHash);
+  }
+  // Väljs kontot till igen hämtas allt på nytt; bokförda rader skrivs över, inte dubbelt
+  await supabase.from('bank_konton').update({ synkad_till: null }).eq('user_id', userId).eq('konto_hash', kontoHash);
+  return { borttagna: bort.length, kvar: bokforda.size };
 }
 
 async function synkaKonto(
@@ -229,7 +312,8 @@ export async function synkaBank(supabase: SupabaseClient, userId: string, { daga
       const { data: konton } = await supabase
         .from('bank_konton')
         .select('konto_hash, uid, synkad_till')
-        .eq('session_id', k.session_id);
+        .eq('session_id', k.session_id)
+        .eq('vald', true);
       for (const konto of konton ?? []) {
         if (konto.uid) transaktioner += await synkaKonto(supabase, userId, konto, dagarBakat);
       }

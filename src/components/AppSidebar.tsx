@@ -112,6 +112,17 @@ export default function AppSidebar() {
           Faktura & offert
         </Link>
 
+        {/* Integrationer: bank, kassa och webbutik */}
+        <Link
+          href="/integrationer"
+          className={`${navItemBase} ${pathname.startsWith('/integrationer') ? navItemActive : navItemInactive}`}
+        >
+          <svg className="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+          Bank & kopplingar
+        </Link>
+
         {/* Hjälp */}
         <div className="px-2 pt-3">
           <Link

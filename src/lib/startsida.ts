@@ -156,7 +156,8 @@ function tillBankrad(r: RadIn, egetKonto: string | null | undefined, kopplingar:
 
 async function kontonMedKopplingar(supabase: SupabaseClient, userId: string) {
   const [{ data: konton }, { data: kopplingar }] = await Promise.all([
-    supabase.from('bank_konton').select('konto_hash, session_id, iban, namn, valuta').eq('user_id', userId),
+    // Konton kunden valt bort hos Integrationer visas inte
+    supabase.from('bank_konton').select('konto_hash, session_id, iban, namn, valuta').eq('user_id', userId).eq('vald', true),
     supabase.from('bank_kopplingar').select('session_id, aspsp_name, status, senast_synkad_at').eq('user_id', userId),
   ]);
   const session = new Map((kopplingar ?? []).map((k) => [k.session_id, k]));
@@ -195,7 +196,8 @@ export async function bankoversikt(supabase: SupabaseClient, userId: string, ant
   const ordning = { aktiv: 0, utgangen: 1, borttagen: 2 };
   ut.sort((a, b) => ordning[a.status] - ordning[b.status] || b.antal - a.antal);
 
-  const kopplade = rader.filter((r) => kopplingar.has(bankNyckel(r.konto_hash, r.transaktion_id))).slice(0, antalSenaste);
+  const valda = new Set(konton.map((k) => k.konto_hash));
+  const kopplade = rader.filter((r) => valda.has(r.konto_hash) && kopplingar.has(bankNyckel(r.konto_hash, r.transaktion_id))).slice(0, antalSenaste);
   const egetKonto = new Map(konton.map((k) => [k.konto_hash, k.iban]));
   let senaste: Bankrad[] = [];
   if (kopplade.length) {

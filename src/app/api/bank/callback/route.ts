@@ -41,14 +41,17 @@ export async function GET(request: Request) {
     return tillbaka(request, 'fel', row?.tillbaka);
   }
 
+  let attValja = 0;
   try {
     const session = await skapaSession(code);
-    await sparaSession(supabase, row.user_id, { name: row.aspsp_name, country: row.aspsp_country }, session);
+    ({ attValja } = await sparaSession(supabase, row.user_id, { name: row.aspsp_name, country: row.aspsp_country }, session));
   } catch (err) {
     console.error('[bank/callback]', err);
     return tillbaka(request, 'fel', row.tillbaka);
   }
 
-  // Första hämtningen startar sidan, så att kunden ser att något händer
+  // Nya konton väntar på kundens val, och kryssrutorna finns på Integrationer.
+  // Annars startar sidan kunden kom från första hämtningen.
+  if (attValja) return tillbaka(request, 'valj');
   return tillbaka(request, 'kopplad', row.tillbaka);
 }

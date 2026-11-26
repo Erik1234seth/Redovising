@@ -406,6 +406,14 @@ function WooKort({ meddela }: { meddela: Meddela }) {
   );
 }
 
+interface BankKonto {
+  konto_hash: string;
+  iban: string | null;
+  namn: string | null;
+  valuta: string | null;
+  vald: boolean;
+}
+
 interface BankKoppling {
   session_id: string;
   aspsp_name: string;
@@ -414,7 +422,7 @@ interface BankKoppling {
   kopplad_at: string;
   senast_synkad_at: string | null;
   senaste_fel: string | null;
-  konton: { konto_hash: string; iban: string | null; namn: string | null; valuta: string | null }[];
+  konton: BankKonto[];
 }
 
 interface BankTransaktion {
@@ -478,6 +486,7 @@ function BankRad({ t, kontonamn }: { t: BankTransaktion; kontonamn: string | nul
 
 const BANK_RESULTAT: Record<string, { text: string; ok: boolean }> = {
   kopplad: { text: 'Banken är kopplad! Vi hämtar transaktionerna nu.', ok: true },
+  valj: { text: 'Banken är kopplad! Kryssa i de konton som hör till företaget, så hämtar vi bara dem.', ok: true },
   avbruten: { text: 'Bankkopplingen avbröts. Du kan försöka igen när du vill.', ok: false },
   fel: { text: 'Något gick fel när banken skulle kopplas. Försök igen.', ok: false },
 };
@@ -493,6 +502,11 @@ function synkMeddelande(data: { transaktioner?: number; nya?: number | null; tot
   return `Klart! ${nya}. Totalt ${tal(data.totalt)} transaktioner från banken.`;
 }
 
+function kontoText(a: BankKonto) {
+  const nr = a.iban?.replace(/\s/g, '');
+  return [a.namn, nr ? `•••• ${nr.slice(-4)}` : null].filter(Boolean).join(' · ') || 'Konto';
+}
+
 function formatBelopp(ore: number, valuta: string) {
   return (ore / 100).toLocaleString('sv-SE', { style: 'currency', currency: valuta || 'SEK' });
 }
@@ -505,6 +519,7 @@ function BankKort({ meddela }: { meddela: Meddela }) {
   const [visaAlla, setVisaAlla] = useState(false);
   /** Första hämtningen efter en ny koppling, som går längre bakåt och tar längre tid. */
   const [forstaHamtning, setForstaHamtning] = useState(false);
+  const [bortval, setBortval] = useState<BankKonto | null>(null);
   const startad = useRef(false);
 
   const laddaAlla = useCallback(async () => {
@@ -574,6 +589,35 @@ function BankKort({ meddela }: { meddela: Meddela }) {
 
   const kopplingsfel = useCallback((text: string) => meddela({ text, ok: false }), [meddela]);
 
+  async function valjKonto(a: BankKonto, vald: boolean, rensa = false) {
+    setBusy(a.konto_hash);
+    setBortval(null);
+    const res = await api('/api/bank', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ konto_hash: a.konto_hash, vald, rensa }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(null);
+    if (!res.ok) {
+      meddela({ text: data.error ?? 'Kunde inte spara valet.', ok: false });
+      return;
+    }
+    if (vald) {
+      // Hämta direkt, så kunden ser att kontot kom med
+      await laddaStatus();
+      synka();
+      return;
+    }
+    meddela({
+      text: rensa
+        ? `Vi läser inte längre ${kontoText(a)}. ${data.borttagna} hämtade transaktioner togs bort${data.kvar ? `, ${data.kvar} som redan bokförts ligger kvar` : ''}.`
+        : `Vi läser inte längre ${kontoText(a)}. Det som redan hämtats ligger kvar.`,
+      ok: true,
+    });
+    laddaStatus();
+  }
+
   async function kopplaBort(k: BankKoppling) {
     if (!window.confirm(`Koppla bort ${k.aspsp_name}? Transaktioner som redan hämtats ligger kvar.`)) return;
     setBusy(k.session_id);
@@ -603,6 +647,9 @@ function BankKort({ meddela }: { meddela: Meddela }) {
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-semibold text-slate-800 text-[15px]">Bankkonto</p>
             {aktiva.length > 0 && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Kopplad</span>}
+            {aktiva.some((k) => k.konton.length > 0 && !k.konton.some((a) => a.vald)) && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Välj konton</span>
+            )}
           </div>
           <p className="text-sm text-slate-400 mt-0.5 leading-snug">
             Vi läser kontots transaktioner varje morgon. Vi kan aldrig flytta pengar eller göra betalningar.
@@ -616,9 +663,51 @@ function BankKort({ meddela }: { meddela: Meddela }) {
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Behöver kopplas om</span>
                 )}
               </div>
-              <ul className="mt-1 text-sm text-slate-500">
+              {k.konton.length > 1 && (
+                <p className="mt-1 text-xs text-slate-400">Kryssa i de konton som hör till företaget. Vi läser bara dem.</p>
+              )}
+              <ul className="mt-2 flex flex-col gap-1">
                 {k.konton.map((a) => (
-                  <li key={a.konto_hash} className="truncate">{[a.namn, a.iban].filter(Boolean).join(' · ') || 'Konto'}</li>
+                  <li key={a.konto_hash}>
+                    <label className={`flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition ${busy === null ? 'cursor-pointer hover:bg-slate-50' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={a.vald}
+                        disabled={busy !== null || k.status !== 'aktiv'}
+                        onChange={(e) => (e.target.checked ? valjKonto(a, true) : setBortval(a))}
+                        className="w-4 h-4 rounded accent-[#173b57] flex-shrink-0"
+                      />
+                      <span className={`truncate ${a.vald ? 'text-slate-700' : 'text-slate-400'}`}>{kontoText(a)}</span>
+                      {busy === a.konto_hash && <span className="text-xs text-slate-400 flex-shrink-0">Sparar…</span>}
+                    </label>
+                    {bortval?.konto_hash === a.konto_hash && (
+                      <div className="ml-9 mt-1 mb-2 rounded-xl bg-slate-50 border border-slate-100 p-3">
+                        <p className="text-sm text-slate-600">Sluta läsa det här kontot. Vad ska hända med transaktionerna vi redan hämtat?</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            onClick={() => valjKonto(a, false, true)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition"
+                            style={{ backgroundColor: CORAL }}
+                          >
+                            Ta bort dem
+                          </button>
+                          <button
+                            onClick={() => valjKonto(a, false)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 transition"
+                          >
+                            Behåll dem
+                          </button>
+                          <button
+                            onClick={() => setBortval(null)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-600 transition"
+                          >
+                            Avbryt
+                          </button>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-400">Transaktioner som redan bokförts tas aldrig bort.</p>
+                      </div>
+                    )}
+                  </li>
                 ))}
               </ul>
               <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">

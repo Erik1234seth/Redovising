@@ -459,7 +459,7 @@ export default function KontoPage() {
         >
           <div>
             <h2 className="font-bold text-slate-800 mb-1">Integrationer</h2>
-            <p className="text-xs text-slate-400">Koppla Zettle så hämtas din försäljning automatiskt</p>
+            <p className="text-xs text-slate-400">Koppla bank, kassa eller webbutik så hämtas allt automatiskt</p>
           </div>
           <svg className="w-4 h-4 text-slate-300 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
