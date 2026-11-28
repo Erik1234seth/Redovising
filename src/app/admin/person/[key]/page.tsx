@@ -14,7 +14,6 @@ import { Rapporter } from '../../_rapporter';
 import { TransaktionsLista } from '../../_transaktioner';
 import { kanLasasAvAi } from '@/lib/underlag/filtyp';
 import { BokslutChecklista, bokslutPunkter, type UppladdningsPunkt } from '../../_bokslut';
-import { KonteringsVy } from '../../_kontering';
 import { MomsFil } from '../../_momsfil';
 import { Varningar } from '../../_varningar';
 import { NeBilaga } from '../../_ne';
@@ -42,7 +41,6 @@ const TABS = [
   { id: 'filer', label: 'Övriga filer' },
   { id: 'underlag', label: 'Underlag' },
   { id: 'transaktioner', label: 'Transaktioner' },
-  { id: 'kontering', label: 'Kontering' },
   { id: 'verifikationer', label: 'Verifikationer' },
   { id: 'huvudbok', label: 'Huvudbok' },
   { id: 'rapporter', label: 'Rapporter' },
@@ -52,7 +50,7 @@ const TABS = [
 type Tab = (typeof TABS)[number]['id'];
 
 /** Flikarna som ligger i Bokföring-menyn i stället för på raden. */
-const BOKFORING: Tab[] = ['underlag', 'transaktioner', 'kontering', 'verifikationer', 'huvudbok', 'rapporter', 'inlamning'];
+const BOKFORING: Tab[] = ['underlag', 'transaktioner', 'verifikationer', 'huvudbok', 'rapporter', 'inlamning'];
 
 export default function PersonPage() {
   const params = useParams<{ key: string }>();
@@ -68,9 +66,8 @@ export default function PersonPage() {
   const [transaktionerCount, setTransaktionerCount] = useState(0);
   const [transaktioner, setTransaktioner] = useState<AdminTransaktion[] | null>(null);
   const [transaktionerError, setTransaktionerError] = useState('');
-  // Filerna som är ikryssade för AI-avläsning, och vilken som läses just nu
+  // Filerna som är ikryssade för att laddas ner eller raderas
   const [valda, setValda] = useState<string[]>([]);
-  const [laser, setLaser] = useState<string | null>(null);
   // Ladda ner alla: hur långt zip-filen kommit, eller felet
   const [laddarNer, setLaddarNer] = useState('');
   const [mail, setMail] = useState<AdminMailMessage[]>([]);
@@ -170,8 +167,6 @@ export default function PersonPage() {
   }, [tab, transaktioner, transaktionerError, rawKey]);
 
   const selectTab = (next: Tab) => {
-    // Konteringen bokför verifikationer — de ska hämtas om nästa gång fliken öppnas
-    if (tab === 'kontering') setVerifikationer(null);
     setTab(next);
     history.replaceState(null, '', next === 'kontext' ? window.location.pathname : `#${next}`);
   };
@@ -443,40 +438,6 @@ export default function PersonPage() {
   };
 
   /**
-   * Läser av de ikryssade filerna med AI, en i taget. AI:n avgör per fil om
-   * det blir transaktioner eller — för ett redan bokfört underlag —
-   * verifikationer, så båda listorna hämtas om efteråt.
-   *
-   * Ett kontoutdrag på tjugo sidor tar en stund, och en fil som fallerar ska
-   * inte ta med sig de andra — därför ett anrop per fil, och felet skrivs på
-   * filen i stället för att stoppa körningen.
-   */
-  const lasUtTransaktioner = async () => {
-    if (laser || valda.length === 0) return;
-    setError('');
-    // Markerade filer som inte går att läsa (SIE, Excel) är markerade för att raderas
-    const filer = underlag.filter((f) => valda.includes(f.id) && kanLasasAvAi(f.fileName, f.mimeType));
-    if (filer.length === 0) return;
-    for (const [i, f] of filer.entries()) {
-      setLaser(filer.length > 1 ? `${f.fileName} (${i + 1}/${filer.length})` : f.fileName);
-      try {
-        const res = await fetch(`/api/admin/underlag/${f.id}/transaktioner`, { method: 'POST' });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || `${f.fileName} kunde inte läsas`);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : `${f.fileName} kunde inte läsas`);
-      }
-    }
-    setLaser(null);
-    setValda([]);
-    setTransaktioner(null);
-    setTransaktionerError('');
-    setVerifikationer(null);
-    setVerifikationerError('');
-    load();
-  };
-
-  /**
    * Stryker rader AI:n tagit med som inte hör hemma — en summarad, en dubblett
    * ur ett överlappande kontoutdrag. Antalet på filen räknas om i routen.
    */
@@ -643,11 +604,6 @@ export default function PersonPage() {
     }
   }
   const ovrigaFiler = underlag.filter((f) => f.sortering === 'ovrigt');
-
-  // SIE-filer läses med kod och hör hemma bland verifikationerna. De går att
-  // markera för att raderas, men AI-avläsningen hoppar över dem.
-  const lasbara = bokforingsfiler.filter((f) => kanLasasAvAi(f.fileName, f.mimeType));
-  const valdaLasbara = lasbara.filter((f) => valda.includes(f.id)).length;
 
   /** Radera med två klick — samma i underlagen och bland övriga filer. */
   const raderaKnapp = (id: string, disabled: boolean) => (confirmDelete === id ? (
@@ -1402,7 +1358,7 @@ export default function PersonPage() {
                 {bokforingsfiler.length > 0 && (
                   <button
                     onClick={() => setValda(valda.length === bokforingsfiler.length ? [] : bokforingsfiler.map((f) => f.id))}
-                    disabled={!!laser || !!raderar}
+                    disabled={!!raderar}
                     className="text-slate-500 hover:text-slate-700 text-xs transition disabled:opacity-40"
                   >
                     {valda.length === bokforingsfiler.length ? 'Avmarkera alla' : 'Markera alla'}
@@ -1428,23 +1384,13 @@ export default function PersonPage() {
                 ) : (
                   <button
                     onClick={() => setConfirmDelete('valda')}
-                    disabled={!!raderar || !!laser}
+                    disabled={!!raderar}
                     title="Radera de markerade filerna och allt som lästs ur dem"
                     className="px-3 py-1.5 text-xs bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-lg transition disabled:opacity-40"
                   >
                     Radera markerade ({valda.length})
                   </button>
                 ))}
-                {lasbara.length > 0 && (
-                  <button
-                    onClick={lasUtTransaktioner}
-                    disabled={valdaLasbara === 0 || !!laser || !!raderar}
-                    title="Låter en AI läsa filerna. Kvitton och kontoutdrag blir transaktioner. Redan bokförda underlag med konton blir verifikationer."
-                    className="px-3 py-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {laser ? 'Läser…' : `Läs av med AI${valdaLasbara ? ` (${valdaLasbara})` : ''}`}
-                  </button>
-                )}
                 {bokforingsfiler.length > 0 && (
                   <button
                     onClick={laddaNerAlla}
@@ -1479,12 +1425,6 @@ export default function PersonPage() {
                 <p className="text-red-600 text-xs mb-3">{laddarNer}</p>
               )}
 
-              {laser && (
-                <p className="text-blue-700 text-xs mb-3">
-                  AI:n läser {laser}… Ett stort kontoutdrag kan ta ett par minuter.
-                </p>
-              )}
-
               {bokforingsfiler.length === 0 ? (
                 <p className="text-slate-500 text-sm">
                   Inga underlag mejlade eller uppladdade än.{canUpload && ' Dra hit filer eller klicka på Ladda upp.'}
@@ -1496,12 +1436,10 @@ export default function PersonPage() {
                       <input
                         type="checkbox"
                         checked={valda.includes(f.id)}
-                        disabled={!!laser || !!raderar}
+                        disabled={!!raderar}
                         onChange={(e) => setValda((list) =>
                           e.target.checked ? [...list, f.id] : list.filter((id) => id !== f.id))}
-                        title={kanLasasAvAi(f.fileName, f.mimeType)
-                          ? 'Markera för att läsa av eller radera filen'
-                          : 'Markera för att radera filen — den här filtypen läser vi inte av med AI'}
+                        title="Markera för att ladda ner eller radera filen"
                         className="shrink-0 mt-1 accent-blue-600 disabled:opacity-30"
                       />
                       <span className="min-w-0 flex-1">
@@ -1623,14 +1561,14 @@ export default function PersonPage() {
                           onClick={() => (f.transaktioner?.antal || f.verifikationer?.inlagda
                             ? setBekraftaFlytt(f.id)
                             : flyttaFil(f.id, 'ovrigt'))}
-                          disabled={!!flyttar || !!laser}
+                          disabled={!!flyttar}
                           title="Inget underlag för bokföringen — flytta till Övriga filer. Det som lästs ut ur filen, och konteringen av det, tas bort."
                           className="text-slate-500 hover:text-slate-800 text-[11px] shrink-0 transition disabled:opacity-40"
                         >
                           Till övriga
                         </button>
                       ))}
-                      {raderaKnapp(f.id, !!laser)}
+                      {raderaKnapp(f.id, false)}
                     </li>
                   ))}
                 </ul>
@@ -1647,9 +1585,7 @@ export default function PersonPage() {
               <p className="text-slate-500 text-sm">Hämtar transaktionerna…</p>
             ) : transaktioner.length === 0 ? (
               <p className="text-slate-500 text-sm leading-relaxed">
-                Inga transaktioner utlästa än. Kryssa i filerna under Underlag och klicka på
-                &quot;Läs av med AI&quot; — AI:n läser av kvitton, fakturor, kontoutdrag
-                och Excel-listor.
+                Inga transaktioner utlästa än. Underlagen läses ut när kunden körs i Flöde.
               </p>
             ) : (
               <>
@@ -1659,17 +1595,6 @@ export default function PersonPage() {
                 </p>
                 <TransaktionsLista transaktioner={transaktioner} onDelete={raderaTransaktioner} />
               </>
-            )
-          )}
-
-          {/* Konteringen enligt K1: båda modellernas förslag per transaktion,
-              och det som bokförts. Kräver ett konto — kundkontexten och
-              betalsättet ligger på profilen. */}
-          {tab === 'kontering' && (
-            person.profileId ? (
-              <KonteringsVy userId={person.profileId} betalsatt={person.betalsatt} />
-            ) : (
-              <p className="text-slate-500 text-sm">Personen har inget konto än, så det finns inget att kontera.</p>
             )
           )}
 
@@ -1685,7 +1610,7 @@ export default function PersonPage() {
               <p className="text-slate-500 text-sm leading-relaxed">
                 Inga verifikationer än. När kunden mejlar in eller du laddar upp en SIE-fil läggs
                 verifikationerna in här automatiskt. En bokförd PDF eller Excel-export — verifikationslista,
-                grundbok, huvudbok — läses in med &quot;Läs av med AI&quot; under Underlag.
+                grundbok, huvudbok — läses in med Plocka verif i flödesschemat.
               </p>
             ) : (
               <>

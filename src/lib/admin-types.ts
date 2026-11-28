@@ -407,34 +407,6 @@ export interface AdminKontering {
   omdome: 'gron' | 'gul' | 'rod';
 }
 
-/** En transaktion i konteringsfliken: modellernas förslag och, när den bokförts, verifikationen. */
-export interface AdminKonteringRad {
-  id: string;
-  datum: string;
-  beskrivning: string;
-  motpart: string;
-  belopp: number;
-  moms: number | null;
-  valuta: string;
-  riktning: 'in' | 'ut';
-  kalla: string;
-  fileName: string | null;
-  /** Allt annat som stod om transaktionen på underlaget. */
-  detaljer: string;
-  /** Osäkerheter från avläsningen, svar från kunden och byråns ändringar och instruktioner. */
-  anteckning: string;
-  konteringar: AdminKontering[];
-  /** Kontot byrån valt för hand. Preliminärt tills det blir verifikation. */
-  vald: { konto: string; momssats: number; momsdelar: Momsdel[] | null; omvand: Omvand | null; motkonto: string | null } | null;
-  /** Dagen konteringen blir verifikation, när den är klar men inte bokförd. */
-  verifikationFran: string | null;
-  verifikation: {
-    id: string;
-    signatur: string | null;
-    rader: { konto: string; kontonamn: string | null; belopp: number }[];
-  } | null;
-}
-
 /** En period på inlämningssidan: deadline, om den är inlämnad och vad som ser fel ut. */
 export interface InlamningPeriod extends Deadlineperiod {
   /** Deadline har passerat utan att perioden markerats som inlämnad. */
